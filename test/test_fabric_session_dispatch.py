@@ -454,13 +454,22 @@ class Hooks(Base):
             self.assertIn(words, text)
         for previous in (None, "", "S-ABC", uuid.upper()):
             with self.subTest(previous=previous):
-                self.assertIn("the sessionId the clear replaced", cli.dispatch_cleared(previous))
+                self.assertIn("cannot name the session id the clear replaced", cli.dispatch_cleared(previous))
+                self.assertNotIn("replaying it exactly", cli.dispatch_cleared(previous))
         self.assertIn("the key the first accept used", cli.dispatch_cleared(uuid))
         # 0.63.0 unit reading 15: the owner with no launcher named, the conflict's ending, and a pending accept with no
         # handoff known that presumes no first accept's key
         self.assertIn("the owner `agent:<name>` step 2 names and no executor", cli.dispatch_cleared(uuid))
         # 0.63.0 product reading 16: a pending accept takes the owner from step 2, never the lease's holder
-        self.assertNotIn("holder` in", cli.dispatch_cleared(uuid, HANDOFF).split("still shows the handoff pending")[1])
+        pending = cli.dispatch_cleared(uuid, HANDOFF).split("still shows the handoff pending")[1]
+        self.assertNotIn("holder", pending)
+        # 0.63.0 unit reading 17: the owner's fallback, the scope of the lease reading, and a pending key from step 2
+        self.assertIn("else `agent:<name>`", pending)
+        self.assertIn("Once the handoff is taken (neither pending nor lapsed)", cli.dispatch_cleared(uuid, HANDOFF))
+        self.assertIn("the key `accept-%s` when Switchboard started the run, else one of its own" % HANDOFF, pending)
+        tail = cli.dispatch_cleared(uuid).split("still shows the handoff pending")[1]
+        self.assertIn("an idempotencyKey of its own", tail)
+        self.assertNotIn("first accept used", tail)
         self.assertIn("(when it names none: your `owner` `agent:<name>`, a key of your own, no executor)",
                       cli.dispatch_contract(FULL), "step 2's fallback, which the notices point at (unit reading 16)")
         self.assertIn("the `owner`, `idempotencyKey` and `executor` the launcher's prompt names", cli.dispatch_contract(FULL))
@@ -560,9 +569,12 @@ class Hooks(Base):
         for previous in (None, ""):
             with self.subTest(previous=previous):
                 text = cli.dispatch_cleared(previous, HANDOFF, new)
-                self.assertIn("with that key, the owner `agent:<provider>`", text)
+                self.assertIn("with the key `accept-%s` when Switchboard started the run, else one of its own, the "
+                              "owner `agent:<provider>`" % HANDOFF, text)
                 self.assertIn("this session's own sessionId (%s)" % new, text)
-                self.assertIn("`accept-%s`" % HANDOFF, text.split("no accept was made")[0])
+                # 0.63.0 product reading 17: nothing to replay is said first, and a lapsed handoff ends the run
+                self.assertTrue(text.index("cannot be replayed") < text.index("still shows the handoff pending"))
+                self.assertIn("When it shows the handoff lapsed, no accept was made and none can be", text)
                 self.assertIn("end the run without touching the request", text)
                 self.assertNotIn("Never accept it under the new id", text)
         self.assertNotIn("(", cli.dispatch_cleared(None, None, "not-a-uuid").split("own sessionId")[1].split(".")[0])

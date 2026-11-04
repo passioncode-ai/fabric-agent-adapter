@@ -148,19 +148,22 @@ session keeps the contract (the record moves to the new session id). A holder th
 the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
 so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,
-`accept-<handoff>`), the same `owner` and the `executor` as the first accept passed them. Once the handoff is no
-longer pending, the lease `observatory_checkpoint_latest` shows is that accept's and survives the clear: its `holder`
+`accept-<handoff>`), the same `owner` and the `executor` as the first accept passed them. Once the handoff is taken
+(neither pending nor lapsed), the lease `observatory_checkpoint_latest` shows is that accept's and survives the clear: its `holder`
 is the first accept's owner, and its `executor` merges the offer (a provider only, Fabric's spec 3.5) with what was
 passed, so it is the passed executor when it carries an `accountRef`, and the first accept passed none when it shows
 a provider alone. A new accept under the new id is refused, and so is a replay with another owner or executor; after
 any refused replay the session ends the run without touching the request and Fabric takes the workflow over. When
 `observatory_checkpoint_latest` still shows the handoff pending, no accept was made and the lease it shows is
 Fabric's own (the workflow's creator, or its `restart` hand-over to `service:fabric`), not the run's: the holder
-accepts it now under that same `sessionId` and key, with the owner step 2 names (`agent:<provider>`, such as
-`agent:claude-code`, when Switchboard started the run, else `agent:<name>`) and no executor, since the launcher's
-prompt is gone, so a later `/clear`, which names the same id, replays it with no executor. When
+accepts it now under that same `sessionId`, with the key and owner step 2 names (`accept-<handoff>` and
+`agent:<provider>`, such as `agent:claude-code`, when Switchboard started the run, else a key of its own and
+`agent:<name>`) and no executor, since the launcher's prompt is gone, so a later `/clear`, which names the same id,
+replays it with no executor; the lease then records the provider alone, not the account Switchboard chose (Fabric's
+spec 3.5 has the session narrow it; nothing reads the account yet). A lapsed handoff (`lapsedHandoff`) was never
+accepted and no longer can be: the session ends the run without touching the request. When
 the hooks cannot name the replaced id (no readable record, or Windows, where any `/clear` takes the record and the
-hooks name no id), the notice gives the new id instead: a pending handoff is accepted under it, and the next `/clear`
+hooks name no id), the notice says first that nothing can be replayed and gives the new id: a pending handoff is accepted under it, and the next `/clear`
 names it, except on Windows, where it names no id either, so an accept made there cannot be replayed after another
 `/clear`. An accept already made under an id the hooks could not name cannot be replayed, so the session ends the run
 without touching the request, and Fabric takes the workflow over after it (step 4). Any other session gets one line in place of the

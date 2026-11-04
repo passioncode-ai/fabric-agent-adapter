@@ -567,10 +567,10 @@
       "request": "FABRIC_DISPATCH_WORKFLOW is set and you were just cleared; the hook names the session id the clear replaced. What do you do about the lease?",
       "expected": [
         "replays the accept with the named sessionId, the same idempotencyKey (accept-<handoff> when Switchboard started the run), the same owner and the executor the first accept passed",
-        "when observatory_checkpoint_latest still shows the handoff pending, accepts it under that same named sessionId, key, owner and executor",
         "never makes a new accept under the new session id",
         "on a replay Observatory refuses, ends the run without touching the request and leaves the workflow to Fabric",
-        "when the handoff is still pending, accepts it under the named sessionId with the owner step 2 names and no executor, never the owner of the lease Fabric holds"
+        "when the handoff is still pending, accepts it under the named sessionId with the owner step 2 names and no executor, never the owner of the lease Fabric holds",
+        "when the handoff lapsed (no accept was made and none can be), ends the run without touching the request"
       ]
     },
     {

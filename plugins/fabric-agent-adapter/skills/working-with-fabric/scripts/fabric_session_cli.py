@@ -213,39 +213,47 @@ DISPATCH_SESSION = " This session's sessionId: {session}."
 #: or its restart hand-over to service:fabric), never the run's (0.63.0 product reading 16).
 DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, and its leaseId comes back only by "
                     "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` and the "
-                    "`executor` as the first accept passed them. Once the handoff is no longer pending, the lease "
-                    "`observatory_checkpoint_latest` shows is that accept's: its `holder` is the owner, and its "
-                    "`executor` the one passed when it carries an `accountRef`, none when it shows a provider alone. "
-                    "A replay Observatory refuses gets no lease back: end the run without touching the request; Fabric "
-                    "takes the workflow over after it. When `observatory_checkpoint_latest` still shows the handoff "
-                    "pending, no accept was made and the lease it shows is Fabric's, not this run's: {pending}")
-_CLEARED_UNKNOWN = "the sessionId the clear replaced"
-_PENDING_NAMED = ("accept it now with that same sessionId, that key, the owner {owner} and no executor (the launcher's "
+                    "`executor` as the first accept passed them. Once the handoff is taken (neither pending nor "
+                    "lapsed), the lease `observatory_checkpoint_latest` shows is that accept's: its `holder` is the "
+                    "owner, and its `executor` the one passed when it carries an `accountRef`, none when it shows a "
+                    "provider alone. A replay Observatory refuses gets no lease back: end the run without touching "
+                    "the request; Fabric takes the workflow over after it.{tail}")
+#: With the replaced id unknown there is nothing to replay: the notice says so first (0.63.0 product reading 17).
+DISPATCH_CLEARED_UNKNOWN = (" This session was cleared, and these hooks cannot name the session id the clear "
+                            "replaced: an accept already made under it cannot be replayed, so when "
+                            "`observatory_checkpoint_latest` shows the handoff taken, end the run without touching the "
+                            "request; Fabric takes the workflow over after it.{tail}")
+#: A pending handoff's lease is Fabric's; a lapsed one (`lapsedHandoff`) was never accepted and no longer can be.
+_CLEARED_TAIL = (" When it shows the handoff lapsed, no accept was made and none can be: end the run the same way. When "
+                 "`observatory_checkpoint_latest` still shows the handoff pending, no accept was made and the lease it "
+                 "shows is Fabric's, not this run's: {pending}")
+_PENDING_NAMED = ("accept it now with that same sessionId, {pkey}, the owner {owner} and no executor (the launcher's "
                   "prompt is gone). Never accept it under the new id.")
 _PENDING_WINDOWS = " On Windows a later /clear names no id either: an accept made now cannot be replayed after it."
 _PENDING_UNKNOWN = ("accept it as step 2 says, with {pkey}, the owner {owner}, no executor and this session's own "
-                    "sessionId{session}. An accept already made under an id these hooks could not name cannot be "
-                    "replayed: end the run without touching the request; Fabric takes the workflow over after it.")
+                    "sessionId{session}.")
 
 
 def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None) -> str:
     """The cleared holder's notice: replay under the id the clear replaced when it is known, and accept a pending
-    handoff under that same id; when it is not known, a pending handoff is accepted under this session's id. A pending
-    accept takes its owner and key from step 2, never from the lease, which is Fabric's until the handoff is taken."""
+    handoff under that same id; when it is not known, nothing can be replayed and a pending handoff is accepted under
+    this session's id. A pending accept takes its owner and key from step 2, never from the lease, which is Fabric's
+    until the handoff is taken."""
     named = isinstance(previous, str) and _SESSION_UUID.fullmatch(previous)
     switchboard = isinstance(handoff, str) and bool(handoff)
     key = "`accept-%s` when Switchboard started the run" % handoff if switchboard else "the key the first accept used"
     owner = ("`agent:<provider>` (such as `agent:claude-code`) when Switchboard started the run, else `agent:<name>`"
              if switchboard else "`agent:<name>` step 2 names")
+    # a pending accept's key is step 2's, never "the first accept's": none was made (0.63.0 unit reading 17)
+    pkey = "the key `accept-%s` when Switchboard started the run, else one of its own" % handoff if switchboard else (
+        "an idempotencyKey of its own")
     if named:
-        pending = _PENDING_NAMED.format(owner=owner)
-    else:
-        own = isinstance(session_id, str) and _SESSION_UUID.fullmatch(session_id)
-        pending = _PENDING_UNKNOWN.format(pkey="that key" if switchboard else "an idempotencyKey of its own",
-                                          owner=owner, session=" (%s)" % session_id if own else "") + (
-            _PENDING_WINDOWS if _WINDOWS else "")
-    return DISPATCH_CLEARED.format(session="sessionId %s" % previous if named else _CLEARED_UNKNOWN, key=key,
-                                   pending=pending)
+        tail = _CLEARED_TAIL.format(pending=_PENDING_NAMED.format(pkey=pkey, owner=owner))
+        return DISPATCH_CLEARED.format(session="sessionId %s" % previous, key=key, tail=tail)
+    own = isinstance(session_id, str) and _SESSION_UUID.fullmatch(session_id)
+    pending = _PENDING_UNKNOWN.format(pkey=pkey, owner=owner, session=" (%s)" % session_id if own else "") + (
+        _PENDING_WINDOWS if _WINDOWS else "")
+    return DISPATCH_CLEARED_UNKNOWN.format(tail=_CLEARED_TAIL.format(pending=pending))
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
