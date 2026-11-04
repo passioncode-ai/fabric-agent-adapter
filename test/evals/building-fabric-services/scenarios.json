@@ -290,7 +290,8 @@
         "on Windows writes a per-user task with task_xml / taskXml (logon trigger, restart on failure every minute, no execution time limit, IgnoreNew, least privilege) and installs it with task_install / taskInstall (schtasks /Create from the XML without administrator rights, then /Run); the descriptor says manager task-scheduler with its \\PassionCode\\<id>.<instance> task",
         "never puts a secret in a unit or a task: the writers refuse a credential-shaped argument, environment name or value; the token stays in the protected token file (0600, or on Windows an ACL of the user, SYSTEM and Administrators only)",
         "stops the operator's way: systemd_uninstall / systemdUninstall (disable --now, then remove) and task_uninstall / taskUninstall (/End, then /Delete), plus remove_descriptor",
-        "checks one copy with check_service.py: the instance lock is held (a Node service holds an abstract socket on Linux or a named pipe on Windows, and the probe sees it)"
+        "checks one copy with check_service.py: the instance lock is held (a Node service holds an abstract socket on Linux or a named pipe on Windows, and the probe sees it)",
+        "the descriptor it writes names source.repository, the repository its code is built from (FAA-198)"
       ]
     },
     {
@@ -443,7 +444,8 @@
         "derives the instance from the context with hold_context_instance / holdContextInstance (fabric_context, installed with fabric_kit.py install --module fabric_context): personal stays the default instance with its existing folders and lock, org:example-org runs as org-example-org with its own descriptor, data, log and cache folders and its own instance lock",
         "passes the estate record this machine applied (verified with verify_estate_record), the machine id and the agentRef, and the organization's instance is refused with exit 78 when the record places no such agent in that context (placement-missing), when its placement names no unrevoked share grant for that context (grant-refused, FAC-SEM-111) or when now is outside the grant's window (grant-window); nothing is created before the refusal",
         "a second copy for the same context exits 75 under the instance lock, and the data folder's fabric-context.json marker refuses a start for another context (context-mismatch, exit 78)",
-        "an uninstall that purges passes the instance (launchd_uninstall(..., instance=) / launchdUninstall(..., {instance})), so the organization's purge never reaches the personal folders"
+        "an uninstall that purges passes the instance (launchd_uninstall(..., instance=) / launchdUninstall(..., {instance})), so the organization's purge never reaches the personal folders",
+        "the new instance's descriptor names source.repository: a new instance is a new install, refused without it (FAA-198)"
       ]
     },
     {
@@ -595,7 +597,7 @@
       "request": "example-agent shows its chat picker on http://127.0.0.1:8765 but has no Fabric descriptor. Open it for me.",
       "expected": [
         "does not open the page in a browser as a workaround",
-        "makes the agent a fabric-service/0.1 service: a descriptor, the well-known document, the login code route and a declared dashboard, so Fabric Dashboards can open it; or, when that is not this task, files a board row for it",
+        "makes the agent a fabric-service/0.1 service: a descriptor that names its source.repository, the well-known document, the login code route and a declared dashboard, so Fabric Dashboards can open it; or, when that is not this task, files a board row for it",
         "says the page cannot be opened in Fabric Dashboards until then"
       ]
     },

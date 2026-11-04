@@ -355,12 +355,12 @@ class Recipe(unittest.TestCase):
         (self.dir / "config.json").write_text(json.dumps(config))
         env = dict(os.environ)
         env.pop("OPENROUTER_API_KEY", None)
-        out = subprocess.run([sys.executable, "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
+        out = subprocess.run([sys.executable, "-B", "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
                               str(self.dir / "config.json"), "--message-id", "m-1", "--text", "Mars weather?"],
                              capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(json.loads(out.stdout)["reasons"], ["no-knowledge"], "no key is needed to hand off")
-        out = subprocess.run([sys.executable, "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
+        out = subprocess.run([sys.executable, "-B", "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
                               str(self.dir / "config.json"), "--message-id", "m-2", "--text", "reset my password"],
                              capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(json.loads(out.stdout)["reasons"], ["model:config"], "no key: handed off, never a crash")

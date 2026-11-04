@@ -201,7 +201,9 @@ class Probe:
         # where a password rides (0.62.0 unit reading 2).
         if not fs.names_repository(self.d):
             self.add("descriptor.source-repository", "NOT_RUN", "the descriptor %s" % fs.NO_SOURCE_REPOSITORY)
-        elif set(problems) - set(fs.validate_descriptor({k: v for k, v in self.d.items() if k != "source"})):  # what the source adds
+        # what the source adds, read in the member rules, which a missing required key never cuts short (unit reading 16)
+        elif set(fs.descriptor_member_problems(self.d)) - set(fs.descriptor_member_problems(
+                {k: v for k, v in self.d.items() if k != "source"})):
             self.add("descriptor.source-repository", "NOT_RUN", "source.repository is refused by descriptor.valid")
         else:
             self.add("descriptor.source-repository", "PASS", "names %s" % shown_repository(self.d["source"]["repository"]))

@@ -270,6 +270,13 @@ class DescriptorTests(unittest.TestCase):
             verdicts = {r["rule"]: r for r in p.results}
             self.assertNotEqual(verdicts["descriptor.source-repository"]["verdict"], "PASS", "a refused source is no pass (unit reading 2)")
             self.assertFalse(any("fixture-not-a-key" in r["evidence"] for r in p.results), "no evidence carries the password")
+            short = {k: v for k, v in d.items() if k != "installedBy"}  # a missing key cuts validate_descriptor short
+            for refused in ("https://bot:fixture-not-a-key@github.com/example-org/example-agent", "not a uri"):
+                short["source"] = {"repository": refused}
+                p = checker.Probe(path, short, root, True)
+                p.descriptor_rules()
+                self.assertEqual({r["rule"]: r for r in p.results}["descriptor.source-repository"]["verdict"], "NOT_RUN",
+                                 "the source is still read when a required key is missing (0.62.0 unit reading 16)")
             d["paths"] = dict(d["paths"], data="opensource/data")  # a problem that only echoes the word is not the source's
             d["source"] = {"repository": "https://github.com/example-org/example-agent"}
             p = checker.Probe(path, d, root, True)

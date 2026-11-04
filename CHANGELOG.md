@@ -59,8 +59,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `https:\\h\u:pw@x/r`; 0.62.0 seam readings 11 and 13).
 - Node's `checkUrl` sent `ht<tab>tps://h\u:pw@x/r` and `https:\/h\u:pw@x/r`, which Python's `check_url` refuses
   (since 0.60.0): it now reads the written user information on the text `new URL` reads, after any run of slashes.
-- Node's `redactUrl` printed `<unparseable url>` for a URL of a scheme that is not special (`ssh://h:99999/r`,
-  `git://\u:pw@h/r`) that `new URL` cannot parse, where Python keeps the scheme: both now print `<scheme>:<redacted>`.
+- Node's `redactUrl` printed `<unparseable url>` for a URL of a scheme other than http, https, ws, wss or ftp (`file:`
+  included) that `new URL` cannot parse (`ssh://[zz]/r`, `ssh://h:99999/r`, `file://h:1/r`), where Python keeps the
+  scheme: both now print `<scheme>:<redacted>`.
 - Node's key set cache (`JwksCache`) accepted `https://h\u:pw@x/j` and `https://@x/j`, which the Python twin refuses:
   it now reads the authority as written too.
 
