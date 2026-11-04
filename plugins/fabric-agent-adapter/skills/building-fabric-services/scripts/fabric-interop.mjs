@@ -270,7 +270,7 @@ export class JobStore {
   // A step is kept as the gate reads it (keptStep), so a job's start and its answer agree.
   requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
     const entries = Object.entries(inputRequests ?? {});
-    if (!entries.length || Array.isArray(inputRequests) || typeof inputRequests !== 'object') throw new InteropError('input_required needs at least one input request.'); // a JSON object of requests, first (unit 38, 40)
+    if (!entries.length || Array.isArray(inputRequests) || typeof inputRequests !== 'object') throw new InteropError('input_required needs a JSON object of at least one input request.'); // a JSON object of requests, first (unit 38, 40)
     const kept = Object.create(null); // the value checked is the value kept (seam 34); a key __proto__ stays a key (35)
     for (const [key, step] of Object.entries(steps ?? {})) {
       kept[key] = Object.hasOwn(inputRequests, key) && step !== null && step !== undefined ? keptStep(step) : {};

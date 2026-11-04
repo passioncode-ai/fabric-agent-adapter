@@ -398,15 +398,15 @@ class JobStore:
         job's private part so an answer's `_meta.mandate` is read for that step (CallContext.approval_step writes it).
         A step is kept as the gate reads it (kept_step), so a job's start and its answer agree."""
         if not isinstance(input_requests, dict) or not input_requests:  # a JSON object of requests, first (readings 38, 39)
-            raise InteropError("input_required needs at least one input request.")
+            raise InteropError("input_required needs a JSON object of at least one input request.")
         kept: Dict[str, Dict[str, Any]] = {}
         for key, step in (steps or {}).items():  # the value checked is the value kept (seam reading 34)
             kept[key] = kept_step(step) if key in input_requests and isinstance(step, dict) else {}
             if not (type(kept[key].get("effect")) is str and kept[key]["effect"] in EFFECT_CLASSES):
-                raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
+                raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % (key,))
         for key, request in input_requests.items():  # each a keyed object, as Node refuses one (product reading 39)
             if not isinstance(key, str) or not _KEY.match(key) or not isinstance(request, dict) or request.get("method") != "elicitation/create":
-                raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
+                raise InteropError("Input request %r must be a keyed elicitation/create request." % (key,))
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))
         return self._transition(job_id, "input_required", {"steps": kept},
