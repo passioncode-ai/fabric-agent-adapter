@@ -394,10 +394,10 @@ class Hooks(Base):
                                 extra_env=ENV)
         self.assertIn(uuid, self.context(done))
 
-    def test_work_that_outlasts_the_run_gets_its_state_then_fails_known(self):
+    def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
-        self.assertIn("work that cannot end by then gets its state as a `com.progress` note", text)
-        self.assertIn("the asker submits it again", text, "Fabric dispatches no accepted request (0.63.0 product r10)")
+        self.assertIn("work that cannot end by then is left accepted for the next run", text)
+        self.assertIn("never failed_known", text, "Fabric dispatches an accepted request since fff4b6d9")
 
     def test_the_prompt_hooks_contract_names_the_session_id(self):
         # 0.63.0 unit reading 9: the reprint after the line adds the handoff carries the id too

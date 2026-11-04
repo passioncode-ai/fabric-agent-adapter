@@ -16,8 +16,8 @@
   (`observatory_checkpoint_latest`), the request and its thread (`com.get`, `com.list`), the lease
   (`observatory_handoff_accept` with its owner, key and the executor the launcher names), `com.status` and the claim,
   a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
-  checkpoints, renewals about every 20 s (work that outlasts the run gives its state as a `com.progress` note, then `failed_known` saying it needs another
-  run, and the asker submits it again: Fabric's dispatcher starts no run for an accepted request), the reply and `com.complete`, and the closing checkpoint with its
+  checkpoints, renewals about every 20 s (work that outlasts the run is left accepted for the next run, its state in a `com.progress` note and an
+  `in_progress` checkpoint; Fabric's dispatcher starts that run since its main at `fff4b6d9`), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
   nudge in such a session. Only the

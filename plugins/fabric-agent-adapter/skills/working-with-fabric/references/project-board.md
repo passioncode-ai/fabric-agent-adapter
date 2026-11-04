@@ -239,8 +239,8 @@ thread. A state with its nearest date is an answer (the operator's rule of 2026-
 request it moves the request to `answered` as any participant reply does (above), so where a responder should still
 do the work, tell the person and leave the request queued instead. To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
 it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
-`com.complete` (DEC-0152 SA-6, proposed). Fabric's unreleased `fabric_whoami` text (`6e6f628e`) sends a participant's
-state as a thread message instead; until its text follows the board's choice, this page holds.
+`com.complete` (DEC-0152 SA-6, proposed). Fabric's `fabric_whoami` says the same since its main at `fff4b6d9` (in no
+release yet).
 The session-start preamble and the unread line both say it; a session started on a board request answers only that
 request and gets no unread line.
 
