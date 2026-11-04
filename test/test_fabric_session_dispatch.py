@@ -710,7 +710,7 @@ class Hooks(Base):
         self.assertEqual(cli.dispatch_of(env, LINE.replace(REQUEST, upper)), (dict(FULL, request=upper), []))
 
     def test_without_the_line_the_prompt_hook_prints_no_contract(self):
-        # Vesta's VES-BOARD-SPAWN-HARDEN 2: without FABRIC_DISPATCH_* no exit contract; with it and no line, none either
+        # agreed on the project board, 2026-11-05: without FABRIC_DISPATCH_* no exit contract; with it and no line, none
         self.assertEqual(self.prompt({}, "answer the request in thread 1")[0].stdout, "")
         self.assertEqual(self.prompt(ENV, "read the diff and report")[0].stdout, "")
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})

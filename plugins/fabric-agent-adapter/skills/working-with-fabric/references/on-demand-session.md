@@ -29,7 +29,7 @@ fabric-dispatch/1 workflow=wf_<16 hex> handoff=<handoff id> request=<request uui
 ```
 
 A session is the run only when its own prompt's first line names the same three as the environment (Fabric's spec
-3.5 on its main at `deaf51fe`, agreed with Vesta on board thread `1add3c03`). The environment alone makes no run: a reader or a subshell the run
+3.5 on its main at `deaf51fe`, agreed on the project board, 2026-11-05). The environment alone makes no run: a reader or a subshell the run
 starts inherits it, and its prompt does not start with the line, so it is a helper that does its own task only. A line
 that disagrees with the environment, or an environment without all three, makes no run either: that session says so
 in the request's thread (`com.get` the request the line names, then `com.submit` kind `message` to its thread, naming

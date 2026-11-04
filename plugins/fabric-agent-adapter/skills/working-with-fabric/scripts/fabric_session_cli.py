@@ -104,8 +104,8 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 #: FAA-201: a session Fabric started on a board request (Fabric's on-demand spec, sections 3.4 to 3.6). The
 #: environment names the workflow, the handoff and the request, and so does the prompt's first line `fabric-dispatch/1
 #: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order). A session is the
-#: run only when its own prompt's first line names the same three as the environment (Fabric's spec 3.5, agreed with
-#: Vesta on board thread 1add3c03): the environment alone makes no run, since a reader or a subshell inherits it; a line
+#: run only when its own prompt's first line names the same three as the environment (Fabric's spec 3.5, agreed on the
+#: project board, 2026-11-05): the environment alone makes no run, since a reader or a subshell inherits it; a line
 #: that disagrees, or an environment without all three, makes none either. A line with no workflow in the environment
 #: is quoted text.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
