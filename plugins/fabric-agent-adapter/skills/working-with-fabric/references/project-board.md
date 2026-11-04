@@ -237,7 +237,10 @@ state now (what is done, where it lies, a branch or a commit, when it will be re
 answer for a merge, a release or the end of the task; the finished result goes later as a second message in the same
 thread. A state with its nearest date is an answer (the operator's rule of 2026-11-04, board thread `11646774`): to a
 request it moves the request to `answered` as any participant reply does (above), so where a responder should still
-do the work, tell the person and leave the request queued instead. To an announcement the state is its **row** line.
+do the work, tell the person and leave the request queued instead. To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
+it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
+`com.complete` (DEC-0152 SA-6, proposed). Fabric's unreleased `fabric_whoami` text (`6e6f628e`) sends a participant's
+state as a thread message instead; until its text follows the board's choice, this page holds.
 The session-start preamble and the unread line both say it; a session started on a board request answers only that
 request and gets no unread line.
 

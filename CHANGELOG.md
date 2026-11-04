@@ -11,14 +11,13 @@
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
   never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
   exit contract in place of the preamble (naming the session's own `sessionId` when it is a UUID, and after a `/clear`
-  that an accept already made stands), also in a session
+  the session id the clear replaced, which a replayed accept needs for its `leaseId`), a retro before the run ends, also in a session
   Fabric launched: `fabric_whoami`, the packet
   (`observatory_checkpoint_latest`), the request and its thread (`com.get`, `com.list`), the lease
   (`observatory_handoff_accept` with its owner, key and the executor the launcher names), `com.status` and the claim,
   a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
-  checkpoints, renewals about every 20 s (work that outlasts the run is left accepted, its state in a checkpoint and a `com.progress` note, for the next
-  run;
-  `failed_known` would settle it), the reply and `com.complete`, and the closing checkpoint with its
+  checkpoints, renewals about every 20 s (work that outlasts the run gives its state as a `com.progress` note, then `failed_known` saying it needs another
+  run, and the asker submits it again: Fabric's dispatcher starts no run for an accepted request), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
   nudge in such a session. Only the
@@ -55,7 +54,7 @@
     file as a source: read again when it changes (its time, size or inode), the last good version kept when a read fails or the file has the
     wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
     time;
-  - `Knowledge.load` refuses a file that is not JSON, one nested deeper than 32 levels on every Python, a file that is not an object with an `entries` list, an entry whose tags are not a list
+  - `Knowledge.load` refuses a file that is not JSON, one nested deeper than 32 levels (on every Python), a file that is not an object with an `entries` list, an entry whose tags are not a list
     of text or whose question is not text, and a file nested too deep, each as a `RecipeError`;
   - `channel-agent.example.json`, one project's declaration under
     `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to
@@ -68,7 +67,8 @@
   object with an `entries` list (`[]`, `{}`, a string) loaded as an empty set and handed every message off as
   `no-knowledge`; `{"entries": null}` or `{"entries": <number>}` stopped it at start with a `TypeError`; an entry with `tags: null`
   failed each message with a `TypeError`; an entry whose `tags` is a string or holds something other than text, or
-  whose `question` is not text, was read and answered from. Fix the file before upgrading.
+  whose `question` is not text, was read and answered from. A file nested deeper than 32 levels, which 0.62.0
+  loaded, is refused too. Fix the file before upgrading.
 - A custom `on_handoff` that stores the row it is given now receives the refused `draft`, which can echo what the
   customer wrote: drop `draft` before storing it (the default outbox does).
 - A session carrying `FABRIC_DISPATCH_WORKFLOW` now gets the exit contract at session start even when Fabric launched

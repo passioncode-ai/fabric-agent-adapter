@@ -81,11 +81,13 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
    accept answer's `pack`: they carry each key's `state` and `use`, and Observatory refuses them in a body.
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
-   stops the run. Work that cannot end by then is left for the next run, before `run-ends-at`: its state (what is
-   done, where it lies, what is left) goes into an `in_progress` checkpoint and onto the request's thread as the note of
-   a `com.progress` (the slot holder's state, DEC-0152 SA-6, proposed); the request stays
-   accepted, never `failed_known`, which settles it for good (spec 3.6: the dispatch then ends finished). The next
-   run takes it over with `com.responder_replace` (below). A launcher that stops a run gives no time to answer:
+   stops the run. Work that cannot end by then is settled before `run-ends-at`: its state (what is done, where it
+   lies, what is left) goes onto the request's thread as the note of a `com.progress` (the slot holder's state,
+   DEC-0152 SA-6, proposed), then `com.complete` `failed_known` says it needs more than one run, and the workflow
+   closes `blocked`. That settles the request (spec 3.6: the dispatch ends finished): the asker submits it again,
+   from that state. A request left accepted would wait with nobody on it, since Fabric's dispatcher starts no run for
+   an accepted request (its `boardDispatch.ts` candidates are queued, claimed with a lapsed lease, and in progress
+   with no live holder; asked of Fabric on thread `b3e60686`). A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
    a typed secret or a payment is the person's: name it in the answer rather than wait.
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
@@ -95,7 +97,9 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
    reads the write as the start of a new workflow and refuses it. The status is `done` for `completed`; for
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
-7. **End the run.** Nothing more: no board sweep, no work claim, no `watch-mail`, no question to the operator.
+7. **End the run.** The one write left is the retro Fabric's `fabric_whoami` asks for after work (an
+   `observatory_lesson`, no values; ADR-0188's `retro-after-work`); nothing more: no board sweep, no work claim, no
+   `watch-mail`, no question to the operator.
 
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
 request `failed_known` with the reason when it holds a fence for it, closes the workflow and ends.
@@ -109,8 +113,9 @@ run unchanged.
 Fabric watches the request and the run (spec 3.6). The request keeps the state the board contract gives it: `queued`
 stays queued, `claimed` is taken again under a new attempt, `accepted` is held until a responder takes it over, and
 `in_progress` stays until the next holder registers, when the board records the lost result; an `outcome_unknown`
-attempt is settled only by `com.reconcile` with an observed result. Fabric may start one more run; after two runs
-with no answer it shows the request to the operator in «На проверке», unchanged. A run past its time limit is stopped
+attempt is settled only by `com.reconcile` with an observed result. Fabric may start one more run for a request
+still queued, claimed with a lapsed lease, or in progress with no live holder (never for an accepted one); after two
+runs with no answer it shows the request to the operator in «На проверке», unchanged. A run past its time limit is stopped
 and ends `timed-out`.
 
 ## A session inside the run
@@ -121,7 +126,11 @@ dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4
 yet in a release; a value outside `[A-Za-z0-9._-]{1,64}` is ignored), else by the
 workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new dispatch of the same workflow is a
 new holder; a launcher that sets the workflow alone gives each run a distinct run id. A `/clear` in the holding
-session keeps the contract (the record moves to the new session id). Any other session gets one line in place of the
+session keeps the contract (the record moves to the new session id). A holder that accepted the handoff before
+the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
+`sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
+so the holder replays the accept with it (Switchboard's prompt fixes the key, `accept-<handoff>`); a new accept under
+the new id is refused. Any other session gets one line in place of the
 contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says

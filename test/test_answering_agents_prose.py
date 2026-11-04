@@ -151,7 +151,8 @@ RECIPE_PARAGRAPH = (
     'repair=decision)`: the model gets its draft and the reasons, and a pass comes back as a reply with `repaired: '
     "true`, a second refusal as a hand-off with `fallback: true` (the channel-agent standard's 4.4 and its ticket's "
     '`fallback`, FAA-197). It calls under a new message id, since the stored decision answers any repeat of the same '
-    'id; `repair=` takes only a hand-off the checks made (not `no-knowledge`, `model-unsure` or `model:*`), and never'
+    "id (`repair=` under the refused decision's own id is refused with a `RecipeError`); `repair=` takes only a hand-off"
+    ' the checks made (not `no-knowledge`, `model-unsure` or `model:*`), and never'
     ' a repeat: a repeat of the id returns the stored decision, which has no draft, so the repair step keeps the '
     'decision it was handed and passes each first decision to `repair=` once. A repair the model declines (`HANDOFF`)'
     " or that finds no knowledge is marked `fallback: true` too: it marks a spent repair; a"

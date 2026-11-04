@@ -394,10 +394,10 @@ class Hooks(Base):
                                 extra_env=ENV)
         self.assertIn(uuid, self.context(done))
 
-    def test_work_that_outlasts_the_run_gets_its_state_and_fails_known(self):
+    def test_work_that_outlasts_the_run_gets_its_state_then_fails_known(self):
         text = cli.dispatch_contract(FULL)
-        self.assertIn("work that cannot end by then is left accepted", text)
-        self.assertIn("never `failed_known`", text, "failed_known settles the request for good (spec 3.6)")
+        self.assertIn("work that cannot end by then gets its state as a `com.progress` note", text)
+        self.assertIn("the asker submits it again", text, "Fabric dispatches no accepted request (0.63.0 product r10)")
 
     def test_the_prompt_hooks_contract_names_the_session_id(self):
         # 0.63.0 unit reading 9: the reprint after the line adds the handoff carries the id too
@@ -423,8 +423,21 @@ class Hooks(Base):
         done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
                                 extra_env=ENV)
         text = self.context(done)
-        self.assertIn("never accept it again under the new id", text)
+        self.assertIn("never accept it anew under the new id", text)
+        self.assertIn("sessionId %s" % uuid, text, "the id the accept was made under (0.63.0 seam reading 10)")
         self.assertNotIn(cleared, text)
+        # the prompt hook's reprint after the clear says the same, never the new id (unit and seam readings 10): a
+        # launcher that sets the workflow alone, so the first line adds the handoff and the request
+        sb = {"FABRIC_DISPATCH_WORKFLOW": WF}
+        first, again = "3c4d5e6f-2c3d-4e7f-8a0b-23456789abcd", "4d5e6f70-3d4e-4f80-9b1c-3456789abcde"
+        self.run_hook("session-start", {"session_id": first, "cwd": str(self.repo), "source": "startup"}, extra_env=sb)
+        self.run_hook("session-start", {"session_id": again, "cwd": str(self.repo), "source": "clear"}, extra_env=sb)
+        done, _ = self.run_hook("user-prompt-submit", {"session_id": again, "cwd": str(self.repo), "prompt": LINE},
+                                extra_env=sb)
+        text = self.context(done)
+        self.assertIn("sessionId %s" % first, text)
+        self.assertIn("never accept it anew under the new id", text)
+        self.assertNotIn(again, text)
 
     def test_the_contract_names_this_sessions_id_for_the_accept(self):
         # 0.63.0 seam reading 7: Observatory asks a retry of the acceptance to send the same sessionId

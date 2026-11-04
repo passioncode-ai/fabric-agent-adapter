@@ -25,8 +25,8 @@ name that as the failing pattern (P2). An agent that repairs passes its own `on_
 its repair step rather than a person; a hand-off the checks made carries the failed checks in `reasons` and the
 refused `draft`, and the repair step passes that decision back as `answer(new_id, text, repair=decision)`: the model
 gets its draft and the reasons, and a pass comes back as a reply with `repaired: true`, a second refusal as a hand-off
-with `fallback: true` (the channel-agent standard's 4.4 and its ticket's `fallback`, FAA-197). It calls under a new
-message id, since the stored decision answers any repeat of the same id; `repair=` takes only a hand-off the checks
+with `fallback: true` (the channel-agent standard's 4.4 and its ticket's `fallback`, FAA-197). It calls under a new message id, since the stored decision answers any repeat of the same id (`repair=` under the
+refused decision's own id is refused with a `RecipeError`); `repair=` takes only a hand-off the checks
 made (not `no-knowledge`, `model-unsure` or `model:*`), and never a repeat: a repeat of the id returns the stored
 decision, which has no draft, so the repair step keeps the decision it was handed and passes each first decision to
 `repair=` once. A repair the model declines (`HANDOFF`) or that finds no knowledge is marked `fallback: true` too: it marks a spent repair; a `model:*` outage is not one. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the

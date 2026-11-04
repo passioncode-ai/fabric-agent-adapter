@@ -502,6 +502,18 @@ class Recipe(unittest.TestCase):
         self.assertIn("nested too deep", str(raised.exception))
         (self.dir / "k.json").write_text(json.dumps({"entries": [dict(entry, note=[[["fine"]]])]}))
         self.assertEqual(len(sa.Knowledge.load(self.dir / "k.json").entries), 1)
+        # the bound itself: the file at level 1, its entries list 2, an entry 3, a member 4 and so on (unit reading 10)
+        for depth, refused in ((sa.MAX_KNOWLEDGE_DEPTH, False), (sa.MAX_KNOWLEDGE_DEPTH + 1, True)):
+            nested = "x"
+            for _ in range(depth - 4):
+                nested = [nested]
+            (self.dir / "k.json").write_text(json.dumps({"entries": [dict(entry, note=nested)]}))
+            if refused:
+                with self.assertRaises(sa.RecipeError):
+                    sa.Knowledge.load(self.dir / "k.json")
+            else:
+                sa.Knowledge.load(self.dir / "k.json")
+        self.assertEqual(sa.MAX_KNOWLEDGE_DEPTH, 32)
 
     def test_a_repair_under_the_same_id_and_a_file_that_is_not_json_are_refused(self):
         # 0.63.0 unit reading 9: the same id returned the stored refusal silently; a broken file raised JSONDecodeError

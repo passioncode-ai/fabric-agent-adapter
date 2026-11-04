@@ -134,14 +134,15 @@ DISPATCH_CONTRACT = (
     "`leaseId`). Every checkpoint you write repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
-    "and finish before run-ends-at; work that cannot end by then is left accepted, its state in an in_progress "
-    "checkpoint and a `com.progress` note on the thread, never `failed_known`. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
+    "and finish before run-ends-at; work that cannot end by then gets its state as a `com.progress` note on the "
+    "thread, then `com.complete` failed_known saying it needs another run (the asker submits it again). Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
     "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
     "the `leaseId`, `close: true`, a status and the packet's body with `done` and `notes` added: done for completed; for "
-    "failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes. 7. End the "
-    "run: no board sweep, no work claim, no watch-mail. The steps and every argument: working-with-fabric "
+    "failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes. 7. Write the retro "
+    "`fabric_whoami` asks for (an `observatory_lesson`, no values), then end the run: no board sweep, no work claim, "
+    "no watch-mail. The steps and every argument: working-with-fabric "
     "references/on-demand-session.md."
 )
 #: A session started inside a dispatched run (a `claude -p` or `codex exec` the run itself runs) inherits the
@@ -198,9 +199,16 @@ def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Opti
 #: Observatory takes a sessionId only as a lowercase UUID (0.63.0 seam reading 8): one the hook was given is named.
 _SESSION_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 DISPATCH_SESSION = " This session's sessionId: {session}."
-#: After a /clear the accept, if one was made, was made under the session id the clear replaced (0.63.0 seam reading 9).
-DISPATCH_CLEARED = (" This session was cleared: a handoff already accepted stands (read its lease state with "
-                    "`observatory_checkpoint_latest`); never accept it again under the new id.")
+#: After a /clear the accept, if one was made, was made under the session id the clear replaced (0.63.0 seam readings
+#: 9 and 10): Observatory replays an accept, with its leaseId, only for that sessionId and the same idempotencyKey.
+DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, and its leaseId comes back only by "
+                    "replaying it with the same idempotencyKey and {session}; never accept it anew under the new id.")
+_CLEARED_UNKNOWN = "the sessionId the clear replaced"
+
+
+def dispatch_cleared(previous: Any) -> str:
+    named = isinstance(previous, str) and _SESSION_UUID.fullmatch(previous)
+    return DISPATCH_CLEARED.format(session="sessionId %s" % previous if named else _CLEARED_UNKNOWN)
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
@@ -209,6 +217,31 @@ def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), se
         session_id) else ""
     return DISPATCH_CONTRACT.format(workflow=dispatch["workflow"], **values) + told + (
         DISPATCH_MISMATCH.format(fields=", ".join(mismatch)) if mismatch else "")
+
+
+def _dispatch_record(dispatch: Dict[str, str], env: Dict[str, str]) -> Tuple[Path, str]:
+    """The folder and the key of a dispatch's record: FABRIC_DISPATCH_ID when it is one, else the workflow, the handoff
+    and the launcher's run id, so a new launch is a new holder."""
+    import hashlib
+    dispatch_id = env.get("FABRIC_DISPATCH_ID") or ""
+    if DISPATCH_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch, a UUID (Switchboard sets it since 0ad56cb)
+        run = "|".join((dispatch["workflow"], "dispatch", dispatch_id))
+    else:
+        run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
+    return state_root(env=env) / "dispatch", hashlib.sha256(run.encode("utf-8")).hexdigest()[:32]
+
+
+def dispatch_cleared_from(dispatch: Dict[str, str], env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """The session id a /clear replaced, when this dispatch's holder came in by one; None otherwise."""
+    env = os.environ if env is None else env
+    folder, key = _dispatch_record(dispatch, env)
+    try:
+        held = json.loads(read_small(folder / (key + ".json")) or "null")
+    except ValueError:
+        return None
+    if not isinstance(held, dict) or not held.get("cleared_from"):
+        return None
+    return str(held["cleared_from"])
 
 
 def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dict[str, str]] = None,
@@ -223,14 +256,7 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     env = os.environ if env is None else env
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return True
-    import hashlib
-    dispatch_id = env.get("FABRIC_DISPATCH_ID") or ""
-    if DISPATCH_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch, a UUID (Switchboard sets it since 0ad56cb)
-        run = "|".join((dispatch["workflow"], "dispatch", dispatch_id))
-    else:
-        run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
-    key = hashlib.sha256(run.encode("utf-8")).hexdigest()[:32]  # a new launch is a new holder
-    folder = state_root(env=env) / "dispatch"
+    folder, key = _dispatch_record(dispatch, env)
     record = {"session": session_id, "at": int(time.time()), "host": os.getppid()}
     if take_over:
         try:
@@ -240,6 +266,8 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
         # On Windows the hook's parent is the Git Bash a hook runs in, a new one each time (0.63.0 unit reading 5):
         # there any /clear takes the record, the contract twice rather than never
         if not isinstance(held, dict) or held.get("host") == record["host"] or _WINDOWS:
+            if isinstance(held, dict):  # the session the clear replaced: the one an earlier accept named
+                record["cleared_from"] = held.get("cleared_from") or held.get("session")
             try:
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _write_private(folder / (key + ".json"), json.dumps(record))
@@ -300,7 +328,8 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
         if not dispatch_holder(dispatch, payload.get("session_id"), env, take_over=payload.get("source") == "clear"):
             return _host_output(host, "SessionStart", DISPATCH_NESTED.format(workflow=dispatch["workflow"]))
         if payload.get("source") == "clear":
-            return _host_output(host, "SessionStart", dispatch_contract(dispatch) + DISPATCH_CLEARED)
+            return _host_output(host, "SessionStart", dispatch_contract(dispatch) + dispatch_cleared(
+                dispatch_cleared_from(dispatch, env)))
         return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id=payload.get("session_id")))
     if fabric_launched(env):
         return None
@@ -360,6 +389,8 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     lines = [dispatch_contract(dispatch, mismatch, session_id)] if dispatch is not None and (dispatch != told or mismatch) else []
     if lines and not dispatch_holder(told, session_id, env):
         lines = []  # a session inside the run was told at its start that the run holds the dispatch
+    elif lines and dispatch_cleared_from(told, env) is not None:  # a cleared holder: the accept keeps the old id
+        lines = [dispatch_contract(dispatch, mismatch) + dispatch_cleared(dispatch_cleared_from(told, env))]
     if fabric_launched(env) or told is not None:  # a dispatched run answers its one request: no unread line, no nudges
         return _host_output("claude", "UserPromptSubmit", "\n".join(lines)) if lines else None
     directory = session_dir(session_id, env)
