@@ -26,7 +26,7 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `FABRIC_NO_SOURCE_REPOSITORY`), so an installed agent's update keeps working. `source_refusal` / `sourceRefusal` say
   why an install would be refused, for an installer that checks before it validates or writes anything else (a `source`
   that is no object names nothing), and `names_repository` / `namesRepository` whether a descriptor names one.
-  `check_service.py` names a descriptor without it, or with one `descriptor.valid` refuses
+  `check_service.py` names a descriptor without it, or with one the descriptor's rules refuse, and why
   (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo, query or
   fragment (a URL through `redact_url`; a local path, one that starts with `/`, `~`, `.`, `\\` or a drive, by its name;
   a value of a URL scheme such as `https:` also without `//`, through `redact_url`; an scp form or any other value from

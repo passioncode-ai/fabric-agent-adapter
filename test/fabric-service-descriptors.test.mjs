@@ -101,3 +101,11 @@ test('registerRemote writes who installed it and takes runner and peer; usage ro
   assert.throws(() => k.makeUsageReceipt('example', 'example-model', { inputTokens: 1, outputTokens: 1, route: 'metered' }));
   assert.ok(!k.ROUTES.includes('platform-metered'), "a configuration's route stays subscription or key");
 });
+
+test('a subscription runner kind that is no string is named, as the Python twin names it (0.62.0 unit reading 17)', () => {
+  for (const kind of [['claude-code'], { x: 1 }]) {
+    const problems = k.descriptorMemberProblems({ runner: { credentialKind: 'subscription', kind } });
+    assert.ok(problems.includes("runner.kind is a runner kind's name"), problems.join('; '));
+    assert.ok(problems.some((p) => p.includes("vendor's runner")), problems.join('; '));
+  }
+});

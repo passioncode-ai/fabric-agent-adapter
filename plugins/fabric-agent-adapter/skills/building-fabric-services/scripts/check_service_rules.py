@@ -207,7 +207,7 @@ def board_responder_verdict(wk: Any, kit: Optional[str] = None) -> Tuple[str, st
             path = Path(kit) if kit else Path(__file__).resolve().parent / "fabric_board.py"
             code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import %s as board; "
                     "print(json.dumps(board.self_check()))" % path.stem)
-            out = subprocess.run([sys.executable, "-E", "-s", "-c", code, str(path.resolve().parent)], capture_output=True,
+            out = subprocess.run([sys.executable, "-E", "-s", "-B", "-c", code, str(path.resolve().parent)], capture_output=True,
                                  text=True, timeout=60, cwd=str(path.resolve().parent))
             problems = json.loads(out.stdout.strip().splitlines()[-1]) if out.returncode == 0 and out.stdout.strip() else ["the kit did not run: %s" % out.stderr.strip()[-200:]]
     except Exception as exc:  # noqa: BLE001 - a kit that cannot run its conversation fails the rule

@@ -277,6 +277,14 @@ class DescriptorTests(unittest.TestCase):
                 p.descriptor_rules()
                 self.assertEqual({r["rule"]: r for r in p.results}["descriptor.source-repository"]["verdict"], "NOT_RUN",
                                  "the source is still read when a required key is missing (0.62.0 unit reading 16)")
+                self.assertIn("is refused: source.repository", {r["rule"]: r for r in p.results}["descriptor.source-repository"]
+                              ["evidence"], "it names the source's own problem (0.62.0 readings 17)")
+            for good in (dict(short), dict(d, installedBy={"by": "robot", "tool": "x"})):  # a problem elsewhere is not the source's
+                good["source"] = {"repository": "https://github.com/example-org/example-agent"}
+                p = checker.Probe(path, good, root, True)
+                p.descriptor_rules()
+                self.assertEqual({r["rule"]: r for r in p.results}["descriptor.source-repository"]["verdict"], "PASS",
+                                 "the difference, not every member problem (unit reading 17)")
             d["paths"] = dict(d["paths"], data="opensource/data")  # a problem that only echoes the word is not the source's
             d["source"] = {"repository": "https://github.com/example-org/example-agent"}
             p = checker.Probe(path, d, root, True)

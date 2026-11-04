@@ -73,7 +73,9 @@ names the same file.
 
 The service that runs it says what it uses (FAA-199): `agent.connections()` names the two models, and the service adds
 its own hand-off route, in its well-known document:
-`fs.connections_extension(agent.connections() + [...], degraded=degraded)`.
+`fs.connections_extension(agent.connections() + [...], degraded=degraded)`. The two take the ids `model` and `fallback`
+(a `degraded` entry whose source is `fallback` marks the fallback); the service's own items take other ids, since one id
+named twice is refused.
 
 ```bash
 python3 <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_kit.py \

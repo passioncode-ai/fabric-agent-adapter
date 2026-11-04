@@ -260,5 +260,14 @@ class Writers(unittest.TestCase):
         self.assertNotIn("platform-metered", fs.ROUTES, "a configuration's route stays subscription or key")
 
 
+class RunnerKindTests(unittest.TestCase):
+    def test_a_subscription_runner_kind_that_is_no_string_is_named_not_raised(self):
+        # 0.62.0 unit reading 17: a list or an object as a key raised TypeError; the Node twin names the same problems.
+        for kind in (["claude-code"], {"x": 1}):
+            problems = fs.descriptor_member_problems({"runner": {"credentialKind": "subscription", "kind": kind}})
+            self.assertIn("runner.kind is a runner kind's name", problems)
+            self.assertTrue(any("vendor's runner" in p for p in problems), problems)
+
+
 if __name__ == "__main__":
     unittest.main()

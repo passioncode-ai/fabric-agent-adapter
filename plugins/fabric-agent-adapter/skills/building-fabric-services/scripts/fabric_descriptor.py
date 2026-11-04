@@ -295,7 +295,9 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("runner.credentialKind is subscription, key, platform-metered or none")
         if "kind" in runner and not (isinstance(runner["kind"], str) and _RUNNER_KIND_NAME.match(runner["kind"])):
             problems.append("runner.kind is a runner kind's name")
-        if runner.get("credentialKind") == "subscription" and runner.get("kind") not in SUBSCRIPTION_RUNNERS:
+        # a kind that is no string is no runner's (a list would raise as a key: 0.62.0 unit reading 17)
+        if runner.get("credentialKind") == "subscription" and not (isinstance(runner.get("kind"), str)
+                                                                    and runner["kind"] in SUBSCRIPTION_RUNNERS):
             problems.append("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex")
         places += [("/runner/%s" % _pointer(k), v) for k, v in runner.items()]
     if "source" in descriptor:

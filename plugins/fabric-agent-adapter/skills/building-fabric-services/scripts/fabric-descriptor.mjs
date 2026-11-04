@@ -182,7 +182,7 @@ export function descriptorMemberProblems(d) {
     for (const k of Object.keys(runner)) if (!['kind', 'credentialKind'].includes(k)) problems.push(`runner has no member ${k}`);
     if (!CREDENTIAL_KINDS.includes(runner.credentialKind)) problems.push('runner.credentialKind is subscription, key, platform-metered or none');
     if ('kind' in runner && !(typeof runner.kind === 'string' && RUNNER_KIND_NAME.test(runner.kind))) problems.push("runner.kind is a runner kind's name");
-    if (runner.credentialKind === 'subscription' && !Object.hasOwn(SUBSCRIPTION_RUNNERS, runner.kind)) problems.push("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex");
+    if (runner.credentialKind === 'subscription' && !(typeof runner.kind === 'string' && Object.hasOwn(SUBSCRIPTION_RUNNERS, runner.kind))) problems.push("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex");
     for (const [k, v] of Object.entries(runner)) places.push([`/runner/${pointer(k)}`, v]);
   }
   if ('source' in d) {
