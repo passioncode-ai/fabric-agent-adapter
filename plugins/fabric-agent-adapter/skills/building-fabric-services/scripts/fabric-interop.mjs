@@ -269,14 +269,14 @@ export class JobStore {
   // job's private part (the format fabric_interop.py writes) so a service reads an answer's _meta.mandate for that step.
   // A step is kept as the gate reads it (keptStep), so a job's start and its answer agree.
   requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
+    const entries = Object.entries(inputRequests ?? {});
+    if (!entries.length || Array.isArray(inputRequests) || typeof inputRequests !== 'object') throw new InteropError('input_required needs at least one input request.'); // a JSON object of requests, first (unit 38, 40)
     const kept = Object.create(null); // the value checked is the value kept (seam 34); a key __proto__ stays a key (35)
     for (const [key, step] of Object.entries(steps ?? {})) {
-      kept[key] = Object.hasOwn(inputRequests ?? {}, key) && step !== null && step !== undefined ? keptStep(step) : {};
+      kept[key] = Object.hasOwn(inputRequests, key) && step !== null && step !== undefined ? keptStep(step) : {};
       if (!EFFECT_CLASSES.includes(kept[key].effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
     }
-    const entries = Object.entries(inputRequests ?? {});
-    if (!entries.length || Array.isArray(inputRequests) || typeof inputRequests !== 'object') throw new InteropError('input_required needs at least one input request.'); // a JSON object of requests (unit 38)
-    for (const [key, request] of entries) if (!KEY.test(key) || request?.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
+    for (const [key, request] of entries) if (!KEY.test(key) || request === null || typeof request !== 'object' || Array.isArray(request) || request.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
     const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
     if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);
     return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, { steps: kept });

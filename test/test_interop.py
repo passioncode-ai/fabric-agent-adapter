@@ -687,6 +687,14 @@ class InputActionTests(unittest.TestCase):
         for requests in (7, True, 1.5, ["pick"], {"pick": "x"}, {"pick": None}, {1: {"method": "elicitation/create"}}):
             with self.assertRaises(fi.InteropError):  # first, with steps= too (readings 39)
                 jobs.request_input(job_id, requests, steps={"pick": {"effect": "reply"}})
+        with self.assertRaises(fi.InteropError):  # a key that is no str, with no step to refuse it first (unit, seam 40)
+            jobs.request_input(job_id, {1: fi.choice_request("Which?", "choice", [("a", "A")])})
+        enum = importlib.import_module("enum")
+
+        class Key(str, enum.Enum):  # a (str, Enum) key is a str, as 0.60.0 took it (product reading 40)
+            PICK = "pick"
+        jobs.request_input(job_id, {Key.PICK: fi.choice_request("Which?", "choice", [("a", "A")])})
+        self.assertEqual(jobs.answer(job_id, {"pick": {"action": "accept"}}), {"pick": {"action": "accept"}})
 
     def test_off_by_default_the_answer_is_taken_as_before(self):
         server, jobs, job_id = self.start()

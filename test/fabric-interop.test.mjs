@@ -402,6 +402,11 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   assert.equal(store.get(zero.id).status, 'input_required');
   assert.throws(() => store.requestInput(zero.id, [request], 'x'), i.InteropError); // requests that are no object are refused
   assert.throws(() => store.requestInput(zero.id, Object.assign(() => {}, { pick: request }), 'x'), i.InteropError); // a function too (unit 39)
+  const throwing = { get 0() { throw new RangeError('step read'); } }; // the requests are refused before a step is read (unit 40)
+  assert.throws(() => store.requestInput(zero.id, [request], 'x', { steps: throwing }), i.InteropError);
+  for (const bad of [[], Object.assign(() => {}, { method: 'elicitation/create' }), null]) { // a request is a plain object (product 40)
+    assert.throws(() => store.requestInput(zero.id, { pick: bad }, 'x'), i.InteropError);
+  }
   assert.equal(store.get(job.id).status, 'input_required');
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);

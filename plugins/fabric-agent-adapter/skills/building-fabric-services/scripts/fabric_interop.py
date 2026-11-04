@@ -405,7 +405,7 @@ class JobStore:
             if not (type(kept[key].get("effect")) is str and kept[key]["effect"] in EFFECT_CLASSES):
                 raise InteropError("Step %r: an input request's key with its effect class (DEC-0125)." % key)
         for key, request in input_requests.items():  # each a keyed object, as Node refuses one (product reading 39)
-            if type(key) is not str or not _KEY.match(key) or not isinstance(request, dict) or request.get("method") != "elicitation/create":
+            if not isinstance(key, str) or not _KEY.match(key) or not isinstance(request, dict) or request.get("method") != "elicitation/create":
                 raise InteropError("Input request %r must be a keyed elicitation/create request." % key)
         for finding in input_request_link_findings({"inputRequests": input_requests}):  # FAC-SEM-143 (D12)
             raise InteropError("%s: %s" % (finding["instancePath"], finding["message"]))

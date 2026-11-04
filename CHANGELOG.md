@@ -71,8 +71,8 @@ says that his approval holds for the whole task, at every link (FAA-195).
   and read an empty list or string, `0`, `false`, or any non-object on another job or an unknown id, as no answer or
   `unknown-job` (a client that writes an empty map as `[]` now gets `-32602`; for an unknown id on a server without
   `authorize`, `-32602` comes before `unknown-job`, where a server with `authorize` answers `unknown-job` first). Both stores' `request_input` /
-  `requestInput` refuse requests that are not a JSON object, and a request that is not a keyed object, with
-  `InteropError` before anything else (0.60.0 Python raised `AttributeError` or `TypeError`, by the shape and whether
+  `requestInput` refuse requests that are not a JSON object (before they read a step), and a request that is
+  not a keyed object (a plain object, under a string key), with `InteropError` (0.60.0 Python raised `AttributeError` or `TypeError`, by the shape and whether
   `steps=` was passed; Node kept an array, which an answer keyed by an index or `length` then matched), and McpToolServer's answer gate reads only an object of requests (older
   than 0.61.0; 0.61.0 seam and unit readings 37 and 38). The same split held for an
   effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
