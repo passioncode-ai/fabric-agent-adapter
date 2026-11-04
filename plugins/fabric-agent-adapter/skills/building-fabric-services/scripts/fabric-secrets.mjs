@@ -105,7 +105,7 @@ export function repositoryPassword(value) {
   const text = value.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
   const colon = text.indexOf(':');
   const scheme = colon < 0 ? '' : text.slice(0, colon).toLowerCase();
-  const rest = colon < 0 ? text : text.slice(colon + 1);
+  const rest = colon < 0 ? '' : text.slice(colon + 1); // as Python's partition leaves it (unit reading 12)
   const authorities = rest.startsWith('//') ? [/^\/\/([^/?#]*)/.exec(rest)[1]] : [];
   if (colon >= 0 && ['ftp', 'http', 'https', 'ws', 'wss', 'file'].includes(scheme)) authorities.push(/^[^/\\?#]*/.exec(rest.replace(/^[/\\]+/, ''))[0]);
   const users = authorities.map((authority) => authority.slice(0, Math.max(authority.lastIndexOf('@'), 0)));
@@ -139,7 +139,7 @@ export function repositoryCredential(value) {
   if (!match) return secretArgument(value);
   const [, head, path, tail] = match;
   const odd = [path, asciiDecoded(path)].flatMap((written) => written.split(/[/\\:]/)).filter((piece) => piece && !repositoryName(piece));
-  if (repositoryPassword(value) || secretArgument(head + tail) || odd.some((piece) => secretArgument(piece))) return true;
+  if (repositoryPassword(value) || secretArgument(head + tail) || secretArgument(asciiDecoded(head)) || odd.some((piece) => secretArgument(piece))) return true; // the authority decoded too (unit reading 12)
   return repositoryParts(head, tail).some((part) => [...rawValues(part)].some(([name, values]) =>
     values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))));
 }

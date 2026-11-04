@@ -10,7 +10,8 @@ VECTORS = json.loads((Path(__file__).resolve().parent / "repository_vectors.json
 KEY = "ghp_" + "Fx9k" * 9  # made up at run time: shaped like a key, never one
 LETTERS = {"SKLETTERS": "sk-" + "AbCd" * 10, "GHLETTERS": "ghp_" + "AbCd" * 9, "AKLETTERS": "AKIA" + "ABCD" * 4,  # made up, no digit
            "SKUPPER": "SK-" + "AbCd" * 10, "JWTLETTERS": "eyJ" + "abcd" + ".eyJ" + "efgh" + ".ijkl", "RUN40": "AbCd" * 10,
-           "SKNAME": "sk-" + "learn-tutorial-notebooks", "SKWORD": "sk-" + "dictionary-extension"}  # a real-looking name a key's shape starts (FAA-200 (24))
+           "SKNAME": "sk-" + "learn-tutorial-notebooks", "SKWORD": "sk-" + "dictionary-extension",
+           "GHREST": "hp_" + "AbCd" * 6, "SKREST": "k-" + "AbCd" * 4, "GLREST": "lpat-" + "AbCd" * 6}  # a real-looking name a key's shape starts (FAA-200 (24))
 
 
 def made(value):
@@ -38,6 +39,12 @@ class RepositoryCredential(unittest.TestCase):
             for value in VECTORS["name"]:
                 with self.subTest(copy=path.parent.parent.name, name=value):
                     self.assertFalse(secrets.repository_credential(made(value)))
+            for value in VECTORS["password"]:  # repository_password read alone, as the Node twin's export is (readings 12)
+                with self.subTest(copy=path.parent.parent.name, password=value):
+                    self.assertTrue(secrets.repository_password(value))
+            for value in VECTORS["no_password"]:
+                with self.subTest(copy=path.parent.parent.name, no_password=value):
+                    self.assertFalse(secrets.repository_password(value))
 
 
 if __name__ == "__main__":

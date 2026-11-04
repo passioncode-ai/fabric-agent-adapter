@@ -79,7 +79,10 @@ export function checkUrl(url, { insecure = false } = {}) {
   if (!['http:', 'https:'].includes(parts.protocol) || !parts.hostname) {
     throw new HttpError('only http and https URLs with a host are sent', { url: redactUrl(url), kind: 'refused' });
   }
-  if (parts.username || parts.password || /^[a-z]+:\/*[^/?#]*@/i.test(String(url).trim())) {
+  // the user information as written, read on the text `new URL` reads (C0 and space off its ends, tab, CR and LF out),
+  // so `ht\ttps://h\\u:pw@x/r` is refused as the Python twin refuses it (0.62.0 unit reading 12)
+  const text = String(url).replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+  if (parts.username || parts.password || /^[a-z][a-z0-9+.-]*:\/*[^/?#]*@/i.test(text)) {
     throw new HttpError('credentials in a URL are refused: send them in a header', { url: redactUrl(url), kind: 'refused' });
   }
   if (parts.protocol === 'http:' && !insecure && !isLoopback(parts.hostname)) {

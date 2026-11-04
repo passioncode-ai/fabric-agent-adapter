@@ -241,4 +241,5 @@ def repository_credential(value: str) -> bool:
         return True
     odd = [piece for written in (path, ascii_decoded(path)) for piece in re.split(r"[/\\:]", written)
            if piece and not repository_name(piece)]
-    return secret_url(head + tail) or any(secret_argument(piece) for piece in odd)
+    # the scheme and authority decoded too: git sends `https://%67hp_...@h` with its user decoded (unit reading 12)
+    return secret_url(head + tail) or secret_argument(ascii_decoded(head)) or any(secret_argument(piece) for piece in odd)
