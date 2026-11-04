@@ -8,6 +8,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 VECTORS = json.loads((Path(__file__).resolve().parent / "repository_vectors.json").read_text(encoding="utf-8"))
 KEY = "ghp_" + "Fx9k" * 9  # made up at run time: shaped like a key, never one
+LETTERS = {"SKLETTERS": "sk-" + "AbCd" * 10, "GHLETTERS": "ghp_" + "AbCd" * 9, "AKLETTERS": "AKIA" + "ABCD" * 4}  # made up, no digit
+
+
+def made(value):
+    for mark, key in LETTERS.items():
+        value = value.replace(mark, key)
+    return value.replace("KEY", KEY)
 COPIES = [ROOT / "plugins/fabric-agent-adapter/skills" / skill / "scripts/fabric_secrets.py"
           for skill in ("building-fabric-services", "adapting-projects-to-fabric")]
 
@@ -25,7 +32,7 @@ class RepositoryCredential(unittest.TestCase):
             secrets = load(path)
             for value in VECTORS["credential"]:
                 with self.subTest(copy=path.parent.parent.name, credential=value):
-                    self.assertTrue(secrets.repository_credential(value.replace("KEY", KEY)))
+                    self.assertTrue(secrets.repository_credential(made(value)))
             for value in VECTORS["name"]:
                 with self.subTest(copy=path.parent.parent.name, name=value):
                     self.assertFalse(secrets.repository_credential(value))

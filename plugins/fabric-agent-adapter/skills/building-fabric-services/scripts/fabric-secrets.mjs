@@ -88,17 +88,45 @@ export function secretUrl(value) {
 const REPOSITORY_URI = /^([A-Za-z][A-Za-z0-9+.-]*:(?:\/\/[^/?#]*)?)([^?#]*)([\s\S]*)$/;
 const REPOSITORY_NAME = /^(?:[a-z0-9._-]+|[A-Za-z._-]+)$/; // lower case, or letters with no digit (readings 8)
 const REPOSITORY_AUTHORITY = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
+const KEY_AT_START = new RegExp(`^(?:${SECRET_VALUE.source})`, 'i');
+const JWT_AT_START = new RegExp(`^${JWT_SHAPE.source}`);
+const SPECIAL_QUERY = /^(?:https?|wss?|ftp|file):/i; // whose query also encodes `'`, as the URL standard does
+
+/** Whether a path segment reads as a repository's name: lower case, or letters with no digit, and not starting with a
+ * provider key's or a JWT's shape (0.62.0 readings 9), so a letters-only key is still a key. */
+export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_START.test(piece) && !JWT_AT_START.test(piece);
+
+// A repository's user information and parameters, read as fabric_secrets.secret_url reads them, by hand: `new URL`
+// refuses a host it cannot parse and a special scheme written without `//` (`https:host/r?access_token=...`), where
+// the Python twin still reads them (0.62.0 readings 8 and 9, FAA-200 (17)).
+function repositoryParts(head, tail) {
+  const authority = (/^[^:]*:\/\/([^/?#]*)/.exec(head)?.[1] ?? '').replace(/[\t\n\r]/g, '');
+  const userinfo = /^file:/i.test(head) ? '' : authority.slice(0, Math.max(authority.lastIndexOf('@'), 0));
+  const password = userinfo.includes(':') ? userinfo.slice(userinfo.indexOf(':') + 1) : '';
+  const text = tail.replace(/[\x00-\x20]+$/, '').replace(/[\t\n\r]/g, '');
+  const hash = text.indexOf('#');
+  const before = hash < 0 ? text : text.slice(0, hash);
+  const query = before.startsWith('?') ? before.slice(1) : '';
+  const fragment = hash < 0 ? '' : text.slice(hash + 1);
+  try { // percent-encode them as `new URL` does, on a host it always reads
+    const url = new URL(`${SPECIAL_QUERY.test(head) ? 'https://h.invalid/' : 'x-repository://h/'}?${query}#${fragment}`);
+    return [password, url.search.slice(1), url.hash.slice(1)];
+  } catch { return [password, query, fragment]; }
+}
 
 // FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
 // user), in its query or fragment as secretUrl reads them, or as a path segment shaped like a key. A path segment in
 // lower case, or of letters with no digit (task-pipeline-dashboard, Task-Pipeline-Dashboard), is the repository's
-// name, never a key, though it reads as an `sk-` shape. A
+// name, never a key, though it reads as an `sk-` shape, unless it starts with a key's shape (repositoryName). A
 // user outside a URL's authority (an scp form, `https:user@host/path`) counts as one: a user is an authority's.
 export function repositoryCredential(value) {
   if (value.includes('@') && !REPOSITORY_AUTHORITY.test(value)) return true;
   const match = REPOSITORY_URI.exec(value);
   if (!match) return secretArgument(value);
   const [, head, path, tail] = match;
-  const odd = path.split(/[/\\:]/).filter((piece) => piece && !REPOSITORY_NAME.test(piece));
-  return secretUrl(head + tail) || odd.some((piece) => secretArgument(piece));
+  const odd = path.split(/[/\\:]/).filter((piece) => piece && !repositoryName(piece));
+  if (secretArgument(head + tail) || odd.some((piece) => secretArgument(piece))) return true;
+  const [password, ...parts] = repositoryParts(head, tail);
+  return password !== '' || parts.some((part) => [...rawValues(part)].some(([name, values]) =>
+    values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))));
 }

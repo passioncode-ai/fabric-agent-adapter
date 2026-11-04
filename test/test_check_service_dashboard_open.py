@@ -282,12 +282,23 @@ class LiveOpensInHostTests(LiveSample):
                              ("git@github.com:example-org/na@me.git", "github.com:example-org/na@me.git"),
                              ("git@github.com:example-org/r#fixture-pw", "github.com:example-org/r"),
                              ("/srv/git/me@corp/r.git", "/srv/git/me@corp/r.git"),
-                             ("/srv/x?token=fixture-pw", "/srv/x")):
+                             ("/srv/x?token=fixture-pw", "/srv/x"),
+                             ("bot:fixture-pw@github.com:example-org/r#://", "github.com:example-org/r"),  # unit reading 9
+                             ("bot:fixture-pw@github.com:example-org/r?x=://", "github.com:example-org/r"),
+                             ("bot:fixture-pw@github.com/example-org/r/x://y", "github.com/example-org/r/x://y"),
+                             ("HTTPS:bot:fixture-pw@h.example/o/r", "https://h.example/o/r"),
+                             ("ws:bot:fixture-pw@h.example/o/r", "ws:<redacted>"),
+                             ("https://github.com/Example-Org/Task-Pipeline-Dashboard",
+                              "https://github.com/Example-Org/Task-Pipeline-Dashboard")):
             self.assertEqual(rules.shown_repository(value), shown, value)
         self.assertEqual(rules.shown_repository("https://github.com/example-org/task-pipeline-dashboard"),
                          "https://github.com/example-org/task-pipeline-dashboard", "a name is no key (seam reading 6)")
         for fake in ("ghp_" + "Fx9k" * 9 + ":example-org/r", "https://github.com/example-org/ghp_" + "Fx9k" * 9):  # made up
             self.assertEqual(rules.shown_repository(fake), "<a repository shaped like a credential>")
+        token = "glpat-" + "Ab1" * 7  # made up, built here; a user that is a token never shows (unit reading 9)
+        for value in (token + ":x@github.com:example-org/r#://", "deploy:" + token + "@github.com:example-org/r?x=://"):
+            self.assertNotIn(token.lower(), rules.shown_repository(value).lower(), "a later :// is no scheme")
+            self.assertNotIn("deploy", rules.shown_repository(value))
 
     def test_a_found_checkout_is_named_without_its_key(self):
         rules = importlib.import_module("check_service_rules")  # the found message too (0.62.0 unit reading 5)

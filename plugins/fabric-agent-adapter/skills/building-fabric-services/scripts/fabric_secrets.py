@@ -192,11 +192,18 @@ _REPOSITORY_NAME = re.compile(r"(?:[a-z0-9._-]+|[A-Za-z._-]+)\Z")  # lower case,
 _REPOSITORY_AUTHORITY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
 
 
+def repository_name(piece: str) -> bool:
+    """Whether a path segment reads as a repository's name: lower case, or letters with no digit, and not starting with
+    a provider key's or a JWT's shape (`sk-`, `ghp_`, `xoxb-`, `AKIA`, `eyJ`: 0.62.0 readings 9), so a letters-only key
+    is still a key while `task-pipeline-dashboard`, which holds an `sk-` shape inside, is a name."""
+    return bool(_REPOSITORY_NAME.match(piece)) and not SECRET_VALUE.match(piece) and not JWT_SHAPE.match(piece)
+
+
 def repository_credential(value: str) -> bool:
     """FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
     user), in its query or fragment as secret_url reads them, or as a path segment shaped like a key. A path segment in
     lower case, or of letters with no digit (task-pipeline-dashboard, Task-Pipeline-Dashboard), is the repository's
-    name, never a key, though it reads as an `sk-` shape. A
+    name, never a key, though it reads as an `sk-` shape, unless it starts with a key's shape (repository_name). A
     user outside a URL's authority (an scp form, `https:user@host/path`) counts as one: a user is an authority's."""
     if "@" in value and not _REPOSITORY_AUTHORITY.match(value):
         return True
@@ -204,5 +211,5 @@ def repository_credential(value: str) -> bool:
     if not match:
         return secret_argument(value)
     head, path, tail = match.groups()
-    odd = [piece for piece in re.split(r"[/\\:]", path) if piece and not _REPOSITORY_NAME.match(piece)]
+    odd = [piece for piece in re.split(r"[/\\:]", path) if piece and not repository_name(piece)]
     return secret_url(head + tail) or any(secret_argument(piece) for piece in odd)

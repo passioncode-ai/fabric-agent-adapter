@@ -1,5 +1,5 @@
 {
-  "note": "0.62.0 readings 7 and 8: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY is replaced at run time by a made-up key shape, never written here.",
+  "note": "0.62.0 readings 7 to 9: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY, SKLETTERS, GHLETTERS and AKLETTERS are replaced at run time by a made-up key shape, never written here.",
   "credential": [
     "https://bot:pw@github.com/example-org/r",
     "https://KEY@github.com/example-org/r",
@@ -12,7 +12,18 @@
     "bot:fixture@github.com:example-org/r#://",
     "https:fixture@github.com/example-org/r/x://y",
     "git@github.com:example-org/r.git",
-    "mailto:someone@example.com"
+    "mailto:someone@example.com",
+    "https://github.com/Example-Org/Task-Pipeline-Dashboard2",
+    "https://github.com/example-org/Desk-Helper-Agent-2026",
+    "https:github.com/example-org/r?access_token=fixture",
+    "wss:h.example/o/r#access_token=fixture",
+    "https:/h.example/o/r?access_token=fixture",
+    "HTTPS:h.example/o/r?Access_Token=fixture",
+    "https://h:99999/r?access_token=fixture",
+    "https://u:fixture@%00/r",
+    "https://github.com/example-org/SKLETTERS",
+    "https://github.com/example-org/GHLETTERS",
+    "https://github.com/example-org/AKLETTERS"
   ],
   "name": [
     "https://github.com/example-org/example-agent",
@@ -22,6 +33,11 @@
     "https://h.example/x?a=b:c@d",
     "urn:example:task-pipeline-dashboard",
     "https://[::1]:8080/x",
-    "https://github.com/Example-Org/Task-Pipeline-Dashboard"
+    "https://github.com/Example-Org/Task-Pipeline-Dashboard",
+    "https://github.com/example-org/task-pipeline-dashboard2",
+    "https://github.com/Example-Org/Agent-V2",
+    "https://github.com/example-org/Desk-Assistant-V2",
+    "x-r:h.example/o/r?q=fixture",
+    "https://github.com/example-org/r?ref=main"
   ]
 }

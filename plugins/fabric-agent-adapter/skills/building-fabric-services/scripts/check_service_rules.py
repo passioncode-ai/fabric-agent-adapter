@@ -19,12 +19,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
-from fabric_secrets import secret_argument  # noqa: E402
+from fabric_secrets import repository_name, secret_argument  # noqa: E402
 
 _LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
 _SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path
 _SPECIAL = re.compile(r"(?:https?|wss?|ftp):", re.I)  # the URL standard's special schemes, read with or without `//`
-_REPOSITORY_NAME = re.compile(r"(?:[a-z0-9._-]+|[A-Za-z._-]+)\Z")  # as fabric_secrets reads a name
+_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the value; a later `://` is path text (unit reading 9)
 
 
 def shown_repository(value: str) -> str:
@@ -34,7 +34,7 @@ def shown_repository(value: str) -> str:
     fragment. A value with a piece shaped like a credential that is no name (lower case, or letters with no digit) is not
     printed (0.62.0 readings 2
     to 7)."""
-    if "://" in value or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
+    if _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
         shown = redact_url(value)
     else:
         cut = 0
@@ -43,7 +43,7 @@ def shown_repository(value: str) -> str:
             hosts = [at for at in ats if _SCP_HOST.match(value, at + 1)]
             cut = (hosts or ats or [-1])[-1] + 1  # the last `@` a host and `:` follow, else the last `@` (unit reading 8)
         shown = re.split(r"[?#]", value[cut:], maxsplit=1)[0]
-    pieces = [piece for piece in re.split(r"[/\\:]", shown) if piece and not _REPOSITORY_NAME.match(piece)]
+    pieces = [piece for piece in re.split(r"[/\\:]", shown) if piece and not repository_name(piece)]
     return "<a repository shaped like a credential>" if any(secret_argument(piece) for piece in pieces) else shown
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
