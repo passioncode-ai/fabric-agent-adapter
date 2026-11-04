@@ -125,8 +125,9 @@ DISPATCH_CONTRACT = (
     "the board ones). Read the request with `com.get` {{message: <request>}} and its thread with `com.list` "
     "{{thread: <the `thread` com.get answered>}}. 2. "
     "`observatory_handoff_accept` with {handoff}, the `owner`, `idempotencyKey` and `executor` the launcher's prompt names "
-    "(when it names none: your `owner` `agent:<name>`, a key of your own, no executor) and this session's own `sessionId` "
-    "(the same on a retry) takes the workflow's lease; keep the `leaseId`. 3. `com.status` once for the "
+    "(when it names none: your `owner` `agent:<name>`, the key `accept-<handoff>`, no executor) and this session's own "
+    "`sessionId` (the same on a retry) takes the workflow's lease; keep the `leaseId`. A lapsed or refused handoff holds "
+    "no lease: end the run without touching the request. 3. `com.status` once for the "
     "epoch and the slot's generation; `com.enroll` for the capability, then `com.claim` (`idempotency`, `capability`, "
     "`request`), `com.accept` and `com.effect_begin` before an effect. When `com.get` shows the request accepted or in "
     "progress (an earlier run), take an accepted one over with `com.responder_replace` (`expectedGeneration`) and its "
@@ -221,10 +222,12 @@ DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, a
 #: With the replaced id unknown there is nothing to replay: the notice says so first (0.63.0 product reading 17).
 DISPATCH_CLEARED_UNKNOWN = (" This session was cleared, and these hooks cannot name the session id the clear "
                             "replaced: an accept already made under it cannot be replayed, so when "
-                            "`observatory_checkpoint_latest` shows the handoff taken, end the run without touching the "
-                            "request; Fabric takes the workflow over after it.{tail}")
+                            "`observatory_checkpoint_latest` shows the handoff taken and this session holds no leaseId "
+                            "for it, end the run without touching the request; Fabric takes the workflow over after "
+                            "it.{tail}")
 #: A pending handoff's lease is Fabric's; a lapsed one (`lapsedHandoff`) was never accepted and no longer can be.
-_CLEARED_TAIL = (" When it shows the handoff lapsed, no accept was made and none can be: end the run the same way. When "
+_CLEARED_TAIL = (" When `observatory_checkpoint_latest` shows the handoff lapsed, no accept was made and none can be: "
+                 "end the run without touching the request. When "
                  "`observatory_checkpoint_latest` still shows the handoff pending, no accept was made and the lease it "
                  "shows is Fabric's, not this run's: {pending}")
 _PENDING_NAMED = ("accept it now with that same sessionId, {pkey}, the owner {owner} and no executor (the launcher's "
@@ -241,12 +244,11 @@ def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None)
     until the handoff is taken."""
     named = isinstance(previous, str) and _SESSION_UUID.fullmatch(previous)
     switchboard = isinstance(handoff, str) and bool(handoff)
-    key = "`accept-%s` when Switchboard started the run" % handoff if switchboard else "the key the first accept used"
+    # step 2's key is `accept-<handoff>` whoever launched the run, so every /clear can replay it (product reading 18)
+    key = "`accept-%s`" % handoff if switchboard else "`accept-<handoff>`, the handoff the packet names"
     owner = ("`agent:<provider>` (such as `agent:claude-code`) when Switchboard started the run, else `agent:<name>`"
              if switchboard else "`agent:<name>` step 2 names")
-    # a pending accept's key is step 2's, never "the first accept's": none was made (0.63.0 unit reading 17)
-    pkey = "the key `accept-%s` when Switchboard started the run, else one of its own" % handoff if switchboard else (
-        "an idempotencyKey of its own")
+    pkey = "the key %s" % key
     if named:
         tail = _CLEARED_TAIL.format(pending=_PENDING_NAMED.format(pkey=pkey, owner=owner))
         return DISPATCH_CLEARED.format(session="sessionId %s" % previous, key=key, tail=tail)
