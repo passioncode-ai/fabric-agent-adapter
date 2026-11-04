@@ -11,8 +11,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   demo source `serve --degraded` marks failing; the online example (`sample-remote-service.mjs`) declares an empty list,
   since it calls nothing outside itself. The support-agent recipe's `SupportAgent.connections()` names its two models
   for the service that runs it, keeping only an id the connections rule accepts, and imports `fabric_connections` only
-  when called (the recipe's install line names the module). `check_service.py` reports `well-known.connections` as `NOT_RUN` when a
-  service declares none (it reported nothing before), and adapting-projects-to-fabric names the declaration in its
+  when called (the recipe's install line names the module). `check_service.py` reports `well-known.connections` as `NOT_RUN` when the
+  well-known document has no connections declaration (it reported nothing before); an empty list is one and reads
+  `PASS`, and adapting-projects-to-fabric names the declaration in its
   adapter step (FAA-199).
 
 ### Changed
@@ -62,6 +63,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
 - Node's `redactUrl` printed `<unparseable url>` for a URL of a scheme other than http, https, ws, wss or ftp (`file:`
   included) that `new URL` cannot parse (`ssh://[zz]/r`, `ssh://h:99999/r`, `file://h:1/r`), where Python keeps the
   scheme: both now print `<scheme>:<redacted>`.
+- A subscription `runner.kind` that is no string (a list or an object) raised `TypeError` in Python's
+  `validate_descriptor`, `write_descriptor` and `check_service.py` (0.61.0 too), and Node named only one of its two
+  problems: both kits now name both as descriptor problems.
 - Node's key set cache (`JwksCache`) accepted `https://h\u:pw@x/j` and `https://@x/j`, which the Python twin refuses:
   it now reads the authority as written too.
 

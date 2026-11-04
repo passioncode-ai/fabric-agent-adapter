@@ -203,7 +203,7 @@ class Probe:
             self.add("descriptor.source-repository", "NOT_RUN", "the descriptor %s" % fs.NO_SOURCE_REPOSITORY)
         # what the source adds, read in the member rules, which a missing required key never cuts short (unit reading 16)
         elif added := sorted(set(fs.descriptor_member_problems(self.d)) - set(fs.descriptor_member_problems(
-                {k: v for k, v in self.d.items() if k != "source"}))):  # its own problem, which carries no value
+                {k: v for k, v in self.d.items() if k != "source"}))):  # its own problem (a member name it names is the descriptor's own, FAA-200 (39))
             self.add("descriptor.source-repository", "NOT_RUN", "source is refused: %s" % added[0])
         else:
             self.add("descriptor.source-repository", "PASS", "names %s" % shown_repository(self.d["source"]["repository"]))
