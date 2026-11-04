@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.61.0"
+  version: "0.62.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "3830a3353923e20f826d466610e1c479f120bec0"
@@ -65,16 +65,17 @@ Answer before writing code, and record the answers in the project README:
 | What it stores | the store, where it lives (Step 2, rule 5), and what survives uninstall |
 | Data and uptime | kind U or O, kit folders, a durable store or `<id>-data`, uptime A or B; a new agent's `LICENSE` holder, transfer audit per release (creating-fabric-agents) |
 | What it tells the operator | the events worth a notification (Step 5) |
+| Source | `source.repository`, required (Step 4); connections, `[]` if none |
 
 ## Step 1: choose the surfaces
 
 | Caller | Surface | Why |
 |---|---|---|
-| Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session; stdio-per-session once left twenty stray servers on this machine |
+| Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session (stdio-per-session once left twenty stray servers) |
 | The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard` (opens only in Fabric Dashboards, below), `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
 | A remote agent | A2A `1.0` over HTTPS, or MCP behind an authenticated gateway | loopback reachability is not authorization |
 | An A2A peer on this computer | `surfaces.a2a` names a public Agent Card, served without the token; its interface URLs are loopback (DEC-0122); the kits read it, serving one is FAA-10 | the card carries no credential, process member or required Fabric extension |
-| The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header; every button on it also a tool on the MCP surface (Step 5) | the CSRF defence all four existing dashboards use |
+| The dashboard page | same-origin REST under `/api`, session cookie plus a custom request header; every button on it also a tool on the MCP surface (Step 5) | the existing dashboards' CSRF defence |
 
 Read [the surfaces and auth reference](references/surfaces-and-auth.md) when wiring
 MCP registration into a client config, the login flow or the CSRF header.
@@ -213,8 +214,8 @@ descriptor's `fabricManifest` at a manifest whose service key names this
 The installer, not the service, owns the plist and the descriptor. Sequence:
 
 1. `write_descriptor(descriptor)`: refuses a port or `id.instance` another descriptor
-   claims. A preview or branch copy is a second **instance**, never a second id, and it is
-   one more service the operator sees, probes and gets notified by. Verify a release with its
+   claims, and a new one without `source.repository` (a rewrite warns). A preview or branch
+   copy is a second **instance**, never a second id: one more service the operator sees. Verify a release with its
    own doctor or self-check before it replaces `default`; a temporary instance is uninstalled
    (`launchd_uninstall`, `remove_descriptor`) as soon as its check is done, not left running.
 2. `launchd_plist(...)` then `launchd_install(...)`: writes and lints the plist,
@@ -269,7 +270,7 @@ refusals.
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
 agents, models, connectors, stores and channels, each with its state, from
 `connections_extension()` / `connectionsExtension()` in `fabric_connections`. Never a credential in it, never a call
-count (that is the usage report); the details are in [the wire reference](references/protocol.md).
+count (that is the usage report); details: [the wire reference](references/protocol.md).
 
 The events feed is a **view over the log you already keep** (a jobs table, a JSONL
 journal), not a second store. Each event is one sentence a person reads; set
@@ -298,7 +299,8 @@ rule it can reach and says which it could not:
 python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 ```
 
-It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, well-known
+It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, `descriptor.source-repository`,
+`well-known.connections`, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,
 launchd pid equals answering pid, `dashboard.declared` (ED-9), `well-known.actions` (DEC-0121),
@@ -405,8 +407,8 @@ this estate needs.
 - **Not macOS / no launchd:** the kits write a systemd user unit (Linux) or a per-user Scheduled Task (Windows); with
   no supervisor at all declare `lifecycle.manager: "none"`, and hosts show the service read-only. Keep every other rule.
 - **A desktop app with no supervisor** (DEC-0069): its descriptor says `manager: "person"` with `lifecycle.app`, no
-  origin, `installedBy {by: "person", role, tool}`; its live origin is in its own liveness file
-  (the lifecycle reference, *An app's own descriptor and the node*).
+  origin, `installedBy {by: "person", role, tool}`, `source.repository` (the lifecycle reference, *An app's own
+  descriptor and the node*).
 - **No Python:** use the Node kit; run the probe from any machine that has Python and
   can reach the port, or mark the probe `NOT_RUN` with the reason.
 - **Neither kit fits the framework:** implement the four routes and the lock by hand

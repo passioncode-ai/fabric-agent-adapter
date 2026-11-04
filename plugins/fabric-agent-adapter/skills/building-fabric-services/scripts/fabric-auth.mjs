@@ -7,7 +7,7 @@ import { PROTOCOL, ServiceError, nowIso } from './fabric-base.mjs';
 import { tokenMatches, windowsTokenProblem } from './fabric-platform.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { isPlainObject } from './fabric-usage.mjs';
-import { validateDescriptor, writeDescriptor } from './fabric-descriptor.mjs';
+import { descriptorPath, namesRepository, sourceRefusal, validateDescriptor, writeDescriptor } from './fabric-descriptor.mjs';
 
 export const SESSION_COOKIE = 'fabric_session';
 
@@ -275,8 +275,17 @@ export function registerRemote({ id, instance = 'default', name, summary, origin
     installedAt: nowIso(), installedBy, ...(runner ? { runner: { ...runner } } : {}), ...(peer ? { peer: { ...peer } } : {}),
     ...(source != null ? { source: isPlainObject(source) ? { ...source } : source } : {}),
   };
+  if (source == null) { // a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
+    let installed = null;
+    try { installed = JSON.parse(fs.readFileSync(descriptorPath(id, instance, dir), 'utf8'))?.source; } catch { /* none installed */ }
+    // Only one the kit accepts: a hand-edited source never blocks a rotation; it is dropped with the warning.
+    const base = new Set(validateDescriptor(d));
+    if (namesRepository({ source: installed }) && validateDescriptor({ ...d, source: installed }).every((p) => base.has(p))) d.source = { ...installed };
+  }
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
+  const refusal = sourceRefusal(d, dir); // before the token is written: a refused install leaves nothing (FAA-198)
+  if (refusal) throw new ServiceError(refusal);
   ensurePrivateDir(path.dirname(tokenFile));
   atomicWrite(tokenFile, String(token).trim(), 0o600);
   return writeDescriptor(d, dir);

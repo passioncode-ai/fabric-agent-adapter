@@ -8,7 +8,7 @@ once, and `sample.draft` is a job that stops for a titled choice before it compl
 `register` also writes the service's manifest, which names this descriptor.
 
   sample_service.py serve --port 47190 --data-dir DIR [--id sample] [--instance default]
-  sample_service.py register --port 47190 --data-dir DIR [--services-dir DIR]
+  sample_service.py register --port 47190 --data-dir DIR [--services-dir DIR] [--id ID] [--repository URI]
 
 Opt-in, off by default: `serve --board-project <Project uuid>` also answers that Project's `sample.echo` requests on
 Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Responder, from a board.respond grant whose
@@ -40,6 +40,11 @@ import fabric_board as fbd  # noqa: E402 - the board responder (opt-in)
 import fabric_hub as fhb  # noqa: E402
 
 VERSION = "0.1.0"
+SAMPLE_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-adapter"  # where this sample is built from (FAA-198)
+# FAA-199: what the sample uses, declared so a host draws its chain (DEC-0096): the template it drafts from, and the
+# demo source `serve --degraded` marks failing (a degraded[].source naming an id is that connection failing).
+CONNECTIONS = [{"id": "template", "kind": "model", "target": "sample-template", "purpose": "drafts the notes"},
+               {"id": "demo", "kind": "connector", "target": "demo", "purpose": "the source --degraded marks failing"}]
 # The dashboard is built from the dashboard kit (fabric-dashboard/0.1, DEC-0036) and declares it
 # in the well-known document only when the kit is there to serve.
 KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
@@ -279,7 +284,8 @@ class Service:
                       "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]
                               + ([TAKE_BACK["tool"]] if self.board is not None else [])},
                       "usage": {"path": fs.USAGE_PATH}},
-            extensions=fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else None,
+            extensions=dict(fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else {},
+                            **fs.connections_extension(CONNECTIONS, degraded=self.degraded, states={"template": "ok"})),
             # DEC-0067: listed only when the board is on — a host pinned before DEC-0067 refuses the member.
             # DEC-0126 OA-7: a server serving a relayed action reads `source`, so it lists operator-source/1 too.
             protocols=self.mcp.well_known_protocols(["fabric-service/0.1", "fabric-project-comms/0.1"]) if self.board is not None else None,
@@ -540,7 +546,7 @@ def write_manifest(args: argparse.Namespace, data: Path, board: bool = False) ->
 
 def register(args: argparse.Namespace) -> int:
     data = Path(args.data_dir)
-    manifest = write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
+    manifest = data / "fabric-agent.json"  # written below, once the descriptor is known to be accepted
     descriptor = {
         "protocol": fs.PROTOCOL, "id": args.id, "instance": args.instance, "name": args.name,
         "summary": "Sample fabric-service/0.1 service.",
@@ -550,11 +556,40 @@ def register(args: argparse.Namespace) -> int:
         else {"manager": "none"},
         "paths": {"data": str(data), "logs": []},
         "fabricManifest": str(manifest),
+        "source": {"repository": args.repository},
         # DEC-0061: who installed it, by role and never by name — a person runs this register command.
         "installedAt": fs.now_iso(), "installedBy": {"by": "person", "role": "operator", "tool": "sample_service.py register %s" % VERSION},
     }
+    # A refused descriptor leaves no manifest naming it (0.62.0 unit reading 1).
+    problems = fs.validate_descriptor(descriptor)
+    refusal = ("Descriptor is invalid: %s." % "; ".join(problems) if problems
+               else fs.source_refusal(descriptor, Path(args.services_dir) if args.services_dir else None))
+    if refusal:
+        print(refusal, file=sys.stderr)
+        return 1
+    services = Path(args.services_dir) if args.services_dir else None
+    installed = fs.descriptor_path(args.id, args.instance, services)
+    try:  # what a failed rewrite puts back (unit reading 4)
+        old = installed.read_bytes() if installed.exists() else None
+    except OSError as exc:  # one it could not put back is never replaced (product reading 5)
+        print("The installed descriptor %s cannot be read (%s); nothing was written." % (installed, exc.strerror or exc), file=sys.stderr)
+        return 1
     try:
-        path = fs.write_descriptor(descriptor, Path(args.services_dir) if args.services_dir else None)
+        path = fs.write_descriptor(descriptor, services)
+        # After the descriptor, so a refusal of any kind (a port claim too) leaves no manifest naming it (unit reading 2);
+        # a manifest that cannot be written takes a new descriptor back with it (unit reading 3).
+        try:
+            write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
+        except OSError as exc:
+            undo = ""
+            try:
+                if old is None:
+                    fs.remove_descriptor(args.id, args.instance, services)
+                else:
+                    fs.atomic_write(installed, old, 0o600)  # its bytes, 0600 as every descriptor the kit writes
+            except OSError as again:  # said in the same line, never a traceback (seam reading 5)
+                undo = "; %s could not be %s either: %s" % (installed, "removed" if old is None else "put back", again.strerror or again)
+            raise fs.ServiceError("The manifest %s cannot be written: %s%s." % (manifest, exc.strerror or exc, undo))
     except fs.ServiceError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -584,6 +619,9 @@ def build_parser() -> argparse.ArgumentParser:
             p.add_argument("--board-project", help="the Project the service will answer on the board: lists its take-back "
                                                    "tool in the manifest (serve with the same --board-project)")
             p.add_argument("--services-dir")
+            # FAA-198: the repository its code is built from, which a new descriptor names; the sample's own by default.
+            # The descriptor runs this sample's code whatever --id names, so its repository is this one by default.
+            p.add_argument("--repository", default=SAMPLE_REPOSITORY, help="the repository its code is built from")
             p.add_argument("--label")
             p.add_argument("--plist")
     return parser

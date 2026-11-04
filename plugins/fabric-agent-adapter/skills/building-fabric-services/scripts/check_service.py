@@ -64,6 +64,7 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402
 import fabric_connections as fcn  # noqa: E402
+from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
 
 Result = Dict[str, str]
@@ -194,6 +195,18 @@ class Probe:
         else:
             unique = "port %d is unique" % self.port
         self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
+        # FAA-198: the repository that links the agent to its project; a new install is refused without it, an installed one
+        # is named here (NOT_RUN is no pass) until its owner adds it.
+        # A source descriptor.valid refuses is no pass either, and the evidence never carries a URL's userinfo or query,
+        # where a password rides (0.62.0 unit reading 2).
+        if not fs.names_repository(self.d):
+            self.add("descriptor.source-repository", "NOT_RUN", "the descriptor %s" % fs.NO_SOURCE_REPOSITORY)
+        # what the source adds, read in the member rules, which a missing required key never cuts short (unit reading 16)
+        elif added := sorted(set(fs.descriptor_member_problems(self.d)) - set(fs.descriptor_member_problems(
+                {k: v for k, v in self.d.items() if k != "source"}))):  # its own problem (a member name it names is the descriptor's own, FAA-200 (39))
+            self.add("descriptor.source-repository", "NOT_RUN", "source is refused: %s" % added[0])
+        else:
+            self.add("descriptor.source-repository", "PASS", "names %s" % shown_repository(self.d["source"]["repository"]))
         if (self.d.get("lifecycle") or {}).get("manager") == "person":
             # DEC-0069: installed, never running — a reader checks the app is still there; liveness is the app's own file.
             present = fs.app_present(self.d)
@@ -275,6 +288,9 @@ class Probe:
             self.add("well-known.connections", "FAIL" if view["reported"] else "PASS",
                      "; ".join(f["message"] for f in fcn.connections_rules(wk)[:5]) or
                      "%d connection(s), %d named in degraded[]" % (len(view["connections"]), failing))
+        else:  # FAA-199: named, never a pass, so the connection map is not left empty unseen
+            self.add("well-known.connections", "NOT_RUN", "declares no %s: a host cannot draw what the service uses "
+                     "(connections_extension / connectionsExtension)" % fcn.CONNECTIONS_EXTENSION_KEY)
         # DEC-0121, FAC-SEM-142: every button's agent twin, declared; no declaration is NOT_RUN (D10).
         self.add("well-known.actions", *well_known_actions_verdict(wk))
         # DEC-0122: where the public Agent Card is; no member is NOT_RUN.
@@ -809,9 +825,9 @@ class Probe:
         if not source:
             self.add(rule, "NOT_RUN", "data is inside repository %s and the descriptor names no source.repository to tell code from data" % top)
         elif remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
-            self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, source))
+            self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, shown_repository(source)))
         else:
-            self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, remote.stdout.strip() or "no remote"))
+            self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, shown_repository(remote.stdout.strip()) or "no remote"))
 
     def lock_rule(self, data: Path) -> None:
         lock = data / "service.lock"

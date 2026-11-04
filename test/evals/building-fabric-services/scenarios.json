@@ -290,7 +290,8 @@
         "on Windows writes a per-user task with task_xml / taskXml (logon trigger, restart on failure every minute, no execution time limit, IgnoreNew, least privilege) and installs it with task_install / taskInstall (schtasks /Create from the XML without administrator rights, then /Run); the descriptor says manager task-scheduler with its \\PassionCode\\<id>.<instance> task",
         "never puts a secret in a unit or a task: the writers refuse a credential-shaped argument, environment name or value; the token stays in the protected token file (0600, or on Windows an ACL of the user, SYSTEM and Administrators only)",
         "stops the operator's way: systemd_uninstall / systemdUninstall (disable --now, then remove) and task_uninstall / taskUninstall (/End, then /Delete), plus remove_descriptor",
-        "checks one copy with check_service.py: the instance lock is held (a Node service holds an abstract socket on Linux or a named pipe on Windows, and the probe sees it)"
+        "checks one copy with check_service.py: the instance lock is held (a Node service holds an abstract socket on Linux or a named pipe on Windows, and the probe sees it)",
+        "the descriptor it writes names source.repository, the repository its code is built from (FAA-198)"
       ]
     },
     {
@@ -346,9 +347,9 @@
       "trap": "a desktop app wrote a descriptor that claimed a port it changes on every start, its installer string as installedBy, and a dashboard showed Fabric's button although Fabric had been uninstalled; a cloud agent offered to colleagues declared no runner and ran on the owner's subscription",
       "request": "example-app is a desktop app with no installer, and example-inbox is offered to the organization's members; register both so hosts list them correctly, and show Fabric's button only when Fabric is installed.",
       "expected": [
-        "writes the app's descriptor with lifecycle.manager person, lifecycle.app the installed app, installedBy {by: person, role, tool} and no origin; rewrites it only when app_descriptor_action / appDescriptorAction says write (no descriptor, another version or path), never from an App Translocation path",
+        "writes the app's descriptor with lifecycle.manager person, lifecycle.app the installed app, installedBy {by: person, role, tool}, source.repository naming the repository its code is built from, and no origin; rewrites it only when app_descriptor_action / appDescriptorAction says write (no descriptor, another version or path), never from an App Translocation path",
         "keeps the app's live origin and process id in its own liveness file, and a caller that sends anything reads that file and checks the process; the descriptor claims no port",
-        "registers the offered service with register_remote / registerRemote passing runner {credentialKind} (never subscription, never a credential's value) and peer {endpoint, custody, residency, maxDataClass}, and installedBy by role, never a person's name",
+        "registers the offered service with register_remote / registerRemote passing source {repository}, runner {credentialKind} (never subscription, never a credential's value) and peer {endpoint, custody, residency, maxDataClass}, and installedBy by role, never a person's name",
         "a host routes a request from anyone but the operator only when peer_refusal / peerRefusal answers null: never above maxDataClass, an unknown class refused first",
         "sets data-fabric=\"absent\" on Fabric's button unless fabric_button_presence / fabricButtonPresence answers present (Fabric's own descriptor registered and, for an app's, its app still installed)"
       ]
@@ -443,7 +444,8 @@
         "derives the instance from the context with hold_context_instance / holdContextInstance (fabric_context, installed with fabric_kit.py install --module fabric_context): personal stays the default instance with its existing folders and lock, org:example-org runs as org-example-org with its own descriptor, data, log and cache folders and its own instance lock",
         "passes the estate record this machine applied (verified with verify_estate_record), the machine id and the agentRef, and the organization's instance is refused with exit 78 when the record places no such agent in that context (placement-missing), when its placement names no unrevoked share grant for that context (grant-refused, FAC-SEM-111) or when now is outside the grant's window (grant-window); nothing is created before the refusal",
         "a second copy for the same context exits 75 under the instance lock, and the data folder's fabric-context.json marker refuses a start for another context (context-mismatch, exit 78)",
-        "an uninstall that purges passes the instance (launchd_uninstall(..., instance=) / launchdUninstall(..., {instance})), so the organization's purge never reaches the personal folders"
+        "an uninstall that purges passes the instance (launchd_uninstall(..., instance=) / launchdUninstall(..., {instance})), so the organization's purge never reaches the personal folders",
+        "the new instance's descriptor names source.repository: a new instance is a new install, refused without it (FAA-198)"
       ]
     },
     {
@@ -522,7 +524,8 @@
         "sets ceiling_usd with window day and prices from the OpenRouter catalog, and a fallback model of another vendor",
         "relies on the ceiling being checked before every attempt, retries and fallback included, with tools and params counted as input",
         "records usage through the client's ledger and shows spend (usage_report or totals), counting unknown cost as unknown, never as 0",
-        "treats an empty or length-cut answer as a failure, not a reply"
+        "treats an empty or length-cut answer as a failure, not a reply",
+        "declares the model and its fallback as connections (kind model) in the well-known document"
       ]
     },
     {
@@ -595,7 +598,7 @@
       "request": "example-agent shows its chat picker on http://127.0.0.1:8765 but has no Fabric descriptor. Open it for me.",
       "expected": [
         "does not open the page in a browser as a workaround",
-        "makes the agent a fabric-service/0.1 service: a descriptor, the well-known document, the login code route and a declared dashboard, so Fabric Dashboards can open it; or, when that is not this task, files a board row for it",
+        "makes the agent a fabric-service/0.1 service: a descriptor that names its source.repository, the well-known document, the login code route and a declared dashboard, so Fabric Dashboards can open it; or, when that is not this task, files a board row for it",
         "says the page cannot be opened in Fabric Dashboards until then"
       ]
     },
@@ -640,7 +643,8 @@
       "expected": [
         "records in the Step 0 answers the data kind O, the data home (the kit's folders; a private repository of the data is <id>-data), uptime category B (local only, no cloud) and the LICENSE holder",
         "runs the transfer audit (fabric_source_check.py check in Git mode on the checkout and with --every-file on a clean copy of what Git would commit) at each release",
-        "adds no cloud host for a category B service"
+        "adds no cloud host for a category B service",
+        "names source.repository in the descriptor (the repository the code is built from) and declares extensions/connections/0.1 in the well-known document, an empty list when it uses nothing"
       ]
     },
     {

@@ -2,6 +2,7 @@
 checkout opens its own pages only through Fabric Dashboards, never with a browser opener. The matcher on its own
 (true and false positives), the verdict over a real Git checkout, finding the checkout, and the live probe."""
 
+import importlib
 import json
 import os
 from pathlib import Path
@@ -229,6 +230,67 @@ class CheckoutTests(unittest.TestCase):
 
 
 @unittest.skipUnless(shutil.which("git"), "git is not installed")
+class ShownRepositoryTests(unittest.TestCase):
+    """How a repository is printed as evidence: a pure function, so no sample runs (0.62.0 unit reading 11)."""
+
+    def test_a_repository_in_the_evidence_carries_no_key(self):
+        rules = importlib.import_module("check_service_rules")
+        for source in ("https://fixture-token@github.com/example-org/example-agent",
+                       "https://github.com/example-org/example-agent?access_token=fixture-token"):
+            _, reason = rules.service_checkout({"source": {"repository": source}, "paths": {"data": "/nonexistent"}}, None)
+            self.assertNotIn("fixture-token", reason, "dashboard.opens-in-host prints it redacted (0.62.0 seam reading 4)")
+            self.assertIn("github.com", reason)
+        for value, shown in (("git@github.com:example-org/r.git", "github.com:example-org/r.git"),  # 0.62.0 readings 4, 5
+                             ("bot:fixture-pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("bot:fixture?pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("deploy:fixture/pw@github.com:example-org/r", "github.com:example-org/r"),  # unit reading 6
+                             ("bot:fix@tu-re-pw@github.com:example-org/r", "github.com:example-org/r"),  # unit reading 7
+                             ("repos/me@corp/r", "corp/r"), ("./me@corp/r", "./me@corp/r"),  # a relative path loses its user part
+                             ("https:bot:fixture-pw@github.com/example-org/r", "https://github.com/example-org/r"),  # unit reading 8
+                             ("http:bot:fixture-pw@h.example/o/r", "http://h.example/o/r"),
+                             ("bot:fixture-pw@github.com/example-org/r", "github.com/example-org/r"),
+                             ("bot:a@b:fixture-pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("/srv/me@h:x/r", "/srv/me@h:x/r"),
+                             ("\\\\srv\\share\\me@corp\\r", "\\\\srv\\share\\me@corp\\r"), ("C:/git/me@corp/r", "C:/git/me@corp/r"),
+                             ("git@github.com:example-org/task-pipeline-dashboard", "github.com:example-org/task-pipeline-dashboard"),
+                             ("bot:fixture\\pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("C:\\git\\me@corp\\r", "C:\\git\\me@corp\\r"),
+                             ("~/git/me@corp/r", "~/git/me@corp/r"),
+                             ("git@github.com:example-org/r.git?token=fixture@pw", "github.com:example-org/r.git"),
+                             ("git@github.com:example-org/na@me.git", "github.com:example-org/na@me.git"),
+                             ("git@github.com:example-org/r#fixture-pw", "github.com:example-org/r"),
+                             ("/srv/git/me@corp/r.git", "/srv/git/me@corp/r.git"),
+                             ("/srv/x?token=fixture-pw", "/srv/x"),
+                             ("bot:fixture-pw@github.com:example-org/r#://", "github.com:example-org/r"),  # unit reading 9
+                             ("bot:fixture-pw@github.com:example-org/r?x=://", "github.com:example-org/r"),
+                             ("bot:fixture-pw@github.com/example-org/r/x://y", "github.com/example-org/r/x://y"),
+                             ("HTTPS:bot:fixture-pw@h.example/o/r", "https://h.example/o/r"),
+                             ("ws:bot:fixture-pw@h.example/o/r", "ws:<redacted>"),
+                             ("https://h\\u:fixture-pw@x.example/o/r", "https://x.example/o/r"),  # seam reading 10
+                             ("https://u\\:fixture-pw@h.example/o/r", "https://h.example/o/r"),
+                             ("https://github.com/Example-Org/Task-Pipeline-Dashboard",
+                              "https://github.com/Example-Org/Task-Pipeline-Dashboard")):
+            self.assertEqual(rules.shown_repository(value), shown, value)
+        self.assertEqual(rules.shown_repository("https://github.com/example-org/task-pipeline-dashboard"),
+                         "https://github.com/example-org/task-pipeline-dashboard", "a name is no key (seam reading 6)")
+        letters = "sk-" + "AbCd" * 10  # made up, no digit: a key all the same, never a name (seam and unit readings 10)
+        for fake in ("ghp_" + "Fx9k" * 9 + ":example-org/r", "https://github.com/example-org/ghp_" + "Fx9k" * 9,
+                     "https://github.com/example-org/" + letters, "git@github.com:example-org/" + letters,
+                     "https://github.com/example-org/%73" + letters[1:],
+                     "https://github.com/example-org/%73k-" + "abcd" * 10):  # made up; decoded too (product reading 11)
+            self.assertEqual(rules.shown_repository(fake), "<a repository shaped like a credential>")
+        for value in ("https:/\t/h\\u:fixture-pw@x.example/o/r", " https://a@u:fixture-pw@h.example/o/r",
+                      "ssh:/\t/a@u:fixture-pw@h.example/o/r", "x-r:\t//@u:fixture-pw@o", "https:/\n/u:fixture-pw@h.example/r",
+                      "file:@u:fixture-pw@/", "file:\\\\a@u:fixture-pw@h/r"):  # read as redact_url reads it (unit reading 11)
+            self.assertNotIn("fixture-pw", rules.shown_repository(value), repr(value))
+            _, reason = rules.service_checkout({"source": {"repository": value}, "paths": {"data": "/nonexistent"}}, None)
+            self.assertNotIn("fixture-pw", reason, repr(value))
+        token = "glpat-" + "Ab1" * 7  # made up, built here; a user that is a token never shows (unit reading 9)
+        for value in (token + ":x@github.com:example-org/r#://", "deploy:" + token + "@github.com:example-org/r?x=://"):
+            self.assertNotIn(token.lower(), rules.shown_repository(value).lower(), "a later :// is no scheme")
+            self.assertNotIn("deploy", rules.shown_repository(value))
+
+
 class LiveOpensInHostTests(LiveSample):
     """The sample service, probed with --repo pointing at a checkout built here."""
 
@@ -252,7 +314,17 @@ class LiveOpensInHostTests(LiveSample):
     def test_no_checkout_is_not_run(self):
         result = self.probe()
         self.assertEqual(result["verdict"], "NOT_RUN")
-        self.assertIn("source.repository", result["evidence"])
+        self.assertIn("pass --repo", result["evidence"])  # the sample names its source.repository since 0.62.0 (FAA-198)
+
+    def test_a_found_checkout_is_named_without_its_key(self):
+        rules = importlib.import_module("check_service_rules")  # the found message too (0.62.0 unit reading 5)
+        repo = self.checkout({"run.sh": "echo\n"})
+        git(repo, "remote", "add", "origin", "https://fixture-token@github.com/example-org/example-agent")
+        top, reason = rules.service_checkout({"source": {"repository": "https://fixture-token@github.com/example-org/example-agent"},
+                                              "commands": {"doctor": [str(repo / "run.sh")]}}, None)
+        self.assertEqual(top, repo.resolve())
+        self.assertNotIn("fixture-token", reason)
+        self.assertIn("github.com/example-org/example-agent", reason)
 
     def test_a_raw_safari_open_fails_and_the_hosts_link_passes(self):
         bad = self.checkout({"open.sh": "open -a Safari http://127.0.0.1:%d/\n" % self.port})

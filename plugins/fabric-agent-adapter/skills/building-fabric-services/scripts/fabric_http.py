@@ -157,6 +157,11 @@ def redact_url(url: str) -> str:
     # then remove every tab, CR and LF, so ` https://u:pw@h` and `ht\ttps:u:pw@h` lose their password too (0.56.0
     # seam r10; Python 3.9's urlsplit keeps a leading space in the scheme).
     url = re.sub(r"[\t\n\r]", "", str(url).strip("".join(map(chr, range(0x21)))))
+    # The user information as written goes first, as git and urllib read it, where WHATWG reads a backslash as a slash:
+    # `https://h\\u:pw@x/r` would print `pw` in its path (0.62.0 seam reading 11). The Node twin does the same.
+    written = re.match(r"([A-Za-z][A-Za-z0-9+.-]*:[/\\]*)([^/?#]*)", url)  # after any run of slashes (seam reading 13)
+    if written and "@" in written.group(2):
+        url = written.group(1) + written.group(2).rpartition("@")[2] + url[written.end():]
     scheme, colon, rest = url.partition(":")
     if colon and scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
         # A special scheme as WHATWG reads it: the authority starts after every slash or backslash that follows the

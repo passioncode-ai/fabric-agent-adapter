@@ -24,8 +24,9 @@ For each message it:
 What the agent does not do: send the reply anywhere (the service that calls it owns its channel), judge facts with a
 model, or answer outside the knowledge file. The model's text is data: a citation it invents fails the check.
 
-The kit modules (fabric_openrouter and its closure) sit beside this file in a service
-(`fabric_kit.py install <dir> --module fabric_openrouter`); in this repository they are read from ../../scripts.
+The kit modules sit beside this file in a service, installed as the README's "Install into a service" says
+(`fabric_kit.py install <dir> --lang py --module fabric_openrouter --module fabric_usage --module fabric_paths
+--module fabric_connections`); in this repository they are read from ../../scripts.
 Standard library only. FAA-65 REQ-09.
 """
 from __future__ import annotations
@@ -370,6 +371,22 @@ class SupportAgent:
         self._lock = threading.RLock()
         self._local = threading.local()
         self._log = DecisionLog(self.state_dir)
+
+    def connections(self) -> List[Dict[str, Any]]:
+        """FAA-199: what the agent uses, for `connections_extension` in the well-known document of the service that runs
+        it (DEC-0096); that service adds its own hand-off route and channels."""
+        # A model id that is not one (empty, missing, with a space) is left out, so a misconfigured fallback degrades the
+        # replies, never the well-known document (0.62.0 seam reading 1).
+        named = [("model", self.model, "drafts replies from the knowledge file"),
+                 ("fallback", self.fallback, "drafts when the first model fails")]
+        import fabric_connections  # the service that declares them installs it (README); the agent runs without it
+        kept = []
+        for ident, target, purpose in named:  # by the connections rule itself, never a second copy of it (seam reading 2)
+            item = {"id": ident, "kind": "model", "target": target, "purpose": purpose}
+            probe = {"extensions": {fabric_connections.CONNECTIONS_EXTENSION_KEY: {"connections": [dict(item, state="unknown")]}}}
+            if not fabric_connections.connections_rules(probe):
+                kept.append(item)
+        return kept
 
     @property
     def decisions_file(self) -> Path:

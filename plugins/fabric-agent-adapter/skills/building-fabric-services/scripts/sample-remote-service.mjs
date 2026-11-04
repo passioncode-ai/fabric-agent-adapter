@@ -52,6 +52,8 @@ function handler(req, res) {
       startedAt, status: 'ready', degraded: [],
       surfaces: { dashboard: { path: '/', login: true }, events: { path: '/fabric/v1/events' } },
       summary: [{ label: 'Jobs today', value: events.length }],
+      // FAA-199: it says what it uses; this example calls nothing outside itself, so the list is empty.
+      extensions: k.connectionsExtension([]),
     }));
   }
   if (req.method === 'GET' && url.pathname === '/fabric/v1/events') {

@@ -185,3 +185,60 @@ def secret_url(value: str) -> bool:
             if any((raw != "" and credential_name(name)) or secret_value(raw) for raw in raws):
                 return True
     return False
+
+
+_REPOSITORY_URI = re.compile(r"\A([A-Za-z][A-Za-z0-9+.-]*:(?://[^/?#]*)?)([^?#]*)(.*)\Z", re.S)
+_REPOSITORY_NAME = re.compile(r"(?:[a-z0-9._-]+|[A-Za-z._-]+)\Z")  # lower case, or letters with no digit (readings 8)
+_REPOSITORY_AUTHORITY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
+_KEY_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))(?:%s)" % SECRET_VALUE.pattern, re.IGNORECASE | re.ASCII)
+_JWT_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))%s" % JWT_SHAPE.pattern)
+
+
+def repository_name(piece: str) -> bool:
+    """Whether a path segment reads as a repository's name: lower case, or letters with no digit, with no provider
+    key's or JWT's shape (`sk-`, `ghp_`, `xoxb-`, `AKIA`, `eyJ`) at its start or after a `.`, `_` or `-` (0.62.0
+    readings 9 and 10), so a letters-only key is still a key while `task-pipeline-dashboard`, which holds an `sk-` shape
+    inside a word, is a name."""
+    return bool(_REPOSITORY_NAME.match(piece)) and not _KEY_AT_A_WORD.search(piece) and not _JWT_AT_A_WORD.search(piece)
+
+
+def ascii_decoded(text: str) -> str:
+    """Every `%XX` escape of an ASCII character decoded, the rest left as written: how a repository's path and user
+    information are read as well as written, since git and hosts decode them (`%73k-` is `sk-`, `u%3Apw` is `u:pw`;
+    0.62.0 readings 11). The Node twin is asciiDecoded."""
+    return re.sub(r"%([0-7][0-9A-Fa-f])", lambda escape: chr(int(escape.group(1), 16)), text)
+
+
+def repository_password(value: str) -> bool:
+    """Whether a repository URI's user information holds a password, in any scheme, `file` too: every slash and
+    backslash after the colon skipped, then up to the next `/`, `?` or `#`, a backslash kept in the user. That one
+    reading holds git's (`https://h\\u:pw@x/r`), curl's (`https:///h\\u:pw@x`) and the URL standard's
+    (`https:///u:pw@h`, which stops at a backslash, a prefix of it) (0.62.0 readings 10 to 14). The user information
+    ends at the last `@`; a password follows its first `:`, as written or ascii_decoded. The Node twin is
+    repositoryPassword."""
+    value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
+    scheme, colon, rest = value.partition(":")
+    authorities = [re.match(r"[^/?#]*", rest.lstrip("/\\")).group(0)] if colon else []
+    users = [authority.rpartition("@")[0] for authority in authorities]
+    return any(user.partition(":")[2] for user in users + [ascii_decoded(user) for user in users])
+
+
+def repository_credential(value: str) -> bool:
+    """FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
+    user), in its query or fragment as secret_url reads them, or as a path segment shaped like a key. A path segment in
+    lower case, or of letters with no digit (task-pipeline-dashboard, Task-Pipeline-Dashboard), is the repository's
+    name, never a key, though it reads as an `sk-` shape, unless a key's shape starts it or follows a `.`, `_` or `-` in
+    it (repository_name); a segment is read as written and ascii_decoded. A
+    user outside a URL's authority (an scp form, `https:user@host/path`) counts as one: a user is an authority's."""
+    if "@" in value and not _REPOSITORY_AUTHORITY.match(value):
+        return True
+    match = _REPOSITORY_URI.match(value)
+    if not match:
+        return secret_argument(value)
+    head, path, tail = match.groups()
+    if repository_password(value):
+        return True
+    odd = [piece for written in (path, ascii_decoded(path)) for piece in re.split(r"[/\\:]", written)
+           if piece and not repository_name(piece)]
+    # the scheme and authority decoded too: git sends `https://%67hp_...@h` with its user decoded (unit reading 12)
+    return secret_url(head + tail) or secret_argument(ascii_decoded(head)) or any(secret_argument(piece) for piece in odd)

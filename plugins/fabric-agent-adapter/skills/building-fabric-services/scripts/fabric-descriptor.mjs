@@ -2,7 +2,7 @@
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_descriptor.py. Node 20+, no dependency.
 import fs from 'node:fs';
 import path from 'node:path';
-import { credentialName, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
+import { credentialName, repositoryCredential, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 import { ID, INSTANCE, LOCAL_PATH, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { protocolsFindings } from './fabric-protocols.mjs';
@@ -182,7 +182,7 @@ export function descriptorMemberProblems(d) {
     for (const k of Object.keys(runner)) if (!['kind', 'credentialKind'].includes(k)) problems.push(`runner has no member ${k}`);
     if (!CREDENTIAL_KINDS.includes(runner.credentialKind)) problems.push('runner.credentialKind is subscription, key, platform-metered or none');
     if ('kind' in runner && !(typeof runner.kind === 'string' && RUNNER_KIND_NAME.test(runner.kind))) problems.push("runner.kind is a runner kind's name");
-    if (runner.credentialKind === 'subscription' && !Object.hasOwn(SUBSCRIPTION_RUNNERS, runner.kind)) problems.push("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex");
+    if (runner.credentialKind === 'subscription' && !(typeof runner.kind === 'string' && Object.hasOwn(SUBSCRIPTION_RUNNERS, runner.kind))) problems.push("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex");
     for (const [k, v] of Object.entries(runner)) places.push([`/runner/${pointer(k)}`, v]);
   }
   if ('source' in d) {
@@ -194,7 +194,8 @@ export function descriptorMemberProblems(d) {
       if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
       else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential'); // before the host
       else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
-      places.push(['/source/repository', repository]);
+      else if (repository.includes('@') && !HIERARCHICAL.test(repository)) problems.push('source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'); // readings 7
+      else if (repositoryCredential(repository)) problems.push('FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository'); // its name is no key (seam 6)
     }
   }
   if ('peer' in d) {
@@ -290,10 +291,39 @@ export function portOf(origin) {
   return Number(m[1]);
 }
 
+export const NO_SOURCE_REPOSITORY = 'names no source.repository, the repository its code is built from '
+  + '(https://github.com/owner/name): it links the agent to its project (FAA-198)';
+const PASS_SOURCE = 'Name it in this call: source: { repository } in the descriptor writeDescriptor writes, or in '
+  + 'registerRemote\'s options; one written after the call returns is too late for a new install.';
+
+const HIERARCHICAL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
+
+// FAA-198: why a new install of this (valid) descriptor is refused, or null: it names no source.repository and no
+// descriptor of its id.instance is installed yet. An installer checks it before it writes anything else.
+export const namesRepository = (d) => d?.source !== null && typeof d?.source === 'object' && !Array.isArray(d.source)
+  && typeof d.source.repository === 'string' && d.source.repository !== '';
+
+// An installed descriptor is a regular file, whatever it holds; a folder, a broken link or a path that cannot be
+// examined is none.
+export function sourceRefusal(d, dir = servicesDir()) {
+  if (namesRepository(d)) return null;
+  const instance = d?.instance ?? 'default';
+  // An id or instance that is no string names no installed file, in both kits (seam reading 3).
+  try { if (typeof d?.id === 'string' && typeof instance === 'string' && fs.statSync(descriptorPath(d.id, instance, dir)).isFile()) return null; } catch { /* not installed */ }
+  return `Descriptor ${d?.id}.${instance} ${NO_SOURCE_REPOSITORY}. ${PASS_SOURCE}`;
+}
+
+// FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns
+// (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY), so an installed agent's update keeps working.
 export function writeDescriptor(d, dir = servicesDir()) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
+  const refusal = sourceRefusal(d, dir);
+  if (refusal) throw new ServiceError(refusal);
+  if (!namesRepository(d)) {
+    process.emitWarning(`Descriptor ${me} ${NO_SOURCE_REPOSITORY}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
+  }
   // DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
   const port = placementOf(d) === 'remote' || d.origin === undefined ? null : portOf(d.origin);
   for (const [file, other] of readDescriptors(dir)) {

@@ -4,8 +4,11 @@ The validator is held to every service-descriptor fixture of the contract at the
 (test/fixtures/contract/descriptor-fixtures.json, service-peer-vectors.json, app-descriptor-vectors.json, made by
 vendor_vectors.mjs). The local channel (DEC-0075) is not a kit surface yet: its six negatives are the only fixtures the
 validator does not refuse, and that set is pinned so a new one is noticed."""
+import contextlib
 import copy
+import io
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -94,7 +97,7 @@ class Readers(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.app = self.dir / "Example App.app"
         self.app.mkdir()
-        self.desc = fixture("service-descriptor-person-app")
+        self.desc = dict(fixture("service-descriptor-person-app"), source={"repository": "https://github.com/example-org/example-agent"})  # FAA-198: a new install names it
         self.desc["lifecycle"]["app"] = str(self.app)
 
     def test_fabric_button_presence(self):
@@ -137,12 +140,13 @@ class Writers(unittest.TestCase):
         services = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, services, True)
         path = fs.register_remote(service_id="example-inbox", name="Example Inbox", origin="https://inbox.example.com",
-                                  token="t" * 32, directory=services)
+                                  token="t" * 32, directory=services, source={"repository": "https://github.com/example-org/example-agent"})
         written = json.loads(path.read_text())
         self.assertEqual(written["installedBy"], {"by": "person", "role": "operator", "tool": "fabric-service register-remote"})
         offered = fixture("service-descriptor-peer-remote")
         path = fs.register_remote(service_id="example-inbox", instance="offered", name="Example Inbox", origin="https://inbox.example.com",
                                   token="t" * 32, directory=services, runner=offered["runner"], peer=offered["peer"],
+                                  source={"repository": "https://github.com/example-org/example-agent"},
                                   installed_by={"by": "person", "role": "administrator", "tool": "example-inbox register-remote 1.0.0"})
         written = json.loads(path.read_text())
         self.assertEqual((written["runner"], written["peer"]), (offered["runner"], offered["peer"]))
@@ -159,6 +163,94 @@ class Writers(unittest.TestCase):
         written = json.loads(next(services.glob("*.json")).read_text())
         self.assertEqual(written["installedBy"]["by"], "person")
         self.assertEqual(fs.validate_descriptor(written), [])
+        self.assertEqual(written["source"], {"repository": sample.SAMPLE_REPOSITORY}, "the sample names where it is built from (FAA-198)")
+        args = sample.build_parser().parse_args(["register", "--port", "47298", "--id", "example-agent", "--data-dir", str(services / "data2"),
+                                                 "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+        self.assertEqual(sample.register(args), 0)
+        written = json.loads((services / "example-agent.default.json").read_text())
+        self.assertEqual(written["source"], {"repository": "https://github.com/example-org/example-agent"})
+        args = sample.build_parser().parse_args(["register", "--port", "47296", "--id", "example-bad", "--data-dir", str(services / "data3"),
+                                                 "--services-dir", str(services), "--repository", ""])
+        self.assertEqual(sample.register(args), 1)
+        self.assertFalse((services / "data3" / "fabric-agent.json").exists(), "a refused descriptor leaves no manifest naming it")
+        for extra, why in ((["--repository", "not a uri"], "an invalid repository"), (["--port", "47299"], "a port another claims")):
+            args = sample.build_parser().parse_args(["register", "--port", "47294", "--id", "example-late", "--data-dir", str(services / "data5"),
+                                                     "--services-dir", str(services)] + extra)
+            self.assertEqual(sample.register(args), 1, why)
+            self.assertFalse((services / "data5" / "fabric-agent.json").exists(), "%s leaves no manifest (unit reading 2)" % why)
+        if os.name != "nt" and os.geteuid() != 0:  # a manifest it cannot write takes the new descriptor back (unit reading 3)
+            (services / "data6").mkdir()
+            (services / "data6").chmod(0o500)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47293", "--id", "example-ro", "--data-dir", str(services / "data6"),
+                                                         "--services-dir", str(services)])
+                self.assertEqual(sample.register(args), 1)
+            finally:
+                (services / "data6").chmod(0o700)
+            self.assertFalse((services / "example-ro.default.json").exists())
+            before = (services / "example-agent.default.json").read_bytes()  # a failed rewrite keeps the installed one
+            (services / "data7").mkdir()
+            (services / "data7").chmod(0o500)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47292", "--id", "example-agent", "--data-dir", str(services / "data7"),
+                                                         "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+                self.assertEqual(sample.register(args), 1)
+            finally:
+                (services / "data7").chmod(0o700)
+            self.assertEqual((services / "example-agent.default.json").read_bytes(), before, "byte for byte (unit reading 4)")
+            (services / "example-agent.default.json").chmod(0)  # one it cannot read is never replaced (product reading 5)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47291", "--id", "example-agent", "--data-dir", str(services / "data8"),
+                                                         "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+                self.assertEqual(sample.register(args), 1)
+            finally:
+                (services / "example-agent.default.json").chmod(0o600)
+            self.assertEqual((services / "example-agent.default.json").read_bytes(), before)
+            self.assertFalse((services / "data8").exists(), "nothing was written")
+            from unittest import mock  # a put-back that fails too is said in the one line, never a traceback (seam reading 5)
+            (services / "data9").mkdir()
+            (services / "data9").chmod(0o500)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47290", "--id", "example-agent", "--data-dir", str(services / "data9"),
+                                                         "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+                real, seen = sample.fs.atomic_write, []
+
+                def failing(path, data, mode):  # the kit's own write goes through fabric_paths; this is the put-back only
+                    seen.append(Path(path).name)
+                    if Path(path).name == "example-agent.default.json":
+                        raise PermissionError(13, "Permission denied")
+                    return real(path, data, mode)
+                err = io.StringIO()
+                with mock.patch.object(sample.fs, "atomic_write", failing), contextlib.redirect_stderr(err):
+                    self.assertEqual(sample.register(args), 1, "a ServiceError line, never a traceback")
+                self.assertIn("example-agent.default.json could not be put back either", err.getvalue())
+                self.assertIn("example-agent.default.json", seen, "the put-back was tried")
+            finally:
+                (services / "data9").chmod(0o700)
+        args = sample.build_parser().parse_args(["register", "--port", "47295", "--id", "example-own", "--data-dir", str(services / "data4"),
+                                                 "--services-dir", str(services)])
+        self.assertEqual(sample.register(args), 0, "another --id still runs this sample's code, so it names this repository")
+        self.assertEqual(json.loads((services / "example-own.default.json").read_text())["source"], {"repository": sample.SAMPLE_REPOSITORY})
+
+    def test_the_sample_declares_what_it_uses(self):
+        """FAA-199: the sample's well-known document lists its connections; --degraded marks the demo source failing."""
+        sample = load("sample_service")
+        fcn = load("fabric_connections")
+        data = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, data, True)
+        for degraded, demo in ((None, "unknown"), ("down for the demo", "degraded")):
+            with self.subTest(degraded=degraded):
+                args = sample.build_parser().parse_args(["serve", "--port", "47297", "--data-dir", str(data)]
+                                                        + (["--degraded", degraded] if degraded else []))
+                svc = sample.Service(args)
+                svc.start()  # the lock first, as serve does; released before the next case
+                try:
+                    wk = svc.well_known()
+                finally:
+                    svc.lock.release()
+                view = fcn.connections_view(wk)
+                self.assertFalse(view["reported"], view)
+                self.assertEqual({c["id"]: c["state"] for c in view["connections"]}, {"template": "ok", "demo": demo})
 
     def test_usage_rows_take_the_platform_metered_route(self):
         receipt = fs.make_usage_receipt("example", "example-model", input_tokens=1, output_tokens=1, route="platform-metered")
@@ -166,6 +258,15 @@ class Writers(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             fs.make_usage_receipt("example", "example-model", input_tokens=1, output_tokens=1, route="metered")
         self.assertNotIn("platform-metered", fs.ROUTES, "a configuration's route stays subscription or key")
+
+
+class RunnerKindTests(unittest.TestCase):
+    def test_a_subscription_runner_kind_that_is_no_string_is_named_not_raised(self):
+        # 0.62.0 unit reading 17: a list or an object as a key raised TypeError; the Node twin names the same problems.
+        for kind in (["claude-code"], {"x": 1}):
+            problems = fs.descriptor_member_problems({"runner": {"credentialKind": "subscription", "kind": kind}})
+            self.assertIn("runner.kind is a runner kind's name", problems)
+            self.assertTrue(any("vendor's runner" in p for p in problems), problems)
 
 
 if __name__ == "__main__":

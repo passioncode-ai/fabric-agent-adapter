@@ -42,8 +42,18 @@ same objects (well-known document, events feed, login code) at the same paths.
 - `commands` may carry `doctor` (a local executable); never `update`.
 - `source.repository` names the repository of the service's code, so Fabric Dashboards can tell code apart from a store
   that versions data. Pass it as `registerRemote({ ..., source: { repository } })` / `register_remote(..., source=...)`
-  (since 0.49.3); the kit checks it as the schema's URI (RFC 3986 characters, a host and a valid port when it names an
-  authority) and refuses a `user:password@` or any value shaped like a credential in it.
+  (since 0.49.3; a new registration without it is refused since 0.62.0, before the token file is written, and a
+  rotation that passes none keeps the installed one, FAA-198); the
+  kit checks it as the schema's URI (RFC 3986 characters, a host and a valid port when it names an
+  authority) and refuses a `user:password@`, a user outside a URL's authority (an scp form), and a value shaped like a
+  credential in its user, query or fragment or as a path segment; a path segment in lower case, or of letters with no
+  digit, is the repository's name unless a key's shape starts it or follows a `.`, `_` or `-` in it (since 0.62.0, so
+  `task-pipeline-dashboard` and `Task-Pipeline-Dashboard` are accepted, a name that starts with `sk-` and 16 more
+  characters is not, in any case, nor `%73k-` and the rest; a host is read for a key's shape anywhere in it, inside a word too, so
+  `task-pipeline-dashboard.example.com` is refused, FAA-200 (32)). A path and a user information are read as written and with
+  their ASCII escapes decoded, and a password as written and as the URL standard reads it (`https://h\u:pw@x/r` is
+  refused). A checkout's origin in scp form (`git@host:owner/name.git`) is refused: write it `https://host/owner/name`,
+  the repository's own page with no path below it, no query and no fragment, which the estate's readers join.
 - `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or
   `{by, role?, tool}` where `by` is `person`, `node` or `organization` and `role` (`operator`, `administrator`) is a
   person's only. There is no `agent` kind: an agent that registers a service writes the string form, or
@@ -111,5 +121,8 @@ The login rules keep every `Set-Cookie` of the answer and judge the session cook
 
 Rotate the token by setting the new value on the platform and re-running `registerRemote` on the
 operator's computer with it; the old token stops working the moment the platform restarts with the
-new value, and so does every session begun under it when `LoginCodes` has `token=`. Rotate the
+new value, and so does every session begun under it when `LoginCodes` has `token=`. The re-run keeps the
+installed `source` when it passes none (one the kit refuses, edited by hand, is dropped with the warning); pass
+`runner`, `peer`, `summary`, `doctor` and `installedBy` / `installed_by` again, since a re-run writes only what it is
+given (without `installedBy` it writes the default person form). Rotate the
 session key on the platform to sign every operator out.

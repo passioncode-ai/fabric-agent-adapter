@@ -18,6 +18,36 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
+from fabric_http import redact_url  # noqa: E402
+from fabric_secrets import ascii_decoded, repository_name, secret_argument  # noqa: E402
+
+_LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
+_SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path
+_SPECIAL = re.compile(r"(?:https?|wss?|ftp|file):", re.I)  # the URL standard's special schemes, read with or without `//`
+_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the value; a later `://` is path text (unit reading 9)
+
+
+def shown_repository(value: str) -> str:
+    """A repository or git origin as evidence: a URL through redact_url, which drops its user information as written
+    first (git's reading, `https://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
+    `\\` or a drive) by its name; an scp form (user[:password]@host:path) from its host, its user and password dropped
+    whatever they hold, up to the last `@` that a host and `:` follow; anything else by its name. Then a query and a
+    fragment. A value with a piece shaped like a credential that is no name (fabric_secrets.repository_name) is not
+    printed (0.62.0 readings 2 to 11). Read first as redact_url reads it: C0 controls and space off its ends, every tab,
+    CR and LF out, so `https:/<tab>/u:pw@h` is the URL it is (unit reading 11)."""
+    value = re.sub(r"[\t\n\r]", "", value.strip("".join(map(chr, range(0x21)))))
+    if _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
+        shown = redact_url(value)  # which drops the user information as written first (seam readings 10 and 11)
+    else:
+        cut = 0
+        if not _LOCAL_PATH.match(value):
+            ats = [i for i, c in enumerate(value) if c == "@"]
+            hosts = [at for at in ats if _SCP_HOST.match(value, at + 1)]
+            cut = (hosts or ats or [-1])[-1] + 1  # the last `@` a host and `:` follow, else the last `@` (unit reading 8)
+        shown = re.split(r"[?#]", value[cut:], maxsplit=1)[0]
+    pieces = [piece for written in (shown, ascii_decoded(shown)) for piece in re.split(r"[/\\:]", written)
+              if piece and not repository_name(piece)]  # as written and decoded, `%73k-` being `sk-` (readings 11)
+    return "<a repository shaped like a credential>" if any(secret_argument(piece) for piece in pieces) else shown
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 
@@ -177,7 +207,7 @@ def board_responder_verdict(wk: Any, kit: Optional[str] = None) -> Tuple[str, st
             path = Path(kit) if kit else Path(__file__).resolve().parent / "fabric_board.py"
             code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import %s as board; "
                     "print(json.dumps(board.self_check()))" % path.stem)
-            out = subprocess.run([sys.executable, "-E", "-s", "-c", code, str(path.resolve().parent)], capture_output=True,
+            out = subprocess.run([sys.executable, "-E", "-s", "-B", "-c", code, str(path.resolve().parent)], capture_output=True,
                                  text=True, timeout=60, cwd=str(path.resolve().parent))
             problems = json.loads(out.stdout.strip().splitlines()[-1]) if out.returncode == 0 and out.stdout.strip() else ["the kit did not run: %s" % out.stderr.strip()[-200:]]
     except Exception as exc:  # noqa: BLE001 - a kit that cannot run its conversation fails the rule
@@ -658,5 +688,5 @@ def service_checkout(descriptor: Any, repo: Optional[str]) -> Tuple[Optional[Pat
             continue
         seen.add(top)
         if same_repository(_git_out(Path(top), "remote", "get-url", "origin") or "", source):
-            return Path(top), "the checkout of %s that holds %s" % (source, place)
-    return None, "no checkout of %s holds the descriptor's commands, manifest or launchd job; pass --repo" % source
+            return Path(top), "the checkout of %s that holds %s" % (shown_repository(source), place)
+    return None, "no checkout of %s holds the descriptor's commands, manifest or launchd job; pass --repo" % shown_repository(source)

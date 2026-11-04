@@ -36,6 +36,9 @@ from fabric_paths import (
     services_dir,
 )
 from fabric_descriptor import (
+    descriptor_path,
+    names_repository,
+    source_refusal,
     validate_descriptor,
     write_descriptor,
 )
@@ -393,6 +396,15 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
         descriptor["runner"] = dict(runner)
     if peer is not None:
         descriptor["peer"] = dict(peer)
+    if source is None:  # a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
+        try:
+            installed = json.loads(descriptor_path(service_id, instance, root).read_text(encoding="utf-8")).get("source")
+        except (OSError, ValueError, AttributeError):
+            installed = None
+        # Only one the kit accepts: a hand-edited source never blocks a rotation; it is dropped with the warning.
+        base = set(validate_descriptor(descriptor))
+        source = installed if names_repository({"source": installed}) and set(
+            validate_descriptor(dict(descriptor, source=installed))) <= base else None
     if source is not None:
         descriptor["source"] = dict(source) if isinstance(source, dict) else source
     if doctor:
@@ -400,9 +412,12 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
     problems = validate_descriptor(descriptor)
     if problems:
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
+    refusal = source_refusal(descriptor, root)  # before the token is written: a refused install leaves nothing (FAA-198)
+    if refusal:
+        raise ServiceError(refusal)
     ensure_private_dir(token_file.parent)
     atomic_write(token_file, token.strip().encode(), 0o600)
-    return write_descriptor(descriptor, root)
+    return write_descriptor(descriptor, root, _stacklevel=3)  # the warning names the installer's call
 
 
 def cookie_value(cookie_header: Optional[str], name: str = SESSION_COOKIE) -> Optional[str]:

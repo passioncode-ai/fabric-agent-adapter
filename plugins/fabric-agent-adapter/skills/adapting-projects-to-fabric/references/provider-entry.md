@@ -57,8 +57,10 @@ It refuses, with one sentence that never quotes a value:
   (`test_provider.SchemaParityTests` compares them with a contract checkout at the pin when `FABRIC_CONTRACT_NEW` names
   one, as the contract job of the nightly CI does), and the reader is held to every `provider.schema.json` fixture of
   the pin (`test/fixtures/contract/provider-fixtures.json`, `test_provider.ContractFixtureTests`);
-- a `source.repository` with a `user:password@` or a value shaped like a credential: it names the repository, never
-  reaches it (since 0.49.3, as the service kit's descriptor check);
+- a `source.repository` with a `user:password@`, a user outside a URL's authority, or a value shaped like a credential
+  in its user, query or fragment or as a path segment (one in lower case, or of letters with no digit, is the name unless a key's shape starts it or follows a `.`, `_` or `-`, read as written and percent-decoded; a host is read for a key's shape anywhere in it,
+  inside a word too, so `task-pipeline-dashboard.example.com` is refused, FAA-200 (32)): it names the
+  repository, never reaches it (since 0.49.3; one rule with the service kit's descriptor check since 0.62.0);
 - a manifest whose name follows a backslash (`C:\Agents\example\fabric-agent.json`). The reader,
   `validate_provider_entry`, accepts it since DEC-0145 (`MANIFEST_PATTERN`, the schema's), but a reader that has not
   re-pinned to DEC-0145 refuses the entry, Fabric's registry among them (CT-192), so the writer does not emit it until

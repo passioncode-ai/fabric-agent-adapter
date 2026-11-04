@@ -71,9 +71,16 @@ names the same file.
 
 ## Install into a service
 
+The service that runs it says what it uses (FAA-199): `agent.connections()` names the two models, and the service adds
+its own hand-off route, in its well-known document:
+`fs.connections_extension(agent.connections() + [...], degraded=degraded)`. The two take the ids `model` and `fallback`
+(a `degraded` entry whose source is `fallback` marks the fallback); the service's own items take other ids, since one id
+named twice is refused.
+
 ```bash
 python3 <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_kit.py \
-  install <service>/support --lang py --module fabric_openrouter --module fabric_usage --module fabric_paths
+  install <service>/support --lang py --module fabric_openrouter --module fabric_usage --module fabric_paths \
+  --module fabric_connections
 cp <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/recipes/support-agent/support_agent.py <service>/support/
 python3 <adapter>/.../fabric_kit.py status <service>/support      # current, older or modified, per file
 ```

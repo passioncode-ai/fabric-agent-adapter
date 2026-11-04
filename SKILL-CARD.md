@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.61.0` |
+| Version | `0.62.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `3830a3353923e20f826d466610e1c479f120bec0` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -25,7 +25,7 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.61.0` |
+| Version | `0.62.0` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `3830a3353923e20f826d466610e1c479f120bec0` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
@@ -48,11 +48,11 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.61.0` |
+| Version | `0.62.0` |
 | Plugin | `fabric-agent-adapter` |
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `3830a3353923e20f826d466610e1c479f120bec0`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036); dashboard action parity `fabric-actions/0.1` (DEC-0121); the operator's mandate `mandate/1` (DEC-0125); the operator's `source` and `operator-source/1` (DEC-0126); a hub key per organization context (DEC-0128) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
-| Inputs | service id, port, callers and surfaces, store, data kind (U or O), uptime (A or B), the `LICENSE` holder of a new agent someone builds for themselves, notification-worthy events |
+| Inputs | service id, port, callers and surfaces, store, data kind (U or O), uptime (A or B), the `LICENSE` holder of a new agent someone builds for themselves, notification-worthy events, the repository the code is built from (`source.repository`), what the service uses (its connections) |
 | Outputs | service code using the Python or Node kit, launchd plist, descriptor, events view, login flow, an MCP surface with jobs and trace context, an optional project-board responder (`fabric_board`, `fabric-board.mjs`), a dashboard built from the dashboard kit with its ED-9 declaration and its action table (`extensions/actions/0.1`), a signed `fabric-package/1` folder (`fabric_package`, `fabric-package.mjs`), probe and layout-probe reports |
 | Mutations | the target service's files; its supervisor file when its installer runs (a launchd plist in `~/Library/LaunchAgents`, a systemd user unit, or a per-user Scheduled Task); one descriptor in the services directory |
 | Network | the probe talks to `127.0.0.1:<port>` for a local service and to the service's own `https` origin for a remote placement, and over MCP calls only `tools/list` and `fabric.job.get` for a made-up id; a board responder talks only to Fabric's hub at the `http://127.0.0.1:<port>` its `hub.json` names, after checking that file's pid; the layout probe opens the dashboard in a local headless browser with a one-time login code; the kit's connectors (`fabric_http`, `fabric_openrouter`) reach the external APIs the service's author configures |
@@ -69,7 +69,7 @@ using Fabric (working-with-fabric) or the Fabric Dashboards app.
 
 | Field | Value |
 |---|---|
-| Version | `0.61.0` |
+| Version | `0.62.0` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | the desktop app v0.3.5 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
 | Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, relay the operator's own decision on a service's action, or the mandate he gave another of his agents (DEC-0125), coordinate, report, link backlog rows, release |

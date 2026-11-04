@@ -432,7 +432,9 @@ export class JwksCache {
     if (typeof source !== 'string' || !source) throw new Error('the key set needs a source');
     if (/^https?:\/\//.test(source)) {
       const url = new URL(source);
-      if (url.username || url.password) throw new Error('a key set URL carries no credentials');
+      const text = source.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+      // the authority as written too, as Python's netloc reads it (`https://h\\u:p@x/j`, `https://@x/j`: seam reading 13)
+      if (url.username || url.password || /^[a-z][a-z0-9+.-]*:[/\\]*[^/?#]*@/i.test(text)) throw new Error('a key set URL carries no credentials');
       if (url.protocol === 'http:' && !loopback(url.hostname)) throw new Error('a key set is read over https, or over http on loopback only');
     } else if (source.includes('://')) {
       throw new Error('a key set is an https URL, a loopback http URL or a file path');

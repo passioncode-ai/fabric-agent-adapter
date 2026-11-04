@@ -86,7 +86,8 @@ that document until `service.id` matches (at most 40 s) before it calls the serv
 
 1. Build or unpack the release into `~/.local/share/<id>/releases/<version>-<sha12>/`
    (a venv or `node_modules` inside it). Never edit a release after it is written.
-2. `write_descriptor` (port and id claims are checked here).
+2. `write_descriptor` (port and id claims are checked here, and a new descriptor without `source.repository` is
+   refused; a rewrite of an installed one warns, FAA-198).
 3. `launchd_install` (Node: `await launchdInstall(...)`, the same steps): write + `plutil -lint`, read `launchctl print-disabled gui/<uid>`,
    `enable` **only when no override is recorded** (a first install), `bootout` and wait
    until `launchctl print gui/<uid>/<label>` fails, `bootstrap` with up to five retries,
@@ -150,7 +151,8 @@ never infers supervision from its parent process.
 
 **An app** a person installs and starts has no supervisor (contract DEC-0069). Its descriptor says
 `"lifecycle": {"manager": "person", "app": "<the installed bundle or executable>"}`, `installedBy {by: "person", role,
-tool}` and no `origin`: it says the app is installed, never that it runs. The installer writes it; where there is none
+tool}`, `source.repository` (the app's own repository; its first write is refused without it, FAA-198) and no `origin`:
+it says the app is installed, never that it runs. The installer writes it; where there is none
 (a macOS app dragged into Applications), the app writes it on a start when `app_descriptor_action` /
 `appDescriptorAction` answers `write` (no descriptor yet, another version in `installedBy.tool`, or another path than
 `lifecycle.app`), and never from an App Translocation path. Its live origin and process id go in its own liveness file,

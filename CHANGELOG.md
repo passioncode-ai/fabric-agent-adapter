@@ -1,5 +1,109 @@
 # Changelog
 
+## 0.62.0 (2026-11-04)
+
+A new install names the repository of its code, and a service says what it uses, so a map of the installed agents can
+link each to its project and draw its chain (FAA-198, FAA-199).
+
+### Added
+
+- The reference service declares its connections (`extensions/connections/0.1`): the template it drafts from and the
+  demo source `serve --degraded` marks failing; the online example (`sample-remote-service.mjs`) declares an empty list,
+  since it calls nothing outside itself. The support-agent recipe's `SupportAgent.connections()` names its two models
+  for the service that runs it, keeping only an id the connections rule accepts, and imports `fabric_connections` only
+  when called (the recipe's install line names the module). `check_service.py` reports `well-known.connections` as `NOT_RUN` when the
+  well-known document has no connections declaration (it reported nothing before); an empty list is one and reads
+  `PASS`, and adapting-projects-to-fabric names the declaration in its
+  adapter step (FAA-199).
+
+### Changed
+
+- `write_descriptor` / `writeDescriptor` refuse a new descriptor that names no `source.repository` (no descriptor of its
+  `id.instance` is installed yet: an installed one is a regular file, whatever it holds, so a folder, a broken link or
+  a path that cannot be examined is none), with `ServiceError` naming the descriptor; `register_remote` / `registerRemote` refuse it before they
+  write the token file, so a refused registration leaves nothing, and a rotation that names no `source` keeps the
+  installed one when the kit accepts it (a hand-edited one it refuses is dropped, as before). Rewriting a descriptor already installed without it still writes it and warns
+  (`NoSourceRepositoryWarning`, a `UserWarning` attributed to the installer's call; Node `process.emitWarning`, code
+  `FABRIC_NO_SOURCE_REPOSITORY`), so an installed agent's update keeps working. `source_refusal` / `sourceRefusal` say
+  why an install would be refused, for an installer that checks before it validates or writes anything else (a `source`
+  that is no object names nothing), and `names_repository` / `namesRepository` whether a descriptor names one.
+  `check_service.py` names a descriptor without it, or with one the descriptor's rules refuse, and why
+  (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo, query or
+  fragment (a URL through `redact_url`; a local path, one that starts with `/`, `~`, `.`, `\\` or a drive, by its name;
+  a value of a URL scheme such as `https:` also without `//`, through `redact_url`; an scp form or any other value from
+  after its user and password, whatever they hold; one with a piece shaped like a credential that is no name not at
+  all), as
+  `state.outside-code` and `dashboard.opens-in-host` now do too for the source and for the data checkout's origin (they
+  printed them as found).
+  `sample_service.py register` writes this repository, whose code its descriptor runs whatever `--id` names, takes
+  `--repository`, and writes its manifest only after the descriptor, so a refusal of any kind leaves none naming it, and
+  a manifest it cannot write takes a new descriptor back with it, or puts an installed one's bytes back; an installed
+  descriptor it cannot read is never replaced (it refuses before writing anything). No owner field is added: the
+  organization follows from the repository (FAA-198). `source.repository` is read for a credential by one rule in both kits and
+  in the provider entry's check (`repository_credential` / `repositoryCredential` in `fabric_secrets`): its user, its query
+  and fragment as `secret_url` reads them (a parameter named for a credential, such as `access_token`, now counts), and
+  a path segment shaped like a key; a path segment in lower case, or of letters with no digit, is the repository's
+  name unless a key's shape (such as `sk-`, `ghp_`, `xoxb-`, `glpat-`, `AKIA`, `eyJ`) starts it or follows a `.`,
+  `_` or `-` in it, so `task-pipeline-dashboard` and `Task-Pipeline-Dashboard`, which read as an `sk-` key, are accepted (a source with it was refused before). A user is accepted only in a URL's
+  authority (`https://user@host/path`): an scp form or an opaque URI holding an `@` (`bot:...@host:path`,
+  `https:user@host/path`) is refused, and so is a password in the user information read any way a reader takes it:
+  as written (`https://h\u:pw@x/r`, as git reads it) or as the URL standard does (`https:///u:pw@h/r`). Node reads
+  the user information and parameters by hand, as Python does, so a special scheme written without `//`
+  (`https:host/r?access_token=...`) or a host `new URL` refuses is read alike.
+
+### Fixed
+
+- `redact_url` / `redactUrl` (the URL an `HttpError` carries and `check_url` / `checkUrl` print) dropped a user
+  information only as the URL standard reads it, so `https://h\u:pw@x/r`, which git and Python's `urllib` read as a
+  password, printed `pw` in its path in both kits (0.61.0 too); they now drop the user information as
+  written first, after any run of slashes or backslashes that follows the scheme (`https:/h\u:pw@x/r`,
+  `https:\\h\u:pw@x/r`; 0.62.0 seam readings 11 and 13).
+- Node's `checkUrl` sent `ht<tab>tps://h\u:pw@x/r` and `https:\/h\u:pw@x/r`, which Python's `check_url` refuses
+  (since 0.60.0): it now reads the written user information on the text `new URL` reads, after any run of slashes.
+- Node's `redactUrl` printed `<unparseable url>` for a URL of a scheme other than http, https, ws, wss or ftp (`file:`
+  included) that `new URL` cannot parse (`ssh://[zz]/r`, `ssh://h:99999/r`, `file://h:1/r`), where Python keeps the
+  scheme: both now print `<scheme>:<redacted>`.
+- A subscription `runner.kind` that is no string (a list or an object) raised `TypeError` in Python's
+  `validate_descriptor`, `write_descriptor` and `check_service.py` (0.61.0 too), and Node, for a list whose text is a
+  subscription runner's name (`["claude-code"]`, which `Object.hasOwn` reads as that key), named only one of its two
+  problems: both kits now name both as descriptor problems.
+- Node's key set cache (`JwksCache`) accepted `https://h\u:pw@x/j` and `https://@x/j`, which the Python twin refuses:
+  it now reads the authority as written too.
+
+### Upgrading
+
+- An installer that writes a descriptor for a new install (`register_remote` / `registerRemote` included) and a desktop
+  app that writes its own (DEC-0069) pass `source: {"repository": "https://github.com/owner/name"}` (the repository
+  their code is built from) in the call that writes it: a source set by a later write is too late, since the first call
+  is refused before anything is written. An installer that loads the kit from the installed plugin meets this as
+  soon as the plugin updates; an installed agent's next update warns until it names one. Only a rewrite in
+  place keeps working: an update that removes the descriptor before it writes it again, a new instance (a preview) and a
+  moved services directory are new installs. In Python the warning is `NoSourceRepositoryWarning` (a `UserWarning`), so
+  a suite that runs with warnings as errors (`-W error`) sees the rewrite raise; filter that class there.
+- Once a descriptor names its repository, two probe rules that read `NOT_RUN` without it start judging:
+  `state.outside-code` fails data kept inside that checkout, and `dashboard.opens-in-host` reads the checkout for pages
+  opened in a browser. A service that passed may fail them until its data moves out of the checkout or its pages open
+  through Fabric Dashboards.
+- Declare what the service uses with `connections_extension` / `connectionsExtension` (an empty list when it uses
+  nothing): until it does, `well-known.connections` reads `NOT_RUN` and the connection map has no row for it.
+- A `source.repository` (a service's or a provider entry's) that names a user outside a URL's authority (an scp form,
+  `https:user@host/path`) or carries a query parameter named for a credential is refused: write it as
+  `https://github.com/owner/name`, with no user, query or fragment. A path segment that mixes upper case with a digit
+  is read for a key's shape (`sk-` and 16 more characters, a `ghp_` run, 40 characters of mixed case and digits), so
+  `Task-Pipeline-Dashboard2` is refused while `Agent-V2` is not: write the repository's name in lower case (hosts such
+  as GitHub take either). A segment that a key's shape starts, or follows a `.`, `_` or `-` in, is refused whatever
+  its case and also percent-encoded (`%73k-` reads as `sk-`). The shapes are those of `fabric_secrets.SECRET_VALUE`,
+  such as `sk-` and 16 more characters, `gh` and one of p, o, u, s, r then `_` and 20, `xox` and one of a, b, o, p, r,
+  s then `-` and 10 (so the word `xoxo-` counts), `glpat-` and 20, `AKIA` and 16, and a JWT as written (`eyJ` in
+  that case, `JWT_SHAPE`); `bearer` and a space counts at a segment's start once decoded (`Bearer%20Tracking` is
+  refused, `team-Bearer%20Tracking` stays a name), and anywhere in a segment or a host when 12 or more token
+  characters with a digit follow it and no letter, digit or `_` comes before it (`x-Bearer%20<a token>` is refused).
+  A host is read for a key's shape anywhere in it, inside a word too, so `task-pipeline-dashboard.example.com` is
+  refused although the same path segment is a name (FAA-200 (32)). Such a host, like a repository such
+  as `sk-learn-` followed by a longer name, has no spelling the kit accepts, so an agent built from it is not installed
+  new, and
+  an installed one keeps working by a rewrite in place that leaves the source out (FAA-200 (24)).
+
 ## 0.61.0 (2026-11-04)
 
 The board responder reads the operator's mandate from a request of his own Project (FAA-135), and working-with-fabric

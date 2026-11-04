@@ -238,6 +238,16 @@
         "says that a value already in Git history needs a fresh history, which is the owner's act, and does not rewrite history or force-push itself",
         "when the owner's own home name is neutral, has one or two letters, or holds a space, a dot, an underscore, a dash or an apostrophe, adds `home: <name>` to the owner's list before the check, and never declares a container's, a cloud image's or a CI runner's user that only the image uses, such as node or vscode, while the owner's own machine's home is declared even when it is such a name (ubuntu, admin), and, when that user is also an image's user in the tree, writes the image's paths through a build argument naming the user (`ARG APP_USER=ubuntu`, `WORKDIR /home/${APP_USER}/app`), never `$HOME` in a Dockerfile's WORKDIR or COPY"
       ]
+    },
+    {
+      "id": "service-names-its-repository-and-connections",
+      "request": "Adapt example-agent, a local service that drafts with one model and posts to a channel, so the agent map links it to its project.",
+      "expected": [
+        "writes the descriptor with source.repository naming the repository its code is built from",
+        "declares extensions/connections/0.1 with the model and the channel through connections_extension or connectionsExtension",
+        "does not add an owner field to the descriptor",
+        "runs check_service.py, reads descriptor.source-repository and well-known.connections as PASS, and treats a NOT_RUN on either as not passing"
+      ]
     }
   ]
 }

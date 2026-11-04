@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.61.0"
+  version: "0.62.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -143,6 +143,9 @@ Preserve the chosen ownership boundary:
   `building-fabric-services`'s `scripts/fabric_interop.py`.
 - Local runner maps typed input, executable identity, result location, cancellation,
   heartbeat, and partial results without relying on ambient accounts.
+- A service declares what it uses (`extensions/connections/0.1`: models, other agents, connectors, stores,
+  channels) with `connections_extension` / `connectionsExtension`, and its descriptor names `source.repository`;
+  the probe names either one missing (FAA-198, FAA-199).
 
 Keep model selection and provider-internal reasoning outside the Fabric contract. Expose
 typed outcomes, evidence, artifacts, and protocol-visible state, not chain-of-thought.

@@ -147,7 +147,7 @@ def validate_provider_entry(entry: Any) -> List[str]:
             problems.append("source is {repository?}")
         elif "repository" in source and not _is_uri(source["repository"]):
             problems.append("source.repository is an absolute URI")
-        elif "repository" in source and (_URI_PASSWORD.match(source["repository"]) or _secrets.secret_argument(source["repository"])):
+        elif "repository" in source and (_URI_PASSWORD.match(source["repository"]) or _secrets.repository_credential(source["repository"])):
             # FAA-120, as the service kit: a repository is named, never reached with a credential in its URI.
             problems.append("source.repository carries no password or credential: it names the repository")
     if not isinstance(entry["installedAt"], str) or not _TIMESTAMP.fullmatch(entry["installedAt"]):

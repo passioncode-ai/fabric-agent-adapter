@@ -56,6 +56,18 @@ class Recipe(unittest.TestCase):
                                 state_dir=self.dir, on_handoff=handoffs.append, **kwargs)
         return agent, handoffs
 
+    def test_it_declares_its_models_as_connections(self):
+        """FAA-199: the service that runs the agent declares what it uses; the agent names its two models."""
+        agent, _ = self.agent(model_says("x"))
+        fcn = importlib.import_module("fabric_connections")
+        ext = fcn.connections_extension(agent.connections(), degraded=[{"source": "fallback", "reason": "down"}], states={"model": "ok"})
+        got = {c["id"]: (c["kind"], c["target"], c["state"]) for c in ext[fcn.CONNECTIONS_EXTENSION_KEY]["connections"]}
+        self.assertEqual(got, {"model": ("model", "a/one", "ok"), "fallback": ("model", "b/two", "degraded")})
+        for bad in ("", None, "qwen/qwen3.8 flash", "a/b\ufeff", "a/" + "x" * 250):  # by the connections rule (seam reading 2)  # a misconfigured fallback degrades replies, never the document (seam reading 1)
+            agent.fallback = bad
+            ext = fcn.connections_extension(agent.connections())
+            self.assertEqual([c["id"] for c in ext[fcn.CONNECTIONS_EXTENSION_KEY]["connections"]], ["model"], repr(bad))
+
     def test_a_grounded_reply(self):
         model = model_says("Open Settings, then Account, then Reset password [KB:password-reset].")
         agent, handoffs = self.agent(model)
@@ -337,18 +349,48 @@ class Recipe(unittest.TestCase):
         self.assertIn("handoffs.jsonl", readme)
         self.assertIn("prune", readme)
 
+    def test_the_documented_install_runs_the_connections(self):  # 0.62.0 seam reading 23: the docstring named one module
+        """The README's install line and the module docstring name one module set, and in a folder installed with it
+        connections() runs under -I, where only that folder is on the path."""
+        import re
+        readme = (RECIPE / "README.md").read_text(encoding="utf-8")
+        section = readme.split("## Install into a service", 1)[1].split("\n## ", 1)[0]
+        modules = re.findall(r"--module (\w+)", section)
+        self.assertIn("fabric_connections", modules)
+        self.assertEqual(re.findall(r"--module (\w+)", sa.__doc__), modules, "the docstring repeats the README's set")
+        folder = self.dir / "installed"
+        argv = [sys.executable, "-B", str(SCRIPTS / "fabric_kit.py"), "install", str(folder), "--lang", "py"]
+        for name in modules:
+            argv += ["--module", name]
+        out = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        for name in ("support_agent.py", "knowledge.example.json"):
+            shutil.copy(RECIPE / name, folder / name)
+        script = ("import json, pathlib, sys; sys.path.insert(0, '.')\n"
+                  "import support_agent as sa, fabric_openrouter as fo\n"
+                  "c = fo.Client(ceiling_usd=1.0, ledger=sa.fabric_usage.JsonlUsageLedger(pathlib.Path('u.jsonl')), "
+                  "prices={}, environ={'OPENROUTER_API_KEY': 'x' * 20}, transport=lambda *a: (503, {}, b'{}'), "
+                  "sleep=lambda s: None)\n"
+                  "a = sa.SupportAgent(knowledge=sa.Knowledge.load('knowledge.example.json'), client=c, model='a/one', "
+                  "fallback='b/two', state_dir=pathlib.Path('.'), on_handoff=print)\n"
+                  "print(json.dumps([x['id'] for x in a.connections()]))\n")
+        out = subprocess.run([sys.executable, "-I", "-B", "-c", script], cwd=folder, capture_output=True, text=True,
+                             timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(json.loads(out.stdout.splitlines()[-1]), ["model", "fallback"])
+
     def test_the_command_line(self):
         config = json.loads((RECIPE / "config.example.json").read_text())
         config.update(knowledge=str(RECIPE / "knowledge.example.json"), stateDir=str(self.dir / "state"))
         (self.dir / "config.json").write_text(json.dumps(config))
         env = dict(os.environ)
         env.pop("OPENROUTER_API_KEY", None)
-        out = subprocess.run([sys.executable, "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
+        out = subprocess.run([sys.executable, "-B", "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
                               str(self.dir / "config.json"), "--message-id", "m-1", "--text", "Mars weather?"],
                              capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertEqual(json.loads(out.stdout)["reasons"], ["no-knowledge"], "no key is needed to hand off")
-        out = subprocess.run([sys.executable, "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
+        out = subprocess.run([sys.executable, "-B", "-E", "-s", str(RECIPE / "support_agent.py"), "answer", "--config",
                               str(self.dir / "config.json"), "--message-id", "m-2", "--text", "reset my password"],
                              capture_output=True, text=True, env=env, timeout=60)
         self.assertEqual(json.loads(out.stdout)["reasons"], ["model:config"], "no key: handed off, never a crash")

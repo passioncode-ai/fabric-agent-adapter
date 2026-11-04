@@ -9,6 +9,7 @@ import os
 import re
 import socketserver
 import subprocess
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -294,7 +295,9 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("runner.credentialKind is subscription, key, platform-metered or none")
         if "kind" in runner and not (isinstance(runner["kind"], str) and _RUNNER_KIND_NAME.match(runner["kind"])):
             problems.append("runner.kind is a runner kind's name")
-        if runner.get("credentialKind") == "subscription" and runner.get("kind") not in SUBSCRIPTION_RUNNERS:
+        # a kind that is no string is no runner's (a list would raise as a key: 0.62.0 unit reading 17)
+        if runner.get("credentialKind") == "subscription" and not (isinstance(runner.get("kind"), str)
+                                                                    and runner["kind"] in SUBSCRIPTION_RUNNERS):
             problems.append("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex")
         places += [("/runner/%s" % _pointer(k), v) for k, v in runner.items()]
     if "source" in descriptor:
@@ -311,7 +314,10 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
                 problems.append("source.repository carries no password: it names the repository, never a credential")
             elif not _authority_ok(repository):
                 problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
-            places.append(("/source/repository", repository))
+            elif "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
+                problems.append("source.repository with a user is a URL with an authority (https://user@host/path), never an scp form")
+            elif fabric_secrets.repository_credential(repository):  # its name is no key (0.62.0 seam reading 6)
+                problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository")
     if "peer" in descriptor:
         peer = descriptor.get("peer")
         if not isinstance(peer, dict):
@@ -434,13 +440,58 @@ def port_of(origin: str) -> int:
     return int(match.group(1))
 
 
-def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Path:
-    """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim)."""
+NO_SOURCE_REPOSITORY = ("names no source.repository, the repository its code is built from "
+                        "(https://github.com/owner/name): it links the agent to its project (FAA-198)")
+PASS_SOURCE = ("Name it in this call: \"source\": {\"repository\": ...} in the descriptor write_descriptor writes, or "
+               "source= to register_remote; one written after the call returns is too late for a new install.")
+
+
+class NoSourceRepositoryWarning(UserWarning):
+    """FAA-198: an installed descriptor rewritten without source.repository (Node: process.emitWarning, code
+    FABRIC_NO_SOURCE_REPOSITORY). A new install without it is refused instead."""
+
+
+def names_repository(descriptor: Any) -> bool:
+    source = descriptor.get("source") if isinstance(descriptor, dict) else None
+    return isinstance(source, dict) and isinstance(source.get("repository"), str) and bool(source["repository"])
+
+
+_HIERARCHICAL = re.compile(r"\A[A-Za-z][A-Za-z0-9+.-]*://")
+
+
+def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Optional[str]:
+    """FAA-198: why a new install of this descriptor is refused, or None: it names no source.repository and no
+    descriptor of its id.instance is installed yet (a regular file, whatever it holds; a folder, a broken link or a path
+    that cannot be examined is none). An installer may check it before it validates or writes anything else."""
+    if names_repository(descriptor):
+        return None
+    d = descriptor if isinstance(descriptor, dict) else {}
+    instance = d.get("instance") if d.get("instance") is not None else "default"  # as Node's `??` reads it
+    me = "%s.%s" % (d.get("id"), instance)
+    try:  # an id or instance that is no string names no installed file, in both kits (seam reading 3)
+        if isinstance(d.get("id"), str) and isinstance(instance, str) and descriptor_path(d["id"], instance, directory).is_file():
+            return None
+    except (OSError, ValueError):  # an unsearchable folder reads as not installed, as Node's statSync does
+        pass
+    return "Descriptor %s %s. %s" % (me, NO_SOURCE_REPOSITORY, PASS_SOURCE)
+
+
+def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None, *, _stacklevel: int = 2) -> Path:
+    """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim).
+
+    FAA-198: a new descriptor names its ``source.repository``; rewriting one already installed without it only
+    warns (``NoSourceRepositoryWarning``), so an installed agent's update keeps working."""
     problems = validate_descriptor(descriptor)
     if problems:
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
     root = directory or services_dir()
     me = "%s.%s" % (descriptor["id"], descriptor["instance"])
+    refusal = source_refusal(descriptor, root)
+    if refusal:
+        raise ServiceError(refusal)
+    if not names_repository(descriptor):
+        warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY),
+                      NoSourceRepositoryWarning, stacklevel=_stacklevel)
     # DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
     port = None if placement_of(descriptor) == "remote" or "origin" not in descriptor else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):

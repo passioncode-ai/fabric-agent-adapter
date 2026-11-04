@@ -133,8 +133,8 @@ part before the first `#` is refused, as `check_url` refuses it, because Node ke
 trim it and read the keys when it ends the URL); a leading space is refused as not a URL), a host holding `%`, a backslash, a Unicode space or a control character (urllib
 would decode or dial it as another host), a bracketed host that is no IPv6 address, a port that is not ASCII digits or is above
 65535, no host, and an empty userinfo. The Node kit accepts several of these as `new URL` reads them, among them a `%`
-host decoded, a backslash as `/`, a tab or line break removed, an empty userinfo dropped and an extra slash before the
-host skipped. The
+host decoded, a backslash as `/`, a tab or line break removed and an extra slash before the host skipped. A user
+information as written is refused by both kits, empty or holding a backslash (since 0.62.0). The
 Python kit verifies Ed25519 itself (RFC 8032, standard library only, strict as OpenSSL: `S` below the group order,
 canonical points, no small-order key); it follows no redirect when it reads the key set; the Node kit uses `node:crypto` and refuses small-order keys
 itself (`isSmallOrderKey`), because Node before 26 lets OpenSSL accept a signature under one.

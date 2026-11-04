@@ -84,3 +84,60 @@ export function secretUrl(value) {
   }
   return false;
 }
+
+const REPOSITORY_URI = /^([A-Za-z][A-Za-z0-9+.-]*:(?:\/\/[^/?#]*)?)([^?#]*)([\s\S]*)$/;
+const REPOSITORY_NAME = /^(?:[a-z0-9._-]+|[A-Za-z._-]+)$/; // lower case, or letters with no digit (readings 8)
+const REPOSITORY_AUTHORITY = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
+const KEY_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))(?:${SECRET_VALUE.source})`, 'i');
+const JWT_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))${JWT_SHAPE.source}`);
+const SPECIAL_QUERY = /^(?:https?|wss?|ftp|file):/i; // whose query also encodes `'`, as the URL standard does
+
+/** Whether a path segment reads as a repository's name: lower case, or letters with no digit, with no provider key's
+ * or JWT's shape at its start or after a `.`, `_` or `-` (0.62.0 readings 9 and 10), so a letters-only key is a key. */
+export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_A_WORD.test(piece) && !JWT_AT_A_WORD.test(piece);
+
+/** Every `%XX` escape of an ASCII character decoded, the rest as written (fabric_secrets.ascii_decoded, readings 11). */
+export const asciiDecoded = (text) => text.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+
+/** Whether a repository URI's user information holds a password: every slash and backslash after the colon skipped,
+ * then up to the next `/`, `?` or `#` (fabric_secrets.repository_password, 0.62.0 readings 10 to 14). */
+export function repositoryPassword(value) {
+  const text = value.replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+  const colon = text.indexOf(':');
+  const rest = colon < 0 ? '' : text.slice(colon + 1); // as Python's partition leaves it (unit reading 12)
+  const authorities = colon < 0 ? [] : [/^[^/?#]*/.exec(rest.replace(/^[/\\]+/, ''))[0]];
+  const users = authorities.map((authority) => authority.slice(0, Math.max(authority.lastIndexOf('@'), 0)));
+  return [...users, ...users.map(asciiDecoded)].some((user) => user.includes(':') && user.slice(user.indexOf(':') + 1) !== '');
+}
+
+// A repository's parameters, read as fabric_secrets.secret_url reads them, by hand: `new URL`
+// refuses a host it cannot parse and a special scheme written without `//` (`https:host/r?access_token=...`), where
+// the Python twin still reads them (0.62.0 readings 8 and 9, FAA-200 (17)).
+function repositoryParts(head, tail) {
+  const text = tail.replace(/[\x00-\x20]+$/, '').replace(/[\t\n\r]/g, '');
+  const hash = text.indexOf('#');
+  const before = hash < 0 ? text : text.slice(0, hash);
+  const query = before.startsWith('?') ? before.slice(1) : '';
+  const fragment = hash < 0 ? '' : text.slice(hash + 1);
+  try { // percent-encode them as `new URL` does, on a host it always reads
+    const url = new URL(`${SPECIAL_QUERY.test(head) ? 'https://h.invalid/' : 'x-repository://h/'}?${query}#${fragment}`);
+    return [url.search.slice(1), url.hash.slice(1)];
+  } catch { return [query, fragment]; }
+}
+
+// FAA-198 (0.62.0 readings 6 and 7): whether a repository URI carries a credential: in its scheme and authority (a
+// user), in its query or fragment as secretUrl reads them, or as a path segment shaped like a key. A path segment in
+// lower case, or of letters with no digit (task-pipeline-dashboard, Task-Pipeline-Dashboard), is the repository's
+// name, never a key, though it reads as an `sk-` shape, unless a key's shape starts it or follows a `.`, `_` or `-` in
+// it (repositoryName); a segment is read as written and asciiDecoded. A
+// user outside a URL's authority (an scp form, `https:user@host/path`) counts as one: a user is an authority's.
+export function repositoryCredential(value) {
+  if (value.includes('@') && !REPOSITORY_AUTHORITY.test(value)) return true;
+  const match = REPOSITORY_URI.exec(value);
+  if (!match) return secretArgument(value);
+  const [, head, path, tail] = match;
+  const odd = [path, asciiDecoded(path)].flatMap((written) => written.split(/[/\\:]/)).filter((piece) => piece && !repositoryName(piece));
+  if (repositoryPassword(value) || secretArgument(head + tail) || secretArgument(asciiDecoded(head)) || odd.some((piece) => secretArgument(piece))) return true; // the authority decoded too (unit reading 12)
+  return repositoryParts(head, tail).some((part) => [...rawValues(part)].some(([name, values]) =>
+    values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))));
+}

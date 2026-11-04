@@ -52,8 +52,17 @@ export class Response {
 
 // The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or fragment.
 export function redactUrl(url) {
+  let text = String(url).replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+  // The user information as written goes first, as the Python twin drops it: `https://h\\u:pw@x/r` would print `pw` in
+  // its path, a backslash being a slash to WHATWG (0.62.0 seam reading 11).
+  const written = /^([A-Za-z][A-Za-z0-9+.-]*:[/\\]*)([^/?#]*)/.exec(text); // after any run of slashes (seam reading 13)
+  if (written && written[2].includes('@')) text = written[1] + written[2].slice(written[2].lastIndexOf('@') + 1) + text.slice(written[0].length);
   let parts;
-  try { parts = new URL(String(url)); } catch { return '<unparseable url>'; }
+  try { parts = new URL(text); } catch {
+    // a scheme other than a special one keeps its name, as the Python twin prints it whatever follows (unit reading 14)
+    const scheme = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(text)?.[1].toLowerCase();
+    return scheme && !['http', 'https', 'ws', 'wss', 'ftp'].includes(scheme) ? `${scheme}:<redacted>` : '<unparseable url>';
+  }
   // Only http and https are sent; any other scheme keeps no more than its name (0.56.0 product r10).
   if (parts.protocol !== 'http:' && parts.protocol !== 'https:') return `${parts.protocol}<redacted>`;
   return `${parts.protocol}//${parts.host}${parts.pathname}`;
@@ -74,7 +83,10 @@ export function checkUrl(url, { insecure = false } = {}) {
   if (!['http:', 'https:'].includes(parts.protocol) || !parts.hostname) {
     throw new HttpError('only http and https URLs with a host are sent', { url: redactUrl(url), kind: 'refused' });
   }
-  if (parts.username || parts.password || /^[a-z]+:\/*[^/?#]*@/i.test(String(url).trim())) {
+  // the user information as written, read on the text `new URL` reads (C0 and space off its ends, tab, CR and LF out),
+  // so `ht\ttps://h\\u:pw@x/r` is refused as the Python twin refuses it (0.62.0 unit reading 12)
+  const text = String(url).replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+  if (parts.username || parts.password || /^[a-z][a-z0-9+.-]*:[/\\]*[^/?#]*@/i.test(text)) {
     throw new HttpError('credentials in a URL are refused: send them in a header', { url: redactUrl(url), kind: 'refused' });
   }
   if (parts.protocol === 'http:' && !insecure && !isLoopback(parts.hostname)) {

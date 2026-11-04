@@ -96,10 +96,10 @@ class RemotePlacement(unittest.TestCase):
         root = temp / "services"
         local = {"protocol": fs.PROTOCOL, "id": "maker", "instance": "default", "name": "Maker", "origin": "http://127.0.0.1:8443",
                  "auth": {"tokenFile": "/tmp/m.token"}, "lifecycle": {"manager": "none"}, "paths": {"data": "/tmp/m", "logs": []},
-                 "installedAt": fs.now_iso(), "installedBy": "test"}
+                 "installedAt": fs.now_iso(), "installedBy": "test", "source": {"repository": "https://github.com/example-org/example-agent"}}
         fs.write_descriptor(local, root)
         path = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com:8443",
-                                  token="t" * 40, directory=root)
+                                  token="t" * 40, directory=root, source={"repository": "https://github.com/example-org/example-agent"})
         d = json.loads(path.read_text())
         self.assertEqual(d["placement"], "remote")
         self.assertEqual(Path(d["auth"]["tokenFile"]).stat().st_mode & 0o777, 0o600)
@@ -114,9 +114,29 @@ class RemotePlacement(unittest.TestCase):
         path = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
                                   token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
         self.assertEqual(json.loads(path.read_text())["source"], {"repository": "https://github.com/example/agent"})
-        path = fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
-                                  directory=root)
-        self.assertNotIn("source", json.loads(path.read_text()), "no source given, none written")
+        rotated = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                     token="r" * 40, directory=root)  # a rotation that names no source keeps it (seam reading 1)
+        self.assertEqual(json.loads(rotated.read_text())["source"], {"repository": "https://github.com/example/agent"})
+        hand = json.loads(rotated.read_text())
+        hand["source"] = {"repository": "git@github.com:example/agent.git"}  # edited by hand: the kit never accepts it
+        rotated.write_text(json.dumps(hand))
+        warnings = importlib.import_module("warnings")
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always")
+            rotated = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                         token="s" * 40, directory=root)  # a source the kit refuses never blocks a rotation
+        self.assertNotIn("source", json.loads(rotated.read_text()))
+        self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning])
+        self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the installer's call")
+        with self.assertRaisesRegex(fs.ServiceError, "example-bare.default names no source.repository(.|\n)*in this call(.|\n)*source= to register_remote"):  # FAA-198
+            fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
+                               directory=root)
+        self.assertFalse(fs.remote_token_file("example-bare", "default", root).exists(), "a refused install writes no token")
+        self.assertFalse(fs.descriptor_path("example-bare", "default", root).exists())
+        fs.descriptor_path("example-bare", "default", root).mkdir()  # a folder there is no installed descriptor
+        with self.assertRaisesRegex(fs.ServiceError, "names no source.repository"):
+            fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40, directory=root)
+        self.assertFalse(fs.remote_token_file("example-bare", "default", root).exists(), "nor its token (unit reading 1)")
         for source, needle in ((["https://github.com/example/agent"], "source is {repository?}"),
                                ({"repository": "https://github.com/example/agent", "branch": "main"}, "source has no member branch"),
                                ({"repository": ""}, "source.repository is a URI"),
@@ -150,9 +170,9 @@ class RemotePlacement(unittest.TestCase):
                          "a user without a password is a name, not a credential")
         for good in ("https://host.example:8443/a@b", "https://github.com/a%20b", "https://[::1]:8080/x", "urn:example:agent", "https://h.example:/x"):
             self.assertEqual(fs.validate_descriptor({**json.loads(path.read_text()), "source": {"repository": good}}), [], good)
-        path = fs.register_remote(service_id="example-none", name="None", origin="https://none.example.com", token="t" * 40,
-                                  directory=root, source=None)
-        self.assertNotIn("source", json.loads(path.read_text()), "None is no source, as undefined and null are in Node")
+        with self.assertRaises(fs.ServiceError):  # None is no source, as undefined and null are in Node: a new install is refused
+            fs.register_remote(service_id="example-none", name="None", origin="https://none.example.com", token="t" * 40,
+                               directory=root, source=None)
 
 
 if __name__ == "__main__":
@@ -249,7 +269,8 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
             self.child.stdout.close()
         self.assertIn(b"example agent on", seen)
         self.services = self.dir / "services"
-        fs.register_remote(service_id="example-agent", name="Example Agent", origin=self.origin, token=token, directory=self.services)
+        fs.register_remote(service_id="example-agent", name="Example Agent", origin=self.origin, token=token, directory=self.services,
+                           source={"repository": "https://github.com/example-org/example-agent"})
 
     def tearDown(self):
         self.child.terminate()
@@ -271,7 +292,7 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
         self.assertEqual(failed, {})
         self.assertEqual(rc, 0)
         for rule in ("well-known.requires-token", "well-known.identity", "network.host-check", "network.cross-site-check",
-                     "events.requires-token", "login.single-use", "login.cookie-host-bound"):
+                     "events.requires-token", "login.single-use", "login.cookie-host-bound", "well-known.connections"):
             self.assertEqual(results[rule]["verdict"], "PASS", rule)
         self.assertEqual(results["lifecycle.platform"]["verdict"], "NOT_RUN")
         self.assertEqual(results["network.loopback-only"]["verdict"], "NOT_RUN")

@@ -202,6 +202,8 @@ const { dirs, instance, lock } = await holdContextInstance('example-agent', 'org
   `~/Library/Application Support/<id>.<instance>`, `~/Library/Logs/<id>.<instance>`, `~/Library/Caches/<id>.<instance>`),
   never inside the personal tree. `launchd_uninstall(..., purge=True, service_id=..., instance=...)` /
   `launchdUninstall(..., {purge, serviceId, instance})` purge only that instance's folders.
+- **Its descriptor names its repository.** A new instance is a new install, so its descriptor passes
+  `source.repository` as the personal one does (FAA-198, since 0.62.0); without it the write is refused.
 - **What it checks, before anything is created.** `context_instance` / `contextInstance` is pure and answers
   `{context, kind, org?, instance, key, dirs, descriptorPath, grant?}`, never the record. An organization's instance
   needs the estate record revision this machine applied (verified with `verify_estate_record`; the helper verifies no

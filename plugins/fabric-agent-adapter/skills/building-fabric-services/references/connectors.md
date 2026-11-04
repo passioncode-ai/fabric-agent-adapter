@@ -45,8 +45,10 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 
 Every answer comes back as a `Response`, whatever its status; `HttpError` means no usable answer came, with `kind`
 `connection`, `timeout`, `too-large` or `refused`, the status when there was one, and the URL redacted to scheme,
-host, port and path (`redact_url`); a URL that is not http or https keeps only its scheme (`htps:<redacted>`), and
-one that does not parse as a URL is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
+host, port and path (`redact_url`); a URL that is not http or https keeps only its scheme (`htps:<redacted>`, and `ssh:<redacted>`
+for `ssh://h:99999/r` too), and an http, https, ws, wss or ftp URL that does not parse (Node reads it with `new URL`;
+Python reads its own special-scheme form and prints what it finds, never the user information), or a value with no
+scheme, is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
 normalises it, Python as given), so a key never belongs in it. Python's `check_url` refuses a host
 with a backslash, space, control character (C0, DEL or C1) or `%`, a URL with a space or ASCII control character before its
 first `#` (the default transport sends a URL up to there, as Node's does; a transport you pass receives the URL as given), or a character outside ASCII in its path or query (ASCII whitespace at its ends is trimmed, as urllib and `new URL` trim it; a Unicode space ending the part before the first `#` is refused, where Node keeps it percent-encoded), a bracketed host that is not an IPv6 address with no zone, and a port that is not

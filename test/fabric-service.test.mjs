@@ -18,7 +18,7 @@ const temp = () => tempDir('fabric-kit-');
 const descriptor = (port, id = 'sample', instance = 'default') => ({
   protocol: k.PROTOCOL, id, instance, name: 'Sample', origin: `http://127.0.0.1:${port}`,
   auth: { tokenFile: '/tmp/x/service.token' }, lifecycle: { manager: 'none' },
-  paths: { data: '/tmp/x', logs: [] }, installedAt: k.nowIso(), installedBy: 'test',
+  paths: { data: '/tmp/x', logs: [] }, installedAt: k.nowIso(), installedBy: 'test', source: { repository: 'https://github.com/example-org/example-agent' },
 });
 
 test('second holder of the instance lock is refused with the pid', { skip: noLinuxLock }, async () => {
@@ -95,6 +95,48 @@ test('a port is a claim', () => {
   const file = k.writeDescriptor(descriptor(47195), dir);
   // On Windows the privacy is the file's ACL, not a mode (fabric-service-platforms.test.mjs checks it).
   if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+});
+
+test('a new install names its repository; a reinstall without it warns (FAA-198)', () => {
+  const dir = temp();
+  const { source, ...bare } = descriptor(47196);
+  assert.ok(k.sourceRefusal(bare, dir));
+  assert.throws(() => k.writeDescriptor(bare, dir), /sample\.default names no source\.repository[\s\S]*in the descriptor writeDescriptor writes/);
+  assert.deepEqual(fs.readdirSync(dir), [], 'a refused install writes nothing');
+  const seen = [];
+  const emit = process.emitWarning;
+  process.emitWarning = (message, options) => seen.push([message, options?.code]);
+  try {
+    k.writeDescriptor(descriptor(47196), dir);
+    assert.deepEqual(seen, [], 'a descriptor that names its repository is written without a word');
+    k.writeDescriptor(bare, dir);
+  } finally {
+    process.emitWarning = emit;
+  }
+  assert.equal(seen.length, 1);
+  assert.match(seen[0][0], /names no source\.repository/);
+  assert.equal(seen[0][1], 'FABRIC_NO_SOURCE_REPOSITORY');
+  assert.equal(k.sourceRefusal(bare, dir), null, 'an installed descriptor is a rewrite');
+  for (const empty of [{}, { repository: '' }, 'x', ['a'], 1, true]) assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: empty }, dir), JSON.stringify(empty));
+  fs.mkdirSync(path.join(dir, 'folder.default.json')); // a folder at the descriptor's path is no installed descriptor
+  assert.ok(k.sourceRefusal({ ...bare, id: 'folder' }, dir));
+  assert.equal(k.sourceRefusal({ ...bare, instance: null }, dir), null, 'a null instance reads as default, as in Python');
+  assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: null }, dir), 'a null source names nothing');
+  const named = { ...descriptor(47188), source: { repository: 'https://github.com/example-org/task-pipeline-dashboard' } };
+  assert.deepEqual(k.validateDescriptor(named), [], 'a repository name is no key (0.62.0 seam reading 6)');
+  const keyed = { ...named, source: { repository: `https://github.com/example-org/r?token=sk-${'Fx9k'.repeat(5)}` } };
+  assert.ok(k.validateDescriptor(keyed).some((p) => p.includes('FAC-SEM-086')), 'a key in the query still is');
+  const named4 = { ...named, source: { repository: 'https://github.com/example-org/r?access_token=fixture' } };
+  assert.ok(k.validateDescriptor(named4).some((p) => p.includes('FAC-SEM-086')), 'a query named for a credential is one (readings 8)');
+  for (const scp of ['bot:fixture@github.com:example-org/r', 'https:fixture@github.com/example-org/r', 'x-access-token:fixture@github.com:example-org/r']) {
+    assert.ok(k.validateDescriptor({ ...named, source: { repository: scp } }).some((p) => p.includes('never an scp form')), scp); // readings 7
+  }
+  const pathKey = { ...named, source: { repository: `https://github.com/example-org/ghp_${'Fx9k'.repeat(9)}` } };
+  assert.ok(k.validateDescriptor(pathKey).some((p) => p.includes('FAC-SEM-086')), 'a path piece shaped like a key still is');
+  assert.ok(k.sourceRefusal({ ...bare, instance: ['default'] }, dir), 'a list instance names no file');
+  assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: { repository: [] } }, dir));
+  fs.symlinkSync(path.join(dir, 'missing.json'), path.join(dir, 'gone.default.json'));
+  assert.ok(k.sourceRefusal({ ...bare, id: 'gone' }, dir), 'a broken link is none either');
 });
 
 test('invalid descriptors are refused', () => {

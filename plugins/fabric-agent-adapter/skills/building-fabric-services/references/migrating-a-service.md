@@ -15,10 +15,12 @@ Order matters: each step leaves the service answering.
    delete it with the operator's consent.
 6. **Regenerate the plist** from `launchd_plist`, pointing at a release; delete stray
    `.plist.bak` files from `~/Library/LaunchAgents` after moving them elsewhere.
-7. **Write the descriptor** from the installer; resolve any port claim it refuses by
-   moving the newcomer, never the established service.
-8. **Re-run the probe** until nothing `FAIL`s; record the table in the service's
-   verification document.
+7. **Write the descriptor** from the installer, with `source.repository` (a new descriptor without it is refused);
+   resolve any port claim it refuses by moving the newcomer, never the established service.
+8. **Declare what it uses** with `connections_extension` / `connectionsExtension` in the well-known document; a
+   service that uses nothing outside itself declares an empty list (`connections_extension([])`), which reads `PASS`.
+9. **Re-run the probe** until nothing `FAIL`s and `descriptor.source-repository` and `well-known.connections` read
+   `PASS` (a `NOT_RUN` is not a pass); record the table in the service's verification document.
 
 ## Gaps that existing services usually have
 
