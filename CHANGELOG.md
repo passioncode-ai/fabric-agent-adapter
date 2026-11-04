@@ -38,6 +38,10 @@
   com.list; answer what waits on you in this turn: ...`, its prefix unchanged for watchers) and the skill's board step
   say to answer a request, an announcement or a question with its state now (done, where, when, what blocks) and send
   the result later in a second message; `references/project-board.md` gains "Answering at once".
+- The owner's word is done the first time (FAA-207, the operator's rule of 2026-11-04 relayed on the board, thread
+  `a7a9d05d`; the contract's CT-220): working-with-fabric's Step 5 and creating-fabric-agents' practices say the agent
+  does it itself, hands the person no command to run, asks one short question on a risk and then acts, and passes on
+  only a human gate with its reason; money limits and secrets stay.
 - The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
   standard's rules for agents on a channel people write to (the ticket as the unit, one outcome per ticket, answer
   rather than route, repair before hand-off, declared sources with a maximum age, hand-off queues with their answered
