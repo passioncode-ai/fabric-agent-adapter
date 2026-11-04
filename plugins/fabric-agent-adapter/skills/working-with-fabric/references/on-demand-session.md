@@ -86,13 +86,13 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    stops the run. Work that cannot end by then gives its state (what is done, where it lies, what is left), before
    `run-ends-at`, as the note of a `com.progress` on the request's thread (the slot holder's state, DEC-0152 SA-6,
    proposed). Then:
-   - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 5 minutes, no
-     run comes before the deadline (Fabric starts none with less than 5 minutes left: 120 s of silence, a 60 s cycle
-     and the launch) and an accepted request does not expire by itself: `com.complete` `failed_known` saying the
-     deadline came first, and steps 6 and 7 (Fabric's main at `f0dd20d6`, spec 3.1 and 3.6 and `boardDispatch`'s
-     `LAUNCH_MARGIN_MS`, in no release yet; a request whose deadline passed unsettled goes to the operator with its
-     workflow closed `blocked`; Fabric counts the 5 minutes from its own dispatch decision, which comes after the run's
-     end and its 120 s silence, so a deadline a few minutes later still finds no next run: asked on the same thread);
+   - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 10 minutes, no
+     run comes before the deadline and an accepted request does not expire by itself: `com.complete` `failed_known`
+     saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
+     executor's silence and one 60 s cycle after `run-ends-at`, and starts none with less than 5 minutes to the
+     deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (Fabric's main at `f0dd20d6`, in no release
+     yet, and its choice of the number on thread `b3e60686`, 2026-11-04); a request whose deadline passed unsettled goes
+     to the operator with its workflow closed `blocked`;
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main

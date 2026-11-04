@@ -556,7 +556,7 @@
       "request": "FABRIC_DISPATCH_WORKFLOW is set. The work the request asks for will not end before run-ends-at. What do you do before the run stops?",
       "expected": [
         "gives its state (what is done, where it lies, what is left) as a com.progress note on the request's thread",
-        "when the request's deadline is not after run-ends-at plus 5 minutes, completes it failed_known saying the deadline came first and closes the workflow",
+        "when the request's deadline is not after run-ends-at plus 10 minutes, completes it failed_known saying the deadline came first and closes the workflow",
         "otherwise leaves the request accepted for the next run: an in_progress checkpoint without close, no com.complete",
         "writes the retro fabric_whoami asks for before it ends"
       ]
