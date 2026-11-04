@@ -652,6 +652,18 @@ class InputActionTests(unittest.TestCase):
     def key_decision(self, key):
         return {"by": "operator", "via": "relayed-instruction", "action": key, "instruction": "Agent: Which? Operator: a", "at": NOW}
 
+    def test_an_answer_that_is_no_json_object_is_refused_never_a_crash(self):
+        """0.61.0 seam reading 37: a list, a string or a number as inputResponses raised out of handle() (the transport
+        sent no reply); it is -32602 now, and JobStore.answer matches nothing for a non-object, as Node's does."""
+        for actions in (False, True):
+            server, jobs, job_id = self.start(input_actions=actions) if actions else self.start()
+            for responses in ([{"action": "accept"}], "accept", 7):
+                answer = server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+                    "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": responses}}})
+                self.assertEqual(answer["error"]["code"], -32602, responses)
+                self.assertEqual(jobs.answer(job_id, responses), {})
+            self.assertEqual(jobs.get(job_id)["status"], "input_required")
+
     def test_off_by_default_the_answer_is_taken_as_before(self):
         server, jobs, job_id = self.start()
         result = self.answer(server, job_id, {"pick": {"action": "accept", "content": {"choice": "a"}}})

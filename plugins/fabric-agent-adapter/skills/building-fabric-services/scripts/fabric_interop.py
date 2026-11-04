@@ -420,8 +420,8 @@ class JobStore:
             job = self.get(job_id)
             if job["status"] != "input_required":
                 return {}
-            matched = {key: value for key, value in (input_responses or {}).items()
-                       if key in job.get("inputRequests", {}) and isinstance(value, dict)
+            matched = {key: value for key, value in (input_responses if isinstance(input_responses, dict) else {}).items()
+                       if isinstance(job.get("inputRequests"), dict) and key in job["inputRequests"] and isinstance(value, dict)
                        and value.get("action") in ("accept", "decline", "cancel")}
             if matched:  # the answered question's kept steps go in the same write: none outlives its answer
                 self._transition(job_id, "working", {"steps": {}})
@@ -922,6 +922,8 @@ class McpToolServer:
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
             caller, inputs = self._caller(headers, tier, verdict), None
             responses = arguments.get("inputResponses")
+            if name == "fabric.job.get" and responses is not None and not isinstance(responses, dict):  # seam r37: never a crash
+                return self._error(rid, -32602, "fabric.job.get takes inputResponses as a JSON object (interop C3.3).")
             if name == "fabric.job.get" and self.input_actions and isinstance(responses, dict) and responses:
                 try:
                     inputs = self._gate_inputs(arguments, headers, tier, meta, caller, verdict)

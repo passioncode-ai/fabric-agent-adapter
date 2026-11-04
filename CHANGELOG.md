@@ -63,7 +63,10 @@ says that his approval holds for the whole task, at every link (FAA-195).
   too, as the board path does, so the start and the answer agree, and a value that only claims `str` never reaches the
   job file (older than 0.61.0; 0.61.0 seam reading 32, readings 33). Node's `JobStore.answer` matched an answer
   keyed by an inherited name (`constructor`, `toString`) as an asked question and cleared the real one; it matches an
-  own key only, as Python does (older than 0.61.0; 0.61.0 seam reading 36). The same split held for an
+  own key only, as Python does (older than 0.61.0; 0.61.0 seam reading 36). Both stores' `answer` match nothing when
+  the answer's `inputResponses` or the job's `inputRequests` is not a plain object (a hand-edited file, an array), and
+  McpToolServer answers a `fabric.job.get` whose `inputResponses` is not a JSON object with `-32602`, where it raised
+  out of `handle()` and the transport sent no reply (older than 0.61.0; 0.61.0 seam and unit readings 37). The same split held for an
   effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
   file wrote as a plain string the answer covered; `job_step` (when a mandate travelled), `request_input(steps=)` and
   `add_tool` (with an action) now admit an effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),

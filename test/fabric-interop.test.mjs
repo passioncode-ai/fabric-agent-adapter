@@ -387,6 +387,14 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   assert.deepEqual(Object.entries(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps), [['__proto__', { effect: 'reply' }]]);
   // An answer keyed by an inherited name answers nothing: the asked question and its step stay (seam reading 36).
   for (const name of ['constructor', 'toString', 'hasOwnProperty']) assert.deepEqual(store.answer(job.id, { [name]: { action: 'accept', content: {} } }), {});
+  for (const responses of [[{ action: 'accept' }], 'accept', 7]) assert.deepEqual(store.answer(job.id, responses), {}); // no object, no match (seam 37)
+  const file = path.join(dir, `${job.id}.json`); // a hand-edited file whose inputRequests is no object answers nothing
+  for (const asked of [[request], 'approve-reply']) {
+    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+    record.job.inputRequests = asked;
+    fs.writeFileSync(file, JSON.stringify(record));
+    assert.deepEqual(store.answer(job.id, { length: { action: 'accept', content: {} }, 0: { action: 'accept', content: {} } }), {});
+  }
   assert.equal(store.get(job.id).status, 'input_required');
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);
