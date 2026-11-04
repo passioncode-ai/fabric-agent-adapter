@@ -59,7 +59,7 @@ def descriptor(port, service_id="sample", instance="default", data="/tmp/x"):
         "protocol": fs.PROTOCOL, "id": service_id, "instance": instance, "name": "Sample",
         "origin": "http://127.0.0.1:%d" % port, "auth": {"tokenFile": data + "/service.token"},
         "lifecycle": {"manager": "none"}, "paths": {"data": data, "logs": []},
-        "installedAt": fs.now_iso(), "installedBy": "test",
+        "installedAt": fs.now_iso(), "installedBy": "test", "source": {"repository": "https://github.com/example-org/example-agent"},
     }
 
 
@@ -191,6 +191,48 @@ class DescriptorTests(unittest.TestCase):
         custom = descriptor(47187)
         custom["auth"] = {"tokenFile": "/tmp/t", "header": "X-Example-Token", "scheme": "Bearer"}
         self.assertTrue(any("scheme must be none" in p for p in fs.validate_descriptor(custom)))
+
+    def test_a_new_install_names_its_repository_and_a_reinstall_without_it_warns(self):
+        """FAA-198: Observatory links an agent to its project by source.repository; an installed agent's update keeps working."""
+        warnings = importlib.import_module("warnings")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            bare = descriptor(47196)
+            del bare["source"]
+            self.assertIsNotNone(fs.source_refusal(bare, root))
+            with self.assertRaisesRegex(fs.ServiceError, "sample.default names no source.repository"):
+                fs.write_descriptor(bare, root)
+            self.assertEqual(list(root.iterdir()), [], "a refused install writes nothing")
+            with warnings.catch_warnings(record=True) as seen:
+                warnings.simplefilter("always")
+                fs.write_descriptor(descriptor(47196), root)
+                self.assertEqual(seen, [], "a descriptor that names its repository is written without a word")
+                fs.write_descriptor(bare, root)  # the rewrite of an installed descriptor without it
+            self.assertEqual(len(seen), 1)
+            self.assertIn("names no source.repository", str(seen[0].message))
+            self.assertNotIn("source", json.loads(fs.descriptor_path("sample", "default", root).read_text()), "written as given")
+            self.assertIsNone(fs.source_refusal(bare, root), "an installed descriptor is a rewrite")
+            for empty in ({}, {"repository": ""}):
+                with self.subTest(source=empty):
+                    other = dict(bare, id="other", origin="http://127.0.0.1:47197", source=empty)
+                    self.assertIsNotNone(fs.source_refusal(other, root))
+
+    def test_the_probe_names_a_missing_repository(self):
+        checker = load("check_service")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = fs.write_descriptor(descriptor(47198), root)
+            d = json.loads(path.read_text())
+            p = checker.Probe(path, d, root, True)
+            p.descriptor_rules()
+            verdicts = {r["rule"]: r for r in p.results}
+            self.assertEqual(verdicts["descriptor.source-repository"]["verdict"], "PASS")
+            del d["source"]
+            p = checker.Probe(path, d, root, True)
+            p.descriptor_rules()
+            verdicts = {r["rule"]: r for r in p.results}
+            self.assertEqual(verdicts["descriptor.source-repository"]["verdict"], "NOT_RUN", "named, never a pass")
+            self.assertIn("names no source.repository", verdicts["descriptor.source-repository"]["evidence"])
 
 
 class TokenAndNetworkTests(unittest.TestCase):
@@ -643,8 +685,9 @@ class StateRuleTests(unittest.TestCase):
     def probe(self, data, source):
         checker = load("check_service")
         d = descriptor(47110, data=str(data))
-        if source:
-            d["source"] = {"repository": source}
+        d["source"] = {"repository": source}
+        if not source:
+            del d["source"]
         p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
         inside = subprocess.run(["git", "-C", str(data), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
         p.state_rule(Path(data), inside)

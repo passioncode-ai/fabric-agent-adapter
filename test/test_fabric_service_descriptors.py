@@ -94,7 +94,7 @@ class Readers(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.dir, True)
         self.app = self.dir / "Example App.app"
         self.app.mkdir()
-        self.desc = fixture("service-descriptor-person-app")
+        self.desc = dict(fixture("service-descriptor-person-app"), source={"repository": "https://github.com/example-org/example-agent"})  # FAA-198: a new install names it
         self.desc["lifecycle"]["app"] = str(self.app)
 
     def test_fabric_button_presence(self):
@@ -137,12 +137,13 @@ class Writers(unittest.TestCase):
         services = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, services, True)
         path = fs.register_remote(service_id="example-inbox", name="Example Inbox", origin="https://inbox.example.com",
-                                  token="t" * 32, directory=services)
+                                  token="t" * 32, directory=services, source={"repository": "https://github.com/example-org/example-agent"})
         written = json.loads(path.read_text())
         self.assertEqual(written["installedBy"], {"by": "person", "role": "operator", "tool": "fabric-service register-remote"})
         offered = fixture("service-descriptor-peer-remote")
         path = fs.register_remote(service_id="example-inbox", instance="offered", name="Example Inbox", origin="https://inbox.example.com",
                                   token="t" * 32, directory=services, runner=offered["runner"], peer=offered["peer"],
+                                  source={"repository": "https://github.com/example-org/example-agent"},
                                   installed_by={"by": "person", "role": "administrator", "tool": "example-inbox register-remote 1.0.0"})
         written = json.loads(path.read_text())
         self.assertEqual((written["runner"], written["peer"]), (offered["runner"], offered["peer"]))
@@ -159,6 +160,12 @@ class Writers(unittest.TestCase):
         written = json.loads(next(services.glob("*.json")).read_text())
         self.assertEqual(written["installedBy"]["by"], "person")
         self.assertEqual(fs.validate_descriptor(written), [])
+        self.assertEqual(written["source"], {"repository": sample.SAMPLE_REPOSITORY}, "the sample names where it is built from (FAA-198)")
+        args = sample.build_parser().parse_args(["register", "--port", "47298", "--id", "example-agent", "--data-dir", str(services / "data2"),
+                                                 "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+        self.assertEqual(sample.register(args), 0)
+        written = json.loads((services / "example-agent.default.json").read_text())
+        self.assertEqual(written["source"], {"repository": "https://github.com/example-org/example-agent"})
 
     def test_usage_rows_take_the_platform_metered_route(self):
         receipt = fs.make_usage_receipt("example", "example-model", input_tokens=1, output_tokens=1, route="platform-metered")

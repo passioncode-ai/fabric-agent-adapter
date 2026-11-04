@@ -36,6 +36,7 @@ from fabric_paths import (
     services_dir,
 )
 from fabric_descriptor import (
+    source_refusal,
     validate_descriptor,
     write_descriptor,
 )
@@ -400,6 +401,9 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
     problems = validate_descriptor(descriptor)
     if problems:
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
+    refusal = source_refusal(descriptor, root)  # before the token is written: a refused install leaves nothing (FAA-198)
+    if refusal:
+        raise ServiceError(refusal)
     ensure_private_dir(token_file.parent)
     atomic_write(token_file, token.strip().encode(), 0o600)
     return write_descriptor(descriptor, root)

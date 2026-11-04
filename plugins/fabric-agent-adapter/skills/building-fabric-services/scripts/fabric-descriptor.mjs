@@ -290,10 +290,28 @@ export function portOf(origin) {
   return Number(m[1]);
 }
 
+export const NO_SOURCE_REPOSITORY = 'names no source.repository, the repository its code is built from '
+  + '(https://github.com/owner/name): it links the agent to its project (FAA-198)';
+
+// FAA-198: why a new install of this (valid) descriptor is refused, or null: it names no source.repository and no
+// descriptor of its id.instance is installed yet. An installer checks it before it writes anything else.
+export function sourceRefusal(d, dir = servicesDir()) {
+  if (d.source?.repository) return null;
+  if (fs.existsSync(descriptorPath(d.id, d.instance, dir))) return null;
+  return `Descriptor ${d.id}.${d.instance} ${NO_SOURCE_REPOSITORY}.`;
+}
+
+// FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns
+// (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY), so an installed agent's update keeps working.
 export function writeDescriptor(d, dir = servicesDir()) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
+  const refusal = sourceRefusal(d, dir);
+  if (refusal) throw new ServiceError(refusal);
+  if (!d.source?.repository) {
+    process.emitWarning(`Descriptor ${me} ${NO_SOURCE_REPOSITORY}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
+  }
   // DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
   const port = placementOf(d) === 'remote' || d.origin === undefined ? null : portOf(d.origin);
   for (const [file, other] of readDescriptors(dir)) {

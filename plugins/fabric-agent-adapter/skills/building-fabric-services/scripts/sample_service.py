@@ -8,7 +8,7 @@ once, and `sample.draft` is a job that stops for a titled choice before it compl
 `register` also writes the service's manifest, which names this descriptor.
 
   sample_service.py serve --port 47190 --data-dir DIR [--id sample] [--instance default]
-  sample_service.py register --port 47190 --data-dir DIR [--services-dir DIR]
+  sample_service.py register --port 47190 --data-dir DIR [--services-dir DIR] [--repository URI]
 
 Opt-in, off by default: `serve --board-project <Project uuid>` also answers that Project's `sample.echo` requests on
 Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Responder, from a board.respond grant whose
@@ -40,6 +40,7 @@ import fabric_board as fbd  # noqa: E402 - the board responder (opt-in)
 import fabric_hub as fhb  # noqa: E402
 
 VERSION = "0.1.0"
+SAMPLE_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-adapter"  # where this sample is built from (FAA-198)
 # The dashboard is built from the dashboard kit (fabric-dashboard/0.1, DEC-0036) and declares it
 # in the well-known document only when the kit is there to serve.
 KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
@@ -550,6 +551,7 @@ def register(args: argparse.Namespace) -> int:
         else {"manager": "none"},
         "paths": {"data": str(data), "logs": []},
         "fabricManifest": str(manifest),
+        "source": {"repository": args.repository},
         # DEC-0061: who installed it, by role and never by name — a person runs this register command.
         "installedAt": fs.now_iso(), "installedBy": {"by": "person", "role": "operator", "tool": "sample_service.py register %s" % VERSION},
     }
@@ -584,6 +586,8 @@ def build_parser() -> argparse.ArgumentParser:
             p.add_argument("--board-project", help="the Project the service will answer on the board: lists its take-back "
                                                    "tool in the manifest (serve with the same --board-project)")
             p.add_argument("--services-dir")
+            # FAA-198: the repository its code is built from, which a new descriptor names; the sample's own by default.
+            p.add_argument("--repository", default=SAMPLE_REPOSITORY)
             p.add_argument("--label")
             p.add_argument("--plist")
     return parser

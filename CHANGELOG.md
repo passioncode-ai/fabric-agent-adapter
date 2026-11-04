@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.62.0 (unreleased)
+
+A new install names the repository of its code, so a map of the installed agents can link each to its project (FAA-198).
+
+### Changed
+
+- `write_descriptor` / `writeDescriptor` refuse a new descriptor that names no `source.repository` (none of its
+  `id.instance` is installed yet), with `ServiceError` naming the descriptor; `register_remote` / `registerRemote`
+  refuse it before they write the token file, so a refused registration leaves nothing. Rewriting a descriptor already
+  installed without it still writes it and warns (`warnings.warn`; Node `process.emitWarning`, code
+  `FABRIC_NO_SOURCE_REPOSITORY`), so an installed agent's update keeps working. `source_refusal` / `sourceRefusal` say
+  why an install would be refused, for an installer that checks before it writes anything else. `check_service.py`
+  names a descriptor without it (`descriptor.source-repository`, `NOT_RUN`, never a pass). `sample_service.py register`
+  writes its own repository and takes `--repository`. No owner field is added: the organization follows from the
+  repository (FAA-198).
+
+### Upgrading
+
+- An installer that writes a descriptor for a new install passes `source: {"repository": "https://github.com/owner/name"}`
+  (the repository its code is built from); an installed agent's next update warns until it does.
+
 ## 0.61.0 (2026-11-04)
 
 The board responder reads the operator's mandate from a request of his own Project (FAA-135), and working-with-fabric

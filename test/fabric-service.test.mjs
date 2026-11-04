@@ -18,7 +18,7 @@ const temp = () => tempDir('fabric-kit-');
 const descriptor = (port, id = 'sample', instance = 'default') => ({
   protocol: k.PROTOCOL, id, instance, name: 'Sample', origin: `http://127.0.0.1:${port}`,
   auth: { tokenFile: '/tmp/x/service.token' }, lifecycle: { manager: 'none' },
-  paths: { data: '/tmp/x', logs: [] }, installedAt: k.nowIso(), installedBy: 'test',
+  paths: { data: '/tmp/x', logs: [] }, installedAt: k.nowIso(), installedBy: 'test', source: { repository: 'https://github.com/example-org/example-agent' },
 });
 
 test('second holder of the instance lock is refused with the pid', { skip: noLinuxLock }, async () => {
@@ -95,6 +95,29 @@ test('a port is a claim', () => {
   const file = k.writeDescriptor(descriptor(47195), dir);
   // On Windows the privacy is the file's ACL, not a mode (fabric-service-platforms.test.mjs checks it).
   if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+});
+
+test('a new install names its repository; a reinstall without it warns (FAA-198)', () => {
+  const dir = temp();
+  const { source, ...bare } = descriptor(47196);
+  assert.ok(k.sourceRefusal(bare, dir));
+  assert.throws(() => k.writeDescriptor(bare, dir), /sample\.default names no source\.repository/);
+  assert.deepEqual(fs.readdirSync(dir), [], 'a refused install writes nothing');
+  const seen = [];
+  const emit = process.emitWarning;
+  process.emitWarning = (message, options) => seen.push([message, options?.code]);
+  try {
+    k.writeDescriptor(descriptor(47196), dir);
+    assert.deepEqual(seen, [], 'a descriptor that names its repository is written without a word');
+    k.writeDescriptor(bare, dir);
+  } finally {
+    process.emitWarning = emit;
+  }
+  assert.equal(seen.length, 1);
+  assert.match(seen[0][0], /names no source\.repository/);
+  assert.equal(seen[0][1], 'FABRIC_NO_SOURCE_REPOSITORY');
+  assert.equal(k.sourceRefusal(bare, dir), null, 'an installed descriptor is a rewrite');
+  for (const empty of [{}, { repository: '' }]) assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: empty }, dir), JSON.stringify(empty));
 });
 
 test('invalid descriptors are refused', () => {

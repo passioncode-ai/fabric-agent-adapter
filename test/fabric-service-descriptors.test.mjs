@@ -63,7 +63,7 @@ test('Fabric\'s button: present only while Fabric\'s descriptor is registered an
   fs.mkdirSync(app);
   const services = path.join(dir, 'services');
   assert.equal(k.fabricButtonPresence(services), 'absent', 'no services directory');
-  const desc = fixture('service-descriptor-person-app');
+  const desc = { ...fixture('service-descriptor-person-app'), source: { repository: 'https://github.com/example-org/example-agent' } }; // FAA-198: a new install names it
   desc.lifecycle.app = app;
   k.writeDescriptor({ ...desc, id: 'fabric', instance: 'default' }, services);
   assert.equal(k.fabricButtonPresence(services), 'present');
@@ -79,7 +79,7 @@ test('Fabric\'s button: present only while Fabric\'s descriptor is registered an
 
 test('two app descriptors without an origin never clash', () => {
   const dir = temp();
-  const desc = fixture('service-descriptor-person-app');
+  const desc = { ...fixture('service-descriptor-person-app'), source: { repository: 'https://github.com/example-org/example-agent' } }; // FAA-198: a new install names it
   desc.lifecycle.app = dir;
   const services = path.join(dir, 'services');
   assert.ok(fs.existsSync(k.writeDescriptor(desc, services)));
@@ -88,12 +88,12 @@ test('two app descriptors without an origin never clash', () => {
 
 test('registerRemote writes who installed it and takes runner and peer; usage rows take platform-metered', () => {
   const dir = temp();
-  const written = JSON.parse(fs.readFileSync(k.registerRemote({ id: 'example-inbox', name: 'Example Inbox', origin: 'https://inbox.example.com', token: 't'.repeat(32), dir }), 'utf8'));
+  const written = JSON.parse(fs.readFileSync(k.registerRemote({ id: 'example-inbox', name: 'Example Inbox', origin: 'https://inbox.example.com', token: 't'.repeat(32), dir, source: { repository: 'https://github.com/example-org/example-agent' } }), 'utf8'));
   assert.deepEqual(written.installedBy, { by: 'person', role: 'operator', tool: 'fabric-service register-remote' });
   const offered = fixture('service-descriptor-peer-remote');
   const second = JSON.parse(fs.readFileSync(k.registerRemote({
     id: 'example-inbox', instance: 'offered', name: 'Example Inbox', origin: 'https://inbox.example.com', token: 't'.repeat(32), dir,
-    runner: offered.runner, peer: offered.peer, installedBy: { by: 'person', role: 'administrator', tool: 'example-inbox register-remote 1.0.0' },
+    source: { repository: 'https://github.com/example-org/example-agent' }, runner: offered.runner, peer: offered.peer, installedBy: { by: 'person', role: 'administrator', tool: 'example-inbox register-remote 1.0.0' },
   }), 'utf8'));
   assert.deepEqual([second.runner, second.peer], [offered.runner, offered.peer]);
   assert.throws(() => k.registerRemote({ id: 'example-inbox', instance: 'bad', name: 'X', origin: 'https://inbox.example.com', token: 't'.repeat(32), dir, peer: offered.peer }), /declares runner/);

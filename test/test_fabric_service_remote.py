@@ -96,10 +96,10 @@ class RemotePlacement(unittest.TestCase):
         root = temp / "services"
         local = {"protocol": fs.PROTOCOL, "id": "maker", "instance": "default", "name": "Maker", "origin": "http://127.0.0.1:8443",
                  "auth": {"tokenFile": "/tmp/m.token"}, "lifecycle": {"manager": "none"}, "paths": {"data": "/tmp/m", "logs": []},
-                 "installedAt": fs.now_iso(), "installedBy": "test"}
+                 "installedAt": fs.now_iso(), "installedBy": "test", "source": {"repository": "https://github.com/example-org/example-agent"}}
         fs.write_descriptor(local, root)
         path = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com:8443",
-                                  token="t" * 40, directory=root)
+                                  token="t" * 40, directory=root, source={"repository": "https://github.com/example-org/example-agent"})
         d = json.loads(path.read_text())
         self.assertEqual(d["placement"], "remote")
         self.assertEqual(Path(d["auth"]["tokenFile"]).stat().st_mode & 0o777, 0o600)
@@ -114,9 +114,11 @@ class RemotePlacement(unittest.TestCase):
         path = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
                                   token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
         self.assertEqual(json.loads(path.read_text())["source"], {"repository": "https://github.com/example/agent"})
-        path = fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
-                                  directory=root)
-        self.assertNotIn("source", json.loads(path.read_text()), "no source given, none written")
+        with self.assertRaisesRegex(fs.ServiceError, "example-bare.default names no source.repository"):  # FAA-198
+            fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
+                               directory=root)
+        self.assertFalse(fs.remote_token_file("example-bare", "default", root).exists(), "a refused install writes no token")
+        self.assertFalse(fs.descriptor_path("example-bare", "default", root).exists())
         for source, needle in ((["https://github.com/example/agent"], "source is {repository?}"),
                                ({"repository": "https://github.com/example/agent", "branch": "main"}, "source has no member branch"),
                                ({"repository": ""}, "source.repository is a URI"),
@@ -150,9 +152,9 @@ class RemotePlacement(unittest.TestCase):
                          "a user without a password is a name, not a credential")
         for good in ("https://host.example:8443/a@b", "https://github.com/a%20b", "https://[::1]:8080/x", "urn:example:agent", "https://h.example:/x"):
             self.assertEqual(fs.validate_descriptor({**json.loads(path.read_text()), "source": {"repository": good}}), [], good)
-        path = fs.register_remote(service_id="example-none", name="None", origin="https://none.example.com", token="t" * 40,
-                                  directory=root, source=None)
-        self.assertNotIn("source", json.loads(path.read_text()), "None is no source, as undefined and null are in Node")
+        with self.assertRaises(fs.ServiceError):  # None is no source, as undefined and null are in Node: a new install is refused
+            fs.register_remote(service_id="example-none", name="None", origin="https://none.example.com", token="t" * 40,
+                               directory=root, source=None)
 
 
 if __name__ == "__main__":
@@ -249,7 +251,8 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
             self.child.stdout.close()
         self.assertIn(b"example agent on", seen)
         self.services = self.dir / "services"
-        fs.register_remote(service_id="example-agent", name="Example Agent", origin=self.origin, token=token, directory=self.services)
+        fs.register_remote(service_id="example-agent", name="Example Agent", origin=self.origin, token=token, directory=self.services,
+                           source={"repository": "https://github.com/example-org/example-agent"})
 
     def tearDown(self):
         self.child.terminate()

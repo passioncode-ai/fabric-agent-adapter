@@ -252,7 +252,7 @@ class LiveOpensInHostTests(LiveSample):
     def test_no_checkout_is_not_run(self):
         result = self.probe()
         self.assertEqual(result["verdict"], "NOT_RUN")
-        self.assertIn("source.repository", result["evidence"])
+        self.assertIn("pass --repo", result["evidence"])  # the sample names its source.repository since 0.62.0 (FAA-198)
 
     def test_a_raw_safari_open_fails_and_the_hosts_link_passes(self):
         bad = self.checkout({"open.sh": "open -a Safari http://127.0.0.1:%d/\n" % self.port})

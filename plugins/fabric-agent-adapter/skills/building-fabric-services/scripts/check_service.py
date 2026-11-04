@@ -194,6 +194,11 @@ class Probe:
         else:
             unique = "port %d is unique" % self.port
         self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
+        # FAA-198: the repository that links the agent to its project; a new install is refused without it, an installed one
+        # is named here (NOT_RUN is no pass) until its owner adds it.
+        source = self.d.get("source") if isinstance(self.d.get("source"), dict) else {}
+        self.add("descriptor.source-repository", "PASS" if source.get("repository") else "NOT_RUN",
+                 "names %s" % source["repository"] if source.get("repository") else "the descriptor %s" % fs.NO_SOURCE_REPOSITORY)
         if (self.d.get("lifecycle") or {}).get("manager") == "person":
             # DEC-0069: installed, never running — a reader checks the app is still there; liveness is the app's own file.
             present = fs.app_present(self.d)

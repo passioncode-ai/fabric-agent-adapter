@@ -118,6 +118,8 @@ export {
   placementOf,
   remoteOriginProblems,
   portOf,
+  NO_SOURCE_REPOSITORY,
+  sourceRefusal,
   writeDescriptor,
   removeDescriptor,
   dashboardExtensionProblems,

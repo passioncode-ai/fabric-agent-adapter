@@ -9,6 +9,7 @@ import os
 import re
 import socketserver
 import subprocess
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -434,13 +435,35 @@ def port_of(origin: str) -> int:
     return int(match.group(1))
 
 
+NO_SOURCE_REPOSITORY = ("names no source.repository, the repository its code is built from "
+                        "(https://github.com/owner/name): it links the agent to its project (FAA-198)")
+
+
+def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Optional[str]:
+    """FAA-198: why a new install of this (valid) descriptor is refused, or None: it names no source.repository and no
+    descriptor of its id.instance is installed yet. An installer checks it before it writes anything else."""
+    if (descriptor.get("source") or {}).get("repository"):
+        return None
+    if descriptor_path(descriptor["id"], descriptor["instance"], directory).exists():
+        return None
+    return "Descriptor %s.%s %s." % (descriptor["id"], descriptor["instance"], NO_SOURCE_REPOSITORY)
+
+
 def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Path:
-    """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim)."""
+    """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim).
+
+    FAA-198: a new descriptor names its ``source.repository``; rewriting one already installed without it only
+    warns (``warnings.warn``), so an installed agent's update keeps working."""
     problems = validate_descriptor(descriptor)
     if problems:
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
     root = directory or services_dir()
     me = "%s.%s" % (descriptor["id"], descriptor["instance"])
+    refusal = source_refusal(descriptor, root)
+    if refusal:
+        raise ServiceError(refusal)
+    if not (descriptor.get("source") or {}).get("repository"):
+        warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY), stacklevel=2)
     # DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
     port = None if placement_of(descriptor) == "remote" or "origin" not in descriptor else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):
