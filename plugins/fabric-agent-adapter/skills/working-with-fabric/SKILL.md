@@ -295,12 +295,14 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 
 ## Step 7: at the end
 
+A dispatched session ends per [on-demand session](references/on-demand-session.md); others:
+
 1. `fabric_stage_report` and `fabric_task_note` with what was done, what remains, and the exact next step.
 2. `fabric_task_handoff` when a task follows this one: a NAMED result, not a summary of the chat.
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
    the next agent reads) or let go (why). Older Fabric: `fabric_task_release`.
 
-Release even at the end: a claim left to lapse reads as stuck work.
+Release anyway: a lapsed claim reads as stuck work.
 
 ## Refusals and lost answers
 
@@ -349,8 +351,8 @@ touched (read in memory from the transcript's last 512 KB, which can hold a secr
 `watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched; one Fabric started on a board request gets its exit contract instead ([on-demand session](references/on-demand-session.md), FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). Read
-[session hooks](references/session-hooks.md) for what they do, log and need, and how to turn them off.
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched; one Fabric started on a board request gets its exit contract instead (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
+hooks](references/session-hooks.md): what they do, log and need, and how to turn them off.
 
 ## Completion format
 

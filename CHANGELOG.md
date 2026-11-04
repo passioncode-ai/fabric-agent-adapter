@@ -5,29 +5,37 @@
 ### Added
 
 - working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `c02e97c2`).
-  It is told by `FABRIC_DISPATCH_WORKFLOW`, `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`, or by its
-  prompt's first line `fabric-dispatch/1 workflow=wf_<16 hex> handoff=<id> request=<uuid>`; the environment wins over
-  the line. The session-start hook prints the exit contract with those values in place of the preamble (read the
-  packet, take the lease with `observatory_handoff_accept`, claim, answer, complete, close the workflow, end; on an
-  error `failed_known` with the reason), and the prompt hook prints it when only the line names the dispatch or the
-  two disagree. `references/on-demand-session.md` holds the steps.
-- The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section for agents
-  on a channel people write to (the ticket as the unit, one outcome per ticket, answer rather than route, repair
-  before hand-off, declared sources with a maximum age, hand-off queues with their answered signal, metadata only, the
-  declaration's form). The support-agent recipe:
-  - a hand-off its checks made carries the refused `draft`, and `answer(new_id, text, repair=decision)` rewrites it
-    once with the refusal's reasons: a pass is a reply with `repaired: true`, a second refusal a hand-off with
-    `fallback: true` (the standard's 4.4 and its ticket's `fallback`);
-  - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config) reads the knowledge file as a source: read again when
-    it changes, the last good version kept when a read fails, `state()` with its age from the last good read;
+  `FABRIC_DISPATCH_WORKFLOW` tells it, alone (as Switchboard's `dispatch` sets it today, board thread `b3e60686`) or
+  with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`; the prompt's first line `fabric-dispatch/1
+  workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
+  never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
+  exit contract in place of the preamble, also in a session Fabric launched: `fabric_whoami`, the packet
+  (`observatory_checkpoint_latest`) and the thread (`com.get`), the lease (`observatory_handoff_accept` with its
+  owner, key and executor), the claim, a run's request left accepted or in progress (`com.responder_replace`,
+  `com.reconcile`), renewals about every 20 s, the reply and `com.complete`, and the closing checkpoint (`done`, or for
+  `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with the reason). The prompt hook
+  prints it again when the line adds to the environment or disagrees with it. `references/on-demand-session.md` holds
+  the steps and every argument.
+- The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
+  standard's rules for agents on a channel people write to (the ticket as the unit, one outcome per ticket, answer
+  rather than route, repair before hand-off, declared sources with a maximum age, hand-off queues with their answered
+  signal, metadata only, the declaration's form). The support-agent recipe:
+  - a hand-off its checks made carries the refused `draft` in the returned decision and to `on_handoff`, never into
+    `decisions.jsonl`; `answer(new_id, text, repair=decision)` rewrites it once with the refusal's reasons: a pass is
+    a reply with `repaired: true`, a second refusal a hand-off with `fallback: true` (the standard's 4.4 and its
+    ticket's `fallback`), which `repair=` then refuses;
+  - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config, which reads the file at once) reads the knowledge
+    file as a source: read again when it changes, the last good version kept when a read fails or the file has the
+    wrong shape, `state()` with its age from the last check that found it good;
+  - `Knowledge.load` refuses a file that is not an object with an `entries` list, where it took an empty set before;
   - `channel-agent.example.json`, one project's declaration under
-    `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it by
-    `test/test_channel_agent_example.py`.
+    `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to
+    the example config's maximum age by `test/test_channel_agent_example.py`.
 
 ### Fixed
 
-- Every annotation in the shipped scripts resolves with `typing.get_type_hints` (FAA-203, a board finding, thread
-  `9fd84d47`): `fabric_estate.py` and four working-with-fabric modules import the `typing` names they use, and
+- Every annotation in the shipped scripts (the kit, the skills' scripts, the recipe and the Hermes adapter) resolves
+  with `typing.get_type_hints` (FAA-203, a board finding, thread `9fd84d47`): `fabric_estate.py` and four working-with-fabric modules import the `typing` names they use, and
   `LoginCodes`' `token` is written `Optional[Union[str, Callable[[], str]]]`, which Python 3.9 reads. A vendored copy
   of `fabric_estate.py` or `fabric_auth.py` reads as older; it worked at run time before.
 

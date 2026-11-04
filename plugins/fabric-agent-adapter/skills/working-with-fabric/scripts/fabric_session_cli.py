@@ -97,8 +97,11 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 
 
 #: FAA-201: a session Fabric started on a board request (Fabric's on-demand spec, c02e97c2, sections 3.4 to 3.6). The
-#: three values come in the environment and on the prompt's first line, `fabric-dispatch/1 workflow=wf_<16 hex>
-#: handoff=<handoff id> request=<uuid>`, fields one space apart in that order; the environment wins over the line.
+#: environment names the workflow, the handoff and the request; the prompt's first line `fabric-dispatch/1
+#: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order) names them too,
+#: and the environment wins. FABRIC_DISPATCH_WORKFLOW alone is enough to tell the session: a launcher that sets only it
+#: (Switchboard's SB-247 at e0309b2) leaves the handoff and the request to the packet. A line with no workflow in the
+#: environment is quoted text, never a dispatch.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
 _DISPATCH_VALUE = {"workflow": r"wf_[0-9a-f]{16}", "handoff": r"handoff:[A-Za-z0-9._:-]{1,120}",
@@ -106,31 +109,42 @@ _DISPATCH_VALUE = {"workflow": r"wf_[0-9a-f]{16}", "handoff": r"handoff:[A-Za-z0
 DISPATCH_LINE = re.compile(r"fabric-dispatch/1 workflow=(%(workflow)s) handoff=(%(handoff)s) request=(%(request)s)"
                            % _DISPATCH_VALUE)
 DISPATCH_CONTRACT = (
-    "[fabric-agent-adapter] Fabric started this session on board request {request} (workflow {workflow}, handoff "
-    "{handoff}). Do it and end; never wait for a person inside this run. 1. `observatory_checkpoint_latest` "
-    "{{workflowId: {workflow}}} reads the packet: the goal, the constraints (obey them first) and the thread. 2. "
-    "`observatory_handoff_accept` {{handoffId: {handoff}}} takes the workflow's lease; keep the `leaseId`. 3. "
-    "`com.enroll` for the request's capability, then `com.claim` {{request: {request}}}, `com.accept` and "
-    "`com.effect_begin` before the work. 4. Do the work the goal names; money, deletion and publication still go "
-    "through `fabric_effect_request`, and a sign-in, a typed secret or a payment is the person's: name it in the "
-    "answer instead. 5. `com.reply` in the thread with the answer, then `com.complete` with an observed outcome. 6. "
-    "`observatory_checkpoint_write` with that `leaseId`, `close: true`, status done for completed or failed for "
-    "failed_known, `done[]` and `notes` with no values. 7. End the run. On an error you cannot get past, complete "
-    "the request `failed_known` with the reason, close the workflow and end."
+    "[fabric-agent-adapter] Fabric started this session on one board request ({request}; workflow {workflow}). Do that "
+    "request and end: nobody watches this run, so never wait for a person. 1. `fabric_whoami`, then read the packet "
+    "with `observatory_checkpoint_latest` {{workflowId: {workflow}}}: obey its constraints first; its artifacts name "
+    "the request, the thread, the capability, the project, the deadline and when the run ends (run-ends-at); read the "
+    "thread with `com.get`. 2. `observatory_handoff_accept` with {handoff}, your `owner` (`agent:<name>`), an "
+    "`idempotencyKey` and `executor` takes the workflow's lease; keep the `leaseId`. 3. `com.enroll` for the "
+    "capability, then `com.claim` (`idempotency`, `capability`, `request`), `com.accept` and `com.effect_begin` before "
+    "an effect. When the request is already accepted or in progress (an earlier run), read the workflow's earlier "
+    "checkpoints: take an accepted one over with `com.responder_replace` and its transfer, settle `outcome_unknown` "
+    "only with `com.reconcile` and an observed result, and never complete what you did not observe. 4. Do the work; "
+    "renew with `com.renew` or `com.progress` about every 20 s in a long step and finish before run-ends-at. Money, "
+    "deletion and publication go through `fabric_effect_request`; a sign-in, a typed secret or a payment is the "
+    "person's: name it in the answer. 5. `com.reply` in the thread, then `com.complete` with an observed outcome: "
+    "completed, or failed_known with the reason. 6. `observatory_checkpoint_write` with the same `owner`, an "
+    "`idempotencyKey`, a `stepId`, the `leaseId`, `close: true`, a status and `body` {{goal, done, notes}} with no "
+    "values: done for completed; for failed_known failed once Observatory takes it (OBS-323), until then blocked with "
+    "the reason in notes. 7. End the run: no board sweep, no work claim, no watch-mail. The steps and every argument: "
+    "working-with-fabric references/on-demand-session.md."
 )
 DISPATCH_MISMATCH = (" The prompt's first line disagrees with the environment on {fields}: the environment's values "
-                     "above are the ones to use; say so in the final checkpoint's notes.")
+                     "above are the ones to use; say so in the closing checkpoint's notes.")
+_UNKNOWN = {"handoff": "the handoff the packet names (`observatory_checkpoint_latest` shows it pending)",
+            "request": "the request the packet names (its `board-request:` artifact)"}
 
 
 def dispatch_from_env(env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, str]]:
-    """The dispatch the environment names, or None when any of the three is missing or malformed (FAA-201)."""
+    """The dispatch the environment names: None unless FABRIC_DISPATCH_WORKFLOW is well formed; the handoff and the
+    request only when they are (FAA-201)."""
     env = os.environ if env is None else env
     found = {}
     for field, name in DISPATCH_ENV:
         value = env.get(name)
-        if not isinstance(value, str) or not re.fullmatch(_DISPATCH_VALUE[field], value):
+        if isinstance(value, str) and re.fullmatch(_DISPATCH_VALUE[field], value):
+            found[field] = value
+        elif field == "workflow":
             return None
-        found[field] = value
     return found
 
 
@@ -144,16 +158,23 @@ def dispatch_from_line(text: Any) -> Optional[Dict[str, str]]:
 
 
 def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Optional[Dict[str, str]], List[str]]:
-    """(the dispatch, the fields the prompt's line names otherwise): the environment wins over the line."""
+    """(the dispatch, the fields the prompt's line names otherwise). The environment decides that there is one and wins
+    on every field it names; the line fills a field it leaves out, for the same workflow only."""
     told, line = dispatch_from_env(env), dispatch_from_line(prompt)
     if told is None:
-        return line, []
-    return told, [field for field, _ in DISPATCH_ENV if line is not None and line[field] != told[field]]
+        return None, []
+    if line is None:
+        return told, []
+    mismatch = [field for field, _ in DISPATCH_ENV if field in told and line[field] != told[field]]
+    if "workflow" in mismatch:
+        return told, mismatch
+    return dict(line, **told), mismatch
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = ()) -> str:
-    return DISPATCH_CONTRACT.format(**dispatch) + (DISPATCH_MISMATCH.format(fields=", ".join(mismatch))
-                                                   if mismatch else "")
+    values = {field: dispatch.get(field) or _UNKNOWN[field] for field in ("handoff", "request")}
+    return DISPATCH_CONTRACT.format(workflow=dispatch["workflow"], **values) + (
+        DISPATCH_MISMATCH.format(fields=", ".join(mismatch)) if mismatch else "")
 
 
 def _host_output(host: str, event: str, context: str) -> str:
@@ -176,12 +197,16 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     """What to print, or None: Claude/Codex hook JSON, plain context for native plugins and Kimi. The preamble when the
     host has `fabric` registered, Fabric runs and the project uses Fabric (project_uses_fabric); a one-line pointer
     when the project shows no sign (FAA-60); when Fabric is down, one line, and only in a project that uses Fabric. Silent on a compacted or resumed session (`source`), which already holds what it was told,
-    and in a session Fabric launched. How to read the machine's Fabric services is the host instructions' to say."""
-    if host not in HOSTS or payload.get("source") in QUIET_SOURCES or fabric_launched(env):
+    and in a session Fabric launched. How to read the machine's Fabric services is the host instructions' to say.
+    A session started on a board request (FAA-201) gets the exit contract instead, launched or not, whatever the folder
+    shows."""
+    if host not in HOSTS or payload.get("source") in QUIET_SOURCES:
         return None
     dispatch = dispatch_from_env(env)
-    if dispatch is not None:  # FAA-201: the exit contract in place of the preamble, whatever the folder shows
+    if dispatch is not None:  # FAA-201: before the launch check, so a run shown in Fabric's console is told too
         return _host_output(host, "SessionStart", dispatch_contract(dispatch))
+    if fabric_launched(env):
+        return None
     cwd = Path(payload.get("cwd") or os.getcwd())
     registration = claude_registration(cwd, env) if host == "claude" else None
     registered = registration is not None if host == "claude" else host_registered(host, cwd, env)
@@ -227,14 +252,18 @@ def _unread_line(directory: Path) -> Optional[str]:
 
 def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None) -> Optional[str]:
     """The unread line when the board's count rose since the last one, then each nudge a turn's answer carried
-    (FAA-142), once; None when there is neither. Reads small files in the session's own folder; never calls Fabric."""
+    (FAA-142), once; None when there is neither. Reads small files in the session's own folder; never calls Fabric.
+    In a session started on a board request (FAA-201), the exit contract again when the prompt's first line adds the
+    handoff or the request the environment left out, or disagrees with it."""
     session_id = payload.get("session_id")
-    if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id) or fabric_launched(env):
+    if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return None
-    directory = session_dir(session_id, env)
+    told = dispatch_from_env(env)
     dispatch, mismatch = dispatch_of(env, payload.get("prompt"))
-    told = dispatch_from_env(env) is not None
-    lines = [dispatch_contract(dispatch, mismatch)] if dispatch is not None and (not told or mismatch) else []
+    lines = [dispatch_contract(dispatch, mismatch)] if dispatch is not None and (dispatch != told or mismatch) else []
+    if fabric_launched(env):
+        return _host_output("claude", "UserPromptSubmit", "\n".join(lines)) if lines else None
+    directory = session_dir(session_id, env)
     lines += [line for line in [_unread_line(directory)] if line] + [nudge_shown(line) for line in take_nudges(directory)]
     if not lines:
         return None

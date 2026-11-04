@@ -184,8 +184,9 @@ RECIPE_RETENTION = (
     "phone number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy "
     "states, at most 30 days for an agent that answers people (the standard's A1). A1 also asks for the text "
     'redacted: the outbox keeps it as written, and `prune` takes any `--keep-days`, so such an agent passes an '
-    '`on_handoff` that redacts what it stores, which replaces the outbox, and keeps 30 days or fewer. Prune on a '
-    'schedule:')
+    '`on_handoff` that redacts what it stores, which replaces the outbox, and keeps 30 days or fewer. A refused '
+    '`draft`, which can echo what the customer wrote, reaches the returned decision and `on_handoff` only: '
+    '`decisions.jsonl` never stores it. Prune on a schedule:')
 CHANGELOG_ENTRY = (
     '- **creating-fabric-agents: agents that answer people** (FAA-162, board request `1ad39d4e`). A new reference, '
     '`references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, '
@@ -320,7 +321,8 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
                       "at most 30",
                       "only a hold on the material counts as `inability`", "at the first refusal", "`on_handoff=`",
                       "per-item `answer` flag", "under a new message id",
-                      "same-vendor fallback", "`model:payment`", "an `on_handoff` that redacts what it stores"):
+                      "same-vendor fallback", "`model:payment`", "an `on_handoff` that redacts what it stores",
+                      "`decisions.jsonl` never stores it"):
             self.assertIn(words, recipe, words)
         self.assertIn("recipes/support-agent/", flat(REFERENCE))
         self.assertIn("agents-that-answer-people.md", flat("building-fabric-services/SKILL.md"))

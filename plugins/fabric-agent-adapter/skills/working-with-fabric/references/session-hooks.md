@@ -151,13 +151,14 @@ only variable names are looked at, never a value (two of them carry the session'
 
 ## A session started on a board request
 
-A session Fabric started to answer one board request (FAA-201) carries `FABRIC_DISPATCH_WORKFLOW`,
+A session Fabric started to answer one board request (FAA-201) carries `FABRIC_DISPATCH_WORKFLOW`, alone or with
 `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`, and its prompt's first line `fabric-dispatch/1 workflow=...
-handoff=... request=...`. SessionStart prints the exit contract with those values in place of the preamble, whatever
-the folder shows and without reading Fabric's files; the prompt hook prints it when only the line names the dispatch,
-or when the line and the environment disagree (the environment wins, and the contract says so). A partial or
-malformed set of the three variables reads as no dispatch. The turn and end hooks work as in any other session. What
-the session then does: [on-demand session](on-demand-session.md).
+handoff=... request=...`. SessionStart prints the exit contract in place of the preamble, whatever the folder shows,
+without reading Fabric's files, and also in a session Fabric launched: there the contract is the one thing it prints.
+The prompt hook prints it again when the line adds the handoff or the request the environment left out, or disagrees
+with it (the environment wins, and the contract says so); a line with no workflow in the environment is quoted text.
+The turn and end hooks work as in any other session (silent in a launched one). What the session then does:
+[on-demand session](on-demand-session.md).
 
 ## What they never do
 

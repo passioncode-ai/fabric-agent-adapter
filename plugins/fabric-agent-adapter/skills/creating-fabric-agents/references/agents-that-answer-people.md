@@ -18,7 +18,8 @@ per-channel targets, A3 (the rubric), A4 (the judge and its calibration), A6 (an
 default) and the rest of its checks that caught real defects, and the practices' other items of P1, P3, P5, P6, P7 and
 P8. Read both sources before you design the reply pipeline. The kit's support-agent recipe (building-fabric-services,
 `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: used alone it hands the message
-to a person at the first refusal (the refused draft is not kept), where this page repairs, researches and holds.
+to a person at the first refusal; with a repairing `on_handoff` it rewrites a refused draft once (`repair=`, a
+second refusal being `fallback: true`), and research and the hold stay this page's.
 
 ## Contents
 

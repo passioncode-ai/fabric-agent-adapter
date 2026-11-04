@@ -146,7 +146,9 @@ class Knowledge:
     @classmethod
     def load(cls, path: Path) -> "Knowledge":
         data = json.loads(Path(path).read_text(encoding="utf-8"))
-        return cls(data.get("entries", []) if isinstance(data, dict) else [])
+        if not isinstance(data, dict) or not isinstance(data.get("entries"), list):
+            raise RecipeError("the knowledge file is an object with an `entries` list")  # never an empty set by mistake
+        return cls(data["entries"])
 
     def lookup(self, question: str, limit: int = 3) -> List[Dict[str, Any]]:
         """The entries sharing the most words with the question (its words against each entry's question, tags and
@@ -164,11 +166,15 @@ class Knowledge:
 
 class KnowledgeSource:
     """The knowledge file as a declared source (the channel-agent standard's 7.1 and 7.4, FAA-197): read again when the
-    file changes, the last good version kept when a read fails (`degraded` until a good one), its age counted from the
-    last good read and `stale` past `max_age_s`. The service shows `state()` and opens an alert when it is stale."""
+    file changes, the last good version kept when a read fails (`degraded` until a good one), and `stale` past
+    `max_age_s`. The age counts from the last check that found the file good: a read that succeeded, or a look that
+    found it unchanged since one; a failed read or a missing file never renews it. It holds in a long-lived process
+    (`from_config` once); the calling service shows `state()` and opens one alert when it is stale."""
 
     def __init__(self, path: Path, *, max_age_s: int, clock: Callable[[], float] = time.time):
-        self.path, self.max_age_s, self._clock = Path(path), int(max_age_s), clock
+        if isinstance(max_age_s, bool) or not isinstance(max_age_s, int) or max_age_s < 1:
+            raise RecipeError("max_age_s is a whole number of seconds, at least 1")
+        self.path, self.max_age_s, self._clock = Path(path), max_age_s, clock
         self._knowledge: Optional[Knowledge] = None
         self._read_at = 0.0
         self._seen: Optional[int] = None
@@ -179,11 +185,15 @@ class KnowledgeSource:
             seen = self.path.stat().st_mtime_ns
         except OSError:
             seen = None
+        if self._knowledge is not None and seen is not None and seen == self._seen:
+            if not self._degraded:
+                self._read_at = self._clock()  # unchanged since a good read: still good
+            return self._knowledge
         if self._knowledge is None or seen != self._seen:
             self._seen = seen
             try:
                 knowledge = Knowledge.load(self.path)
-            except (OSError, ValueError, RecipeError) as err:
+            except (OSError, ValueError, TypeError, RecipeError) as err:
                 if self._knowledge is None:
                     raise RecipeError("the knowledge file %s could not be read (%s)" % (self.path.name,
                                                                                        err.__class__.__name__))
@@ -285,8 +295,8 @@ REPAIR_NOTE = ("Your reply was refused by the checks: {reasons}. Write it again 
 
 def repairable(decision: Any) -> bool:
     """A hand-off the code checks made, with the draft they refused: no-knowledge, model-unsure and model:* are not."""
-    if not isinstance(decision, Mapping) or decision.get("action", "handoff") != "handoff":
-        return False
+    if not isinstance(decision, Mapping) or decision.get("action", "handoff") != "handoff" or decision.get("fallback"):
+        return False  # a fallback already had its one repair
     reasons = decision.get("reasons")
     draft = decision.get("draft")
     return (isinstance(draft, str) and bool(draft.strip()) and isinstance(reasons, list) and bool(reasons)
@@ -486,7 +496,7 @@ class SupportAgent:
                     self.on_handoff(dict(decision, question=text, at=_stamp(at)))
                 finally:
                     self._local.in_handoff = False
-            self._log.append(decision, at)
+            self._log.append({k: v for k, v in decision.items() if k != "draft"}, at)  # the draft is never stored
         return dict(decision, repeated=False)
 
     def _decide(self, message_id: str, text: str, task_run_id: Optional[str],
@@ -537,7 +547,8 @@ def from_config(config_path: Path, *, on_handoff: Optional[Callable[[Dict[str, A
                                       project_id=config.get("projectId"), **overrides)
     knowledge: Union[Knowledge, KnowledgeSource] = Knowledge.load(home / config["knowledge"])
     if config.get("knowledgeMaxAgeSeconds") is not None:  # the file as a source with an age (FAA-197)
-        knowledge = KnowledgeSource(home / config["knowledge"], max_age_s=int(config["knowledgeMaxAgeSeconds"]))
+        knowledge = KnowledgeSource(home / config["knowledge"], max_age_s=config["knowledgeMaxAgeSeconds"])
+        knowledge.current()  # read now: state() is fresh from the start, and a bad file fails here
     return SupportAgent(knowledge=knowledge, client=client, model=config["model"],
                         fallback=config["fallback"], state_dir=state, max_tokens=int(config.get("maxTokens", 600)),
                         max_chars=int(config.get("maxChars", 1200)), on_handoff=on_handoff)

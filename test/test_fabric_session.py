@@ -131,7 +131,8 @@ class Base(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items()
                     if k not in ("XDG_DATA_HOME", "XDG_CACHE_HOME", "LOCALAPPDATA", "CODEX_HOME", "CLAUDE_CODE_SESSION_ID",
                                  "FABRIC_SERVICES_DIR", "FABRIC_LAUNCHED_SESSION", "FABRIC_ACP_SESSION",
-                                 "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT")}
+                                 "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT", "FABRIC_DISPATCH_WORKFLOW",
+                                 "FABRIC_DISPATCH_HANDOFF", "FABRIC_DISPATCH_REQUEST")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"

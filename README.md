@@ -37,7 +37,8 @@ In Claude Code the plugin adds four session hooks: SessionStart (at startup and 
 resume) puts that preamble into the session when the MCP server `fabric` is registered, Fabric runs and the project
 uses Fabric (one line pointing at `fabric_whoami` in a folder with no sign of it); when Fabric
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
-project that uses Fabric; Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
+project that uses Fabric; in a session Fabric started on a board request (`FABRIC_DISPATCH_WORKFLOW` set) it prints the
+exit contract instead, and UserPromptSubmit prints it again when the prompt's first line adds to it (FAA-201); Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
 and the board's unread count, and, once the running Fabric takes them (unless `FABRIC_SESSION_NO_REPOSITORIES=1`), the other repositories the turn touched (it then
 reads the last 512 KB of the session transcript (message text and tool output included, which can hold a secret the session displayed; read in memory only), uses only tool names and path arguments, and sends host/owner/name, never a
 local path or text); UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the

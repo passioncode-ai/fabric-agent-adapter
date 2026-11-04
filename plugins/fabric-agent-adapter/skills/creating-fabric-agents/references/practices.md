@@ -107,7 +107,8 @@ finished. Organization members have the full page with every receipt: the Passio
 
 The channel-agent standard v1 (`channel-agent-standard/1`, its round 4 of 2026-11-04; the neutral copy travels with its
 owner on the Fabric board, FAA-197) sets what every agent answering people on a channel does, so two agents count
-alike. The support-agent recipe (`building-fabric-services/recipes/support-agent`) carries the parts of it a
+alike. Unlike the sections above, these are the standard's rules rather than lessons from one measured failure;
+each names its check where the kit has one. The support-agent recipe (`building-fabric-services/recipes/support-agent`) carries the parts of it a
 draft-and-check step owns.
 
 - **The unit is the ticket, and a channel rule bounds it**: a private chat until 24 hours of silence, a group's one

@@ -463,6 +463,9 @@ class Recipe(unittest.TestCase):
         self.assertTrue(handoffs[-1]["fallback"], "the hand-off names the fallback for the ticket's `fallback`")
         saved = [json.loads(line) for line in (self.dir / "decisions.jsonl").read_text().splitlines()]
         self.assertEqual([row["decision"].get("fallback") for row in saved], [None, True])
+        self.assertEqual([row["decision"].get("draft") for row in saved], [None, None], "a refused draft is never stored")
+        with self.assertRaises(sa.RecipeError):
+            agent.answer("m-1-r2", "How do I reset my password?", repair=second)  # one repair, then a person
 
     def test_a_repair_that_hands_off_for_another_reason_is_no_fallback(self):
         for said, reasons in (("HANDOFF", ["model-unsure"]), (None, ["model:failed"])):
@@ -508,6 +511,57 @@ class Recipe(unittest.TestCase):
         agent, _ = self.agent(model_says("Open Settings, then Account [KB:password-reset]."), knowledge=source)
         self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "reply")
 
+    def test_a_redacting_on_handoff_keeps_the_draft_out_of_the_state(self):
+        # 0.63.0 readings 1: a refused draft can echo what the customer wrote; it reaches on_handoff, never a file
+        agent, handoffs = self.agent(model_says("Write to someone@example.org about it [KB:password-reset]."))
+        agent.on_handoff = lambda row: handoffs.append({"messageId": row["messageId"], "reasons": row["reasons"]})
+        got = agent.answer("m-1", "How do I reset my password?")
+        self.assertIn("someone@example.org", got["draft"])
+        stored = "".join(path.read_text() for path in self.dir.glob("*.jsonl"))
+        self.assertNotIn("someone@example.org", stored)
+
+    def test_a_rewrite_of_the_wrong_shape_keeps_the_last_good_version(self):
+        path = self.dir / "knowledge.json"
+        shutil.copy(RECIPE / "knowledge.example.json", path)
+        now = [1000.0]
+        source = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+        first = source.current()
+        for n, shape in enumerate(('{"entries": null}', '{"entries": 5}', "[]", "{}", '"x"'), 1):
+            with self.subTest(shape=shape):
+                path.write_text(shape)
+                os.utime(path, (now[0] + n, now[0] + n))
+                self.assertIs(source.current(), first)
+                self.assertTrue(source.state()["degraded"])
+        agent, _ = self.agent(model_says("Open Settings, then Account [KB:password-reset]."), knowledge=source)
+        self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "reply")
+
+    def test_an_unchanged_good_file_stays_fresh(self):
+        path = self.dir / "knowledge.json"
+        shutil.copy(RECIPE / "knowledge.example.json", path)
+        now = [1000.0]
+        source = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+        source.current()
+        for later in (1500.0, 2000.0, 2600.0):
+            now[0] = later
+            source.current()
+            self.assertEqual((source.state()["stale"], source.state()["age_s"]), (False, 0), later)
+        now[0] = 3201.0
+        self.assertTrue(source.state()["stale"], "past the maximum age with no check in between")
+        now[0] = 3800.0
+        self.assertEqual(sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0]).state()["age_s"], None)
+
+    def test_the_maximum_age_is_a_whole_number_of_seconds(self):
+        for bad in (0, -5, True, "60", 1.5):
+            with self.subTest(bad=bad), self.assertRaises(sa.RecipeError):
+                sa.KnowledgeSource(self.dir / "k.json", max_age_s=bad)
+        now = [10.0]
+        source = sa.KnowledgeSource(self.dir / "k.json", max_age_s=1, clock=lambda: now[0])
+        (self.dir / "k.json").write_text('{"entries": []}')
+        source.current()
+        now[0] = 11.0
+        self.assertEqual(source.state()["age_s"], 1)
+        self.assertFalse(source.state()["stale"], "exactly at the maximum age is not past it")
+
     def test_a_source_that_never_read_well_is_an_error(self):
         path = self.dir / "knowledge.json"
         path.write_text("[]oops")
@@ -522,6 +576,8 @@ class Recipe(unittest.TestCase):
         agent = sa.from_config(self.dir / "config.json")
         self.assertIsInstance(agent.knowledge, sa.KnowledgeSource)
         self.assertEqual(agent.knowledge.max_age_s, 3600)
+        self.assertEqual((agent.knowledge.state()["age_s"], agent.knowledge.state()["stale"]), (0, False),
+                         "read at start: no alert at every start")
         del config["knowledgeMaxAgeSeconds"]
         (self.dir / "config.json").write_text(json.dumps(config))
         self.assertIsInstance(sa.from_config(self.dir / "config.json").knowledge, sa.Knowledge)

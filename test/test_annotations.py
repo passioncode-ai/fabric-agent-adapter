@@ -13,7 +13,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "plugins/fabric-agent-adapter/skills"
 FOLDERS = [SKILLS / "building-fabric-services/scripts", SKILLS / "working-with-fabric/scripts",
-           SKILLS / "adapting-projects-to-fabric/scripts"]
+           SKILLS / "adapting-projects-to-fabric/scripts", SKILLS / "building-fabric-services/recipes/support-agent",
+           SKILLS / "creating-fabric-agents/scripts", SKILLS / "working-with-fabric/scripts/hosts/hermes"]
+#: Modules that run inside their host and import it (the Hermes adapter takes hermes_cli from the running Hermes).
+HOST_MODULES = {"hermes_cli"}
 
 
 def modules():
@@ -41,6 +44,11 @@ class Annotations(unittest.TestCase):
                 sys.path.insert(0, str(folder))
             try:
                 module = importlib.import_module(name)
+            except ModuleNotFoundError as exc:
+                if (exc.name or "").split(".")[0] in HOST_MODULES:
+                    continue
+                unresolved.append("%s: import %s" % (name, exc.__class__.__name__))
+                continue
             except Exception as exc:  # noqa: BLE001 - a script that needs its host is not this test's subject
                 unresolved.append("%s: import %s" % (name, exc.__class__.__name__))
                 continue

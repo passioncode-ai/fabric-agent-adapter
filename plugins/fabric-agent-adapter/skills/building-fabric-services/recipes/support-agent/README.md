@@ -93,9 +93,11 @@ python3 <adapter>/.../fabric_kit.py status <service>/support      # current, old
 The channel-agent standard declares every source with its owner, cadence and maximum age, and a source that fails
 keeps its last good version and says so (its 7.1 and 7.4). `KnowledgeSource(path, max_age_s=...)` is the knowledge
 file read that way: it reads the file again when it changes, keeps the last good version when a read fails, and
-`state()` gives `{id, age_s, max_age_s, stale, degraded}` with the age counted from the last good read. Pass it as
-`knowledge=`, or set `knowledgeMaxAgeSeconds` in the config. The service shows that state on its page and opens one
-alert when `stale` turns true; a file that was never read well is an error at the first message.
+`state()` gives `{id, age_s, max_age_s, stale, degraded}` with the age counted from the last check that found the
+file good (a read that succeeded, or a look that found it unchanged since). Pass it as `knowledge=`, or set
+`knowledgeMaxAgeSeconds` in the config, which reads the file at once (a file never read well fails there). It holds
+in a long-lived process; the CLI, one process per message, reads afresh each time. The calling service shows `state()`
+on its page and opens one alert when `stale` turns true: the recipe has no page and sends no alert itself.
 
 ## Declaring the channel-agent standard
 
@@ -136,7 +138,10 @@ the store's runner, which puts the named key into this one process's environment
 `python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only <project> OPENROUTER_API_KEY --
 python3 support_agent.py answer ...`); a long-running
 service gets it the same way from its service manager. The decision
-prints as JSON: `{"messageId", "action": "reply"|"handoff", "reply"?, "citations", "reasons", "costUsd", "repeated"}`.
+prints as JSON: `{"messageId", "action": "reply"|"handoff", "reply"?, "citations", "reasons", "costUsd", "repeated"}`,
+with `"draft"` on a hand-off the checks made, `"repaired": true` on a reply after `repair=` and `"fallback": true` on
+a second refusal. Two meanings of the word: the config's `fallback` is the second model; a decision's `fallback: true`
+is the channel-agent standard's second refusal. `repair=` refuses a decision that is already `fallback: true`.
 Exit 1 on a broken config or knowledge file. A missing key is not a crash: the message is handed off with
 `model:config`.
 
@@ -151,7 +156,8 @@ Every handoff row in `handoffs.jsonl` holds the customer's own message, which ca
 number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy states, at most
 30 days for an agent that answers people (the standard's A1). A1 also asks for the text redacted: the outbox keeps it
 as written, and `prune` takes any `--keep-days`, so such an agent passes an `on_handoff` that redacts what it stores,
-which replaces the outbox, and keeps 30 days or fewer. Prune on a schedule:
+which replaces the outbox, and keeps 30 days or fewer. A refused `draft`, which can echo what the customer wrote,
+reaches the returned decision and `on_handoff` only: `decisions.jsonl` never stores it. Prune on a schedule:
 
 ```bash
 python3 support_agent.py prune --config config.json --keep-days 30

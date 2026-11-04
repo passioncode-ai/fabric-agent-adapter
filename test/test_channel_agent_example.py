@@ -99,6 +99,13 @@ class Example(unittest.TestCase):
         self.assertNotIn("—", text)
         self.assertNotRegex(text, r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}", "no address")
 
+    def test_the_example_config_measures_the_age_the_declaration_names(self):
+        config = json.loads((EXAMPLE.parent / "config.example.json").read_text(encoding="utf-8"))
+        source = next(s for s in self.declaration[KEY]["projects"][0]["sources"] if s["id"] == "knowledge")
+        hours = re.fullmatch(r"PT(\d+)H", source["max_age"])
+        self.assertIsNotNone(hours, source["max_age"])
+        self.assertEqual(config["knowledgeMaxAgeSeconds"], int(hours.group(1)) * 3600)
+
     def test_the_checks_catch_each_rule(self):
         project = lambda d: d[KEY]["projects"][0]  # noqa: E731
         cases = [
