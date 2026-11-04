@@ -210,17 +210,15 @@ def ascii_decoded(text: str) -> str:
 
 
 def repository_password(value: str) -> bool:
-    """Whether a repository URI's user information holds a password, read both ways a reader may: as written (after
-    `scheme://`, up to the first `/`, `?` or `#`, as git reads `https://h\\u:pw@x/r`) and as WHATWG reads a special
-    scheme (every slash and backslash after the colon skipped, up to the next one, `?` or `#`, as `https:///u:pw@h`
-    reads), that reading in every scheme (`ssh:///u:pw@h`, `git+https:///u:pw@h`), `file` too (0.62.0 readings 10, 13). The user information ends at the last `@`; a password
-    follows its first `:`, as written or ascii_decoded (readings 11). The Node twin is repositoryPassword."""
+    """Whether a repository URI's user information holds a password, in any scheme, `file` too: every slash and
+    backslash after the colon skipped, then up to the next `/`, `?` or `#`, a backslash kept in the user. That one
+    reading holds git's (`https://h\\u:pw@x/r`), curl's (`https:///h\\u:pw@x`) and the URL standard's
+    (`https:///u:pw@h`, which stops at a backslash, a prefix of it) (0.62.0 readings 10 to 14). The user information
+    ends at the last `@`; a password follows its first `:`, as written or ascii_decoded. The Node twin is
+    repositoryPassword."""
     value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
     scheme, colon, rest = value.partition(":")
-    authorities = []  # the reading after `//` as written is the last one below (unit reading 13: it subsumes it)
-    if colon:  # every scheme, so `ssh:///u:pw@h` and `git+https:///u:pw@h` read their user too (seam reading 13)
-        skipped = rest.lstrip("/\\")  # and as curl reads `https:///h\\u:pw@x`: a backslash kept in that user
-        authorities += [re.match(r"[^/\\?#]*", skipped).group(0), re.match(r"[^/?#]*", skipped).group(0)]
+    authorities = [re.match(r"[^/?#]*", rest.lstrip("/\\")).group(0)] if colon else []
     users = [authority.rpartition("@")[0] for authority in authorities]
     return any(user.partition(":")[2] for user in users + [ascii_decoded(user) for user in users])
 

@@ -53,7 +53,9 @@
     "https://dev.azure.com/example-org/Bearer%20Tracking/_git/portal",
     "git+https:///u:fixture@x.example/o/r.git",
     "ssh:///u:fixture@x.example/o/r",
-    "https:///h\\u:fixture@x.example/o/r"
+    "https:///h\\u:fixture@x.example/o/r",
+    "https://task-pipeline-dashboard.example.com/o/r",
+    "ssh://\\/u:fixture@x.example/o/r"
   ],
   "name": [
     "https://github.com/example-org/example-agent",
@@ -75,7 +77,8 @@
     "file:///srv/git/r",
     "https://github.com/example-org/my%20repo",
     "https://u:\t@h.example/r",
-    "https://github.com/example-org/team-Bearer%20Tracking"
+    "https://github.com/example-org/team-Bearer%20Tracking",
+    "https://Bearer%20x.example/o/r"
   ],
   "no_password": [
     "//u%3Afixture@h.example/r",
@@ -86,6 +89,7 @@
     "https://u%3Afixture@h.example/r",
     "https://h\\u:fixture@x.example/r",
     "https:///u:fixture@h.example/r",
-    "ssh:///u:fixture@x.example/o/r"
+    "ssh:///u:fixture@x.example/o/r",
+    "https://\\/u:fixture@x.example/o/r"
   ]
 }
