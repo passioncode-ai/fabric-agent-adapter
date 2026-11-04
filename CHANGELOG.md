@@ -63,8 +63,8 @@ says that his approval holds for the whole task, at every link (FAA-195).
   too, as the board path does, so the start and the answer agree, and a value that only claims `str` never reaches the
   job file (older than 0.61.0; 0.61.0 seam reading 32, readings 33). The same split held for an
   effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
-  file wrote as a plain string the answer covered; `job_step`, `request_input(steps=)` and `add_tool` now admit an
-  effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),
+  file wrote as a plain string the answer covered; `job_step` (when a mandate travelled), `request_input(steps=)` and
+  `add_tool` (with an action) now admit an effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),
   and both stores read each member of a step once and keep the value they checked (0.61.0 seam and unit readings 34). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
   (0.61.0 seam reading 22).
@@ -110,11 +110,12 @@ says that his approval holds for the whole task, at every link (FAA-195).
   mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
   An effect passed that way to `approval_step`, `job_step` (when the start call carried a mandate), `request_input(steps=)` or `add_tool` with an action now raises
   `InteropError`: pass `member.value` there too. A Node service that keeps a step through `requestInput({steps})` with
-  a `String` object project or a `Number` object spend is likewise asked at the answer: pass the primitive value.
+  a `String` object project (under a mandate limited to projects) or a `Number` object spend (under a `perCallMaxUsd`)
+  is likewise asked at the answer: pass the primitive value.
 - A kept step holds only `effect`, `spendUsd` and `project`: a service that put its own keys in `steps=` keeps them
   elsewhere.
 - A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it (a `str`-subclass
-  project as its plain string), so its answer may still be covered: answer or cancel such jobs before upgrading.
+  project or effect, or a Node `String` or `Number` object, as its plain value), so its answer may still be covered: answer or cancel such jobs before upgrading.
 
 ## 0.60.0 (2026-11-03)
 
