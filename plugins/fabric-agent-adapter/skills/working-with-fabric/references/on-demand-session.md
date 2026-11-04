@@ -90,8 +90,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      run comes before the deadline and an accepted request does not expire by itself: `com.complete` `failed_known`
      saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
      executor's silence and one 60 s cycle after `run-ends-at`, and starts none with less than 5 minutes to the
-     deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (Fabric's main at `f0dd20d6`, in no release
-     yet, and its choice of the number on thread `b3e60686`, 2026-11-04); a request whose deadline passed unsettled goes
+     deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (`RUN_END_TO_DEADLINE_MS` and spec 3.6 on
+     Fabric's main at `afe28a60`, in no release yet); a request whose deadline passed unsettled goes
      to the operator with its workflow closed `blocked`;
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
