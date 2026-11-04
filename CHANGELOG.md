@@ -111,18 +111,20 @@ says that his approval holds for the whole task, at every link (FAA-195).
 - A Python service that passes a job or tool project as a `(str, Enum)` member or another `str` subclass, under a
   mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
   An effect passed that way to `approval_step`, `job_step` (when the start call carried a mandate), `request_input(steps=)` or `add_tool` with an action now raises
-  `InteropError`: pass `member.value` there too. A Node step that is a function, an array or an object whose members
-  are inherited or getters, which 0.60.0 kept without those members, is now kept with them, so a covering mandate on
-  the answer is read for it. A Node service that keeps a step through `requestInput({steps})` with
+  `InteropError`: pass `member.value` there too. A Node service that keeps a step through `requestInput({steps})` with
   a `String` object project (under a mandate limited to projects) or a `Number` object spend (under a `perCallMaxUsd`)
   is likewise asked at the answer: pass the primitive value.
-- A kept step holds only `effect`, `spendUsd` and `project`: a service that put its own keys in `steps=` keeps them
-  elsewhere. Each of the three is read when the step is kept, so a Python step (a `dict` subclass) whose accessor
-  raises for its spend or project, which 0.60.0 kept as its storage, now raises that error from `request_input`.
-- A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it (a `str`-subclass
-  project or effect, or a Node `String` or `Number` object, as its plain value, and a Node step whose members were
-  inherited or getters, or a function or an array, without them: with no project kept, a mandate limited to projects
-  covers its answer), so its answer may still be covered: answer or cancel such jobs before upgrading.
+- A kept step holds only `effect`, `spendUsd` and `project`, read as the step's accessors answer them (Node property
+  access, Python `.get`), where 0.60.0 kept the step's JSON form (Node `JSON.stringify`, Python the dict's storage): a
+  service that put its own keys in `steps=` keeps them elsewhere. The two differ for a Node step that is a function
+  (0.60.0 kept no step), an array, an object whose members are inherited (a class's getters included) or not
+  enumerable, or one with its own `toJSON`, and for a Python `dict` subclass whose `.get` answers otherwise than its
+  storage: such a step is now kept as its accessors answer, and an accessor that throws for the spend or the project,
+  which 0.60.0 never called, now throws from `requestInput` / `request_input` (the job stays `working`).
+- A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it: a `str`-subclass
+  project or effect, or a Node `String` or `Number` object, as its plain value, and the step kinds above in their JSON
+  form. A step so kept with its effect but no project is covered at a 0.61.0 answer by a mandate limited to projects;
+  one kept with no effect waits for the operator (`effect-missing`). Answer or cancel such jobs before upgrading.
 
 ## 0.60.0 (2026-11-03)
 
