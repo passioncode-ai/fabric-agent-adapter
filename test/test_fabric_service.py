@@ -222,7 +222,9 @@ class DescriptorTests(unittest.TestCase):
             self.assertIsNotNone(fs.source_refusal(dict(bare, id="folder"), root))
             self.assertIsNone(fs.source_refusal(dict(bare, instance=None), root), "a null instance reads as default, as in Node")
             self.assertIsNotNone(fs.source_refusal(["not", "a", "descriptor"], root))
-            self.assertIsNotNone(fs.source_refusal(dict(bare, id="other", origin="http://127.0.0.1:47197", source={"repository": []}), root))
+            self.assertIsNotNone(fs.source_refusal(dict(bare, instance=["default"]), root), "a list instance names no file")
+            for odd in ([], ["a"], 1, True):  # a repository is a non-empty string, in Python as in Node (unit reading 3)
+                self.assertIsNotNone(fs.source_refusal(dict(bare, id="other", origin="http://127.0.0.1:47197", source={"repository": odd}), root), odd)
             if os.name != "nt" and os.geteuid() != 0:  # an unsearchable folder reads as not installed, on 3.9 too (unit reading 2)
                 shut = root / "shut"
                 shut.mkdir()
@@ -257,6 +259,20 @@ class DescriptorTests(unittest.TestCase):
             verdicts = {r["rule"]: r for r in p.results}
             self.assertNotEqual(verdicts["descriptor.source-repository"]["verdict"], "PASS", "a refused source is no pass (unit reading 2)")
             self.assertFalse(any("fixture-not-a-key" in r["evidence"] for r in p.results), "no evidence carries the password")
+            d["paths"] = dict(d["paths"], data="opensource/data")  # a problem that only echoes the word is not the source's
+            d["source"] = {"repository": "https://github.com/example-org/example-agent"}
+            p = checker.Probe(path, d, root, True)
+            p.descriptor_rules()
+            self.assertEqual({r["rule"]: r for r in p.results}["descriptor.source-repository"]["verdict"], "PASS", "seam reading 3")
+            d["paths"] = json.loads(path.read_text())["paths"]
+            for kept in ("https://fixture-token@github.com/example-org/example-agent",  # valid, yet a key rides in them
+                         "https://github.com/example-org/example-agent?access_token=fixture-token"):
+                d["source"] = {"repository": kept}
+                p = checker.Probe(path, d, root, True)
+                p.descriptor_rules()
+                verdicts = {r["rule"]: r for r in p.results}
+                self.assertEqual(verdicts["descriptor.source-repository"]["verdict"], "PASS", kept)
+                self.assertNotIn("fixture-token", verdicts["descriptor.source-repository"]["evidence"], "printed redacted (unit reading 3)")
 
 
 class TokenAndNetworkTests(unittest.TestCase):
@@ -743,10 +759,25 @@ class StateRuleTests(unittest.TestCase):
             self.repo(code, "git@github.com:passioncode-ai/svc.git")
             (code / "data").mkdir()
             self.assertEqual(self.probe(code / "data", "https://github.com/passioncode-ai/svc"), "FAIL")
+            d = descriptor(47110, data=str(code / "data"))  # the FAIL evidence prints the source redacted (unit reading 3)
+            d["source"] = {"repository": "https://fixture-token@github.com/passioncode-ai/svc"}
+            p = load("check_service").Probe(Path("/dev/null"), d, Path("/tmp"), True)
+            p.state_rule(code / "data", subprocess.run(["git", "-C", str(code / "data"), "rev-parse", "--show-toplevel"], capture_output=True, text=True))
+            self.assertEqual(p.results[-1]["verdict"], "FAIL")
+            self.assertNotIn("fixture-token", p.results[-1]["evidence"])
             store = Path(temp) / "store"
             self.repo(store, "git@github.com:passioncode-ai/svc-registry.git")
             self.assertEqual(self.probe(store, "https://github.com/passioncode-ai/svc"), "PASS")
             self.assertEqual(self.probe(store, None), "NOT_RUN")
+            secret = Path(temp) / "secret-store"  # a data repository whose origin carries a password (product reading 3)
+            self.repo(secret, "https://bot:fixture-not-a-key@github.com/example-org/example-store.git")
+            checker = load("check_service")
+            d = descriptor(47110, data=str(secret))
+            d["source"] = {"repository": "https://github.com/example-org/example-agent"}
+            p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
+            p.state_rule(secret, subprocess.run(["git", "-C", str(secret), "rev-parse", "--show-toplevel"], capture_output=True, text=True))
+            self.assertEqual(p.results[-1]["verdict"], "PASS")
+            self.assertNotIn("fixture-not-a-key", p.results[-1]["evidence"], "the store's origin is printed redacted")
             plain = Path(temp) / "plain"
             plain.mkdir()
             self.assertEqual(self.probe(plain, "https://github.com/passioncode-ai/svc"), "PASS")

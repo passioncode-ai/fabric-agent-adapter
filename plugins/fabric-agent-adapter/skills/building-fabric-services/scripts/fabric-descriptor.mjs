@@ -303,7 +303,8 @@ export const namesRepository = (d) => d?.source !== null && typeof d?.source ===
 export function sourceRefusal(d, dir = servicesDir()) {
   if (namesRepository(d)) return null;
   const instance = d?.instance ?? 'default';
-  try { if (fs.statSync(descriptorPath(String(d?.id), String(instance), dir)).isFile()) return null; } catch { /* not installed */ }
+  // An id or instance that is no string names no installed file, in both kits (seam reading 3).
+  try { if (typeof d?.id === 'string' && typeof instance === 'string' && fs.statSync(descriptorPath(d.id, instance, dir)).isFile()) return null; } catch { /* not installed */ }
   return `Descriptor ${d?.id}.${instance} ${NO_SOURCE_REPOSITORY}.`;
 }
 

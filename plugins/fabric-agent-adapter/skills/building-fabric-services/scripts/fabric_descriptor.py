@@ -458,8 +458,8 @@ def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None)
     d = descriptor if isinstance(descriptor, dict) else {}
     instance = d.get("instance") if d.get("instance") is not None else "default"  # as Node's `??` reads it
     me = "%s.%s" % (d.get("id"), instance)
-    try:
-        if descriptor_path(str(d.get("id")), str(instance), directory).is_file():
+    try:  # an id or instance that is no string names no installed file, in both kits (seam reading 3)
+        if isinstance(d.get("id"), str) and isinstance(instance, str) and descriptor_path(d["id"], instance, directory).is_file():
             return None
     except (OSError, ValueError):  # an unsearchable folder reads as not installed, as Node's statSync does
         pass

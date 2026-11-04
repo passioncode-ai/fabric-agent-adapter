@@ -567,10 +567,18 @@ def register(args: argparse.Namespace) -> int:
     if refusal:
         print(refusal, file=sys.stderr)
         return 1
+    services = Path(args.services_dir) if args.services_dir else None
+    new = not fs.descriptor_path(args.id, args.instance, services).is_file()
     try:
-        path = fs.write_descriptor(descriptor, Path(args.services_dir) if args.services_dir else None)
-        # After the descriptor, so a refusal of any kind (a port claim too) leaves no manifest naming it (unit reading 2).
-        write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
+        path = fs.write_descriptor(descriptor, services)
+        # After the descriptor, so a refusal of any kind (a port claim too) leaves no manifest naming it (unit reading 2);
+        # a manifest that cannot be written takes a new descriptor back with it (unit reading 3).
+        try:
+            write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
+        except OSError as exc:
+            if new:
+                fs.remove_descriptor(args.id, args.instance, services)
+            raise fs.ServiceError("The manifest %s cannot be written: %s." % (manifest, exc.strerror or exc))
     except fs.ServiceError as exc:
         print(str(exc), file=sys.stderr)
         return 1

@@ -201,7 +201,7 @@ class Probe:
         # where a password rides (0.62.0 unit reading 2).
         if not fs.names_repository(self.d):
             self.add("descriptor.source-repository", "NOT_RUN", "the descriptor %s" % fs.NO_SOURCE_REPOSITORY)
-        elif any("source" in p for p in problems):
+        elif set(problems) - set(fs.validate_descriptor({k: v for k, v in self.d.items() if k != "source"})):  # what the source adds
             self.add("descriptor.source-repository", "NOT_RUN", "source.repository is refused by descriptor.valid")
         else:
             self.add("descriptor.source-repository", "PASS", "names %s" % redact_url(self.d["source"]["repository"]))
@@ -825,7 +825,7 @@ class Probe:
         elif remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
             self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, redact_url(source)))
         else:
-            self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, remote.stdout.strip() or "no remote"))
+            self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, redact_url(remote.stdout.strip()) if remote.stdout.strip() else "no remote"))
 
     def lock_rule(self, data: Path) -> None:
         lock = data / "service.lock"

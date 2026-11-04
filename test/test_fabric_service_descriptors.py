@@ -6,6 +6,7 @@ vendor_vectors.mjs). The local channel (DEC-0075) is not a kit surface yet: its 
 validator does not refuse, and that set is pinned so a new one is noticed."""
 import copy
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -175,6 +176,16 @@ class Writers(unittest.TestCase):
                                                      "--services-dir", str(services)] + extra)
             self.assertEqual(sample.register(args), 1, why)
             self.assertFalse((services / "data5" / "fabric-agent.json").exists(), "%s leaves no manifest (unit reading 2)" % why)
+        if os.name != "nt" and os.geteuid() != 0:  # a manifest it cannot write takes the new descriptor back (unit reading 3)
+            (services / "data6").mkdir()
+            (services / "data6").chmod(0o500)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47293", "--id", "example-ro", "--data-dir", str(services / "data6"),
+                                                         "--services-dir", str(services)])
+                self.assertEqual(sample.register(args), 1)
+            finally:
+                (services / "data6").chmod(0o700)
+            self.assertFalse((services / "example-ro.default.json").exists())
         args = sample.build_parser().parse_args(["register", "--port", "47295", "--id", "example-own", "--data-dir", str(services / "data4"),
                                                  "--services-dir", str(services)])
         self.assertEqual(sample.register(args), 0, "another --id still runs this sample's code, so it names this repository")

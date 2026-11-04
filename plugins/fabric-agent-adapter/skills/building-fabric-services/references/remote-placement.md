@@ -115,5 +115,6 @@ Rotate the token by setting the new value on the platform and re-running `regist
 operator's computer with it; the old token stops working the moment the platform restarts with the
 new value, and so does every session begun under it when `LoginCodes` has `token=`. The re-run keeps the
 installed `source` when it passes none (one the kit refuses, edited by hand, is dropped with the warning); pass
-`runner`, `peer`, `summary` and `doctor` again, since a re-run writes only what it is given. Rotate the
+`runner`, `peer`, `summary`, `doctor` and `installedBy` / `installed_by` again, since a re-run writes only what it is
+given (without `installedBy` it writes the default person form). Rotate the
 session key on the platform to sign every operator out.
