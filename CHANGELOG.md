@@ -108,7 +108,7 @@ says that his approval holds for the whole task, at every link (FAA-195).
   0.60.0): reinstall with `fabric_kit.py install` and check with `status`, never by copying `fabric_board_link` alone.
 - A Python service that passes a job or tool project as a `(str, Enum)` member or another `str` subclass, under a
   mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
-  An effect passed that way to `approval_step`, `job_step`, `request_input(steps=)` or `add_tool` now raises
+  An effect passed that way to `approval_step`, `job_step` (when the start call carried a mandate), `request_input(steps=)` or `add_tool` with an action now raises
   `InteropError`: pass `member.value` there too. A Node service that keeps a step through `requestInput({steps})` with
   a `String` object project or a `Number` object spend is likewise asked at the answer: pass the primitive value.
 - A kept step holds only `effect`, `spendUsd` and `project`: a service that put its own keys in `steps=` keeps them

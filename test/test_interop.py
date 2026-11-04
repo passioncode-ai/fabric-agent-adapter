@@ -1183,6 +1183,24 @@ class JobApprovalStepTests(unittest.TestCase):
             with self.assertRaises(fi.InteropError):
                 fi.job_step(scoped, spend_usd=0.5, project="alpha", **dict(call, effect=effect))
         self.assertNotEqual(self.jobs.get(job_id)["status"], "input_required", "nothing was kept")
+        for agent in ({"agent_id": "example-agent"}, {}):  # add_tool with an action too (seam and unit readings 35)
+            server = fi.McpToolServer("example-agent", "1.0.0", **agent)
+            for effect in (Effect.REPLY, Text("reply")):
+                with self.assertRaises(fi.InteropError):
+                    server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {}, action=RELAYED,
+                                    target="reply", effect=effect)
+            self.assertNotIn("reviews.approve", server.handlers, "a refused tool is not served")
+
+        class Flip(dict):  # a step whose effect answers differently on a second read: kept as read once
+            reads = 0
+
+            def get(self, key, default=None):
+                if key == "effect":
+                    Flip.reads += 1
+                    return "reply" if Flip.reads == 1 else "deploy"
+                return dict.get(self, key, default)
+        self.jobs.request_input(job_id, {"approve-reply": request}, "Publish it?", steps={"approve-reply": Flip()})
+        self.assertEqual((self.jobs.private(job_id)["steps"], Flip.reads), ({"approve-reply": {"effect": "reply"}}, 1))
 
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",

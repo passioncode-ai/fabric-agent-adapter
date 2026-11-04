@@ -269,9 +269,9 @@ export class JobStore {
   // job's private part (the format fabric_interop.py writes) so a service reads an answer's _meta.mandate for that step.
   // A step is kept as the gate reads it (keptStep), so a job's start and its answer agree.
   requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
-    const kept = {}; // the value checked is the value kept (seam reading 34)
+    const kept = Object.create(null); // the value checked is the value kept (seam 34); a key __proto__ stays a key (35)
     for (const [key, step] of Object.entries(steps ?? {})) {
-      kept[key] = Object.hasOwn(inputRequests ?? {}, key) && step !== null && typeof step === 'object' ? keptStep(step) : {};
+      kept[key] = Object.hasOwn(inputRequests ?? {}, key) && step !== null && step !== undefined ? keptStep(step) : {};
       if (!EFFECT_CLASSES.includes(kept[key].effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
     }
     const entries = Object.entries(inputRequests ?? {});
