@@ -881,6 +881,17 @@ class ActionGateMandateTests(unittest.TestCase):
                  (dict(spend=lambda a: 10 ** 5000), tight, "outside-mandate: spend"),
                  (dict(spend=0.5, project=lambda a: 1 / 0), scoped, "outside-mandate: project"),
                  (dict(spend=0.5, project=lambda a: 7), scoped, "outside-mandate: project"))
+        enum = importlib.import_module("enum")
+
+        class Site(str, enum.Enum):
+            ALPHA = "alpha"
+
+        class Text(str):
+            pass
+        # 0.61.0 unit reading 33: a str subclass is no exact str, so it is unreadable, never "no project" a scoped
+        # mandate would cover, even when it spells a listed project.
+        cases += tuple((dict(spend=0.5, project=(lambda value: lambda a: value)(value)), scoped, "outside-mandate: project")
+                       for value in (Text("beta"), Text("alpha"), Site.ALPHA))
         for options, mandate, detail in cases:
             server = fi.McpToolServer("example-agent", "1.0.0", agent_id="example-agent", clock=lambda: NOW_SECONDS)
             server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: {"done": True}, action=RELAYED,

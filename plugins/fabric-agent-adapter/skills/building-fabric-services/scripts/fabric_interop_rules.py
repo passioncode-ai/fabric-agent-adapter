@@ -412,7 +412,7 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     per-agent credential; never a name the call carries), `spend_usd` (its own estimate), `project`, and `mandate_capability` (a job's kept step: the job's capability
     the mandate is read under, DEC-0141 MJ-1; unusable, the refusal is operator-decision-required). Both are read failing
     closed, as McpToolServer reads them (FAA-139): a spend that is not a finite double is none (`mandate_spend`), a
-    project that is not a string is UNREADABLE_PROJECT, which a mandate limited to projects refuses. A covered call
+    project that is not an exact str (a subclass included) is UNREADABLE_PROJECT, which a mandate limited to projects refuses. A covered call
     answers {ok: True, record: {by: operator, via: mandate, task, chain, caller}, decision: None, mandate}; without
     `self_id` the mandate is not read and the call is answered as before it existed."""
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19

@@ -781,12 +781,12 @@ class McpToolServer:
         spend = number
         finite = math.isfinite(double)  # the service's own number goes on when it is finite (25 stays 25)
         if project is _UNREADABLE or not (project is None or type(project) is str):  # an exact str, as the core compares
-            project = _UNREADABLE_PROJECT  # a function that raised or named no string: a scoped mandate refuses
+            project = _UNREADABLE_PROJECT  # a function that raised or named no exact str: a scoped mandate refuses
         return {"self_id": self.agent_id, "effect": entry.get("effect"),
                 "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
                 # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
                 "spend_usd": spend if finite else None,
-                "project": project if type(project) is str else None}
+                "project": project}  # None or an exact str, read once above: never re-decided into no project (unit r33)
 
     @staticmethod
     def _read(value: Any, arguments: Dict[str, Any]) -> Any:
