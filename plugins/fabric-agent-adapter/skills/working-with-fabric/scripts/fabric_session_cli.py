@@ -193,8 +193,8 @@ def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = ()) ->
 
 def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dict[str, str]] = None,
                     take_over: bool = False) -> bool:
-    """Whether this session holds the dispatch: the first session id seen for (workflow, handoff, the launcher's run
-    id) holds it, recorded once in the hooks' folder (0600, created exclusively). `take_over` (a `/clear`, which gives
+    """Whether this session holds the dispatch: the first session id seen for the dispatch (its FABRIC_DISPATCH_ID when
+    the launcher sets one, else the workflow, the handoff and the launcher's run id) holds it, recorded once in the hooks' folder (0600, created exclusively). `take_over` (a `/clear`, which gives
     the same run a new session id; a nested `claude -p` starts with `startup`) moves the record to this id. A session
     id that is not one, or a folder that cannot be written, counts as the holder: better the contract twice than
     never."""
@@ -202,7 +202,11 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return True
     import hashlib
-    run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
+    dispatch_id = env.get("FABRIC_DISPATCH_ID") or ""
+    if SESSION_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch (Switchboard 0.7.8 sets it)
+        run = "|".join((dispatch["workflow"], "dispatch", dispatch_id))
+    else:
+        run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
     key = hashlib.sha256(run.encode("utf-8")).hexdigest()[:32]  # a new launch is a new holder
     folder = state_root(env=env) / "dispatch"
     if take_over:

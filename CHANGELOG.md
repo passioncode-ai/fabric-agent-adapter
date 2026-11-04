@@ -17,7 +17,8 @@
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it. Only the
   run's first session holds the dispatch: a session the run starts itself inherits the environment and gets one line
-  telling it not to accept, claim, complete or close, and a `/clear` in the holding session keeps the contract (the
+  telling it not to accept, claim, complete or close (the dispatch is told by its `FABRIC_DISPATCH_ID` when the
+  launcher sets one), and a `/clear` in the holding session keeps the contract (the
   hooks keep one record per run under `dispatch/`, pruned after 7 days). Every checkpoint the session writes repeats
   the packet's goal, constraints, artifacts and credentials, since Observatory keeps only the latest body.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the

@@ -208,6 +208,19 @@ class Hooks(Base):
                                 extra_env=wf_only)
         self.assertIn("observatory_handoff_accept", self.context(done))
 
+    def test_the_dispatch_id_keys_the_holder_when_it_is_set(self):
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        one = dict(ENV, FABRIC_DISPATCH_ID="d-1", SWITCHBOARD_LAUNCH_ID="launch-1")
+        self.assertIn("observatory_handoff_accept", self.context(self.start(one)[0]))
+        same = dict(one, SWITCHBOARD_LAUNCH_ID="launch-other")  # the dispatch id, not the launch id, decides
+        done, _ = self.run_hook("session-start", {"session_id": other, "cwd": str(self.repo), "source": "startup"},
+                                extra_env=same)
+        self.assertEqual(self.context(done), cli.DISPATCH_NESTED.format(workflow=WF))
+        again = dict(ENV, FABRIC_DISPATCH_ID="d-2", SWITCHBOARD_LAUNCH_ID="launch-1")
+        done, _ = self.run_hook("session-start", {"session_id": other, "cwd": str(self.repo), "source": "startup"},
+                                extra_env=again)
+        self.assertIn("observatory_handoff_accept", self.context(done), "a new dispatch is a new holder")
+
     def test_the_holder_fails_open(self):
         from unittest import mock
         env = dict(self.env, **ENV)

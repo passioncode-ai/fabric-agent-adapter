@@ -101,7 +101,8 @@ and ends `timed-out`.
 
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
 environment. Only the run's first session holds the dispatch: the hooks record the first session id for the
-workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new launch of the same workflow is a
+dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one; Switchboard sets it from 0.7.8), else by the
+workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new dispatch of the same workflow is a
 new holder; a launcher that sets the workflow alone gives each run a distinct run id. A `/clear` in the holding
 session keeps the contract (the record moves to the new session id). Any other session gets one line in place of the
 contract: do the task
