@@ -111,7 +111,8 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
 _DISPATCH_VALUE = {"workflow": DISPATCH_WORKFLOW, "handoff": r"handoff:[A-Za-z0-9._:-]{1,120}",
-                   "request": r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"}
+                   # Switchboard takes a request in either case (uuid::Uuid::parse_str), so the hooks do too
+                   "request": r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"}
 #: Fabric's dispatch id, a UUID, within the form Switchboard's `--dispatch-id` takes (board thread b3e60686): a value
 #: outside it keys nothing, and the holder falls back to the workflow, the handoff and the launcher's run id.
 DISPATCH_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
@@ -417,8 +418,9 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
         # a /clear in the run's own process keeps the run its prompt confirmed; a clear with no record holds nothing
         if payload.get("source") == "clear" and isinstance(session_id, str) and SESSION_ID.fullmatch(session_id) \
                 and dispatch_holder(dispatch, session_id, env, take_over=True):
-            return _host_output(host, "SessionStart", dispatch_contract(dispatch) + dispatch_cleared(
-                dispatch_cleared_from(dispatch, env), dispatch["handoff"], session_id))
+            # on Windows any /clear takes the record, a helper's too: there the run is still the line's to name
+            return _host_output(host, "SessionStart", dispatch_contract(dispatch, conditional=_WINDOWS)
+                                + dispatch_cleared(dispatch_cleared_from(dispatch, env), dispatch["handoff"], session_id))
         # the prompt is not seen yet: the run is the session whose own first line names these three
         return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id, conditional=True))
     if fabric_launched(env):

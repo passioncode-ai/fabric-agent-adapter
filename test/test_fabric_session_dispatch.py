@@ -690,6 +690,25 @@ class Hooks(Base):
         only = {"FABRIC_DISPATCH_WORKFLOW": WF}
         self.assertEqual(self.context(self.prompt(only, LINE)[0]), cli.DISPATCH_INCOMPLETE.format(workflow=WF))
 
+    def test_on_windows_a_clear_is_told_the_condition(self):
+        # 0.63.0 seam reading 19: any Windows /clear takes the record, so the run stays the line's to name
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            cli.dispatch_holder(FULL, SID, env)
+        cleared = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        with mock.patch.object(cli.os, "getppid", return_value=222), mock.patch.object(cli, "_WINDOWS", True):
+            said = cli.hook_session_start({"session_id": cleared, "cwd": str(self.repo), "source": "clear"}, env)
+        text = json.loads(said)["hookSpecificOutput"]["additionalContext"]
+        self.assertTrue(text.startswith(cli.DISPATCH_IF.format(**FULL)))
+        self.assertIn("On Windows a later /clear names no id either", text)
+
+    def test_an_uppercase_request_is_a_request(self):
+        # Switchboard parses the request with uuid::Uuid::parse_str, which takes either case
+        upper = REQUEST.upper()
+        env = dict(ENV, FABRIC_DISPATCH_REQUEST=upper)
+        self.assertEqual(cli.dispatch_of(env, LINE.replace(REQUEST, upper)), (dict(FULL, request=upper), []))
+
     def test_without_the_line_the_prompt_hook_prints_no_contract(self):
         # Vesta's VES-BOARD-SPAWN-HARDEN 2: without FABRIC_DISPATCH_* no exit contract; with it and no line, none either
         self.assertEqual(self.prompt({}, "answer the request in thread 1")[0].stdout, "")

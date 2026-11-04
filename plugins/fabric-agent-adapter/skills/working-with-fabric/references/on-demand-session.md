@@ -186,7 +186,9 @@ and the dashboard-kit notice says nothing there. A host whose hook gets no sessi
 OpenCode, OpenClaw, Pi) is always told the conditional contract and checks its first line itself; no record is
 written. A run whose own session has no prompt hook (Codex, Kimi, or a Codex home that does not trust the hook: the
 person never trusted it, or a Switchboard before 0.7.8 started it) elects no holder either: the session checks its
-first line itself, and a nested session, whose prompt has no line, stays a helper.
+first line itself, and a nested session, whose prompt has no line, stays a helper. A Claude Code session such a run
+starts with the run's own full prompt, line included, finds no record and is told it is the run; Observatory's one
+accept per handoff then decides which of the two goes on, the other's accept being refused.
 
 The plugin tells a dispatched session from 0.63.0 on; an older one prints its ordinary preamble there, and only the
 launcher's appended exit contract tells the run what to do.
