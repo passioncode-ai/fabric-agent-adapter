@@ -17,8 +17,9 @@ Order matters: each step leaves the service answering.
    `.plist.bak` files from `~/Library/LaunchAgents` after moving them elsewhere.
 7. **Write the descriptor** from the installer, with `source.repository` (a new descriptor without it is refused);
    resolve any port claim it refuses by moving the newcomer, never the established service.
-8. **Re-run the probe** until nothing `FAIL`s; record the table in the service's
-   verification document.
+8. **Declare what it uses** with `connections_extension` / `connectionsExtension` in the well-known document.
+9. **Re-run the probe** until nothing `FAIL`s and `descriptor.source-repository` and `well-known.connections` read
+   `PASS` (a `NOT_RUN` is not a pass); record the table in the service's verification document.
 
 ## Gaps that existing services usually have
 

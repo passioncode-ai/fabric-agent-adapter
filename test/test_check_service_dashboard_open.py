@@ -2,6 +2,7 @@
 checkout opens its own pages only through Fabric Dashboards, never with a browser opener. The matcher on its own
 (true and false positives), the verdict over a real Git checkout, finding the checkout, and the live probe."""
 
+import importlib
 import json
 import os
 from pathlib import Path
@@ -253,6 +254,14 @@ class LiveOpensInHostTests(LiveSample):
         result = self.probe()
         self.assertEqual(result["verdict"], "NOT_RUN")
         self.assertIn("pass --repo", result["evidence"])  # the sample names its source.repository since 0.62.0 (FAA-198)
+
+    def test_a_repository_in_the_evidence_carries_no_key(self):
+        rules = importlib.import_module("check_service_rules")
+        for source in ("https://fixture-token@github.com/example-org/example-agent",
+                       "https://github.com/example-org/example-agent?access_token=fixture-token"):
+            _, reason = rules.service_checkout({"source": {"repository": source}, "paths": {"data": "/nonexistent"}}, None)
+            self.assertNotIn("fixture-token", reason, "dashboard.opens-in-host prints it redacted (0.62.0 seam reading 4)")
+            self.assertIn("github.com", reason)
 
     def test_a_raw_safari_open_fails_and_the_hosts_link_passes(self):
         bad = self.checkout({"open.sh": "open -a Safari http://127.0.0.1:%d/\n" % self.port})

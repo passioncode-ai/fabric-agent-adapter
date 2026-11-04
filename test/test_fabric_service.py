@@ -223,6 +223,8 @@ class DescriptorTests(unittest.TestCase):
             self.assertIsNone(fs.source_refusal(dict(bare, instance=None), root), "a null instance reads as default, as in Node")
             self.assertIsNotNone(fs.source_refusal(["not", "a", "descriptor"], root))
             self.assertIsNotNone(fs.source_refusal(dict(bare, instance=["default"]), root), "a list instance names no file")
+            (root / "True.default.json").write_text("{}")  # only the type check refuses this one (unit reading 4)
+            self.assertIsNotNone(fs.source_refusal(dict(bare, id=True), root), "an id that is no string names no file")
             for odd in ([], ["a"], 1, True):  # a repository is a non-empty string, in Python as in Node (unit reading 3)
                 self.assertIsNotNone(fs.source_refusal(dict(bare, id="other", origin="http://127.0.0.1:47197", source={"repository": odd}), root), odd)
             if os.name != "nt" and os.geteuid() != 0:  # an unsearchable folder reads as not installed, on 3.9 too (unit reading 2)
@@ -778,6 +780,12 @@ class StateRuleTests(unittest.TestCase):
             p.state_rule(secret, subprocess.run(["git", "-C", str(secret), "rev-parse", "--show-toplevel"], capture_output=True, text=True))
             self.assertEqual(p.results[-1]["verdict"], "PASS")
             self.assertNotIn("fixture-not-a-key", p.results[-1]["evidence"], "the store's origin is printed redacted")
+            for origin, named in (("git@github.com:example-org/example-store.git", "github.com:example-org/example-store.git"),
+                                  ("/srv/git/example-store.git", "/srv/git/example-store.git")):
+                subprocess.run(["git", "-C", str(secret), "remote", "set-url", "origin", origin], check=True)
+                p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
+                p.state_rule(secret, subprocess.run(["git", "-C", str(secret), "rev-parse", "--show-toplevel"], capture_output=True, text=True))
+                self.assertIn(named, p.results[-1]["evidence"], "the evidence still names the repository (unit reading 4)")
             plain = Path(temp) / "plain"
             plain.mkdir()
             self.assertEqual(self.probe(plain, "https://github.com/passioncode-ai/svc"), "PASS")

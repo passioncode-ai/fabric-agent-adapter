@@ -568,7 +568,12 @@ def register(args: argparse.Namespace) -> int:
         print(refusal, file=sys.stderr)
         return 1
     services = Path(args.services_dir) if args.services_dir else None
-    new = not fs.descriptor_path(args.id, args.instance, services).is_file()
+    installed = fs.descriptor_path(args.id, args.instance, services)
+    unread = object()  # an installed descriptor that cannot be read now is left alone on a failure, never removed
+    try:  # what a failed rewrite puts back (unit reading 4)
+        old: Any = installed.read_bytes() if installed.is_file() else None
+    except OSError:
+        old = unread
     try:
         path = fs.write_descriptor(descriptor, services)
         # After the descriptor, so a refusal of any kind (a port claim too) leaves no manifest naming it (unit reading 2);
@@ -576,8 +581,10 @@ def register(args: argparse.Namespace) -> int:
         try:
             write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
         except OSError as exc:
-            if new:
+            if old is None:
                 fs.remove_descriptor(args.id, args.instance, services)
+            elif old is not unread:
+                fs.atomic_write(installed, old, 0o600)
             raise fs.ServiceError("The manifest %s cannot be written: %s." % (manifest, exc.strerror or exc))
     except fs.ServiceError as exc:
         print(str(exc), file=sys.stderr)

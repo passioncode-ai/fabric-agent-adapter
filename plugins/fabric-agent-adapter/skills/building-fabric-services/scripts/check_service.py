@@ -64,7 +64,7 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402
 import fabric_connections as fcn  # noqa: E402
-from fabric_http import redact_url  # noqa: E402 - a URL in evidence carries no userinfo or query
+from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
 
 Result = Dict[str, str]
@@ -204,7 +204,7 @@ class Probe:
         elif set(problems) - set(fs.validate_descriptor({k: v for k, v in self.d.items() if k != "source"})):  # what the source adds
             self.add("descriptor.source-repository", "NOT_RUN", "source.repository is refused by descriptor.valid")
         else:
-            self.add("descriptor.source-repository", "PASS", "names %s" % redact_url(self.d["source"]["repository"]))
+            self.add("descriptor.source-repository", "PASS", "names %s" % shown_repository(self.d["source"]["repository"]))
         if (self.d.get("lifecycle") or {}).get("manager") == "person":
             # DEC-0069: installed, never running — a reader checks the app is still there; liveness is the app's own file.
             present = fs.app_present(self.d)
@@ -823,9 +823,9 @@ class Probe:
         if not source:
             self.add(rule, "NOT_RUN", "data is inside repository %s and the descriptor names no source.repository to tell code from data" % top)
         elif remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
-            self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, redact_url(source)))
+            self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, shown_repository(source)))
         else:
-            self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, redact_url(remote.stdout.strip()) if remote.stdout.strip() else "no remote"))
+            self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, shown_repository(remote.stdout.strip()) or "no remote"))
 
     def lock_rule(self, data: Path) -> None:
         lock = data / "service.lock"

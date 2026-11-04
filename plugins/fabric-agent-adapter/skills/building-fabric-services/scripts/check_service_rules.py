@@ -18,6 +18,16 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
+from fabric_http import redact_url  # noqa: E402
+
+
+def shown_repository(value: str) -> str:
+    """A repository or git origin as evidence: a URL through redact_url; an scp form (`user@host:path`) or a local path
+    without its user and query, so evidence names the repository and never a credential riding in it (0.62.0
+    readings 2 to 4)."""
+    if "://" in value:
+        return redact_url(value)
+    return value.split("?", 1)[0].rpartition("@")[2]
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 
@@ -658,5 +668,5 @@ def service_checkout(descriptor: Any, repo: Optional[str]) -> Tuple[Optional[Pat
             continue
         seen.add(top)
         if same_repository(_git_out(Path(top), "remote", "get-url", "origin") or "", source):
-            return Path(top), "the checkout of %s that holds %s" % (source, place)
-    return None, "no checkout of %s holds the descriptor's commands, manifest or launchd job; pass --repo" % source
+            return Path(top), "the checkout of %s that holds %s" % (shown_repository(source), place)
+    return None, "no checkout of %s holds the descriptor's commands, manifest or launchd job; pass --repo" % shown_repository(source)

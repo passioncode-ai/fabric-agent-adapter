@@ -186,6 +186,16 @@ class Writers(unittest.TestCase):
             finally:
                 (services / "data6").chmod(0o700)
             self.assertFalse((services / "example-ro.default.json").exists())
+            before = (services / "example-agent.default.json").read_bytes()  # a failed rewrite keeps the installed one
+            (services / "data7").mkdir()
+            (services / "data7").chmod(0o500)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47292", "--id", "example-agent", "--data-dir", str(services / "data7"),
+                                                         "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+                self.assertEqual(sample.register(args), 1)
+            finally:
+                (services / "data7").chmod(0o700)
+            self.assertEqual((services / "example-agent.default.json").read_bytes(), before, "byte for byte (unit reading 4)")
         args = sample.build_parser().parse_args(["register", "--port", "47295", "--id", "example-own", "--data-dir", str(services / "data4"),
                                                  "--services-dir", str(services)])
         self.assertEqual(sample.register(args), 0, "another --id still runs this sample's code, so it names this repository")
