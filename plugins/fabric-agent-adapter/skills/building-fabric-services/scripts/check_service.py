@@ -280,6 +280,9 @@ class Probe:
             self.add("well-known.connections", "FAIL" if view["reported"] else "PASS",
                      "; ".join(f["message"] for f in fcn.connections_rules(wk)[:5]) or
                      "%d connection(s), %d named in degraded[]" % (len(view["connections"]), failing))
+        else:  # FAA-199: named, never a pass, so the connection map is not left empty unseen
+            self.add("well-known.connections", "NOT_RUN", "declares no %s: a host cannot draw what the service uses "
+                     "(connections_extension / connectionsExtension)" % fcn.CONNECTIONS_EXTENSION_KEY)
         # DEC-0121, FAC-SEM-142: every button's agent twin, declared; no declaration is NOT_RUN (D10).
         self.add("well-known.actions", *well_known_actions_verdict(wk))
         # DEC-0122: where the public Agent Card is; no member is NOT_RUN.

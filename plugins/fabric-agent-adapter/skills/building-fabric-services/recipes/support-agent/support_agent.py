@@ -371,6 +371,12 @@ class SupportAgent:
         self._local = threading.local()
         self._log = DecisionLog(self.state_dir)
 
+    def connections(self) -> List[Dict[str, Any]]:
+        """FAA-199: what the agent uses, for `connections_extension` in the well-known document of the service that runs
+        it (DEC-0096); that service adds its own hand-off route and channels."""
+        return [{"id": "model", "kind": "model", "target": self.model, "purpose": "drafts replies from the knowledge file"},
+                {"id": "fallback", "kind": "model", "target": self.fallback, "purpose": "drafts when the first model fails"}]
+
     @property
     def decisions_file(self) -> Path:
         return self._log.path

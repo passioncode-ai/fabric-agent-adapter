@@ -56,6 +56,14 @@ class Recipe(unittest.TestCase):
                                 state_dir=self.dir, on_handoff=handoffs.append, **kwargs)
         return agent, handoffs
 
+    def test_it_declares_its_models_as_connections(self):
+        """FAA-199: the service that runs the agent declares what it uses; the agent names its two models."""
+        agent, _ = self.agent(model_says("x"))
+        fcn = importlib.import_module("fabric_connections")
+        ext = fcn.connections_extension(agent.connections(), degraded=[{"source": "fallback", "reason": "down"}], states={"model": "ok"})
+        got = {c["id"]: (c["kind"], c["target"], c["state"]) for c in ext[fcn.CONNECTIONS_EXTENSION_KEY]["connections"]}
+        self.assertEqual(got, {"model": ("model", "a/one", "ok"), "fallback": ("model", "b/two", "degraded")})
+
     def test_a_grounded_reply(self):
         model = model_says("Open Settings, then Account, then Reset password [KB:password-reset].")
         agent, handoffs = self.agent(model)

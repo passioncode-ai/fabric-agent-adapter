@@ -2,7 +2,16 @@
 
 ## 0.62.0 (unreleased)
 
-A new install names the repository of its code, so a map of the installed agents can link each to its project (FAA-198).
+A new install names the repository of its code, and a service says what it uses, so a map of the installed agents can
+link each to its project and draw its chain (FAA-198, FAA-199).
+
+### Added
+
+- The reference service declares its connections (`extensions/connections/0.1`): the template it drafts from and the
+  demo source `serve --degraded` marks failing. The support-agent recipe's `SupportAgent.connections()` names its two
+  models for the service that runs it. `check_service.py` reports `well-known.connections` as `NOT_RUN` when a
+  service declares none (it reported nothing before), and adapting-projects-to-fabric names the declaration in its
+  adapter step (FAA-199).
 
 ### Changed
 

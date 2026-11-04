@@ -163,7 +163,9 @@ class ProbeRules(unittest.TestCase):
         result = self.probe(bad, page)["well-known.connections"]
         self.assertEqual(result["verdict"], "FAIL")
         self.assertNotIn(secret, result["evidence"])
-        self.assertNotIn("well-known.connections", self.probe(dict(wk, extensions={}), page), "an optional extension")
+        absent = self.probe(dict(wk, extensions={}), page)["well-known.connections"]  # optional, named (FAA-199)
+        self.assertEqual(absent["verdict"], "NOT_RUN", "an optional extension is never a pass when it is missing")
+        self.assertIn("declares no", absent["evidence"])
 
 
 if __name__ == "__main__":

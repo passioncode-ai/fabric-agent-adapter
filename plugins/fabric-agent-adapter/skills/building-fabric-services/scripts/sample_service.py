@@ -41,6 +41,10 @@ import fabric_hub as fhb  # noqa: E402
 
 VERSION = "0.1.0"
 SAMPLE_REPOSITORY = "https://github.com/passioncode-ai/fabric-agent-adapter"  # where this sample is built from (FAA-198)
+# FAA-199: what the sample uses, declared so a host draws its chain (DEC-0096): the template it drafts from, and the
+# demo source `serve --degraded` marks failing (a degraded[].source naming an id is that connection failing).
+CONNECTIONS = [{"id": "template", "kind": "model", "target": "sample-template", "purpose": "drafts the notes"},
+               {"id": "demo", "kind": "connector", "target": "demo", "purpose": "the source --degraded marks failing"}]
 # The dashboard is built from the dashboard kit (fabric-dashboard/0.1, DEC-0036) and declares it
 # in the well-known document only when the kit is there to serve.
 KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
@@ -280,7 +284,8 @@ class Service:
                       "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [c["name"] for c in CAPABILITIES]
                               + ([TAKE_BACK["tool"]] if self.board is not None else [])},
                       "usage": {"path": fs.USAGE_PATH}},
-            extensions=fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else None,
+            extensions=dict(fs.dashboard_extension() if (KIT_DIR / "fabric-dashboard.css").is_file() else {},
+                            **fs.connections_extension(CONNECTIONS, degraded=self.degraded, states={"template": "ok"})),
             # DEC-0067: listed only when the board is on — a host pinned before DEC-0067 refuses the member.
             # DEC-0126 OA-7: a server serving a relayed action reads `source`, so it lists operator-source/1 too.
             protocols=self.mcp.well_known_protocols(["fabric-service/0.1", "fabric-project-comms/0.1"]) if self.board is not None else None,

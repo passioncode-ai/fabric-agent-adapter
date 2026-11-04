@@ -143,6 +143,9 @@ Preserve the chosen ownership boundary:
   `building-fabric-services`'s `scripts/fabric_interop.py`.
 - Local runner maps typed input, executable identity, result location, cancellation,
   heartbeat, and partial results without relying on ambient accounts.
+- A service declares what it uses (`extensions/connections/0.1`: models, other agents, connectors, stores,
+  channels) with `connections_extension` / `connectionsExtension`, and its descriptor names `source.repository`;
+  the probe names either one missing (FAA-198, FAA-199).
 
 Keep model selection and provider-internal reasoning outside the Fabric contract. Expose
 typed outcomes, evidence, artifacts, and protocol-visible state, not chain-of-thought.

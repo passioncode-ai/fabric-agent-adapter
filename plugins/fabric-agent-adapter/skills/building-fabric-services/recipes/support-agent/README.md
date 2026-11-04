@@ -71,6 +71,10 @@ names the same file.
 
 ## Install into a service
 
+The service that runs it says what it uses (FAA-199): `agent.connections()` names the two models, and the service adds
+its own hand-off route, in its well-known document:
+`fs.connections_extension(agent.connections() + [...], degraded=degraded)`.
+
 ```bash
 python3 <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_kit.py \
   install <service>/support --lang py --module fabric_openrouter --module fabric_usage --module fabric_paths

@@ -128,7 +128,8 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   `connectionsExtension(declared, {degraded, states})`: `state` comes from the service's own checks (`states`, by
   `id`), else `degraded` when `degraded[]` names it, else `unknown`; a declaration a host would hide is refused with
   `ServiceError`, and `build_well_known` refuses one passed in by hand. `connections_view` / `connectionsView` read
-  a peer's list as Fabric Dashboards does, and `check_service.py` reports `well-known.connections`. Build it each
+  a peer's list as Fabric Dashboards does, and `check_service.py` reports `well-known.connections` (`NOT_RUN` when
+  the document declares none, FAA-199; the reference service declares its template and its demo source). Build it each
   time the well-known document is built, from the same `degraded` list:
 
   ```python

@@ -167,6 +167,26 @@ class Writers(unittest.TestCase):
         written = json.loads((services / "example-agent.default.json").read_text())
         self.assertEqual(written["source"], {"repository": "https://github.com/example-org/example-agent"})
 
+    def test_the_sample_declares_what_it_uses(self):
+        """FAA-199: the sample's well-known document lists its connections; --degraded marks the demo source failing."""
+        sample = load("sample_service")
+        fcn = load("fabric_connections")
+        data = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, data, True)
+        for degraded, demo in ((None, "unknown"), ("down for the demo", "degraded")):
+            with self.subTest(degraded=degraded):
+                args = sample.build_parser().parse_args(["serve", "--port", "47297", "--data-dir", str(data)]
+                                                        + (["--degraded", degraded] if degraded else []))
+                svc = sample.Service(args)
+                svc.start()  # the lock first, as serve does; released before the next case
+                try:
+                    wk = svc.well_known()
+                finally:
+                    svc.lock.release()
+                view = fcn.connections_view(wk)
+                self.assertFalse(view["reported"], view)
+                self.assertEqual({c["id"]: c["state"] for c in view["connections"]}, {"template": "ok", "demo": demo})
+
     def test_usage_rows_take_the_platform_metered_route(self):
         receipt = fs.make_usage_receipt("example", "example-model", input_tokens=1, output_tokens=1, route="platform-metered")
         self.assertEqual(receipt["route"], "platform-metered")
