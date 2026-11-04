@@ -72,10 +72,10 @@ link each to its project and draw its chain (FAA-198, FAA-199).
 
 ### Upgrading
 
-- An installer that writes a descriptor for a new install, and a desktop app that writes its own (DEC-0069), passes
-  `source: {"repository": "https://github.com/owner/name"}` (the repository its code is built from) in the call that
-  writes it, `register_remote` / `registerRemote` included: a source set by a later write is too late, since the first
-  call is refused before anything is written. An installer that loads the kit from the installed plugin meets this as
+- An installer that writes a descriptor for a new install (`register_remote` / `registerRemote` included) and a desktop
+  app that writes its own (DEC-0069) pass `source: {"repository": "https://github.com/owner/name"}` (the repository
+  their code is built from) in the call that writes it: a source set by a later write is too late, since the first call
+  is refused before anything is written. An installer that loads the kit from the installed plugin meets this as
   soon as the plugin updates; an installed agent's next update warns until it names one. Only a rewrite in
   place keeps working: an update that removes the descriptor before it writes it again, a new instance (a preview) and a
   moved services directory are new installs. In Python the warning is `NoSourceRepositoryWarning` (a `UserWarning`), so

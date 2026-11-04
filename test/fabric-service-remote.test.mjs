@@ -109,7 +109,7 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
   }
   assert.deepEqual(seen, ['FABRIC_NO_SOURCE_REPOSITORY']);
   assert.throws(() => k.registerRemote({ id: 'example-bare', name: 'Bare', origin: 'https://bare.example.com', token: 't'.repeat(40), dir }),
-    /example-bare\.default names no source\.repository[\s\S]*in this call/); // FAA-198
+    /example-bare\.default names no source\.repository[\s\S]*in this call[\s\S]*in registerRemote's options/); // FAA-198
   assert.ok(!fs.existsSync(k.remoteTokenFile('example-bare', 'default', dir)), 'a refused install writes no token');
   assert.ok(!fs.existsSync(k.descriptorPath('example-bare', 'default', dir)));
   for (const [source, needle] of [
