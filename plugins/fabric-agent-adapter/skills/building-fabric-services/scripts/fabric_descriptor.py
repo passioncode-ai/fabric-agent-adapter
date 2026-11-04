@@ -444,20 +444,22 @@ class NoSourceRepositoryWarning(UserWarning):
     FABRIC_NO_SOURCE_REPOSITORY). A new install without it is refused instead."""
 
 
-def names_repository(descriptor: Dict[str, Any]) -> bool:
-    source = descriptor.get("source")
-    return isinstance(source, dict) and bool(source.get("repository"))
+def names_repository(descriptor: Any) -> bool:
+    source = descriptor.get("source") if isinstance(descriptor, dict) else None
+    return isinstance(source, dict) and isinstance(source.get("repository"), str) and bool(source["repository"])
 
 
 def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Optional[str]:
     """FAA-198: why a new install of this descriptor is refused, or None: it names no source.repository and no
-    descriptor of its id.instance is installed yet (a regular file; a folder, a broken link or one that cannot be read
-    is none). An installer may check it before it validates or writes anything else."""
+    descriptor of its id.instance is installed yet (a regular file, whatever it holds; a folder, a broken link or a path
+    that cannot be examined is none). An installer may check it before it validates or writes anything else."""
     if names_repository(descriptor):
         return None
-    me = "%s.%s" % (descriptor.get("id"), descriptor.get("instance", "default"))
+    d = descriptor if isinstance(descriptor, dict) else {}
+    instance = d.get("instance") if d.get("instance") is not None else "default"  # as Node's `??` reads it
+    me = "%s.%s" % (d.get("id"), instance)
     try:
-        if descriptor_path(str(descriptor.get("id")), str(descriptor.get("instance", "default")), directory).is_file():
+        if descriptor_path(str(d.get("id")), str(instance), directory).is_file():
             return None
     except (OSError, ValueError):  # an unsearchable folder reads as not installed, as Node's statSync does
         pass

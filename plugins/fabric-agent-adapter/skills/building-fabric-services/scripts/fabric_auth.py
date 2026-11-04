@@ -37,6 +37,7 @@ from fabric_paths import (
 )
 from fabric_descriptor import (
     descriptor_path,
+    names_repository,
     source_refusal,
     validate_descriptor,
     write_descriptor,
@@ -400,7 +401,10 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
             installed = json.loads(descriptor_path(service_id, instance, root).read_text(encoding="utf-8")).get("source")
         except (OSError, ValueError, AttributeError):
             installed = None
-        source = installed if isinstance(installed, dict) and installed.get("repository") else None
+        # Only one the kit accepts: a hand-edited source never blocks a rotation; it is dropped with the warning.
+        base = set(validate_descriptor(descriptor))
+        source = installed if names_repository({"source": installed}) and set(
+            validate_descriptor(dict(descriptor, source=installed))) <= base else None
     if source is not None:
         descriptor["source"] = dict(source) if isinstance(source, dict) else source
     if doctor:

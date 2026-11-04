@@ -117,6 +117,17 @@ class RemotePlacement(unittest.TestCase):
         rotated = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
                                      token="r" * 40, directory=root)  # a rotation that names no source keeps it (seam reading 1)
         self.assertEqual(json.loads(rotated.read_text())["source"], {"repository": "https://github.com/example/agent"})
+        hand = json.loads(rotated.read_text())
+        hand["source"] = {"repository": "git@github.com:example/agent.git"}  # edited by hand: the kit never accepts it
+        rotated.write_text(json.dumps(hand))
+        warnings = importlib.import_module("warnings")
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always")
+            rotated = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                         token="s" * 40, directory=root)  # a source the kit refuses never blocks a rotation
+        self.assertNotIn("source", json.loads(rotated.read_text()))
+        self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning])
+        self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the installer's call")
         with self.assertRaisesRegex(fs.ServiceError, "example-bare.default names no source.repository"):  # FAA-198
             fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
                                directory=root)
@@ -281,7 +292,7 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
         self.assertEqual(failed, {})
         self.assertEqual(rc, 0)
         for rule in ("well-known.requires-token", "well-known.identity", "network.host-check", "network.cross-site-check",
-                     "events.requires-token", "login.single-use", "login.cookie-host-bound"):
+                     "events.requires-token", "login.single-use", "login.cookie-host-bound", "well-known.connections"):
             self.assertEqual(results[rule]["verdict"], "PASS", rule)
         self.assertEqual(results["lifecycle.platform"]["verdict"], "NOT_RUN")
         self.assertEqual(results["network.loopback-only"]["verdict"], "NOT_RUN")

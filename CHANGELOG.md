@@ -8,25 +8,29 @@ link each to its project and draw its chain (FAA-198, FAA-199).
 ### Added
 
 - The reference service declares its connections (`extensions/connections/0.1`): the template it drafts from and the
-  demo source `serve --degraded` marks failing. The support-agent recipe's `SupportAgent.connections()` names its two
-  models for the service that runs it. `check_service.py` reports `well-known.connections` as `NOT_RUN` when a
+  demo source `serve --degraded` marks failing; the online example (`sample-remote-service.mjs`) declares an empty list,
+  since it calls nothing outside itself. The support-agent recipe's `SupportAgent.connections()` names its two models
+  for the service that runs it, keeping only an id the connections rule accepts, and imports `fabric_connections` only
+  when called (the recipe's install line names the module). `check_service.py` reports `well-known.connections` as `NOT_RUN` when a
   service declares none (it reported nothing before), and adapting-projects-to-fabric names the declaration in its
   adapter step (FAA-199).
 
 ### Changed
 
 - `write_descriptor` / `writeDescriptor` refuse a new descriptor that names no `source.repository` (no descriptor of its
-  `id.instance` is installed yet: an installed one is a regular file, so a folder, a broken link or one that cannot be
-  read is none), with `ServiceError` naming the descriptor; `register_remote` / `registerRemote` refuse it before they
+  `id.instance` is installed yet: an installed one is a regular file, whatever it holds, so a folder, a broken link or
+  a path that cannot be examined is none), with `ServiceError` naming the descriptor; `register_remote` / `registerRemote` refuse it before they
   write the token file, so a refused registration leaves nothing, and a rotation that names no `source` keeps the
-  installed one. Rewriting a descriptor already installed without it still writes it and warns
+  installed one when the kit accepts it (a hand-edited one it refuses is dropped, as before). Rewriting a descriptor already installed without it still writes it and warns
   (`NoSourceRepositoryWarning`, a `UserWarning` attributed to the installer's call; Node `process.emitWarning`, code
   `FABRIC_NO_SOURCE_REPOSITORY`), so an installed agent's update keeps working. `source_refusal` / `sourceRefusal` say
   why an install would be refused, for an installer that checks before it validates or writes anything else (a `source`
   that is no object names nothing), and `names_repository` / `namesRepository` whether a descriptor names one.
-  `check_service.py` names a descriptor without it (`descriptor.source-repository`, `NOT_RUN`, never a pass).
-  `sample_service.py register` writes this repository for `--id sample` and takes `--repository` (another `--id` names
-  its own, or is refused), and writes its manifest only once the descriptor is accepted. No owner field is added: the
+  `check_service.py` names a descriptor without it, or with one `descriptor.valid` refuses
+  (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo or query, as
+  `state.outside-code` now does too.
+  `sample_service.py register` writes this repository, whose code its descriptor runs whatever `--id` names, takes
+  `--repository`, and writes its manifest only after the descriptor, so a refusal of any kind leaves none naming it. No owner field is added: the
   organization follows from the repository (FAA-198).
 
 ### Upgrading

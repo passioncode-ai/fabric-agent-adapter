@@ -120,6 +120,11 @@ test('a new install names its repository; a reinstall without it warns (FAA-198)
   for (const empty of [{}, { repository: '' }, 'x', ['a'], 1, true]) assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: empty }, dir), JSON.stringify(empty));
   fs.mkdirSync(path.join(dir, 'folder.default.json')); // a folder at the descriptor's path is no installed descriptor
   assert.ok(k.sourceRefusal({ ...bare, id: 'folder' }, dir));
+  assert.equal(k.sourceRefusal({ ...bare, instance: null }, dir), null, 'a null instance reads as default, as in Python');
+  assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: null }, dir), 'a null source names nothing');
+  assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: { repository: [] } }, dir));
+  fs.symlinkSync(path.join(dir, 'missing.json'), path.join(dir, 'gone.default.json'));
+  assert.ok(k.sourceRefusal({ ...bare, id: 'gone' }, dir), 'a broken link is none either');
 });
 
 test('invalid descriptors are refused', () => {

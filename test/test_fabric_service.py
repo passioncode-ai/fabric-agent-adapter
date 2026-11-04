@@ -220,6 +220,18 @@ class DescriptorTests(unittest.TestCase):
                     self.assertIsNotNone(fs.source_refusal(other, root))
             (root / "folder.default.json").mkdir()  # a folder at the descriptor's path is no installed descriptor
             self.assertIsNotNone(fs.source_refusal(dict(bare, id="folder"), root))
+            self.assertIsNone(fs.source_refusal(dict(bare, instance=None), root), "a null instance reads as default, as in Node")
+            self.assertIsNotNone(fs.source_refusal(["not", "a", "descriptor"], root))
+            self.assertIsNotNone(fs.source_refusal(dict(bare, id="other", origin="http://127.0.0.1:47197", source={"repository": []}), root))
+            if os.name != "nt" and os.geteuid() != 0:  # an unsearchable folder reads as not installed, on 3.9 too (unit reading 2)
+                shut = root / "shut"
+                shut.mkdir()
+                fs.write_descriptor(dict(descriptor(47199), id="inside"), shut)
+                shut.chmod(0)
+                try:
+                    self.assertIsNotNone(fs.source_refusal(dict(bare, id="inside"), shut))
+                finally:
+                    shut.chmod(0o700)
             (root / "gone.default.json").symlink_to(root / "missing.json")
             self.assertIsNotNone(fs.source_refusal(dict(bare, id="gone"), root), "a broken link is none either")
 
@@ -239,6 +251,12 @@ class DescriptorTests(unittest.TestCase):
             verdicts = {r["rule"]: r for r in p.results}
             self.assertEqual(verdicts["descriptor.source-repository"]["verdict"], "NOT_RUN", "named, never a pass")
             self.assertIn("names no source.repository", verdicts["descriptor.source-repository"]["evidence"])
+            d["source"] = {"repository": "https://bot:fixture-not-a-key@github.com/example-org/example-agent"}
+            p = checker.Probe(path, d, root, True)
+            p.descriptor_rules()
+            verdicts = {r["rule"]: r for r in p.results}
+            self.assertNotEqual(verdicts["descriptor.source-repository"]["verdict"], "PASS", "a refused source is no pass (unit reading 2)")
+            self.assertFalse(any("fixture-not-a-key" in r["evidence"] for r in p.results), "no evidence carries the password")
 
 
 class TokenAndNetworkTests(unittest.TestCase):

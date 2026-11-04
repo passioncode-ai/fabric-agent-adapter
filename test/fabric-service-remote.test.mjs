@@ -96,6 +96,18 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).source, { repository: 'https://github.com/example/agent' });
   const rotated = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 'r'.repeat(40), dir });
   assert.deepEqual(JSON.parse(fs.readFileSync(rotated, 'utf8')).source, { repository: 'https://github.com/example/agent' }, 'a rotation keeps it');
+  const hand = JSON.parse(fs.readFileSync(rotated, 'utf8'));
+  fs.writeFileSync(rotated, JSON.stringify({ ...hand, source: { repository: 'git@github.com:example/agent.git' } })); // edited by hand
+  const emit = process.emitWarning;
+  const seen = [];
+  process.emitWarning = (message, options) => seen.push(options?.code);
+  try {
+    const again = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 's'.repeat(40), dir });
+    assert.ok(!('source' in JSON.parse(fs.readFileSync(again, 'utf8'))), 'a source the kit refuses never blocks a rotation');
+  } finally {
+    process.emitWarning = emit;
+  }
+  assert.deepEqual(seen, ['FABRIC_NO_SOURCE_REPOSITORY']);
   assert.throws(() => k.registerRemote({ id: 'example-bare', name: 'Bare', origin: 'https://bare.example.com', token: 't'.repeat(40), dir }),
     /example-bare\.default names no source\.repository/); // FAA-198
   assert.ok(!fs.existsSync(k.remoteTokenFile('example-bare', 'default', dir)), 'a refused install writes no token');
@@ -200,6 +212,7 @@ test('the sample online service over real TLS, met the way a host meets it', { s
     const wk = await ask('GET', '/.well-known/fabric-service', { Authorization: `Bearer ${token}` });
     assert.equal(wk.status, 200);
     assert.equal(JSON.parse(wk.body).service.id, 'example-agent');
+    assert.deepEqual(JSON.parse(wk.body).extensions?.[k.CONNECTIONS_EXTENSION_KEY], { connections: [] }, 'it says it uses nothing (FAA-199)');
     assert.equal((await ask('GET', '/.well-known/fabric-service', { Authorization: `Bearer ${token}`, Host: 'evil.example.com' })).status, 403);
     assert.equal((await ask('GET', '/fabric/v1/events', { Authorization: `Bearer ${token}`, 'Sec-Fetch-Site': 'cross-site' })).status, 403);
     assert.equal((await ask('GET', '/fabric/v1/events')).status, 401);

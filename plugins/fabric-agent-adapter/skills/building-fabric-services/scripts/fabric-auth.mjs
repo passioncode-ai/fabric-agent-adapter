@@ -7,7 +7,7 @@ import { PROTOCOL, ServiceError, nowIso } from './fabric-base.mjs';
 import { tokenMatches, windowsTokenProblem } from './fabric-platform.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { isPlainObject } from './fabric-usage.mjs';
-import { descriptorPath, sourceRefusal, validateDescriptor, writeDescriptor } from './fabric-descriptor.mjs';
+import { descriptorPath, namesRepository, sourceRefusal, validateDescriptor, writeDescriptor } from './fabric-descriptor.mjs';
 
 export const SESSION_COOKIE = 'fabric_session';
 
@@ -267,11 +267,6 @@ export function remoteTokenFile(id, instance = 'default', dir = servicesDir()) {
  */
 export function registerRemote({ id, instance = 'default', name, summary, origin, token, doctor, dir = servicesDir(),
   installedBy = { by: 'person', role: 'operator', tool: 'fabric-service register-remote' }, runner, peer, source }) {
-  if (source == null) { // a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
-    let installed = null;
-    try { installed = JSON.parse(fs.readFileSync(descriptorPath(id, instance, dir), 'utf8'))?.source; } catch { /* none installed */ }
-    if (installed && typeof installed === 'object' && installed.repository) source = installed;
-  }
   if (!token || String(token).trim().length < 16) throw new ServiceError('the service token must be at least 16 characters.');
   const tokenFile = remoteTokenFile(id, instance, dir);
   const d = {
@@ -280,6 +275,13 @@ export function registerRemote({ id, instance = 'default', name, summary, origin
     installedAt: nowIso(), installedBy, ...(runner ? { runner: { ...runner } } : {}), ...(peer ? { peer: { ...peer } } : {}),
     ...(source != null ? { source: isPlainObject(source) ? { ...source } : source } : {}),
   };
+  if (source == null) { // a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
+    let installed = null;
+    try { installed = JSON.parse(fs.readFileSync(descriptorPath(id, instance, dir), 'utf8'))?.source; } catch { /* none installed */ }
+    // Only one the kit accepts: a hand-edited source never blocks a rotation; it is dropped with the warning.
+    const base = new Set(validateDescriptor(d));
+    if (namesRepository({ source: installed }) && validateDescriptor({ ...d, source: installed }).every((p) => base.has(p))) d.source = { ...installed };
+  }
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const refusal = sourceRefusal(d, dir); // before the token is written: a refused install leaves nothing (FAA-198)

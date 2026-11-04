@@ -295,9 +295,11 @@ export const NO_SOURCE_REPOSITORY = 'names no source.repository, the repository 
 
 // FAA-198: why a new install of this (valid) descriptor is refused, or null: it names no source.repository and no
 // descriptor of its id.instance is installed yet. An installer checks it before it writes anything else.
-export const namesRepository = (d) => d?.source !== null && typeof d?.source === 'object' && !Array.isArray(d.source) && Boolean(d.source.repository);
+export const namesRepository = (d) => d?.source !== null && typeof d?.source === 'object' && !Array.isArray(d.source)
+  && typeof d.source.repository === 'string' && d.source.repository !== '';
 
-// An installed descriptor is a regular file; a folder, a broken link or one that cannot be read is none.
+// An installed descriptor is a regular file, whatever it holds; a folder, a broken link or a path that cannot be
+// examined is none.
 export function sourceRefusal(d, dir = servicesDir()) {
   if (namesRepository(d)) return null;
   const instance = d?.instance ?? 'default';

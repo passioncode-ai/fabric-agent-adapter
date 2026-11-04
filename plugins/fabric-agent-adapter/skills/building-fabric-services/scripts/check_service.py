@@ -64,6 +64,7 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402
 import fabric_connections as fcn  # noqa: E402
+from fabric_http import redact_url  # noqa: E402 - a URL in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
 
 Result = Dict[str, str]
@@ -196,9 +197,14 @@ class Probe:
         self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
         # FAA-198: the repository that links the agent to its project; a new install is refused without it, an installed one
         # is named here (NOT_RUN is no pass) until its owner adds it.
-        source = self.d.get("source") if isinstance(self.d.get("source"), dict) else {}
-        self.add("descriptor.source-repository", "PASS" if source.get("repository") else "NOT_RUN",
-                 "names %s" % source["repository"] if source.get("repository") else "the descriptor %s" % fs.NO_SOURCE_REPOSITORY)
+        # A source descriptor.valid refuses is no pass either, and the evidence never carries a URL's userinfo or query,
+        # where a password rides (0.62.0 unit reading 2).
+        if not fs.names_repository(self.d):
+            self.add("descriptor.source-repository", "NOT_RUN", "the descriptor %s" % fs.NO_SOURCE_REPOSITORY)
+        elif any("source" in p for p in problems):
+            self.add("descriptor.source-repository", "NOT_RUN", "source.repository is refused by descriptor.valid")
+        else:
+            self.add("descriptor.source-repository", "PASS", "names %s" % redact_url(self.d["source"]["repository"]))
         if (self.d.get("lifecycle") or {}).get("manager") == "person":
             # DEC-0069: installed, never running — a reader checks the app is still there; liveness is the app's own file.
             present = fs.app_present(self.d)
@@ -817,7 +823,7 @@ class Probe:
         if not source:
             self.add(rule, "NOT_RUN", "data is inside repository %s and the descriptor names no source.repository to tell code from data" % top)
         elif remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
-            self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, source))
+            self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, redact_url(source)))
         else:
             self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, remote.stdout.strip() or "no remote"))
 

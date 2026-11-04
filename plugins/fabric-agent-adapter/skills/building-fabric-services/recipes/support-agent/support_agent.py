@@ -378,8 +378,14 @@ class SupportAgent:
         # replies, never the well-known document (0.62.0 seam reading 1).
         named = [("model", self.model, "drafts replies from the knowledge file"),
                  ("fallback", self.fallback, "drafts when the first model fails")]
-        return [{"id": ident, "kind": "model", "target": target, "purpose": purpose} for ident, target, purpose in named
-                if isinstance(target, str) and target and not any(c.isspace() for c in target)]
+        import fabric_connections  # the service that declares them installs it (README); the agent runs without it
+        kept = []
+        for ident, target, purpose in named:  # by the connections rule itself, never a second copy of it (seam reading 2)
+            item = {"id": ident, "kind": "model", "target": target, "purpose": purpose}
+            probe = {"extensions": {fabric_connections.CONNECTIONS_EXTENSION_KEY: {"connections": [dict(item, state="unknown")]}}}
+            if not fabric_connections.connections_rules(probe):
+                kept.append(item)
+        return kept
 
     @property
     def decisions_file(self) -> Path:

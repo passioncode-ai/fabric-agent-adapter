@@ -170,10 +170,15 @@ class Writers(unittest.TestCase):
                                                  "--services-dir", str(services), "--repository", ""])
         self.assertEqual(sample.register(args), 1)
         self.assertFalse((services / "data3" / "fabric-agent.json").exists(), "a refused descriptor leaves no manifest naming it")
+        for extra, why in ((["--repository", "not a uri"], "an invalid repository"), (["--port", "47299"], "a port another claims")):
+            args = sample.build_parser().parse_args(["register", "--port", "47294", "--id", "example-late", "--data-dir", str(services / "data5"),
+                                                     "--services-dir", str(services)] + extra)
+            self.assertEqual(sample.register(args), 1, why)
+            self.assertFalse((services / "data5" / "fabric-agent.json").exists(), "%s leaves no manifest (unit reading 2)" % why)
         args = sample.build_parser().parse_args(["register", "--port", "47295", "--id", "example-own", "--data-dir", str(services / "data4"),
                                                  "--services-dir", str(services)])
-        self.assertEqual(sample.register(args), 1, "someone's own agent names its repository, never the sample's (seam reading 1)")
-        self.assertFalse((services / "example-own.default.json").exists())
+        self.assertEqual(sample.register(args), 0, "another --id still runs this sample's code, so it names this repository")
+        self.assertEqual(json.loads((services / "example-own.default.json").read_text())["source"], {"repository": sample.SAMPLE_REPOSITORY})
 
     def test_the_sample_declares_what_it_uses(self):
         """FAA-199: the sample's well-known document lists its connections; --degraded marks the demo source failing."""

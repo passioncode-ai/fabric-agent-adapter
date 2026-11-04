@@ -8,7 +8,7 @@ once, and `sample.draft` is a job that stops for a titled choice before it compl
 `register` also writes the service's manifest, which names this descriptor.
 
   sample_service.py serve --port 47190 --data-dir DIR [--id sample] [--instance default]
-  sample_service.py register --port 47190 --data-dir DIR [--services-dir DIR] [--repository URI]
+  sample_service.py register --port 47190 --data-dir DIR [--services-dir DIR] [--id ID] [--repository URI]
 
 Opt-in, off by default: `serve --board-project <Project uuid>` also answers that Project's `sample.echo` requests on
 Fabric's project board (fabric-project-comms/0.1, FAA-12b) with fabric_board.Responder, from a board.respond grant whose
@@ -556,8 +556,7 @@ def register(args: argparse.Namespace) -> int:
         else {"manager": "none"},
         "paths": {"data": str(data), "logs": []},
         "fabricManifest": str(manifest),
-        # Another --id is someone's own agent: it names its repository, never this one (0.62.0 seam reading 1).
-        **({"source": {"repository": args.repository or SAMPLE_REPOSITORY}} if args.repository or args.id == "sample" else {}),
+        "source": {"repository": args.repository},
         # DEC-0061: who installed it, by role and never by name — a person runs this register command.
         "installedAt": fs.now_iso(), "installedBy": {"by": "person", "role": "operator", "tool": "sample_service.py register %s" % VERSION},
     }
@@ -568,9 +567,10 @@ def register(args: argparse.Namespace) -> int:
     if refusal:
         print(refusal, file=sys.stderr)
         return 1
-    write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
     try:
         path = fs.write_descriptor(descriptor, Path(args.services_dir) if args.services_dir else None)
+        # After the descriptor, so a refusal of any kind (a port claim too) leaves no manifest naming it (unit reading 2).
+        write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
     except fs.ServiceError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -601,7 +601,8 @@ def build_parser() -> argparse.ArgumentParser:
                                                    "tool in the manifest (serve with the same --board-project)")
             p.add_argument("--services-dir")
             # FAA-198: the repository its code is built from, which a new descriptor names; the sample's own by default.
-            p.add_argument("--repository", help="the repository its code is built from; this repository's for --id sample")
+            # The descriptor runs this sample's code whatever --id names, so its repository is this one by default.
+            p.add_argument("--repository", default=SAMPLE_REPOSITORY, help="the repository its code is built from")
             p.add_argument("--label")
             p.add_argument("--plist")
     return parser
