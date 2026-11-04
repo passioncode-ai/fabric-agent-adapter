@@ -80,6 +80,12 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   place keeps working: an update that removes the descriptor before it writes it again, a new instance (a preview) and a
   moved services directory are new installs. In Python the warning is `NoSourceRepositoryWarning` (a `UserWarning`), so
   a suite that runs with warnings as errors (`-W error`) sees the rewrite raise; filter that class there.
+- Once a descriptor names its repository, two probe rules that read `NOT_RUN` without it start judging:
+  `state.outside-code` fails data kept inside that checkout, and `dashboard.opens-in-host` reads the checkout for pages
+  opened in a browser. A service that passed may fail them until its data moves out of the checkout or its pages open
+  through Fabric Dashboards.
+- Declare what the service uses with `connections_extension` / `connectionsExtension` (an empty list when it uses
+  nothing): until it does, `well-known.connections` reads `NOT_RUN` and the connection map has no row for it.
 - A `source.repository` (a service's or a provider entry's) that names a user outside a URL's authority (an scp form,
   `https:user@host/path`) or carries a query parameter named for a credential is refused: write it as
   `https://github.com/owner/name`, with no user, query or fragment. A path segment that mixes upper case with a digit

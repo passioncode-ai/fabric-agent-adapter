@@ -24,8 +24,9 @@ For each message it:
 What the agent does not do: send the reply anywhere (the service that calls it owns its channel), judge facts with a
 model, or answer outside the knowledge file. The model's text is data: a citation it invents fails the check.
 
-The kit modules (fabric_openrouter and its closure) sit beside this file in a service
-(`fabric_kit.py install <dir> --module fabric_openrouter`); in this repository they are read from ../../scripts.
+The kit modules sit beside this file in a service, installed as the README's "Install into a service" says
+(`fabric_kit.py install <dir> --lang py --module fabric_openrouter --module fabric_usage --module fabric_paths
+--module fabric_connections`); in this repository they are read from ../../scripts.
 Standard library only. FAA-65 REQ-09.
 """
 from __future__ import annotations

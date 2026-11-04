@@ -349,6 +349,36 @@ class Recipe(unittest.TestCase):
         self.assertIn("handoffs.jsonl", readme)
         self.assertIn("prune", readme)
 
+    def test_the_documented_install_runs_the_connections(self):  # 0.62.0 seam reading 23: the docstring named one module
+        """The README's install line and the module docstring name one module set, and in a folder installed with it
+        connections() runs under -I, where only that folder is on the path."""
+        import re
+        readme = (RECIPE / "README.md").read_text(encoding="utf-8")
+        section = readme.split("## Install into a service", 1)[1].split("\n## ", 1)[0]
+        modules = re.findall(r"--module (\w+)", section)
+        self.assertIn("fabric_connections", modules)
+        self.assertEqual(re.findall(r"--module (\w+)", sa.__doc__), modules, "the docstring repeats the README's set")
+        folder = self.dir / "installed"
+        argv = [sys.executable, "-B", str(SCRIPTS / "fabric_kit.py"), "install", str(folder), "--lang", "py"]
+        for name in modules:
+            argv += ["--module", name]
+        out = subprocess.run(argv, capture_output=True, text=True, timeout=120)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        for name in ("support_agent.py", "knowledge.example.json"):
+            shutil.copy(RECIPE / name, folder / name)
+        script = ("import json, pathlib, sys; sys.path.insert(0, '.')\n"
+                  "import support_agent as sa, fabric_openrouter as fo\n"
+                  "c = fo.Client(ceiling_usd=1.0, ledger=sa.fabric_usage.JsonlUsageLedger(pathlib.Path('u.jsonl')), "
+                  "prices={}, environ={'OPENROUTER_API_KEY': 'x' * 20}, transport=lambda *a: (503, {}, b'{}'), "
+                  "sleep=lambda s: None)\n"
+                  "a = sa.SupportAgent(knowledge=sa.Knowledge.load('knowledge.example.json'), client=c, model='a/one', "
+                  "fallback='b/two', state_dir=pathlib.Path('.'), on_handoff=print)\n"
+                  "print(json.dumps([x['id'] for x in a.connections()]))\n")
+        out = subprocess.run([sys.executable, "-I", "-B", "-c", script], cwd=folder, capture_output=True, text=True,
+                             timeout=60)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(json.loads(out.stdout.splitlines()[-1]), ["model", "fallback"])
+
     def test_the_command_line(self):
         config = json.loads((RECIPE / "config.example.json").read_text())
         config.update(knowledge=str(RECIPE / "knowledge.example.json"), stateDir=str(self.dir / "state"))

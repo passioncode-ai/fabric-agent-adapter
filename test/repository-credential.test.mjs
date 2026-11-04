@@ -12,7 +12,7 @@ const LETTERS = { // made up, no digit
   SKNAME: `sk-${'learn-tutorial-notebooks'}`, SKWORD: `sk-${'dictionary-extension'}`,
   GHREST: `hp_${'AbCd'.repeat(6)}`, SKREST: `k-${'AbCd'.repeat(4)}`, GLREST: `lpat-${'AbCd'.repeat(6)}`, // a real-looking name a key's shape starts (FAA-200 (24))
 };
-const made = (value) => Object.entries(LETTERS).reduce((text, [mark, key]) => text.replaceAll(mark, key), value).replace('KEY', KEY);
+const made = (value) => Object.entries(LETTERS).reduce((text, [mark, key]) => text.replaceAll(mark, key), value).replaceAll('KEY', KEY);
 
 test('repositoryCredential reads the shared vectors as Python does', () => {
   for (const value of vectors.credential) assert.equal(repositoryCredential(made(value)), true, value);
