@@ -682,7 +682,7 @@ class InputActionTests(unittest.TestCase):
             path.write_text(json.dumps(record))
             self.assertIn("result", server.handle({"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {
                 "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"pick": {"action": "accept"}}}}}))
-        with self.assertRaises(fi.InteropError):  # requests that are no object are refused, never kept
+        with self.assertRaisesRegex(fi.InteropError, "a JSON object of at least one input request"):  # never kept (unit 42)
             jobs.request_input(job_id, [fi.choice_request("Which?", "choice", [("a", "A")])])
         for requests in (7, True, 1.5, ["pick"], {"pick": "x"}, {"pick": None}, {1: {"method": "elicitation/create"}}):
             with self.assertRaises(fi.InteropError):  # first, with steps= too (readings 39)

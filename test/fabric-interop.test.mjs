@@ -400,7 +400,7 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   store.requestInput(zero.id, { 0: request }, 'Publish it?');
   for (const responses of [[{ action: 'accept', content: {} }], 'a']) assert.deepEqual(store.answer(zero.id, responses), {});
   assert.equal(store.get(zero.id).status, 'input_required');
-  assert.throws(() => store.requestInput(zero.id, [request], 'x'), i.InteropError); // requests that are no object are refused
+  assert.throws(() => store.requestInput(zero.id, [request], 'x'), /a JSON object of at least one input request/); // requests that are no object are refused (unit 42)
   assert.throws(() => store.requestInput(zero.id, Object.assign(() => {}, { pick: request }), 'x'), i.InteropError); // a function too (unit 39)
   const throwing = { get 0() { throw new RangeError('step read'); } }; // the requests are refused before a step is read (unit 40)
   assert.throws(() => store.requestInput(zero.id, [request], 'x', { steps: throwing }), i.InteropError);

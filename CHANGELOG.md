@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.61.0 (unreleased)
+## 0.61.0 (2026-11-04)
 
 The board responder reads the operator's mandate from a request of his own Project (FAA-135), and working-with-fabric
 says that his approval holds for the whole task, at every link (FAA-195).
