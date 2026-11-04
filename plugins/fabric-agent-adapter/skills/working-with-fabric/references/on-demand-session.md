@@ -31,8 +31,8 @@ fabric-dispatch/1 workflow=wf_<16 hex> handoff=<handoff id> request=<request uui
 The environment decides that the session was dispatched and wins on every value it names; the line fills a value the
 environment left out, for the same workflow only, and a disagreement is said in the closing checkpoint's notes. A line
 with no `FABRIC_DISPATCH_WORKFLOW` in the environment is quoted text (a board message pasted into a session), never a
-dispatch. Switchboard's `dispatch` sets all three and writes the line (SB-247, on Switchboard's main since `7ac2a5b`, with
-`FABRIC_DISPATCH_ID` since `0ad56cb`, not yet in a release; board thread `b3e60686`). With a launcher that sets the workflow alone, the session reads the handoff
+dispatch. Switchboard's `dispatch` sets all three and writes the line (SB-247, with
+`FABRIC_DISPATCH_ID`, since Switchboard 0.7.8 of 2026-11-04; board thread `b3e60686`). With a launcher that sets the workflow alone, the session reads the handoff
 from the packet and the request from the launcher's prompt; when neither names the request, it closes the workflow
 `blocked` saying so and ends (Observatory's write redacts the packet's board references, below).
 
@@ -43,9 +43,9 @@ left out or disagrees with it. A resumed or compacted session prints nothing. Th
 run Switchboard starts (its isolated home carries the operator's plugins). A Codex run gets the adapter's hook only when
 the person installed it with `install-host-hooks` and that run's `CODEX_HOME` trusts it: Codex runs a `hooks.json` hook
 only when the home's own `config.toml` trusts it (measured with codex-cli 0.165.0). Switchboard links the person's
-`hooks.json` into its isolated homes, and since `0ad56cb` (not yet in a release) carries the person's trust in that
+`hooks.json` into its isolated homes, and since 0.7.8 carries the person's trust in that
 file into the home's `config.toml`, never a hook changed after it was trusted. Where the person has not trusted the
-hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended exit contract alone tells a Codex run.
+hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exit contract alone tells a Codex run.
 
 ## What the session does
 
@@ -129,8 +129,8 @@ and ends `timed-out`.
 
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
 environment. Only the run's first session holds the dispatch: the hooks record the first session id for the
-dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard's main sets it since `0ad56cb`, not
-yet in a release; a value outside `[A-Za-z0-9._-]{1,64}` is ignored), else by the
+dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard sets it since
+0.7.8; a value outside `[A-Za-z0-9._-]{1,64}` is ignored), else by the
 workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new dispatch of the same workflow is a
 new holder; a launcher that sets the workflow alone gives each run a distinct run id. A `/clear` in the holding
 session keeps the contract (the record moves to the new session id). A holder that accepted the handoff before
@@ -146,7 +146,7 @@ you were given, and never accept the handoff, claim, replace the responder, comp
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says
 nothing there. A host whose hook gets no session id (the native bridges: Hermes, OpenCode, OpenClaw, Pi) is always
 told the full contract, since the hooks cannot tell its sessions apart. The election counts sessions whose hook ran: in a run whose own session has no adapter hook (a Codex
-run whose home does not trust the hook: the person never trusted it, or a Switchboard before `0ad56cb` started it), the first nested session the run
+run whose home does not trust the hook: the person never trusted it, or a Switchboard before 0.7.8 started it), the first nested session the run
 starts is taken as the holder.
 
 The plugin tells a dispatched session from 0.63.0 on; an older one prints its ordinary preamble there, and only the

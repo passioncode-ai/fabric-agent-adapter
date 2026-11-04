@@ -105,7 +105,7 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 #: environment names the workflow, the handoff and the request; the prompt's first line `fabric-dispatch/1
 #: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order) names them too,
 #: and the environment wins. FABRIC_DISPATCH_WORKFLOW alone is enough to tell the session: a launcher that sets only it
-#: (Switchboard before its 7ac2a5b) leaves the handoff and the request to the packet. A line with no workflow in the
+#: (Switchboard main before 7ac2a5b, never released) leaves the handoff and the request to the packet. A line with no workflow in the
 #: environment is quoted text, never a dispatch.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
@@ -232,7 +232,7 @@ def _dispatch_record(dispatch: Dict[str, str], env: Dict[str, str]) -> Tuple[Pat
     and the launcher's run id, so a new launch is a new holder."""
     import hashlib
     dispatch_id = env.get("FABRIC_DISPATCH_ID") or ""
-    if DISPATCH_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch, a UUID (Switchboard sets it since 0ad56cb)
+    if DISPATCH_ID.fullmatch(dispatch_id):  # Fabric's own id for one dispatch, a UUID (Switchboard sets it since 0.7.8)
         run = "|".join((dispatch["workflow"], "dispatch", dispatch_id))
     else:
         run = "|".join((dispatch["workflow"], dispatch.get("handoff") or "", env.get("SWITCHBOARD_LAUNCH_ID") or ""))
@@ -275,9 +275,15 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
         # there any /clear takes the record, the contract twice rather than never
         if not isinstance(held, dict) or held.get("host") == record["host"] or _WINDOWS:
             # the session the clear replaced, the one an earlier accept named: only when this hook's parent wrote the
-            # record (on Windows, where any /clear takes it, a nested session must not learn the holder's id)
+            # record (on Windows, where any /clear takes it, a nested session must not learn the holder's id); a record
+            # already cleared keeps what it said, "" (the replaced id unknown) included (0.63.0 unit reading 12)
             same = isinstance(held, dict) and held.get("host") == record["host"]
-            record["cleared_from"] = (held.get("cleared_from") or held.get("session") or "") if same else ""
+            if not same:
+                record["cleared_from"] = ""
+            elif "cleared_from" in held:
+                record["cleared_from"] = held["cleared_from"] if isinstance(held["cleared_from"], str) else ""
+            else:
+                record["cleared_from"] = held.get("session") if isinstance(held.get("session"), str) else ""
             try:
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)
                 _write_private(folder / (key + ".json"), json.dumps(record))

@@ -6,7 +6,7 @@
 
 - working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `1329b60f`).
   `FABRIC_DISPATCH_WORKFLOW` tells it, with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST` (Switchboard's
-  `dispatch` sets all three, SB-247 on its main since `7ac2a5b`, not yet released, board thread `b3e60686`) or alone (an
+  `dispatch` sets all three, SB-247, released in Switchboard 0.7.8 on 2026-11-04, board thread `b3e60686`) or alone (an
   earlier launcher); the prompt's first line `fabric-dispatch/1
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
   never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
@@ -24,12 +24,12 @@
   nudge in such a session. Only the
   run's first session holds the dispatch: a session the run starts itself inherits the environment and gets one line
   telling it not to accept, claim, complete or close (the dispatch is told by its `FABRIC_DISPATCH_ID` when the
-  launcher sets one in the form `[A-Za-z0-9._-]{1,64}`, as Switchboard's main does since `0ad56cb`, not yet released), and a `/clear` in the holding session keeps the contract (the
+  launcher sets one in the form `[A-Za-z0-9._-]{1,64}`, as Switchboard 0.7.8 does), and a `/clear` in the holding session keeps the contract (the
   hooks keep one record per run under `dispatch/`, pruned after 7 days by the Claude Code turn and end hooks and by the next session start on a board request). Every
   checkpoint the session writes repeats the goal, constraints, artifacts and credentials of the packet's
   `checkpoint.body`, since Observatory keeps only the latest body; the session takes the request from the environment
   or the first line and its thread from `com.get`, since Observatory's write redacts the packet's board references. A
-  Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes carry the person's trust since `0ad56cb`, not yet released); a host whose hook gets no session id (the native bridges) is always told
+  Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes carry the person's trust since 0.7.8); a host whose hook gets no session id (the native bridges) is always told
   the full contract; on Windows any `/clear` keeps the contract, since each hook runs under a new Git Bash.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.

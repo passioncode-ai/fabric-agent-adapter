@@ -426,6 +426,7 @@ class Hooks(Base):
         text = self.context(done)
         self.assertIn("Never accept it anew under the new id", text)
         self.assertIn("sessionId %s" % uuid, text, "the id the accept was made under (0.63.0 seam reading 10)")
+        self.assertIn("`accept-%s`" % HANDOFF, text, "the key, from the handoff (0.63.0 unit reading 12)")
         self.assertNotIn(cleared, text)
         # the prompt hook's reprint after the clear says the same, never the new id (unit and seam readings 10): a
         # launcher that sets the workflow alone, so the first line adds the handoff and the request
@@ -437,6 +438,7 @@ class Hooks(Base):
                                 extra_env=sb)
         text = self.context(done)
         self.assertIn("sessionId %s" % first, text)
+        self.assertIn("`accept-%s`" % HANDOFF, text, "the handoff the line gave (0.63.0 unit reading 12)")
         self.assertIn("Never accept it anew under the new id", text)
         self.assertNotIn(again, text)
 
@@ -452,6 +454,7 @@ class Hooks(Base):
                 self.assertIn("the sessionId the clear replaced", cli.dispatch_cleared(previous))
         self.assertIn("the key the first accept used", cli.dispatch_cleared(uuid))
         self.assertIn("observatory_lesson", cli.dispatch_contract(FULL), "step 7's retro")
+        self.assertIn("insight/1", cli.dispatch_contract(FULL), "step 7's retro (0.63.0 unit reading 12)")
 
     def test_a_second_clear_names_the_first_holder(self):
         from unittest import mock
@@ -463,6 +466,17 @@ class Hooks(Base):
             cli.dispatch_holder(FULL, b, env, take_over=True)
             cli.dispatch_holder(FULL, c, env, take_over=True)
         self.assertEqual(cli.dispatch_cleared_from(FULL, env), a)
+
+    def test_a_second_clear_keeps_the_unknown_id_unknown(self):
+        # 0.63.0 unit reading 12: the first clear found no record, so the second must not name the session it started
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        b, c = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc", "3c4d5e6f-2c3d-4e7f-8a0b-23456789abcd"
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            cli.dispatch_holder(FULL, b, env, take_over=True)
+            cli.dispatch_holder(FULL, c, env, take_over=True)
+        self.assertEqual(cli.dispatch_cleared_from(FULL, env), "")
+        self.assertIn("the sessionId the clear replaced", cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env)))
 
     def test_a_clear_with_no_readable_record_still_reads_as_cleared(self):
         env = dict(self.env, **ENV)
@@ -500,7 +514,8 @@ class Hooks(Base):
         text = (Path(cli.__file__).resolve().parents[1] / "references" / "on-demand-session.md").read_text()
         flat = " ".join(text.split())
         self.assertIn("that run's `CODEX_HOME` trusts it", flat)
-        self.assertNotRegex(flat, r"Switchboard 0\.7\.8 on|from 0\.7\.8 on", "no Switchboard release says so yet")
+        self.assertIn("since 0.7.8 carries the person's trust", flat, "Switchboard 0.7.8 of 2026-11-04 carries it")
+        self.assertNotRegex(flat, r"Switchboard[^.]*not yet in a release", "Switchboard 0.7.8 is released")
 
     def test_one_workflow_pattern_for_every_reader(self):
         dashboard_kit = (Path(cli.__file__).resolve().parents[2] / "building-fabric-services/scripts/dashboard_kit.py")
