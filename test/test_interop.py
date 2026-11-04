@@ -671,6 +671,10 @@ class InputActionTests(unittest.TestCase):
             record["job"]["inputRequests"] = asked
             path.write_text(json.dumps(record))
             self.assertEqual(jobs.answer(job_id, {"pick": {"action": "accept"}, "ick": {"action": "accept"}}), {}, asked)
+            record["private"]["steps"] = asked  # the answer gate too, input_actions on: an answer, never a crash
+            path.write_text(json.dumps(record))
+            self.assertIn("result", server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {
+                "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"pick": {"action": "accept"}}}}}))
         with self.assertRaises(fi.InteropError):  # requests that are no object are refused, never kept
             jobs.request_input(job_id, [fi.choice_request("Which?", "choice", [("a", "A")])])
 

@@ -65,7 +65,8 @@ says that his approval holds for the whole task, at every link (FAA-195).
   keyed by an inherited name (`constructor`, `toString`) as an asked question and cleared the real one; it matches an
   own key only, as Python does (older than 0.61.0; 0.61.0 seam reading 36). Both stores' `answer` match nothing when
   the answer's `inputResponses` or the job's `inputRequests` is not a plain object (a hand-edited file, an array), and
-  McpToolServer answers a `fabric.job.get` whose `inputResponses` is present and not a JSON object with `-32602`:
+  McpToolServer answers a `fabric.job.get` whose `inputResponses` is present, not `null` (read as a poll, as before)
+  and not a JSON object with `-32602`:
   0.60.0 raised out of `handle()` for a non-empty one on a job waiting `input_required` (the transport sent no reply)
   and read an empty list or string, `0`, `false`, or any non-object on another job or an unknown id, as no answer or
   `unknown-job` (a client that writes an empty map as `[]` now gets `-32602`). Both stores' `request_input` /
@@ -133,7 +134,11 @@ says that his approval holds for the whole task, at every link (FAA-195).
 - A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it: a `str`-subclass
   project or effect, or a Node `String` or `Number` object, as its plain value, and the step kinds above in their JSON
   form. A step so kept with its effect but no project is covered at a 0.61.0 answer by a mandate limited to projects;
-  one kept with no effect waits for the operator (`effect-missing`). Answer or cancel such jobs before upgrading.
+  one kept with no effect waits for the operator (`effect-missing` where a step is kept, `no-decision` where none is),
+  and a Node job whose requests 0.60.0 kept as an array can no longer be answered. Answer or cancel such jobs before
+  upgrading.
+- A `fabric.job.get` whose `inputResponses` is not a JSON object (`[]` and `""` included), on any job, is now
+  `-32602`: send an object, or leave it out (or `null`) to poll.
 
 ## 0.60.0 (2026-11-03)
 

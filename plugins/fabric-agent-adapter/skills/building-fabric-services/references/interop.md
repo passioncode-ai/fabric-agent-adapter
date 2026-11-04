@@ -332,8 +332,11 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   `capabilities` name `fabric.job.get` covers no step of another capability.
   Node has no tool server: a Node service reads `store.load(jobId).private.steps` and `.private.capability` BEFORE
   `store.answer` (which clears the steps), gates the answer with `actionGate({..., mandateCapability:
-  private.capability})` for each key the job asked (`Object.hasOwn(job.inputRequests, key)`, its step read with
-  `Object.hasOwn(steps, key)`, as McpToolServer gates only asked keys), then answers. It logs the `fault` that `jobStep` and `actionGate` return beside their
+  private.capability})` for each answered key the job asked whose value's action is accept, decline or cancel, one
+  decision per call (when `job.inputRequests` and the answer's `inputResponses` are plain
+  objects, `Object.hasOwn(job.inputRequests, key)`, its step read with `Object.hasOwn(steps, key)`, as McpToolServer
+  gates only asked keys; McpToolServer answers an `inputResponses` that is present, not `null` and no object with
+  `-32602`, and reads `null` and `{}` as a poll, which the contract's schema does not admit), then answers. It logs the `fault` that `jobStep` and `actionGate` return beside their
   answer, as `on_fault` does in Python: `mandate-capability-missing` at the start means the job's tool is not a
   capability name; at the answer it also means `mandateCapability` was not passed. Any service that gates a job's
   answer itself (Node `actionGate`, or Python `action_gate(..., mandate_capability=)` outside `McpToolServer`, whose

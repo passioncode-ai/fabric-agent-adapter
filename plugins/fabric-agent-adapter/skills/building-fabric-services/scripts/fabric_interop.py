@@ -413,7 +413,7 @@ class JobStore:
                                 inputRequests=input_requests, statusMessage=message)
 
     def answer(self, job_id: str, input_responses: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply inputResponses to an input_required job; unknown keys are ignored (MCP Tasks rule).
+        """Apply inputResponses (a JSON object, a dict) to an input_required job; unknown keys are ignored (MCP Tasks rule).
 
         Returns the responses that matched; when any did, the job is working again."""
         with self._lock:
@@ -805,7 +805,7 @@ class McpToolServer:
         agent_id, a step approval_step kept is read under the call's `_meta.mandate` too (C3.3)."""
         job_id = str(arguments.get("id", ""))
         job = self.jobs.get(job_id)
-        steps = self.jobs.private(job_id).get("steps") or {}
+        steps = self.jobs.private(job_id).get("steps") if isinstance(self.jobs.private(job_id).get("steps"), dict) else {}
         asked = job.get("inputRequests") if job["status"] == "input_required" and isinstance(job.get("inputRequests"), dict) else {}
         records: Dict[str, Any] = {}
         for key, value in arguments["inputResponses"].items():
