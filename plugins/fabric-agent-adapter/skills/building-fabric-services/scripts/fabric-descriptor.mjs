@@ -293,8 +293,8 @@ export function portOf(origin) {
 
 export const NO_SOURCE_REPOSITORY = 'names no source.repository, the repository its code is built from '
   + '(https://github.com/owner/name): it links the agent to its project (FAA-198)';
-const PASS_SOURCE = 'Pass source: { repository } in this call (writeDescriptor or registerRemote): one written after it '
-  + 'returns is too late for a new install (0.62.0 seam reading 20).';
+const PASS_SOURCE = 'Name it in this call: source: { repository } in the descriptor writeDescriptor writes, or in '
+  + 'registerRemote\'s options; one written after the call returns is too late for a new install.';
 
 const HIERARCHICAL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
 

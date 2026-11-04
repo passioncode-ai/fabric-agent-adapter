@@ -442,8 +442,8 @@ def port_of(origin: str) -> int:
 
 NO_SOURCE_REPOSITORY = ("names no source.repository, the repository its code is built from "
                         "(https://github.com/owner/name): it links the agent to its project (FAA-198)")
-PASS_SOURCE = ("Pass source={\"repository\": ...} in this call (write_descriptor or register_remote): one written after "
-               "it returns is too late for a new install (0.62.0 seam reading 20).")
+PASS_SOURCE = ("Name it in this call: \"source\": {\"repository\": ...} in the descriptor write_descriptor writes, or "
+               "source= to register_remote; one written after the call returns is too late for a new install.")
 
 
 class NoSourceRepositoryWarning(UserWarning):

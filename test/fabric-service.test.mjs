@@ -101,7 +101,7 @@ test('a new install names its repository; a reinstall without it warns (FAA-198)
   const dir = temp();
   const { source, ...bare } = descriptor(47196);
   assert.ok(k.sourceRefusal(bare, dir));
-  assert.throws(() => k.writeDescriptor(bare, dir), /sample\.default names no source\.repository/);
+  assert.throws(() => k.writeDescriptor(bare, dir), /sample\.default names no source\.repository[\s\S]*in the descriptor writeDescriptor writes/);
   assert.deepEqual(fs.readdirSync(dir), [], 'a refused install writes nothing');
   const seen = [];
   const emit = process.emitWarning;

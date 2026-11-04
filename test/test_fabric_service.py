@@ -200,7 +200,7 @@ class DescriptorTests(unittest.TestCase):
             bare = descriptor(47196)
             del bare["source"]
             self.assertIsNotNone(fs.source_refusal(bare, root))
-            with self.assertRaisesRegex(fs.ServiceError, "sample.default names no source.repository"):
+            with self.assertRaisesRegex(fs.ServiceError, "sample.default names no source.repository(.|\n)*in the descriptor write_descriptor writes"):
                 fs.write_descriptor(bare, root)
             self.assertEqual(list(root.iterdir()), [], "a refused install writes nothing")
             with warnings.catch_warnings(record=True) as seen:
