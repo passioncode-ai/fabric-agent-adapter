@@ -446,9 +446,10 @@ class Hooks(Base):
         # 0.63.0 readings 11: Observatory replays only the same sessionId, key, owner and executor
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
         text = cli.dispatch_cleared(uuid, HANDOFF)
-        for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF, "the same `owner` and `executor` the first accept passed",
+        for words in ("sessionId %s" % uuid, "`accept-%s`" % HANDOFF,
                       "still shows the handoff pending, no accept was made", "Never accept it under the new id",
-                      "`observatory_checkpoint_latest` shows the workflow's executor"):
+                      "exactly as the first accept passed it, none if it passed none", "is no guide",
+                      "`agent:<provider>` when Switchboard started the run", "an idempotency conflict"):
             self.assertIn(words, text)
         for previous in (None, "", "S-ABC", uuid.upper()):
             with self.subTest(previous=previous):
@@ -504,20 +505,40 @@ class Hooks(Base):
         new = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
         done, _ = self.run_hook("session-start", {"session_id": new, "cwd": str(self.repo), "source": "clear"},
                                 extra_env=ENV)
-        self.assertIn("with this session's own sessionId (%s)" % new, self.context(done))
+        self.assertIn("this session's own sessionId (%s)" % new, self.context(done))
         sb = {"FABRIC_DISPATCH_WORKFLOW": WF}
         again = "4d5e6f70-3d4e-4f80-9b1c-3456789abcde"
         self.run_hook("session-start", {"session_id": again, "cwd": str(self.repo), "source": "clear"}, extra_env=sb)
         done, _ = self.run_hook("user-prompt-submit", {"session_id": again, "cwd": str(self.repo), "prompt": LINE},
                                 extra_env=sb)
-        self.assertIn("with this session's own sessionId (%s)" % again, self.context(done))
+        self.assertIn("this session's own sessionId (%s)" % again, self.context(done))
+
+    def test_on_windows_the_new_id_is_said_not_to_be_named_again(self):
+        # 0.63.0 unit reading 14: a later clear on Windows names no id, so the notice does not promise a replay
+        from unittest import mock
+        new = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
+        with mock.patch.object(cli, "_WINDOWS", True):
+            self.assertIn("On Windows a later /clear names no id either", cli.dispatch_cleared("", HANDOFF, new))
+        self.assertNotIn("On Windows", cli.dispatch_cleared("", HANDOFF, new))
+
+    def test_an_id_the_notice_cannot_name_is_not_carried_on(self):
+        # 0.63.0 unit reading 14: a first holder outside the UUID form, then two clears: the next names the second
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        b, c = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc", "3c4d5e6f-2c3d-4e7f-8a0b-23456789abcd"
+        with mock.patch.object(cli.os, "getppid", return_value=111):
+            cli.dispatch_holder(FULL, "S-ABC", env)
+            cli.dispatch_holder(FULL, b, env, take_over=True)
+            cli.dispatch_holder(FULL, c, env, take_over=True)
+        self.assertEqual(cli.dispatch_cleared_from(FULL, env), b)
 
     def test_an_unknown_id_gives_the_new_one_for_a_pending_handoff(self):
         new = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
         for previous in (None, ""):
             with self.subTest(previous=previous):
                 text = cli.dispatch_cleared(previous, HANDOFF, new)
-                self.assertIn("with this session's own sessionId (%s)" % new, text)
+                self.assertIn("with that key and this session's own sessionId (%s)" % new, text)
+                self.assertIn("`accept-%s`" % HANDOFF, text.split("no accept was made")[0])
                 self.assertIn("end the run without touching the request", text)
                 self.assertNotIn("Never accept it under the new id", text)
         self.assertNotIn("(", cli.dispatch_cleared(None, None, "not-a-uuid").split("own sessionId")[1].split(".")[0])

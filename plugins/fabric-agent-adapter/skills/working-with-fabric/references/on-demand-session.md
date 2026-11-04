@@ -92,10 +92,11 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
      at `fff4b6d9`, in no release yet; a Fabric before it dispatches no accepted request). The open workflow is Fabric's
      to move, not the run's: after the run ends, and no sooner than 120 s of the executor's silence, Fabric hands it to
-     itself (`observatory_handoff_create` with reason `restart`, or `crash` when Switchboard names the run crashed,
+     itself (`observatory_handoff_create` with reason `restart`, or `crash` when Switchboard reports the run failed,
      to `service:fabric`), takes the new lease and routes it to the next run; when the request goes to «На проверке» or
      its deadline passes, Fabric closes it `blocked` the same way (Fabric's spec at `c560d97e`, sections 3.4 and 3.6;
-     its decision on thread `b3e60686`, 2026-11-04). This run only leaves it open.
+     its decision on thread `b3e60686`, 2026-11-04; its code at that commit does not do it yet, so a second run on
+     Fabric's main meets a workflow whose lease is still this run's). This run only leaves it open.
 
    A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
@@ -141,14 +142,19 @@ session keeps the contract (the record moves to the new session id). A holder th
 the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
 so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,
-`accept-<handoff>`), the same `owner` and `executor` the first accept passed (the launcher's prompt names both;
-`observatory_checkpoint_latest` shows the workflow's executor); a new accept under the new id is refused. When
+`accept-<handoff>`), the same `owner` (`agent:<provider>` when Switchboard started the run) and the `executor` exactly
+as the first accept passed it, none if it passed none (the launcher's prompt names them; the lease
+`observatory_checkpoint_latest` shows merges the offer's executor in, so it matches only when the first accept passed
+the executor whole); a new accept under the new id is refused, and so is a replay with another executor (an
+idempotency conflict), after which the session ends the run without touching the request and Fabric takes the
+workflow over. When
 `observatory_checkpoint_latest` still shows the handoff pending, no accept was made, and the holder accepts it now
 under that same `sessionId`, key, owner and executor, so a later `/clear`, which names the same id, replays it. When
 the hooks cannot name the replaced id (no readable record, or Windows, where any `/clear` takes the record and the
 hooks name no id), the notice gives the new id instead: a pending handoff is accepted under it, and the next `/clear`
-names it; an accept already made under the unknown id cannot be replayed, so the session ends the run without touching the
-request, and Fabric takes the workflow over after it (step 4). Any other session gets one line in place of the
+names it, except on Windows, where it names no id either, so an accept made there cannot be replayed after another
+`/clear`. An accept already made under an id the hooks could not name cannot be replayed, so the session ends the run
+without touching the request, and Fabric takes the workflow over after it (step 4). Any other session gets one line in place of the
 contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says

@@ -205,15 +205,20 @@ DISPATCH_SESSION = " This session's sessionId: {session}."
 #: After a /clear the accept, if one was made, was made under the session id the clear replaced (0.63.0 seam readings
 #: 9 and 10): Observatory replays an accept, with its leaseId, only for that sessionId and the same idempotencyKey. A
 #: pending handoff is accepted under that same id, so every later replay matches it (0.63.0 seam reading 13).
+#: Observatory keys the replay on the executor as passed; the lease checkpoint_latest shows merges the offer in, so it
+#: is no guide (0.63.0 seam reading 14).
 DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, and its leaseId comes back only by "
-                    "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` and `executor` "
-                    "the first accept passed (the launcher's prompt names both; `observatory_checkpoint_latest` shows "
-                    "the workflow's executor). When `observatory_checkpoint_latest` still shows the handoff pending, no "
-                    "accept was made: {pending}")
+                    "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` ({owner}) and "
+                    "the `executor` exactly as the first accept passed it, none if it passed none (the launcher's "
+                    "prompt names them; the lease `observatory_checkpoint_latest` shows merges the offer in and is no "
+                    "guide). A replay Observatory refuses (an idempotency conflict) gets no lease back: end the run "
+                    "without touching the request; Fabric takes the workflow over after it. When "
+                    "`observatory_checkpoint_latest` still shows the handoff pending, no accept was made: {pending}")
 _CLEARED_UNKNOWN = "the sessionId the clear replaced"
 _PENDING_NAMED = ("accept it now with that same sessionId, key, owner and executor. Never accept it under the new "
                   "id.")
-_PENDING_UNKNOWN = ("accept it as step 2 says, with this session's own sessionId{session}. An accept already made "
+_PENDING_WINDOWS = " On Windows a later /clear names no id either: an accept made now cannot be replayed after it."
+_PENDING_UNKNOWN = ("accept it as step 2 says, with that key and this session's own sessionId{session}. An accept already made "
                     "under an id these hooks could not name cannot be replayed: end the run without touching the "
                     "request; Fabric takes the workflow over after it.")
 
@@ -222,15 +227,17 @@ def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None)
     """The cleared holder's notice: replay under the id the clear replaced when it is known, and accept a pending
     handoff under that same id; when it is not known, a pending handoff is accepted under this session's id."""
     named = isinstance(previous, str) and _SESSION_UUID.fullmatch(previous)
-    key = "`accept-%s` when Switchboard started the run" % handoff if isinstance(handoff, str) and handoff else (
-        "the key the first accept used")
+    switchboard = isinstance(handoff, str) and bool(handoff)
+    key = "`accept-%s` when Switchboard started the run" % handoff if switchboard else "the key the first accept used"
+    owner = "`agent:<provider>` when Switchboard started the run" if switchboard else "the one step 2 names"
     if named:
         pending = _PENDING_NAMED
     else:
         own = isinstance(session_id, str) and _SESSION_UUID.fullmatch(session_id)
-        pending = _PENDING_UNKNOWN.format(session=" (%s)" % session_id if own else "")
+        pending = _PENDING_UNKNOWN.format(session=" (%s)" % session_id if own else "") + (
+            _PENDING_WINDOWS if _WINDOWS else "")
     return DISPATCH_CLEARED.format(session="sessionId %s" % previous if named else _CLEARED_UNKNOWN, key=key,
-                                   pending=pending)
+                                   owner=owner, pending=pending)
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
@@ -293,7 +300,11 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
             # already cleared keeps the id it named; one cleared with the id unknown names the session it started, which
             # was told to accept a pending handoff under its own id (0.63.0 seam reading 13)
             same = isinstance(held, dict) and held.get("host") == record["host"]
-            named = held.get("cleared_from") or held.get("session") if same else ""
+            # an id the notice cannot name (not a lowercase UUID) is not carried on: the session it started was told
+            # to accept under its own id (0.63.0 unit reading 14)
+            kept = held.get("cleared_from") if same else None
+            named = kept if isinstance(kept, str) and _SESSION_UUID.fullmatch(kept) else (
+                held.get("session") if same else "")
             record["cleared_from"] = named if isinstance(named, str) else ""
             try:
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)

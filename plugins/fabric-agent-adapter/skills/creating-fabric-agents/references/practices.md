@@ -129,14 +129,16 @@ draft-and-check step owns.
 - **Every source is declared with its owner, how it is read, its cadence and its maximum age**; one that fails keeps its last good version and
   says so, and its age is that version's (its file's modification time). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
-  recommendation to its owner, posted on the board: `recommendation` is that board thread's id. What the queue counts
-  (`items_seen_unit`) is one of `mails`, `updates`, `messages` or `reviews`. Many `referred` tickets show a missing signal, not a regression.
+  recommendation to its owner, posted on the board: `recommendation` is that board thread's id. Many `referred` tickets show a missing signal, not a regression.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.
 - **The declaration lives under the extension key**
   `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, one entry per project (the contract's
   proposed DEC-0150, not merged yet; the key and the form may change when it is). A required
-  member is never null: a member not there yet is `{"none": "not_yet", "until": "<date>"}`, one not used
-  `{"none": "not_used"}`; `recommendation` appears only with `answered_signal: "none"`. Example: the recipe's
+  member is never null, except where nothing is decided (a channel's `decision`, and the optional `quiet_window`,
+  `late_answer_window` and `evals.spend_record`): a member not there yet is `{"none": "not_yet", "until": "<date>"}`,
+  one not used `{"none": "not_used"}` (only `question_route`, `gap_registry`, `tickets.pd_check` and a channel's
+  `texts.final` take that form); `recommendation` appears only with `answered_signal: "none"`; what each channel
+  counts (`channels[].items_seen_unit`) is one of `mails`, `updates`, `messages` or `reviews`. Example: the recipe's
   `channel-agent.example.json`. `check_service.py` reads it once the contract publishes its schema.

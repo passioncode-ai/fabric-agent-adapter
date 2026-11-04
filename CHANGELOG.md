@@ -19,7 +19,7 @@
   a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
   checkpoints, renewals about every 20 s (work that outlasts the run gives its state in a `com.progress` note and is left accepted for the next run,
   which Fabric's dispatcher starts since its main at `fff4b6d9`, in no release yet, Fabric itself moving the open
-  Observatory workflow to that run, as its spec at `c560d97e` says (sections 3.4 and 3.6); when the request's deadline is not after
+  Observatory workflow to that run, as its spec at `c560d97e` says (sections 3.4 and 3.6; its code does not yet); when the request's deadline is not after
   run-ends-at, it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
   the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
@@ -32,7 +32,9 @@
   `checkpoint.body`, since Observatory keeps only the latest body; the session takes the request from the environment
   or the first line and its thread from `com.get`, since Observatory's write redacts the packet's board references. A
   Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes carry the person's trust since 0.7.8); a host whose hook gets no session id (the native bridges) is always told
-  the full contract; on Windows any `/clear` keeps the contract, since each hook runs under a new Git Bash.
+  the full contract; on Windows any `/clear` keeps the contract, since each hook runs under a new Git Bash, and names
+  no replaced id, so an accept made before a `/clear` there cannot be replayed and the run ends without touching the
+  request.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.
 - working-with-fabric: whatever waits on the Project is answered in the same turn (FAA-205, the operator's rule of
@@ -54,7 +56,7 @@
     the retry; not a `model:*` outage) a hand-off with `fallback: true` (the standard's 4.4 and its ticket's
     `fallback`), which `repair=` then refuses, as it refuses a repair under the refused decision's own message id;
   - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config, which reads the file at once) reads the knowledge
-    file as a source: read again when it changes (its time, size or inode), the last good version kept when a read fails or the file has the
+    file as a source: read again when it changes (its time, size, inode or status-change time, the last a creation time on Windows), the last good version kept when a read fails or the file has the
     wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
     time;
   - `Knowledge.load` refuses a file that is not JSON, one nested deeper than 32 levels (on every Python), a file that is not an object with an `entries` list, an entry whose tags are not a list

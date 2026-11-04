@@ -665,7 +665,10 @@ class Recipe(unittest.TestCase):
         os.utime(fresh, (1000.0, 1000.0))
         os.replace(fresh, path)  # a new inode: what a build that replaces the file leaves
         self.assertTrue(next(iter(source.current().entries.values()))["answer"].endswith("!"))
-        # 0.63.0 unit reading 13: in place, the same size and the same inode, the time set back (`rsync --inplace -t`)
+        # 0.63.0 unit reading 13: in place, the same size and the same inode, the time set back (`rsync --inplace -t`);
+        # POSIX only: on Windows st_ctime is the creation time (unit reading 14)
+        if os.name == "nt":
+            return
         inode = path.stat().st_ino
         with open(path, "r+") as handle:
             text = handle.read()

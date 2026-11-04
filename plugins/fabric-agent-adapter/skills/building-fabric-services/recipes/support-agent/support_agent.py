@@ -213,7 +213,8 @@ class KnowledgeSource:
 
     def current(self) -> Knowledge:
         try:  # the time, the size, the inode and the status-change time, which no copy or `touch -r` can set back: a
-            # rewrite in one coarse tick, a copy that kept the time, or one in place with the same size still shows
+            # rewrite in one coarse tick, a copy that kept the time, or (on POSIX with fine timestamps) one in place
+            # with the same size still shows; on Windows st_ctime is the creation time and catches no such rewrite
             stat = self.path.stat()
             seen: Optional[Tuple[int, int, int, int]] = (stat.st_mtime_ns, stat.st_size, stat.st_ino, stat.st_ctime_ns)
         except OSError:
