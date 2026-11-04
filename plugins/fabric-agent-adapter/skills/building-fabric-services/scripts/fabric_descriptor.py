@@ -442,6 +442,8 @@ def port_of(origin: str) -> int:
 
 NO_SOURCE_REPOSITORY = ("names no source.repository, the repository its code is built from "
                         "(https://github.com/owner/name): it links the agent to its project (FAA-198)")
+PASS_SOURCE = ("Pass source={\"repository\": ...} in this call (write_descriptor or register_remote): one written after "
+               "it returns is too late for a new install (0.62.0 seam reading 20).")
 
 
 class NoSourceRepositoryWarning(UserWarning):
@@ -471,7 +473,7 @@ def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None)
             return None
     except (OSError, ValueError):  # an unsearchable folder reads as not installed, as Node's statSync does
         pass
-    return "Descriptor %s %s." % (me, NO_SOURCE_REPOSITORY)
+    return "Descriptor %s %s. %s" % (me, NO_SOURCE_REPOSITORY, PASS_SOURCE)
 
 
 def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None, *, _stacklevel: int = 2) -> Path:

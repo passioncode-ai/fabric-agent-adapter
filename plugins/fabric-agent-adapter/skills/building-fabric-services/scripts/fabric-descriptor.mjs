@@ -293,6 +293,8 @@ export function portOf(origin) {
 
 export const NO_SOURCE_REPOSITORY = 'names no source.repository, the repository its code is built from '
   + '(https://github.com/owner/name): it links the agent to its project (FAA-198)';
+const PASS_SOURCE = 'Pass source: { repository } in this call (writeDescriptor or registerRemote): one written after it '
+  + 'returns is too late for a new install (0.62.0 seam reading 20).';
 
 const HIERARCHICAL = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
 
@@ -308,7 +310,7 @@ export function sourceRefusal(d, dir = servicesDir()) {
   const instance = d?.instance ?? 'default';
   // An id or instance that is no string names no installed file, in both kits (seam reading 3).
   try { if (typeof d?.id === 'string' && typeof instance === 'string' && fs.statSync(descriptorPath(d.id, instance, dir)).isFile()) return null; } catch { /* not installed */ }
-  return `Descriptor ${d?.id}.${instance} ${NO_SOURCE_REPOSITORY}.`;
+  return `Descriptor ${d?.id}.${instance} ${NO_SOURCE_REPOSITORY}. ${PASS_SOURCE}`;
 }
 
 // FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns

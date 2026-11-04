@@ -128,7 +128,7 @@ class RemotePlacement(unittest.TestCase):
         self.assertNotIn("source", json.loads(rotated.read_text()))
         self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning])
         self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the installer's call")
-        with self.assertRaisesRegex(fs.ServiceError, "example-bare.default names no source.repository"):  # FAA-198
+        with self.assertRaisesRegex(fs.ServiceError, "example-bare.default names no source.repository(.|\n)*in this call"):  # FAA-198
             fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
                                directory=root)
         self.assertFalse(fs.remote_token_file("example-bare", "default", root).exists(), "a refused install writes no token")
