@@ -81,7 +81,9 @@ hook, or a Switchboard before `0ad56cb` started the run, the launcher's appended
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
    stops the run. Work that cannot end by then gets a `com.reply` with its state (what is done, where it lies, what is
-   left) and `com.complete` `failed_known` with that reason; the next run or the operator takes it from there. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
+   left) and `com.complete` `failed_known` with that reason, before `run-ends-at`: a launcher that stops a run sends
+   SIGTERM and kills it about 5 s later (Switchboard), too short to answer; the next run or the operator takes it
+   from there. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
    a typed secret or a payment is the person's: name it in the answer rather than wait.
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
    `completed`, or `failed_known` with the reason.
