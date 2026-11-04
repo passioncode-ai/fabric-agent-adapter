@@ -232,6 +232,8 @@ from fabric_descriptor import (  # noqa: F401
     remote_origin_problems,
     port_of,
     NO_SOURCE_REPOSITORY,
+    NoSourceRepositoryWarning,
+    names_repository,
     source_refusal,
     write_descriptor,
     remove_descriptor,

@@ -213,8 +213,8 @@ descriptor's `fabricManifest` at a manifest whose service key names this
 The installer, not the service, owns the plist and the descriptor. Sequence:
 
 1. `write_descriptor(descriptor)`: refuses a port or `id.instance` another descriptor
-   claims. A preview or branch copy is a second **instance**, never a second id, and it is
-   one more service the operator sees, probes and gets notified by. Verify a release with its
+   claims, and a new one without `source.repository` (a rewrite warns). A preview or branch
+   copy is a second **instance**, never a second id: one more service the operator sees. Verify a release with its
    own doctor or self-check before it replaces `default`; a temporary instance is uninstalled
    (`launchd_uninstall`, `remove_descriptor`) as soon as its check is done, not left running.
 2. `launchd_plist(...)` then `launchd_install(...)`: writes and lints the plist,
@@ -269,7 +269,7 @@ refusals.
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
 agents, models, connectors, stores and channels, each with its state, from
 `connections_extension()` / `connectionsExtension()` in `fabric_connections`. Never a credential in it, never a call
-count (that is the usage report); the details are in [the wire reference](references/protocol.md).
+count (that is the usage report); details: [the wire reference](references/protocol.md).
 
 The events feed is a **view over the log you already keep** (a jobs table, a JSONL
 journal), not a second store. Each event is one sentence a person reads; set
@@ -298,7 +298,8 @@ rule it can reach and says which it could not:
 python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 ```
 
-It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, well-known
+It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, `descriptor.source-repository`,
+`well-known.connections`, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,
 launchd pid equals answering pid, `dashboard.declared` (ED-9), `well-known.actions` (DEC-0121),

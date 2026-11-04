@@ -94,6 +94,8 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
   const file = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 't'.repeat(40), dir,
     source: { repository: 'https://github.com/example/agent' } });
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).source, { repository: 'https://github.com/example/agent' });
+  const rotated = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 'r'.repeat(40), dir });
+  assert.deepEqual(JSON.parse(fs.readFileSync(rotated, 'utf8')).source, { repository: 'https://github.com/example/agent' }, 'a rotation keeps it');
   assert.throws(() => k.registerRemote({ id: 'example-bare', name: 'Bare', origin: 'https://bare.example.com', token: 't'.repeat(40), dir }),
     /example-bare\.default names no source\.repository/); // FAA-198
   assert.ok(!fs.existsSync(k.remoteTokenFile('example-bare', 'default', dir)), 'a refused install writes no token');

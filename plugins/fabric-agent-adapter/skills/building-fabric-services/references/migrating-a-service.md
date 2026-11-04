@@ -15,8 +15,8 @@ Order matters: each step leaves the service answering.
    delete it with the operator's consent.
 6. **Regenerate the plist** from `launchd_plist`, pointing at a release; delete stray
    `.plist.bak` files from `~/Library/LaunchAgents` after moving them elsewhere.
-7. **Write the descriptor** from the installer; resolve any port claim it refuses by
-   moving the newcomer, never the established service.
+7. **Write the descriptor** from the installer, with `source.repository` (a new descriptor without it is refused);
+   resolve any port claim it refuses by moving the newcomer, never the established service.
 8. **Re-run the probe** until nothing `FAIL`s; record the table in the service's
    verification document.
 

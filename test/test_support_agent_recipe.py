@@ -63,6 +63,10 @@ class Recipe(unittest.TestCase):
         ext = fcn.connections_extension(agent.connections(), degraded=[{"source": "fallback", "reason": "down"}], states={"model": "ok"})
         got = {c["id"]: (c["kind"], c["target"], c["state"]) for c in ext[fcn.CONNECTIONS_EXTENSION_KEY]["connections"]}
         self.assertEqual(got, {"model": ("model", "a/one", "ok"), "fallback": ("model", "b/two", "degraded")})
+        for bad in ("", None, "qwen/qwen3.8 flash"):  # a misconfigured fallback degrades replies, never the document (seam reading 1)
+            agent.fallback = bad
+            ext = fcn.connections_extension(agent.connections())
+            self.assertEqual([c["id"] for c in ext[fcn.CONNECTIONS_EXTENSION_KEY]["connections"]], ["model"], repr(bad))
 
     def test_a_grounded_reply(self):
         model = model_says("Open Settings, then Account, then Reset password [KB:password-reset].")

@@ -36,6 +36,7 @@ from fabric_paths import (
     services_dir,
 )
 from fabric_descriptor import (
+    descriptor_path,
     source_refusal,
     validate_descriptor,
     write_descriptor,
@@ -394,6 +395,12 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
         descriptor["runner"] = dict(runner)
     if peer is not None:
         descriptor["peer"] = dict(peer)
+    if source is None:  # a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
+        try:
+            installed = json.loads(descriptor_path(service_id, instance, root).read_text(encoding="utf-8")).get("source")
+        except (OSError, ValueError, AttributeError):
+            installed = None
+        source = installed if isinstance(installed, dict) and installed.get("repository") else None
     if source is not None:
         descriptor["source"] = dict(source) if isinstance(source, dict) else source
     if doctor:
@@ -406,7 +413,7 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
         raise ServiceError(refusal)
     ensure_private_dir(token_file.parent)
     atomic_write(token_file, token.strip().encode(), 0o600)
-    return write_descriptor(descriptor, root)
+    return write_descriptor(descriptor, root, _stacklevel=3)  # the warning names the installer's call
 
 
 def cookie_value(cookie_header: Optional[str], name: str = SESSION_COOKIE) -> Optional[str]:

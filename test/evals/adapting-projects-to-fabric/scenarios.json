@@ -246,7 +246,7 @@
         "writes the descriptor with source.repository naming the repository its code is built from",
         "declares extensions/connections/0.1 with the model and the channel through connections_extension or connectionsExtension",
         "does not add an owner field to the descriptor",
-        "runs check_service.py and names descriptor.source-repository and well-known.connections NOT_RUN as not passing"
+        "runs check_service.py, reads descriptor.source-repository and well-known.connections as PASS, and treats a NOT_RUN on either as not passing"
       ]
     }
   ]

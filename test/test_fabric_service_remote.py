@@ -114,11 +114,18 @@ class RemotePlacement(unittest.TestCase):
         path = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
                                   token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
         self.assertEqual(json.loads(path.read_text())["source"], {"repository": "https://github.com/example/agent"})
+        rotated = fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                     token="r" * 40, directory=root)  # a rotation that names no source keeps it (seam reading 1)
+        self.assertEqual(json.loads(rotated.read_text())["source"], {"repository": "https://github.com/example/agent"})
         with self.assertRaisesRegex(fs.ServiceError, "example-bare.default names no source.repository"):  # FAA-198
             fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40,
                                directory=root)
         self.assertFalse(fs.remote_token_file("example-bare", "default", root).exists(), "a refused install writes no token")
         self.assertFalse(fs.descriptor_path("example-bare", "default", root).exists())
+        fs.descriptor_path("example-bare", "default", root).mkdir()  # a folder there is no installed descriptor
+        with self.assertRaisesRegex(fs.ServiceError, "names no source.repository"):
+            fs.register_remote(service_id="example-bare", name="Bare", origin="https://bare.example.com", token="t" * 40, directory=root)
+        self.assertFalse(fs.remote_token_file("example-bare", "default", root).exists(), "nor its token (unit reading 1)")
         for source, needle in ((["https://github.com/example/agent"], "source is {repository?}"),
                                ({"repository": "https://github.com/example/agent", "branch": "main"}, "source has no member branch"),
                                ({"repository": ""}, "source.repository is a URI"),

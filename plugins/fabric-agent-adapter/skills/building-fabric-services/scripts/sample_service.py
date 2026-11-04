@@ -546,7 +546,7 @@ def write_manifest(args: argparse.Namespace, data: Path, board: bool = False) ->
 
 def register(args: argparse.Namespace) -> int:
     data = Path(args.data_dir)
-    manifest = write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
+    manifest = data / "fabric-agent.json"  # written below, once the descriptor is known to be accepted
     descriptor = {
         "protocol": fs.PROTOCOL, "id": args.id, "instance": args.instance, "name": args.name,
         "summary": "Sample fabric-service/0.1 service.",
@@ -556,10 +556,19 @@ def register(args: argparse.Namespace) -> int:
         else {"manager": "none"},
         "paths": {"data": str(data), "logs": []},
         "fabricManifest": str(manifest),
-        "source": {"repository": args.repository},
+        # Another --id is someone's own agent: it names its repository, never this one (0.62.0 seam reading 1).
+        **({"source": {"repository": args.repository or SAMPLE_REPOSITORY}} if args.repository or args.id == "sample" else {}),
         # DEC-0061: who installed it, by role and never by name — a person runs this register command.
         "installedAt": fs.now_iso(), "installedBy": {"by": "person", "role": "operator", "tool": "sample_service.py register %s" % VERSION},
     }
+    # A refused descriptor leaves no manifest naming it (0.62.0 unit reading 1).
+    problems = fs.validate_descriptor(descriptor)
+    refusal = ("Descriptor is invalid: %s." % "; ".join(problems) if problems
+               else fs.source_refusal(descriptor, Path(args.services_dir) if args.services_dir else None))
+    if refusal:
+        print(refusal, file=sys.stderr)
+        return 1
+    write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
     try:
         path = fs.write_descriptor(descriptor, Path(args.services_dir) if args.services_dir else None)
     except fs.ServiceError as exc:
@@ -592,7 +601,7 @@ def build_parser() -> argparse.ArgumentParser:
                                                    "tool in the manifest (serve with the same --board-project)")
             p.add_argument("--services-dir")
             # FAA-198: the repository its code is built from, which a new descriptor names; the sample's own by default.
-            p.add_argument("--repository", default=SAMPLE_REPOSITORY)
+            p.add_argument("--repository", help="the repository its code is built from; this repository's for --id sample")
             p.add_argument("--label")
             p.add_argument("--plist")
     return parser

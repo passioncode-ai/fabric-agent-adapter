@@ -119,6 +119,7 @@ export {
   remoteOriginProblems,
   portOf,
   NO_SOURCE_REPOSITORY,
+  namesRepository,
   sourceRefusal,
   writeDescriptor,
   removeDescriptor,

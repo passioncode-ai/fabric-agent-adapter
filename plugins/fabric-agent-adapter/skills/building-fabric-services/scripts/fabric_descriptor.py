@@ -439,21 +439,36 @@ NO_SOURCE_REPOSITORY = ("names no source.repository, the repository its code is 
                         "(https://github.com/owner/name): it links the agent to its project (FAA-198)")
 
 
+class NoSourceRepositoryWarning(UserWarning):
+    """FAA-198: an installed descriptor rewritten without source.repository (Node: process.emitWarning, code
+    FABRIC_NO_SOURCE_REPOSITORY). A new install without it is refused instead."""
+
+
+def names_repository(descriptor: Dict[str, Any]) -> bool:
+    source = descriptor.get("source")
+    return isinstance(source, dict) and bool(source.get("repository"))
+
+
 def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Optional[str]:
-    """FAA-198: why a new install of this (valid) descriptor is refused, or None: it names no source.repository and no
-    descriptor of its id.instance is installed yet. An installer checks it before it writes anything else."""
-    if (descriptor.get("source") or {}).get("repository"):
+    """FAA-198: why a new install of this descriptor is refused, or None: it names no source.repository and no
+    descriptor of its id.instance is installed yet (a regular file; a folder, a broken link or one that cannot be read
+    is none). An installer may check it before it validates or writes anything else."""
+    if names_repository(descriptor):
         return None
-    if descriptor_path(descriptor["id"], descriptor["instance"], directory).exists():
-        return None
-    return "Descriptor %s.%s %s." % (descriptor["id"], descriptor["instance"], NO_SOURCE_REPOSITORY)
+    me = "%s.%s" % (descriptor.get("id"), descriptor.get("instance", "default"))
+    try:
+        if descriptor_path(str(descriptor.get("id")), str(descriptor.get("instance", "default")), directory).is_file():
+            return None
+    except (OSError, ValueError):  # an unsearchable folder reads as not installed, as Node's statSync does
+        pass
+    return "Descriptor %s %s." % (me, NO_SOURCE_REPOSITORY)
 
 
-def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Path:
+def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None, *, _stacklevel: int = 2) -> Path:
     """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim).
 
     FAA-198: a new descriptor names its ``source.repository``; rewriting one already installed without it only
-    warns (``warnings.warn``), so an installed agent's update keeps working."""
+    warns (``NoSourceRepositoryWarning``), so an installed agent's update keeps working."""
     problems = validate_descriptor(descriptor)
     if problems:
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
@@ -462,8 +477,9 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
     refusal = source_refusal(descriptor, root)
     if refusal:
         raise ServiceError(refusal)
-    if not (descriptor.get("source") or {}).get("repository"):
-        warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY), stacklevel=2)
+    if not names_repository(descriptor):
+        warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY),
+                      NoSourceRepositoryWarning, stacklevel=_stacklevel)
     # DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
     port = None if placement_of(descriptor) == "remote" or "origin" not in descriptor else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):

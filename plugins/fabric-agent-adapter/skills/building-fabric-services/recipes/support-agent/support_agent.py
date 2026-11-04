@@ -374,8 +374,12 @@ class SupportAgent:
     def connections(self) -> List[Dict[str, Any]]:
         """FAA-199: what the agent uses, for `connections_extension` in the well-known document of the service that runs
         it (DEC-0096); that service adds its own hand-off route and channels."""
-        return [{"id": "model", "kind": "model", "target": self.model, "purpose": "drafts replies from the knowledge file"},
-                {"id": "fallback", "kind": "model", "target": self.fallback, "purpose": "drafts when the first model fails"}]
+        # A model id that is not one (empty, missing, with a space) is left out, so a misconfigured fallback degrades the
+        # replies, never the well-known document (0.62.0 seam reading 1).
+        named = [("model", self.model, "drafts replies from the knowledge file"),
+                 ("fallback", self.fallback, "drafts when the first model fails")]
+        return [{"id": ident, "kind": "model", "target": target, "purpose": purpose} for ident, target, purpose in named
+                if isinstance(target, str) and target and not any(c.isspace() for c in target)]
 
     @property
     def decisions_file(self) -> Path:

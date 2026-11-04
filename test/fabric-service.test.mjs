@@ -117,7 +117,9 @@ test('a new install names its repository; a reinstall without it warns (FAA-198)
   assert.match(seen[0][0], /names no source\.repository/);
   assert.equal(seen[0][1], 'FABRIC_NO_SOURCE_REPOSITORY');
   assert.equal(k.sourceRefusal(bare, dir), null, 'an installed descriptor is a rewrite');
-  for (const empty of [{}, { repository: '' }]) assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: empty }, dir), JSON.stringify(empty));
+  for (const empty of [{}, { repository: '' }, 'x', ['a'], 1, true]) assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: empty }, dir), JSON.stringify(empty));
+  fs.mkdirSync(path.join(dir, 'folder.default.json')); // a folder at the descriptor's path is no installed descriptor
+  assert.ok(k.sourceRefusal({ ...bare, id: 'folder' }, dir));
 });
 
 test('invalid descriptors are refused', () => {

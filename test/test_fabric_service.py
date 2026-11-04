@@ -209,13 +209,19 @@ class DescriptorTests(unittest.TestCase):
                 self.assertEqual(seen, [], "a descriptor that names its repository is written without a word")
                 fs.write_descriptor(bare, root)  # the rewrite of an installed descriptor without it
             self.assertEqual(len(seen), 1)
+            self.assertIs(seen[0].category, fs.NoSourceRepositoryWarning, "a class an installer can filter (unit reading 1)")
+            self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the caller")
             self.assertIn("names no source.repository", str(seen[0].message))
             self.assertNotIn("source", json.loads(fs.descriptor_path("sample", "default", root).read_text()), "written as given")
             self.assertIsNone(fs.source_refusal(bare, root), "an installed descriptor is a rewrite")
-            for empty in ({}, {"repository": ""}):
+            for empty in ({}, {"repository": ""}, "x", ["a"], 1, True):  # a source that is no object names nothing (unit reading 1)
                 with self.subTest(source=empty):
                     other = dict(bare, id="other", origin="http://127.0.0.1:47197", source=empty)
                     self.assertIsNotNone(fs.source_refusal(other, root))
+            (root / "folder.default.json").mkdir()  # a folder at the descriptor's path is no installed descriptor
+            self.assertIsNotNone(fs.source_refusal(dict(bare, id="folder"), root))
+            (root / "gone.default.json").symlink_to(root / "missing.json")
+            self.assertIsNotNone(fs.source_refusal(dict(bare, id="gone"), root), "a broken link is none either")
 
     def test_the_probe_names_a_missing_repository(self):
         checker = load("check_service")

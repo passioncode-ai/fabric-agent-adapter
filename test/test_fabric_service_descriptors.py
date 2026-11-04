@@ -166,6 +166,14 @@ class Writers(unittest.TestCase):
         self.assertEqual(sample.register(args), 0)
         written = json.loads((services / "example-agent.default.json").read_text())
         self.assertEqual(written["source"], {"repository": "https://github.com/example-org/example-agent"})
+        args = sample.build_parser().parse_args(["register", "--port", "47296", "--id", "example-bad", "--data-dir", str(services / "data3"),
+                                                 "--services-dir", str(services), "--repository", ""])
+        self.assertEqual(sample.register(args), 1)
+        self.assertFalse((services / "data3" / "fabric-agent.json").exists(), "a refused descriptor leaves no manifest naming it")
+        args = sample.build_parser().parse_args(["register", "--port", "47295", "--id", "example-own", "--data-dir", str(services / "data4"),
+                                                 "--services-dir", str(services)])
+        self.assertEqual(sample.register(args), 1, "someone's own agent names its repository, never the sample's (seam reading 1)")
+        self.assertFalse((services / "example-own.default.json").exists())
 
     def test_the_sample_declares_what_it_uses(self):
         """FAA-199: the sample's well-known document lists its connections; --degraded marks the demo source failing."""

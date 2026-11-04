@@ -15,20 +15,28 @@ link each to its project and draw its chain (FAA-198, FAA-199).
 
 ### Changed
 
-- `write_descriptor` / `writeDescriptor` refuse a new descriptor that names no `source.repository` (none of its
-  `id.instance` is installed yet), with `ServiceError` naming the descriptor; `register_remote` / `registerRemote`
-  refuse it before they write the token file, so a refused registration leaves nothing. Rewriting a descriptor already
-  installed without it still writes it and warns (`warnings.warn`; Node `process.emitWarning`, code
+- `write_descriptor` / `writeDescriptor` refuse a new descriptor that names no `source.repository` (no descriptor of its
+  `id.instance` is installed yet: an installed one is a regular file, so a folder, a broken link or one that cannot be
+  read is none), with `ServiceError` naming the descriptor; `register_remote` / `registerRemote` refuse it before they
+  write the token file, so a refused registration leaves nothing, and a rotation that names no `source` keeps the
+  installed one. Rewriting a descriptor already installed without it still writes it and warns
+  (`NoSourceRepositoryWarning`, a `UserWarning` attributed to the installer's call; Node `process.emitWarning`, code
   `FABRIC_NO_SOURCE_REPOSITORY`), so an installed agent's update keeps working. `source_refusal` / `sourceRefusal` say
-  why an install would be refused, for an installer that checks before it writes anything else. `check_service.py`
-  names a descriptor without it (`descriptor.source-repository`, `NOT_RUN`, never a pass). `sample_service.py register`
-  writes its own repository and takes `--repository`. No owner field is added: the organization follows from the
-  repository (FAA-198).
+  why an install would be refused, for an installer that checks before it validates or writes anything else (a `source`
+  that is no object names nothing), and `names_repository` / `namesRepository` whether a descriptor names one.
+  `check_service.py` names a descriptor without it (`descriptor.source-repository`, `NOT_RUN`, never a pass).
+  `sample_service.py register` writes this repository for `--id sample` and takes `--repository` (another `--id` names
+  its own, or is refused), and writes its manifest only once the descriptor is accepted. No owner field is added: the
+  organization follows from the repository (FAA-198).
 
 ### Upgrading
 
 - An installer that writes a descriptor for a new install passes `source: {"repository": "https://github.com/owner/name"}`
-  (the repository its code is built from); an installed agent's next update warns until it does.
+  (the repository its code is built from), and so does a desktop app that writes its own descriptor (DEC-0069: its first
+  write on a new machine is refused without it); an installed agent's next update warns until it does. Only a rewrite in
+  place keeps working: an update that removes the descriptor before it writes it again, a new instance (a preview) and a
+  moved services directory are new installs. In Python the warning is `NoSourceRepositoryWarning` (a `UserWarning`), so
+  a suite that runs with warnings as errors (`-W error`) sees the rewrite raise; filter that class there.
 
 ## 0.61.0 (2026-11-04)
 
