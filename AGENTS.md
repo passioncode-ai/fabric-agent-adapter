@@ -151,16 +151,16 @@ this repository both obeys it and ships its service layer
   whose release got no answer stays for the next worker), reads the board's unread
   count (`com.status`) after a turn, and exits. A session rejoins at most once a minute: a turn within 60 s of its
   last successful rejoin stays in the spool for the next worker; the end of a session always starts one (FAA-53). UserPromptSubmit reads small files in that spool (the count) and takes the nudges a
-  turn's answer carried by renaming their file away (FAA-142), except in a session started on a board request or inside its run, where it reads neither; it calls nothing. Every one is silent in a session Fabric launched (except the exit contract in one started on a board request, and the
+  turn's answer carried by renaming their file away (FAA-142), except in a session started on a board request or inside its run, where it reads neither and, on a prompt whose first line names the dispatch, writes the `dispatch/` record (0600) electing the run's holder; it calls nothing. Every one is silent in a session Fabric launched (except the exit contract in one started on a board request, and the
   dashboard-kit notice says nothing in such a session); a launched session is remembered by a marker so the process walk
   runs once, and a walk that cannot read the processes spools nothing (FAA-68). Measured 2026-10-11 under a load average of about 220,
   with the feature absent: medians 282 / 271 / 329 ms for start / stop / end, of which 65 ms is Python's own start
   ([raw](docs/reports/2026-10-11-working-with-fabric/raw/hook-timing.log)); the prompt hook is measured in
   [FAA-12a's raw](docs/reports/2026-10-12-faa-12a-board-participants/raw/hook-timing.log).
 - Codex and Kimi Code: `fabric_session.py hook session-start --host codex|kimi`, only where the person added it with
-  `install-host-hooks --apply`; it prints the preamble and exits. In a session started on a board request it prints the
-  exit contract instead and also writes the dispatch record (the holding session's id and, after a `/clear`, the id it replaced, the agent's process id and a time, 0600) in the user's cache folder,
-  pruning such records after 7 days.
+  `install-host-hooks --apply`; it prints the preamble and exits. In a session under a board request's environment it
+  prints the conditional exit contract instead and only prunes dispatch records older than 7 days in the user's cache
+  folder; it writes none, having no prompt to check.
 
 No `.mcp.json`, no launchd job, no port, no per-session server, no login item. Nothing idles on its own; the one
 long-lived process, `watch-mail`, runs only while an agent waits on the board, under that agent's watcher. `install.sh` and `bin/fabric-agent-adapter.js` (the installer and `pack`/`sign`/`verify`) run once when a person calls them and exit.

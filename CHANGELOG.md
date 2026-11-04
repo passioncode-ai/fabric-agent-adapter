@@ -35,7 +35,7 @@
   `checkpoint.body`, since Observatory keeps only the latest body; the session takes the request from the environment
   or the first line and its thread from `com.get`, since Observatory's write redacts the packet's board references. A
   Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes carry the person's trust since 0.7.8); a host whose hook gets no session id (the native bridges) is always told
-  the full contract; on Windows any `/clear` keeps the contract, since each hook runs under a new Git Bash, and names
+  the conditional contract and writes no record; on Windows any `/clear` keeps the contract, since each hook runs under a new Git Bash, and names
   no replaced id, so an accept made before a `/clear` there cannot be replayed and the run ends without touching the
   request.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
@@ -81,8 +81,8 @@
 - A custom `on_handoff` that stores the row it is given now receives the refused `draft`, which can echo what the
   customer wrote: drop `draft` before storing it (the default outbox does).
 - A session carrying `FABRIC_DISPATCH_WORKFLOW` now gets the exit contract at session start, on the condition that its
-  own prompt starts with the dispatch line naming the same three, even when Fabric launched it; with all three
-  missing it gets one line that it is no run. Its prompt hook prints no unread line or reminder (the nudges file
+  own prompt starts with the dispatch line naming the same three, even when Fabric launched it; with the workflow
+  set but the handoff or the request missing or malformed, it gets one line that no session there is a run. Its prompt hook prints no unread line or reminder (the nudges file
   stays), and `watch-mail` refuses to start there. A launcher that sets the workflow alone starts no run any more.
 - A session that does a board request with no person in its chat stops before a production step and names it for a
   person (working-with-fabric `references/project-board.md`, board thread `1add3c03`).

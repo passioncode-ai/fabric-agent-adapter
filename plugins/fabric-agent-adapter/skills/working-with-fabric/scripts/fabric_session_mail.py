@@ -182,8 +182,9 @@ def watch_mail_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = None) ->
         sys.stderr.write("watch-mail: this session was launched by Fabric; call com.status with your own tools.\n")
         return 2
     if re.fullmatch(DISPATCH_WORKFLOW, env.get("FABRIC_DISPATCH_WORKFLOW") or ""):
-        sys.stderr.write("watch-mail: this session was started on a board request; it does that request and ends "
-                         "(working-with-fabric references/on-demand-session.md).\n")
+        sys.stderr.write("watch-mail: this session runs under a board request's environment (its run or a helper "
+                         "of it); watch-mail does not start here (working-with-fabric "
+                         "references/on-demand-session.md).\n")
         return 2
     cwd = Path(args.cwd).expanduser()
     if not claude_registration(cwd, env):

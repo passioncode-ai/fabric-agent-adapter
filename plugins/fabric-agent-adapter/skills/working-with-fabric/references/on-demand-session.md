@@ -18,7 +18,7 @@ adapter 0.63.0 on, so a launcher can start one today.
 
 | Environment | Value |
 |---|---|
-| `FABRIC_DISPATCH_WORKFLOW` | the Observatory workflow that holds the packet, `wf_` and 16 lowercase hex digits; alone it is enough |
+| `FABRIC_DISPATCH_WORKFLOW` | the Observatory workflow that holds the packet, `wf_` and 16 lowercase hex digits; without the other two no session under it is a run |
 | `FABRIC_DISPATCH_HANDOFF` | the handoff that gives this session the workflow's lease, `handoff:...` |
 | `FABRIC_DISPATCH_REQUEST` | the board request to answer, a UUID |
 
@@ -62,7 +62,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    is its message's) and its thread with `com.list {thread: <thread>}`, the `thread` `com.get` answered, under the
    session's own credential. The folder is the working directory. The body's `credentials` block names the
    keys the request needs, by name only; reach them with `use_secret.py run`. `observatory_checkpoint_latest` also
-   shows the pending handoff, for a session whose launcher passed none.
+   shows the pending handoff.
 2. **Take the lease.** `observatory_handoff_accept {owner, idempotencyKey, handoffId, executor?, sessionId?}`:
    pass this session's own `sessionId` (the same one on a retry) and the `owner`, `idempotencyKey` and `executor` the
    launcher's prompt names (Switchboard's: `agent:<provider>`, `accept-<handoff>` and `{provider, accountRef}`); when
@@ -143,7 +143,9 @@ and ends `timed-out`.
 
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
 environment, and its prompt does not start with the line, so it is a helper; an Agent tool subagent runs in the same
-process and gets no hook output at all. A helper launched outside the run is best started with `env -u
+process and gets no hook output at all. Every session under the environment gets the conditional contract at its
+start; the prompt hook prints one line only to a second session whose own first line names the dispatch, telling it
+the run holds it. A helper launched outside the run is best started with `env -u
 FABRIC_DISPATCH_WORKFLOW -u FABRIC_DISPATCH_HANDOFF -u FABRIC_DISPATCH_REQUEST`. The first session whose own line names
 the dispatch holds it: the prompt hook records that session id for the dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard sets it since
 0.7.8; a value outside `[A-Za-z0-9._-]{1,64}` is ignored), else by the
@@ -179,11 +181,12 @@ names it, except on Windows, where it names no id either, so an accept made ther
 without touching the request, and Fabric takes the workflow over after it (step 4). Any other session gets one line in place of the
 contract: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
-workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says
-nothing there. A host whose hook gets no session id (the native bridges: Hermes, OpenCode, OpenClaw, Pi) is always
-told the full contract, since the hooks cannot tell its sessions apart. The election counts sessions whose hook ran: in a run whose own session has no adapter hook (a Codex
-run whose home does not trust the hook: the person never trusted it, or a Switchboard before 0.7.8 started it), the first nested session the run
-starts is taken as the holder.
+workflow's checkpoints. `watch-mail` refuses to start under a board request's environment, the run's or a helper's,
+and the dashboard-kit notice says nothing there. A host whose hook gets no session id (the native bridges: Hermes,
+OpenCode, OpenClaw, Pi) is always told the conditional contract and checks its first line itself; no record is
+written. A run whose own session has no prompt hook (Codex, Kimi, or a Codex home that does not trust the hook: the
+person never trusted it, or a Switchboard before 0.7.8 started it) elects no holder either: the session checks its
+first line itself, and a nested session, whose prompt has no line, stays a helper.
 
 The plugin tells a dispatched session from 0.63.0 on; an older one prints its ordinary preamble there, and only the
 launcher's appended exit contract tells the run what to do.

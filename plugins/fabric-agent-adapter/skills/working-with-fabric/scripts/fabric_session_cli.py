@@ -121,9 +121,8 @@ DISPATCH_LINE = re.compile(r"fabric-dispatch/1 workflow=(%(workflow)s) handoff=(
 DISPATCH_HEAD = "[fabric-agent-adapter] Fabric started this session on one board request ({request}; workflow {workflow})."
 #: Before the prompt is seen (session start; Codex and Kimi have no prompt hook) the contract is conditional.
 DISPATCH_IF = (
-    "[fabric-agent-adapter] This session is the run Fabric started on a board request only when its own prompt's "
-    "first line is exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`, as "
-    "FABRIC_DISPATCH_* says. No such line: it is a helper; do your task only, touching neither the handoff, the "
+    "[fabric-agent-adapter] This session is the run on a board request only when its own prompt's first line is "
+    "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; do your task only, touching neither the handoff, the "
     "request nor the workflow. That line with other values: no run; say so in the request's thread and stop. The run:")
 DISPATCH_CONTRACT = (
     " Do that "
@@ -322,10 +321,11 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     """Whether this session holds the dispatch: the first session id seen for the dispatch (its FABRIC_DISPATCH_ID when
     the launcher sets one, else the workflow, the handoff and the launcher's run id) holds it, recorded once in the hooks' folder (0600, created exclusively). `take_over` (a `/clear`, which gives
     the same run a new session id; a nested `claude -p` starts with `startup`) moves the record to this id when the
-    record was written under this hook's parent (the agent's own process, which a `/clear` keeps). A session
-    id that is not one, or a folder that cannot be written, counts as the holder: better the contract twice than
+    record was written under this hook's parent (the agent's own process, which a `/clear` keeps); a missing or
+    unreadable record holds nothing on a take-over, since only a prompt's line makes the run. A session id that is not
+    one, or a folder that cannot be written, counts as the holder outside a take-over: better the contract twice than
     never. A record that cannot be read (damaged by hand, or created and not yet written by a hook running at the same
-    moment) counts as held by another session, outside a take-over: the session it names may be at work."""
+    moment) counts as held by another session: the session it names may be at work."""
     env = os.environ if env is None else env
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return True
@@ -477,7 +477,9 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     told = dispatch_from_env(env)
     dispatch, disagree = dispatch_of(env, payload.get("prompt"))
     lines: List[str] = []
-    if disagree:  # a line that names other values, or an environment without all three: no run (Fabric's spec 3.5)
+    if disagree and not dispatch_complete(told):  # the environment lacks them: say that, not a disagreement
+        lines = [DISPATCH_INCOMPLETE.format(workflow=told["workflow"])]
+    elif disagree:  # a line that names other values: no run (Fabric's spec 3.5)
         lines = [DISPATCH_OTHER.format(fields=", ".join(disagree))]
     elif dispatch is not None:  # the line names what the environment names: the first such session is the run
         if not dispatch_holder(dispatch, session_id, env):

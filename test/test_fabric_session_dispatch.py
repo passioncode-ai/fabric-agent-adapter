@@ -148,7 +148,7 @@ class Hooks(Base):
         sb = {"FABRIC_DISPATCH_WORKFLOW": WF, "SWITCHBOARD_LAUNCH_ID": "launch-1"}
         self.assertEqual(self.context(self.start(sb)[0]), cli.DISPATCH_INCOMPLETE.format(workflow=WF))
         context = self.context(self.prompt(sb, LINE)[0])
-        self.assertEqual(context, cli.DISPATCH_OTHER.format(fields="handoff, request"))
+        self.assertEqual(context, cli.DISPATCH_INCOMPLETE.format(workflow=WF))
 
     def test_the_contract_does_not_wait_for_a_registration_or_a_project_sign(self):
         self.assertIn(WF, self.context(self.start(ENV)[0]))
@@ -171,6 +171,8 @@ class Hooks(Base):
         self.assertFalse((cli.state_root(env=self.env) / "dispatch").exists())
         longest = dict(FULL, handoff="handoff:" + "x" * 120)
         self.assertLess(len(cli.dispatch_contract(longest, conditional=True)), 4000, "Hermes' MAX_CONTEXT_CHARS")
+        uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
+        self.assertLess(len(cli.dispatch_contract(longest, uuid, conditional=True)), 4000, "with a session id too")
 
     def test_a_resumed_dispatch_is_quiet(self):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "resume"},
@@ -656,15 +658,37 @@ class Hooks(Base):
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             self.assertEqual(mail.watch_mail_cli(["--session-id", SID, "--cwd", str(self.repo)], env=env), 2)
-        self.assertIn("started on a board request", err.getvalue())
+        self.assertIn("runs under a board request's environment", err.getvalue())
         for junk in ("wf_xyz", "1"):  # 0.63.0 unit reading 6: a malformed workflow is no dispatch, as for the hooks
             err = io.StringIO()
             with contextlib.redirect_stderr(err):
                 code = mail.watch_mail_cli(["--session-id", SID, "--cwd", str(self.repo)],
                                            env=dict(env, FABRIC_DISPATCH_WORKFLOW=junk))
             self.assertEqual(code, 2, "stopped further on: no fabric registered in this home")
-            self.assertNotIn("started on a board request", err.getvalue(), junk)
+            self.assertNotIn("board request's environment", err.getvalue(), junk)
             self.assertIn("no MCP server named fabric", err.getvalue())
+
+    def test_a_clear_with_no_session_id_or_a_bad_one_holds_nothing(self):
+        # 0.63.0 unit reading 19: the clear branch needs a session id; without one the session is told the condition
+        for payload, host in (({"cwd": str(self.repo), "source": "clear"}, "claude"),
+                              ({"session_id": "a b", "cwd": str(self.repo), "source": "clear"}, "claude"),
+                              ({"cwd": str(self.repo), "source": "clear"}, "hermes")):
+            with self.subTest(host=host, payload=sorted(payload)):
+                done, _ = self.run_hook("session-start", payload, extra_env=ENV, args=("--host", host))
+                text = done.stdout if host == "hermes" else self.context(done)
+                self.assertIn("only when its own prompt's first line", text)
+                self.assertFalse(text.startswith(cli.DISPATCH_HEAD.format(**FULL)))
+                self.assertLess(len(text), 4000)
+        self.assertFalse((cli.state_root(env=self.env) / "dispatch").exists())
+
+    def test_a_run_whose_id_is_no_uuid_is_confirmed_without_naming_it(self):
+        done, _ = self.run_hook("user-prompt-submit", {"session_id": "S-ABC", "cwd": str(self.repo), "prompt": LINE},
+                                extra_env=ENV)
+        self.assertEqual(self.context(done), cli.DISPATCH_IS_RUN)
+
+    def test_an_incomplete_environment_with_the_line_is_told_what_it_lacks(self):
+        only = {"FABRIC_DISPATCH_WORKFLOW": WF}
+        self.assertEqual(self.context(self.prompt(only, LINE)[0]), cli.DISPATCH_INCOMPLETE.format(workflow=WF))
 
     def test_without_the_line_the_prompt_hook_prints_no_contract(self):
         # Vesta's VES-BOARD-SPAWN-HARDEN 2: without FABRIC_DISPATCH_* no exit contract; with it and no line, none either
