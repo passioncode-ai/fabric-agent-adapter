@@ -134,8 +134,8 @@ this repository both obeys it and ships its service layer
   call); in a folder with no such sign, one line pointing at `fabric_whoami` (FAA-60); when Fabric is down, one line,
   and only in a project that uses Fabric; in a session Fabric started on a board request (`FABRIC_DISPATCH_WORKFLOW`),
   the exit contract instead, read from the environment, with one record per run in the hooks' folder
-  (`dispatch/`, 0600, pruned after 7 days; a session the run starts itself gets one line instead) (FAA-201), which the prompt hook prints again when the
-  prompt's first line adds to it or disagrees with it. Stop and SessionEnd first remove
+  (`dispatch/`, 0600, pruned after 7 days) (FAA-201), on the condition that the session's own prompt starts with the
+  dispatch line naming the same three; the prompt hook, which sees that line, confirms the run or says it is none. Stop and SessionEnd first remove
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
   running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s);
   only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'

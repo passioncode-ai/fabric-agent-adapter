@@ -28,18 +28,20 @@ The prompt's first line names the same three, fields one space apart in this ord
 fabric-dispatch/1 workflow=wf_<16 hex> handoff=<handoff id> request=<request uuid>
 ```
 
-The environment decides that the session was dispatched and wins on every value it names; the line fills a value the
-environment left out, for the same workflow only, and a disagreement is said in the closing checkpoint's notes. A line
-with no `FABRIC_DISPATCH_WORKFLOW` in the environment is quoted text (a board message pasted into a session), never a
-dispatch. Switchboard's `dispatch` sets all three and writes the line (SB-247, with
-`FABRIC_DISPATCH_ID`, since Switchboard 0.7.8 of 2026-11-04; board thread `b3e60686`). With a launcher that sets the workflow alone, the session reads the handoff
-from the packet and the request from the launcher's prompt; when neither names the request, it closes the workflow
-`blocked` saying so and ends (Observatory's write redacts the packet's board references, below).
+A session is the run only when its own prompt's first line names the same three as the environment (Fabric's spec
+3.5, agreed with Vesta on board thread `1add3c03`). The environment alone makes no run: a reader or a subshell the run
+starts inherits it, and its prompt does not start with the line, so it is a helper that does its own task only. A line
+that disagrees with the environment, or an environment without all three, makes no run either: that session says so
+in the request's thread (`com.get` the request the line names, then `com.submit` kind `message` to its thread, naming
+only the ids), takes nothing, writes no checkpoint and stops. A line with no `FABRIC_DISPATCH_WORKFLOW` in the
+environment is quoted text (a board message pasted into a session), never a dispatch. Switchboard's `dispatch` sets
+all three and writes the line (SB-247, with `FABRIC_DISPATCH_ID`, since Switchboard 0.7.8 of 2026-11-04; board thread
+`b3e60686`).
 
-The plugin's session-start hook prints the exit contract (the steps below, with the values filled in or pointed at the
-packet) in place of the usual preamble, whatever the folder shows, and also in a session Fabric launched (a run shown
-in Fabric's console). In Claude Code the prompt hook prints it again when the first line adds a value the environment
-left out or disagrees with it. A resumed or compacted session prints nothing. The plugin's hooks reach a Claude Code
+The plugin's session-start hook, which sees no prompt yet, prints the exit contract (the steps below, with the values
+filled in) on that condition, in place of the usual preamble, whatever the folder shows, and also in a session Fabric
+launched (a run shown in Fabric's console). In Claude Code the prompt hook, which sees the line, says the session is
+the run, or that it is none; in Codex and Kimi, which have no prompt hook, the session checks its first line itself. A resumed or compacted session prints nothing. The plugin's hooks reach a Claude Code
 run Switchboard starts (its isolated home carries the operator's plugins). A Codex run gets the adapter's hook only when
 the person installed it with `install-host-hooks` and that run's `CODEX_HOME` trusts it: Codex runs a `hooks.json` hook
 only when the home's own `config.toml` trusts it (measured with codex-cli 0.165.0). Switchboard links the person's
@@ -140,12 +142,15 @@ and ends `timed-out`.
 ## A session inside the run
 
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
-environment. Only the run's first session holds the dispatch: the hooks record the first session id for the
-dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard sets it since
+environment, and its prompt does not start with the line, so it is a helper; an Agent tool subagent runs in the same
+process and gets no hook output at all. A helper launched outside the run is best started with `env -u
+FABRIC_DISPATCH_WORKFLOW -u FABRIC_DISPATCH_HANDOFF -u FABRIC_DISPATCH_REQUEST`. The first session whose own line names
+the dispatch holds it: the prompt hook records that session id for the dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard sets it since
 0.7.8; a value outside `[A-Za-z0-9._-]{1,64}` is ignored), else by the
 workflow, the handoff and the launcher's run id (`SWITCHBOARD_LAUNCH_ID`), so a new dispatch of the same workflow is a
-new holder; a launcher that sets the workflow alone gives each run a distinct run id. A `/clear` in the holding
-session keeps the contract (the record moves to the new session id). A holder that accepted the handoff before
+new holder. A `/clear` in the holding session's process keeps the contract (the record moves to the new session id);
+a `/clear` with no record (in Codex and Kimi the hooks keep none, having no prompt hook) gets the conditional contract
+again, so a cleared Codex run reads as a helper and Fabric takes the request over after it. A holder that accepted the handoff before
 the `/clear` lost its `leaseId` with the context: Observatory replays an accept, `leaseId` included, only for the same
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
 so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,

@@ -101,12 +101,13 @@ DOWN_NOTICE = (
 QUIET_SOURCES = frozenset(("compact", "resume"))
 
 
-#: FAA-201: a session Fabric started on a board request (Fabric's on-demand spec, 1329b60f, sections 3.4 to 3.6). The
-#: environment names the workflow, the handoff and the request; the prompt's first line `fabric-dispatch/1
-#: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order) names them too,
-#: and the environment wins. FABRIC_DISPATCH_WORKFLOW alone is enough to tell the session: a launcher that sets only it
-#: (Switchboard main before 7ac2a5b, never released) leaves the handoff and the request to the packet. A line with no workflow in the
-#: environment is quoted text, never a dispatch.
+#: FAA-201: a session Fabric started on a board request (Fabric's on-demand spec, sections 3.4 to 3.6). The
+#: environment names the workflow, the handoff and the request, and so does the prompt's first line `fabric-dispatch/1
+#: workflow=wf_<16 hex> handoff=<handoff id> request=<uuid>` (fields one space apart, in that order). A session is the
+#: run only when its own prompt's first line names the same three as the environment (Fabric's spec 3.5, agreed with
+#: Vesta on board thread 1add3c03): the environment alone makes no run, since a reader or a subshell inherits it; a line
+#: that disagrees, or an environment without all three, makes none either. A line with no workflow in the environment
+#: is quoted text.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
 _DISPATCH_VALUE = {"workflow": DISPATCH_WORKFLOW, "handoff": r"handoff:[A-Za-z0-9._:-]{1,120}",
@@ -117,8 +118,15 @@ DISPATCH_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
 _WINDOWS = os.name == "nt"
 DISPATCH_LINE = re.compile(r"fabric-dispatch/1 workflow=(%(workflow)s) handoff=(%(handoff)s) request=(%(request)s)"
                            % _DISPATCH_VALUE)
+DISPATCH_HEAD = "[fabric-agent-adapter] Fabric started this session on one board request ({request}; workflow {workflow})."
+#: Before the prompt is seen (session start; Codex and Kimi have no prompt hook) the contract is conditional.
+DISPATCH_IF = (
+    "[fabric-agent-adapter] This session is the run Fabric started on a board request only when its own prompt's "
+    "first line is exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`, as "
+    "FABRIC_DISPATCH_* says. No such line: it is a helper; do your task only, touching neither the handoff, the "
+    "request nor the workflow. That line with other values: no run; say so in the request's thread and stop. The run:")
 DISPATCH_CONTRACT = (
-    "[fabric-agent-adapter] Fabric started this session on one board request ({request}; workflow {workflow}). Do that "
+    " Do that "
     "request and end: nobody watches this run, so never wait for a person. 1. `fabric_whoami`, then read the packet "
     "with `observatory_checkpoint_latest` {{workflowId: {workflow}}}: obey its constraints first; its goal describes "
     "the request; its artifacts are references (the capability, the deadline, run-ends-at; Observatory's write redacts "
@@ -140,7 +148,7 @@ DISPATCH_CONTRACT = (
     "thread, then: when the request's deadline is not after run-ends-at plus 10 minutes (no next run starts that close to it), `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
-    "typed secret or a payment is the person's: name it in the answer. 5. `com.reply` in the thread, then "
+    "typed secret, a payment or a production step is the person's (no person is in this chat): name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
     "the `leaseId`, `close: true`, a status and the packet's body with `done` and `notes` added: done for completed; for "
@@ -150,18 +158,29 @@ DISPATCH_CONTRACT = (
     "no watch-mail. The steps and every argument: working-with-fabric "
     "references/on-demand-session.md."
 )
-#: A session started inside a dispatched run (a `claude -p` or `codex exec` the run itself runs) inherits the
-#: environment: only the run's first session holds the dispatch; any other gets this line (0.63.0 seam reading 2).
+#: A second session whose own prompt starts with the same dispatch line (another process under the run's environment):
+#: the first such session holds the dispatch, and any other gets this line (0.63.0 seam reading 2).
 DISPATCH_NESTED = (
     "[fabric-agent-adapter] This session runs inside a run Fabric started on a board request (workflow {workflow}); "
     "that run holds it. Do the task you were given only: do not accept the handoff, claim the request, replace its "
     "responder, complete it or write the workflow's checkpoints."
 )
-DISPATCH_MISMATCH = (" The prompt's first line disagrees with the environment on {fields}: the environment's values "
-                     "above are the ones to use; say so in the closing checkpoint's notes.")
-_UNKNOWN = {"handoff": "the handoff the packet names (`observatory_checkpoint_latest` shows it pending)",
-            "request": "the request the launcher's prompt names (Observatory's write redacts it from the packet); when no "
-                       "prompt names it, close the workflow blocked saying so and end"}
+#: The prompt's line confirms the run (0.63.0, Fabric's spec 3.5): the contract printed at the start applies.
+DISPATCH_IS_RUN = ("[fabric-agent-adapter] This prompt's first line names the board request FABRIC_DISPATCH_* names: "
+                   "this session is the run, and the contract its start printed applies (working-with-fabric "
+                   "references/on-demand-session.md).")
+#: A line and an environment that disagree make no run: the session says so and stops (Fabric's spec 3.5).
+DISPATCH_OTHER = ("[fabric-agent-adapter] This prompt's first line and FABRIC_DISPATCH_* disagree on {fields}: this "
+                  "session is no run. Say so in the request's thread (`com.get` {{message: <the request the line "
+                  "names>}}, then `com.submit` kind `message` to its thread, naming only the ids), take nothing, write "
+                  "no checkpoint, and stop.")
+#: FABRIC_DISPATCH_WORKFLOW without a well-formed handoff and request: no session under it is a run.
+DISPATCH_INCOMPLETE = ("[fabric-agent-adapter] FABRIC_DISPATCH_WORKFLOW ({workflow}) is set without a well-formed "
+                       "FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST: no session here is a run Fabric started on "
+                       "a board request. Do the task you were given only; never accept the handoff, claim, complete the "
+                       "request or write the workflow's checkpoints. A prompt that starts with `fabric-dispatch/1` makes "
+                       "no run either: say in the request's thread that the launcher's environment lacks them, and "
+                       "stop.")
 
 
 def dispatch_from_env(env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, str]]:
@@ -187,18 +206,21 @@ def dispatch_from_line(text: Any) -> Optional[Dict[str, str]]:
     return dict(zip(("workflow", "handoff", "request"), match.groups())) if match else None
 
 
+def dispatch_complete(told: Optional[Dict[str, str]]) -> bool:
+    """Whether the environment names all three: only then can a session under it be the run."""
+    return told is not None and all(field in told for field, _ in DISPATCH_ENV)
+
+
 def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Optional[Dict[str, str]], List[str]]:
-    """(the dispatch, the fields the prompt's line names otherwise). The environment decides that there is one and wins
-    on every field it names; the line fills a field it leaves out, for the same workflow only."""
+    """(the dispatch, the fields the prompt's line and the environment disagree on). The dispatch is the environment's
+    when it names all three and the prompt's first line names the same three: that session is the run (Fabric's spec
+    3.5). No line, or no environment, is (None, []); a line that disagrees, or an environment without all three, is
+    (None, the fields)."""
     told, line = dispatch_from_env(env), dispatch_from_line(prompt)
-    if told is None:
+    if told is None or line is None:
         return None, []
-    if line is None:
-        return told, []
-    mismatch = [field for field, _ in DISPATCH_ENV if field in told and line[field] != told[field]]
-    if "workflow" in mismatch:
-        return told, mismatch
-    return dict(line, **told), mismatch
+    fields = [field for field, _ in DISPATCH_ENV if told.get(field) != line[field]]
+    return (dict(told), []) if not fields else (None, fields)
 
 
 #: Observatory takes a sessionId only as a lowercase UUID (0.63.0 seam reading 8): one the hook was given is named.
@@ -262,12 +284,12 @@ def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None)
     return DISPATCH_CLEARED_UNKNOWN.format(tail=_CLEARED_TAIL.format(hname=hname, pending=pending))
 
 
-def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:
-    values = {field: dispatch.get(field) or _UNKNOWN[field] for field in ("handoff", "request")}
+def dispatch_contract(dispatch: Dict[str, str], session_id: Any = None, conditional: bool = False) -> str:
+    """The exit contract for a dispatch the environment names in full: conditional on the prompt's first line before
+    the prompt is seen, or as the run's once it is known to be (a cleared holder)."""
     told = DISPATCH_SESSION.format(session=session_id) if isinstance(session_id, str) and _SESSION_UUID.fullmatch(
         session_id) else ""
-    return DISPATCH_CONTRACT.format(workflow=dispatch["workflow"], **values) + told + (
-        DISPATCH_MISMATCH.format(fields=", ".join(mismatch)) if mismatch else "")
+    return ((DISPATCH_IF if conditional else DISPATCH_HEAD) + DISPATCH_CONTRACT).format(**dispatch) + told
 
 
 def _dispatch_record(dispatch: Dict[str, str], env: Dict[str, str]) -> Tuple[Path, str]:
@@ -316,13 +338,16 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
             held = None
         # On Windows the hook's parent is the Git Bash a hook runs in, a new one each time (0.63.0 unit reading 5):
         # there any /clear takes the record, the contract twice rather than never
-        if not isinstance(held, dict) or held.get("host") == record["host"] or _WINDOWS:
+        # no record: no prompt of this process confirmed the run (Fabric's spec 3.5), so the clear holds nothing
+        if not isinstance(held, dict):
+            return False
+        if held.get("host") == record["host"] or _WINDOWS:
             # the session the clear replaced, the one an earlier accept named: only when this hook's parent wrote the
             # record (on Windows, where any /clear takes it, a nested session must not learn the holder's id). A record
             # already cleared keeps the id it named; one cleared with the id unknown names the session it started, which
             # was told to accept a pending handoff under its own id (0.63.0 seam reading 13)
             # on Windows never: a reused process id must not tell a nested session the holder's id (unit reading 15)
-            same = not _WINDOWS and isinstance(held, dict) and held.get("host") == record["host"]
+            same = not _WINDOWS and held.get("host") == record["host"]
             # an id the notice cannot name (not a lowercase UUID) is not carried on: the session it started was told
             # to accept under its own id (0.63.0 unit reading 14)
             kept = held.get("cleared_from") if same else None
@@ -386,12 +411,16 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     dispatch = dispatch_from_env(env)
     if dispatch is not None:  # FAA-201: before the launch check, so a run shown in Fabric's console is told too
         prune_dispatch_records(env)  # Codex and Kimi have no turn or end hook to do it; the spools stay theirs
-        if not dispatch_holder(dispatch, payload.get("session_id"), env, take_over=payload.get("source") == "clear"):
-            return _host_output(host, "SessionStart", DISPATCH_NESTED.format(workflow=dispatch["workflow"]))
-        if payload.get("source") == "clear":
+        if not dispatch_complete(dispatch):
+            return _host_output(host, "SessionStart", DISPATCH_INCOMPLETE.format(workflow=dispatch["workflow"]))
+        session_id = payload.get("session_id")
+        # a /clear in the run's own process keeps the run its prompt confirmed; a clear with no record holds nothing
+        if payload.get("source") == "clear" and isinstance(session_id, str) and SESSION_ID.fullmatch(session_id) \
+                and dispatch_holder(dispatch, session_id, env, take_over=True):
             return _host_output(host, "SessionStart", dispatch_contract(dispatch) + dispatch_cleared(
-                dispatch_cleared_from(dispatch, env), dispatch.get("handoff"), payload.get("session_id")))
-        return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id=payload.get("session_id")))
+                dispatch_cleared_from(dispatch, env), dispatch["handoff"], session_id))
+        # the prompt is not seen yet: the run is the session whose own first line names these three
+        return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id, conditional=True))
     if fabric_launched(env):
         return None
     cwd = Path(payload.get("cwd") or os.getcwd())
@@ -440,20 +469,25 @@ def _unread_line(directory: Path) -> Optional[str]:
 def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str]] = None) -> Optional[str]:
     """The unread line when the board's count rose since the last one, then each nudge a turn's answer carried
     (FAA-142), once; None when there is neither. Reads small files in the session's own folder; never calls Fabric.
-    In a session started on a board request (FAA-201), the exit contract again when the prompt's first line adds the
-    handoff or the request the environment left out, or disagrees with it."""
+    In a session under FABRIC_DISPATCH_* (FAA-201), the verdict the prompt's first line gives: the run when it names the
+    same three as the environment (the first such session holds it), no run when it disagrees."""
     session_id = payload.get("session_id")
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return None
     told = dispatch_from_env(env)
-    dispatch, mismatch = dispatch_of(env, payload.get("prompt"))
-    lines = [dispatch_contract(dispatch, mismatch, session_id)] if dispatch is not None and (dispatch != told or mismatch) else []
-    if lines and not dispatch_holder(told, session_id, env):
-        lines = []  # a session inside the run was told at its start that the run holds the dispatch
-    elif lines:
-        previous = dispatch_cleared_from(told, env)
-        if previous is not None:  # a cleared holder: the accept keeps the old id
-            lines = [dispatch_contract(dispatch, mismatch) + dispatch_cleared(previous, dispatch.get("handoff"), session_id)]
+    dispatch, disagree = dispatch_of(env, payload.get("prompt"))
+    lines: List[str] = []
+    if disagree:  # a line that names other values, or an environment without all three: no run (Fabric's spec 3.5)
+        lines = [DISPATCH_OTHER.format(fields=", ".join(disagree))]
+    elif dispatch is not None:  # the line names what the environment names: the first such session is the run
+        if not dispatch_holder(dispatch, session_id, env):
+            lines = [DISPATCH_NESTED.format(workflow=dispatch["workflow"])]
+        else:
+            previous = dispatch_cleared_from(dispatch, env)
+            lines = [DISPATCH_IS_RUN + DISPATCH_SESSION.format(session=session_id) if _SESSION_UUID.fullmatch(
+                session_id) else DISPATCH_IS_RUN]
+            if previous is not None:  # a cleared holder: the accept keeps the old id
+                lines = [DISPATCH_IS_RUN + dispatch_cleared(previous, dispatch["handoff"], session_id)]
     if fabric_launched(env) or told is not None:  # a dispatched run answers its one request: no unread line, no nudges
         return _host_output("claude", "UserPromptSubmit", "\n".join(lines)) if lines else None
     directory = session_dir(session_id, env)

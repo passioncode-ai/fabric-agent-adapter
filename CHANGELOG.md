@@ -5,12 +5,14 @@
 ### Added
 
 - working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `1329b60f`).
-  `FABRIC_DISPATCH_WORKFLOW` tells it, with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST` (Switchboard's
-  `dispatch` sets all three, SB-247, released in Switchboard 0.7.8 on 2026-11-04, board thread `b3e60686`) or alone (an
-  earlier launcher); the prompt's first line `fabric-dispatch/1
-  workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
-  never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
-  exit contract in place of the preamble (naming the session's own `sessionId` when it is a UUID, and after a `/clear`
+  A session is the run only when its own prompt's first line `fabric-dispatch/1 workflow=wf_<16 hex> handoff=<id>
+  request=<uuid>` names the same three as `FABRIC_DISPATCH_WORKFLOW`, `FABRIC_DISPATCH_HANDOFF` and
+  `FABRIC_DISPATCH_REQUEST` (Switchboard's `dispatch` sets all three and writes the line, SB-247, released in
+  Switchboard 0.7.8 on 2026-11-04); the environment alone makes no run, since a reader or a subshell inherits it, and a
+  line that disagrees, or an environment without all three, makes none either: that session says so in the request's
+  thread and stops (Fabric's spec 3.5, agreed with Vesta on board thread `1add3c03`). A line with no workflow in the
+  environment is quoted text. The session-start hook, which sees no prompt yet, prints the exit contract on that
+  condition in place of the preamble (naming the session's own `sessionId` when it is a UUID, and after a `/clear`
   the session id the clear replaced, which a replayed accept needs for its `leaseId` and a pending handoff is accepted
   under, or the new id when the replaced one is unknown), a retro before the run ends, also in a session
   Fabric launched: `fabric_whoami`, the packet
@@ -23,9 +25,9 @@
   run-ends-at plus 10 minutes, since no next run starts that close to it (`RUN_END_TO_DEADLINE_MS` on Fabric's main at
   `afe28a60`, in no release yet), it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
   `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
-  the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it, and no unread line or
-  nudge in such a session. Only the
-  run's first session holds the dispatch: a session the run starts itself inherits the environment and gets one line
+  the reason). The prompt hook, which sees the line, tells the session it is the run (or, for a line that disagrees,
+  that it is none), and prints no unread line or nudge in such a session. Only the
+  first session whose line names the dispatch holds it: another one gets one line
   telling it not to accept, claim, complete or close (the dispatch is told by its `FABRIC_DISPATCH_ID` when the
   launcher sets one in the form `[A-Za-z0-9._-]{1,64}`, as Switchboard 0.7.8 does), and a `/clear` in the holding session keeps the contract (the
   hooks keep one record per run under `dispatch/`, pruned after 7 days by the Claude Code turn and end hooks and by the next session start on a board request). Every
@@ -78,9 +80,12 @@
   loaded, is refused too. Fix the file before upgrading.
 - A custom `on_handoff` that stores the row it is given now receives the refused `draft`, which can echo what the
   customer wrote: drop `draft` before storing it (the default outbox does).
-- A session carrying `FABRIC_DISPATCH_WORKFLOW` now gets the exit contract at session start even when Fabric launched
-  it, its prompt hook prints no unread line or reminder (the nudges file stays), and `watch-mail` refuses to start
-  there.
+- A session carrying `FABRIC_DISPATCH_WORKFLOW` now gets the exit contract at session start, on the condition that its
+  own prompt starts with the dispatch line naming the same three, even when Fabric launched it; with all three
+  missing it gets one line that it is no run. Its prompt hook prints no unread line or reminder (the nudges file
+  stays), and `watch-mail` refuses to start there. A launcher that sets the workflow alone starts no run any more.
+- A session that does a board request with no person in its chat stops before a production step and names it for a
+  person (working-with-fabric `references/project-board.md`, board thread `1add3c03`).
 
 ### Fixed
 

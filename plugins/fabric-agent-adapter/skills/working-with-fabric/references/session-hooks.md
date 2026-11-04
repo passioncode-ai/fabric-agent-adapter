@@ -154,14 +154,17 @@ only variable names are looked at, never a value (two of them carry the session'
 
 ## A session started on a board request
 
-A session Fabric started to answer one board request (FAA-201) carries `FABRIC_DISPATCH_WORKFLOW`, alone or with
+A session Fabric started to answer one board request (FAA-201) carries `FABRIC_DISPATCH_WORKFLOW`,
 `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`, and its prompt's first line `fabric-dispatch/1 workflow=...
-handoff=... request=...`. SessionStart prints the exit contract in place of the preamble, whatever the folder shows,
-without reading Fabric's files, and also in a session Fabric launched: there the contract is the one thing it prints.
-The prompt hook prints it again when the line adds the handoff or the request the environment left out, or disagrees
-with it (the environment wins, and the contract says so); a line with no workflow in the environment is quoted text.
-Only the run's first session holds the dispatch (a record in `dispatch/`, below; a `/clear` keeps it): a session the
-run starts itself gets one line instead, telling it not to accept, claim, complete or close. The prompt hook prints no unread line and no nudges there, nor in a session inside the run, and leaves the nudges file where it is. The turn and end hooks work as in any other session (silent in a launched one); their worker still reads the count and keeps the nudges, which nothing prints. What the session then does:
+handoff=... request=...` names the same three: only that makes it the run (Fabric's spec 3.5), since a reader or a
+subshell inherits the environment. SessionStart, which sees no prompt yet, prints the exit contract on that condition
+in place of the preamble, whatever the folder shows, without reading Fabric's files, and also in a session Fabric
+launched: there the contract is the one thing it prints; an environment without all three gets one line saying no
+session under it is a run. The prompt hook, which sees the line, says the session is the run, or, for a line that
+disagrees, that it is none and stops after saying so in the request's thread; a line with no workflow in the
+environment is quoted text. The first session whose line names the dispatch holds it (a record in `dispatch/`, below;
+a `/clear` in its process keeps it): another gets one line instead, telling it not to accept, claim, complete or
+close. The prompt hook prints no unread line and no nudges there, nor in a session inside the run, and leaves the nudges file where it is. The turn and end hooks work as in any other session (silent in a launched one); their worker still reads the count and keeps the nudges, which nothing prints. What the session then does:
 [on-demand session](on-demand-session.md).
 
 ## What they never do
