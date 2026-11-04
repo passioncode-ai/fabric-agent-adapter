@@ -509,23 +509,23 @@
       "trap": "a session Fabric started on a board request runs the usual routine (the board sweep, a work claim, watch-mail), looks for the thread in the packet instead of reading it with com.get, asks the operator a question inside the run and waits, or ends without completing the request",
       "request": "FABRIC_DISPATCH_WORKFLOW is set and your prompt starts with `fabric-dispatch/1 workflow=wf_0123456789abcdef handoff=handoff:0123456789abcdef request=262ff4f7-6ba0-4a84-9704-cf830ace244d`. What do you do?",
       "expected": [
-        "calls fabric_whoami first, then reads the packet with observatory_checkpoint_latest for that workflow and obeys its constraints first; reads the thread with com.get, since the packet carries references only",
+        "calls fabric_whoami first, then reads the packet with observatory_checkpoint_latest for that workflow and obeys its constraints first; reads the request with com.get {message} and its thread with com.list {thread}, since the packet carries references only",
         "takes the lease with observatory_handoff_accept on that handoff (its owner, an idempotencyKey, executor) and keeps the leaseId",
         "claims and accepts the named request (com.enroll for its capability, com.claim, com.accept, com.effect_begin before an effect), renews about every 20 s in a long step, answers with com.reply and completes it with com.complete and an observed outcome",
         "never waits for a person inside the run: a sign-in, a typed secret or a payment is named in the answer, and money, deletion and publication still go through fabric_effect_request",
-        "writes the closing checkpoint with the lease, close true, body goal, done and notes and no values: done for completed; for failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes; then ends the run",
+        "writes in_progress checkpoints after the lease, the claim and the reply, and the closing checkpoint with workflowId, the lease, close true, body goal, done and notes and no values: done for completed; for failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes; then ends the run",
         "when the prompt's line and the environment disagree, uses the environment's values and says so in the closing checkpoint's notes"
       ]
     },
     {
       "id": "a-second-run-on-a-request-killed-mid-way",
       "trap": "a session started on a board request finds the request already accepted or in progress from an earlier run, completes it without observing what that run did, or claims it again and gets nothing, then ends with no answer",
-      "request": "FABRIC_DISPATCH_WORKFLOW is set; the packet's request is `accepted` by an earlier run that ended, and another one of yours is `outcome_unknown`. What do you do?",
+      "request": "FABRIC_DISPATCH_WORKFLOW is set; com.get shows the packet's request `accepted` by an earlier run that ended, and after your takeover an earlier attempt of the same request reads `outcome_unknown`. What do you do?",
       "expected": [
-        "reads the workflow's earlier checkpoints before acting",
-        "takes the accepted request over with com.responder_replace and its transfer, never com.claim (an accepted request is never claimed)",
+        "reads com.status once for the epoch and the slot's generation, com.get on the request for its state, and the latest checkpoint for what the earlier run recorded",
+        "takes the accepted request over with com.responder_replace (expectedGeneration) and its transfer, never com.claim (an accepted request is never claimed)",
         "settles outcome_unknown only with com.reconcile and an observed result, and never completes what it did not observe",
-        "renews the board lease with com.renew or com.progress about every 20 s in a long step and finishes before run-ends-at"
+        "answers no other request, and renews the board lease with com.renew or com.progress about every 20 s in a long step, finishing before run-ends-at"
       ]
     }
   ]

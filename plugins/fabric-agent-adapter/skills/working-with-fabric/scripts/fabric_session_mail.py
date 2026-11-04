@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -178,6 +179,10 @@ def watch_mail_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = None) ->
         return 2
     if fabric_launched(env):
         sys.stderr.write("watch-mail: this session was launched by Fabric; call com.status with your own tools.\n")
+        return 2
+    if re.fullmatch(r"wf_[0-9a-f]{16}", env.get("FABRIC_DISPATCH_WORKFLOW") or ""):
+        sys.stderr.write("watch-mail: this session was started on a board request; it does that request and ends "
+                         "(working-with-fabric references/on-demand-session.md).\n")
         return 2
     cwd = Path(args.cwd).expanduser()
     if not claude_registration(cwd, env):

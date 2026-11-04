@@ -2,7 +2,8 @@
 
 Read this when a person asks what the plugin's Fabric hooks do, where they log, how to turn them off, or what they
 need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` and run
-`scripts/fabric_session.py hook <event>`. Codex and Kimi Code get one hook, the session-start preamble, which
+`scripts/fabric_session.py hook <event>`. Codex and Kimi Code get one hook, the session-start preamble (or the exit contract in a session started on a board
+request), which
 `install-host-hooks` adds to their own config on the person's consent.
 
 ## Contents
@@ -135,7 +136,8 @@ or when its parent is gone. It refuses to start in a session Fabric launched, an
 
 ## A session Fabric launched
 
-Every hook, and `watch-mail`, is silent there: Fabric briefed that session itself. The signals, cheapest first;
+Every hook, and `watch-mail`, is silent there: Fabric briefed that session itself. The one exception is a session
+started on a board request, which gets its exit contract (below). The signals, cheapest first;
 only variable names are looked at, never a value (two of them carry the session's credential):
 
 1. `FABRIC_LAUNCHED_SESSION=1`: the marker Fabric is asked to set (D6). `0` or empty is not the marker.

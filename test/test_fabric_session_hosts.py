@@ -71,6 +71,7 @@ class CodexUpdated(HostInstallers):
         path = self.codex_file({"hooks": {"SessionStart": [ours]}})
         code, out = self.install("codex")
         self.assertIn("would update", out)
+        self.assertIn("or the exit contract in a session Fabric started on a board request", out, "FAA-201")
         code, out = self.install("codex", "--apply")
         self.assertEqual(code, 0, out)
         self.assertIn("updated the Fabric preamble hook in", out)

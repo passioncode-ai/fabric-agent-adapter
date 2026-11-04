@@ -43,7 +43,7 @@ and the board's unread count, and, once the running Fabric takes them (unless `F
 reads the last 512 KB of the session transcript (message text and tool output included, which can hold a secret the session displayed; read in memory only), uses only tool names and path arguments, and sends host/owner/name, never a
 local path or text); UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the
 session left claimed. Stop, UserPromptSubmit and SessionEnd spool and call Fabric only when the running Fabric
-advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched, never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
+advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched (except the exit contract in one started on a board request), never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
 kept or sent) and always
 exit 0 once `python3` starts (on Windows, Claude Code runs hooks in Git Bash, or PowerShell without it, where `python3`
 must name Python 3.9 or later; FAA-183). `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks

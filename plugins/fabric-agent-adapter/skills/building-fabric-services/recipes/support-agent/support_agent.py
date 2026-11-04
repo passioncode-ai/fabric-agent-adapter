@@ -167,43 +167,40 @@ class Knowledge:
 class KnowledgeSource:
     """The knowledge file as a declared source (the channel-agent standard's 7.1 and 7.4, FAA-197): read again when the
     file changes, the last good version kept when a read fails (`degraded` until a good one), and `stale` past
-    `max_age_s`. The age counts from the last check that found the file good: a read that succeeded, or a look that
-    found it unchanged since one; a failed read or a missing file never renews it. It holds in a long-lived process
-    (`from_config` once); the calling service shows `state()` and opens one alert when it is stale."""
+    `max_age_s`. The age is the last good version's: from its file's modification time, so a file nobody rebuilt ages
+    however often it is looked at, and a restart does not make old content new. The calling service shows `state()`
+    and opens one alert when it is stale."""
 
     def __init__(self, path: Path, *, max_age_s: int, clock: Callable[[], float] = time.time):
         if isinstance(max_age_s, bool) or not isinstance(max_age_s, int) or max_age_s < 1:
             raise RecipeError("max_age_s is a whole number of seconds, at least 1")
         self.path, self.max_age_s, self._clock = Path(path), max_age_s, clock
         self._knowledge: Optional[Knowledge] = None
-        self._read_at = 0.0
+        self._good_mtime = 0.0
         self._seen: Optional[int] = None
         self._degraded = False
 
     def current(self) -> Knowledge:
         try:
-            seen = self.path.stat().st_mtime_ns
+            seen: Optional[int] = self.path.stat().st_mtime_ns
         except OSError:
             seen = None
         if self._knowledge is not None and seen is not None and seen == self._seen:
-            if not self._degraded:
-                self._read_at = self._clock()  # unchanged since a good read: still good
-            return self._knowledge
-        if self._knowledge is None or seen != self._seen:
-            self._seen = seen
-            try:
-                knowledge = Knowledge.load(self.path)
-            except (OSError, ValueError, TypeError, RecipeError) as err:
-                if self._knowledge is None:
-                    raise RecipeError("the knowledge file %s could not be read (%s)" % (self.path.name,
-                                                                                       err.__class__.__name__))
-                self._degraded = True
-            else:
-                self._knowledge, self._read_at, self._degraded = knowledge, self._clock(), False
+            return self._knowledge  # unchanged since this version was read (or failed to read)
+        try:
+            knowledge = Knowledge.load(self.path)
+        except (OSError, ValueError, RecursionError, RecipeError) as err:  # RecursionError: JSON nested too deep
+            if self._knowledge is None:
+                raise RecipeError("the knowledge file %s could not be read (%s)" % (self.path.name,
+                                                                                   err.__class__.__name__))
+            self._seen, self._degraded = seen, True
+        else:
+            self._knowledge, self._seen, self._degraded = knowledge, seen, False
+            self._good_mtime = seen / 1e9 if seen is not None else self._clock()
         return self._knowledge
 
     def state(self) -> Dict[str, Any]:
-        age = max(0, int(self._clock() - self._read_at)) if self._knowledge is not None else None
+        age = max(0, int(self._clock() - self._good_mtime)) if self._knowledge is not None else None
         return {"id": "knowledge", "age_s": age, "max_age_s": self.max_age_s,
                 "stale": age is None or age > self.max_age_s, "degraded": self._degraded}
 
@@ -458,7 +455,8 @@ class SupportAgent:
     def _outbox(self, decision: Dict[str, Any]) -> None:
         # The outbox keeps the customer's own text until it is pruned: see `prune` and the README's retention note.
         fabric_paths.ensure_private_dir(self.state_dir)
-        line = json.dumps(decision, ensure_ascii=False, separators=(",", ":")) + "\n"
+        kept = {k: v for k, v in decision.items() if k != "draft"}  # a person reads the question and the reasons
+        line = json.dumps(kept, ensure_ascii=False, separators=(",", ":")) + "\n"
         _append_line(self.state_dir / "handoffs.jsonl", line.encode("utf-8"))
 
     def prune(self, keep_days: int, *, now: Optional[datetime] = None) -> Dict[str, int]:
@@ -479,7 +477,8 @@ class SupportAgent:
         if not isinstance(text, str) or not text.strip():
             raise RecipeError("the message has no text")
         if repair is not None and not repairable(repair):
-            raise RecipeError("repair= takes a hand-off the checks made, with its draft and reasons")
+            raise RecipeError("repair= takes a hand-off the checks made, with its draft and reasons: the first call's "
+                              "decision or the on_handoff copy (a repeat returns no draft, and a fallback had its repair)")
         if getattr(self._local, "in_handoff", False):
             raise ReentryError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
                               "this call returns")

@@ -115,10 +115,12 @@ session; the tool list changes. Follow those rules: they outrank this skill wher
 
 ### Then the project board
 
+A dispatched session skips this, Step 4 and Step 7: [on-demand session](references/on-demand-session.md).
+
 `com.status` (can the board be read, how many unread), then `com.list` (`unread: true` where listed); `com.read_ack`
 only what you actually read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when
-every participant needs it (DEC-0135); a board pinned before DEC-0135 (every Fabric to 0.3.14) refuses it, so send
-the same content as a new message to the thread. A request addressed to your Project is your next task. Ask another Project
+every participant needs it (DEC-0135); a board pinned before DEC-0135 refuses it, so send
+it as a new message to the thread. A request addressed to your Project is your next task. Ask another Project
 only through `com.submit`, addressed to its Project id (never a session, a process id or a folder) with the same
 idempotency key on a retry. When nobody answers (no `active` responder, no live claim, no agent-sync lease, nothing
 `held`): a change small as the reference defines it goes into the owner's repository by its AGENTS.md and you reply
@@ -294,8 +296,6 @@ item 2 says. Your single live claim links the row (Fabric 0.3.14): file an unrel
 by hand, or say it is linked. Do not paste the row's text or status into the task; edit it in its repository.
 
 ## Step 7: at the end
-
-A dispatched session ends per [on-demand session](references/on-demand-session.md); others:
 
 1. `fabric_stage_report` and `fabric_task_note` with what was done, what remains, and the exact next step.
 2. `fabric_task_handoff` when a task follows this one: a NAMED result, not a summary of the chat.

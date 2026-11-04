@@ -1,8 +1,16 @@
 # A session started on a board request (FAA-201)
 
 When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
-project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `c02e97c2`). That session
+project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `77bf16ac`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person.
+
+## Contents
+
+- How the session knows
+- What the session does
+- When a run ends without an answer
+- A session inside the run
+- What the session does not do
 
 ## How the session knows
 
@@ -39,27 +47,33 @@ adapter hook (its isolated `CODEX_HOME` holds no `hooks.json`), so there the app
    the request's text; its `constraints` carry the exit contract, the three floors and the operator's mandate when the
    request has one: obey them first. Its `artifacts` are references only, `kind: "other"` with `ref`
    `board-request:<uuid>`, `board-thread:<uuid>`, `capability:<name>`, `fabric-project:<uuid>`,
-   `deadline:<time>` and `run-ends-at:<time>`. No message body travels in the packet: read the thread with `com.get`
+   `deadline:<time>` and `run-ends-at:<time>`. No message body travels in the packet: read the request with `com.get
+   {message: <request>}` (a request's id is its message's) and its thread with `com.list {thread: <board-thread>}`,
    under the session's own credential. The folder is the working directory. The body's `credentials` block names the
    keys the request needs, by name only; reach them with `use_secret.py run`. `observatory_checkpoint_latest` also
    shows the pending handoff, for a session whose launcher passed none.
 2. **Take the lease.** `observatory_handoff_accept {owner, idempotencyKey, handoffId, executor?, sessionId?}`:
-   `owner` is `agent:<name>` (the same one for every write below), `executor` narrows the hand-over to the account the
-   launcher chose. Keep the `leaseId` it returns: only its holder writes the workflow's checkpoints, and the dispatcher
+   `owner` is `agent:<name>` (the same one for every write below); `executor` narrows the hand-over to the account the
+   launcher chose: pass the `{provider, accountRef}` the launcher's prompt names, or leave it out when it names none.
+   Reading the packet before the accept, as step 1 does, is harmless. Keep the `leaseId` it returns: only its holder writes the workflow's checkpoints, and the dispatcher
    never passes a lease any other way.
-3. **Take the request.** `com.enroll` for the request's capability, then `com.claim {idempotency, capability,
-   request}`, `com.accept`, and `com.effect_begin` before the work has an effect. An earlier run may have left the
-   request taken: read the workflow's earlier checkpoints first. An accepted request is never claimed again: take it
-   over with `com.responder_replace` and its `transfer` (its receipt carries the new attempt). An `outcome_unknown`
-   one is settled only by `com.reconcile` with an observed result. Never complete what you did not observe.
+3. **Take the request.** `com.status` once, for the epoch every idempotency key names and the slot's generation.
+   `com.enroll` for the request's capability, then `com.claim {idempotency, capability, request}`, `com.accept`, and
+   `com.effect_begin` before the work has an effect. An earlier run may have left the request taken: `com.get` on the
+   request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
+   claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
+   attempt). An `outcome_unknown` one is settled only by `com.reconcile` with an observed result. Never complete what
+   you did not observe. After the lease, after the claim or the takeover, and after the reply, write an `in_progress`
+   checkpoint (`workflowId`, `leaseId`, no values), so a later run has something to read.
 4. **Do the work** the goal names. The board's lease is 60 s: renew with `com.renew` or `com.progress` about every 20 s
    during a long step, so `com.complete` never meets `lease_expired`. Finish before `run-ends-at`, when the launcher
    stops the run. Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
    a typed secret or a payment is the person's: name it in the answer rather than wait.
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
    `completed`, or `failed_known` with the reason.
-6. **Close the workflow.** `observatory_checkpoint_write {owner, idempotencyKey, stepId, status, body, leaseId,
-   close: true}`, with `body` `{goal, done[], notes}` and no values in it. The status is `done` for `completed`; for
+6. **Close the workflow.** `observatory_checkpoint_write {workflowId, owner, idempotencyKey, stepId, status, body,
+   leaseId, close: true}`, with `body` `{goal, done[], notes}` and no values in it. Without `workflowId` Observatory
+   reads the write as the start of a new workflow and refuses it. The status is `done` for `completed`; for
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
 7. **End the run.** Nothing more: no board sweep, no work claim, no `watch-mail`, no question to the operator.
@@ -78,6 +92,18 @@ stays queued, `claimed` is taken again under a new attempt, `accepted` is held u
 `in_progress` turns `outcome_unknown`, which only a reconcile settles. Fabric may start one more run; after two runs
 with no answer it shows the request to the operator in «На проверке», unchanged. A run past its time limit is stopped
 and ends `timed-out`.
+
+## A session inside the run
+
+A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
+environment. Only the run's first session holds the dispatch: the hooks record the first session id for the workflow
+and the handoff (or the launcher's run id), and any other session gets one line in place of the contract: do the task
+you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
+workflow's checkpoints. `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says
+nothing there.
+
+The plugin tells a dispatched session from 0.63.0 on; an older one prints its ordinary preamble there, and only the
+launcher's appended exit contract tells the run what to do.
 
 ## What the session does not do
 

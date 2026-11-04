@@ -123,7 +123,7 @@ draft-and-check step owns.
   is a fallback, marked on the ticket (`fallback: true`). Check: the recipe's `repair=` and its tests.
 - **At most one clarifying question, never two in a row**; no reply where none is owed.
 - **Every source is declared with its owner, cadence and maximum age**; one that fails keeps its last good version and
-  says so, and its age counts from that read. Check: the recipe's `KnowledgeSource`.
+  says so, and its age is that version's (its file's modification time). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
   recommendation to its owner. Many `referred` tickets show a missing signal, not a regression.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an

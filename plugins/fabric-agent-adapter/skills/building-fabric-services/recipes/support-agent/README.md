@@ -27,7 +27,8 @@ refused `draft`, and the repair step passes that decision back as `answer(new_id
 gets its draft and the reasons, and a pass comes back as a reply with `repaired: true`, a second refusal as a hand-off
 with `fallback: true` (the channel-agent standard's 4.4 and its ticket's `fallback`, FAA-197). It calls under a new
 message id, since the stored decision answers any repeat of the same id; `repair=` takes only a hand-off the checks
-made (not `no-knowledge`, `model-unsure` or `model:*`). `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
+made (not `no-knowledge`, `model-unsure` or `model:*`), and never a repeat: a repeat of the id returns the stored
+decision, which has no draft, so the repair step keeps the decision it was handed. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
 hand-off and returns: since 0.55.0 a call to `answer` from inside it, on the same thread, is refused with
 `ReentryError` (a `RecipeError`), and unless `on_handoff` catches it the first call raises it too, its draft paid and
 nothing saved or delivered. A call it hands to another thread and waits for waits for the lock forever, so it never
@@ -93,10 +94,9 @@ python3 <adapter>/.../fabric_kit.py status <service>/support      # current, old
 The channel-agent standard declares every source with its owner, cadence and maximum age, and a source that fails
 keeps its last good version and says so (its 7.1 and 7.4). `KnowledgeSource(path, max_age_s=...)` is the knowledge
 file read that way: it reads the file again when it changes, keeps the last good version when a read fails, and
-`state()` gives `{id, age_s, max_age_s, stale, degraded}` with the age counted from the last check that found the
-file good (a read that succeeded, or a look that found it unchanged since). Pass it as `knowledge=`, or set
-`knowledgeMaxAgeSeconds` in the config, which reads the file at once (a file never read well fails there). It holds
-in a long-lived process; the CLI, one process per message, reads afresh each time. The calling service shows `state()`
+`state()` gives `{id, age_s, max_age_s, stale, degraded}`. The age is the last good version's, from its file's
+modification time: a file nobody rebuilt grows old however often it is read, and a restart does not make it new. Pass it as `knowledge=`, or set
+`knowledgeMaxAgeSeconds` in the config, which reads the file at once (a file never read well fails there). The calling service shows `state()`
 on its page and opens one alert when `stale` turns true: the recipe has no page and sends no alert itself.
 
 ## Declaring the channel-agent standard
@@ -157,7 +157,8 @@ number or a card number. It stays until it is pruned. Choose a retention the pro
 30 days for an agent that answers people (the standard's A1). A1 also asks for the text redacted: the outbox keeps it
 as written, and `prune` takes any `--keep-days`, so such an agent passes an `on_handoff` that redacts what it stores,
 which replaces the outbox, and keeps 30 days or fewer. A refused `draft`, which can echo what the customer wrote,
-reaches the returned decision and `on_handoff` only: `decisions.jsonl` never stores it. Prune on a schedule:
+reaches the returned decision and an `on_handoff` the agent passes, never a file: neither `decisions.jsonl` nor the
+default outbox stores it. Prune on a schedule:
 
 ```bash
 python3 support_agent.py prune --config config.json --keep-days 30

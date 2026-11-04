@@ -301,7 +301,8 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
             out("Apply it, on the person's go-ahead: fabric_session.py install-host-hooks --host %s --apply "
                 "--expect-sha256 %s" % (args.host, digest))
             out("The hook only prints the preamble at session start (no turn observation, no unread count: %s "
-                "cannot rejoin its Fabric session yet). It is silent in a session Fabric launched.%s" % (
+                "cannot rejoin its Fabric session yet), or the exit contract in a session Fabric started on a board "
+                "request; otherwise it is silent in a session Fabric launched.%s" % (
                     HOSTS[args.host], " Codex may ask you to trust the new hook (/hooks) before it runs."
                     if args.host == "codex" else ""))
             return 0

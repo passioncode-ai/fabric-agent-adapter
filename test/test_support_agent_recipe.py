@@ -486,13 +486,18 @@ class Recipe(unittest.TestCase):
                 with self.assertRaises(sa.RecipeError):
                     agent.answer("m-9", "How do I reset my password?", repair=repair)
 
-    def test_the_knowledge_file_is_a_source_with_an_age_from_its_last_good_read(self):
-        """FAA-197, the channel-agent standard's 7.1 and 7.4: a source keeps its last good version when a read fails,
-        says so, and its age counts from the last good read."""
+    def source_at(self, at, max_age_s=600):
+        """The example knowledge, written at `at` on a clock the test moves."""
         path = self.dir / "knowledge.json"
         shutil.copy(RECIPE / "knowledge.example.json", path)
-        now = [1000.0]
-        source = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+        os.utime(path, (at, at))
+        now = [at]
+        return path, now, sa.KnowledgeSource(path, max_age_s=max_age_s, clock=lambda: now[0])
+
+    def test_the_knowledge_file_is_a_source_with_the_age_of_its_last_good_version(self):
+        """FAA-197, the channel-agent standard's 7.1 and 7.4: a source keeps its last good version when a read fails,
+        says so, and its age is that version's (its file's modification time), however often it is looked at."""
+        path, now, source = self.source_at(1000.0)
         first = source.current()
         self.assertEqual(source.state(), {"id": "knowledge", "age_s": 0, "max_age_s": 600, "stale": False,
                                           "degraded": False})
@@ -500,63 +505,76 @@ class Recipe(unittest.TestCase):
         path.write_text("{not json")
         os.utime(path, (now[0], now[0]))
         self.assertIs(source.current(), first, "a failed read keeps the last good version")
-        self.assertEqual(source.state()["age_s"], 300)
-        self.assertTrue(source.state()["degraded"])
-        now[0] = 1700.0
-        self.assertTrue(source.state()["stale"], "older than its maximum age")
+        self.assertEqual((source.state()["age_s"], source.state()["degraded"]), (300, True))
+        for later in (1500.0, 1700.0):  # looks at the same broken file renew nothing
+            now[0] = later
+            self.assertIs(source.current(), first)
+        self.assertEqual((source.state()["age_s"], source.state()["stale"], source.state()["degraded"]),
+                         (700, True, True))
         shutil.copy(RECIPE / "knowledge.example.json", path)
-        os.utime(path, (now[0] + 1, now[0] + 1))
+        os.utime(path, (now[0], now[0]))
         source.current()
         self.assertEqual((source.state()["age_s"], source.state()["degraded"]), (0, False), "a good read clears both")
         agent, _ = self.agent(model_says("Open Settings, then Account [KB:password-reset]."), knowledge=source)
         self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "reply")
 
     def test_a_redacting_on_handoff_keeps_the_draft_out_of_the_state(self):
-        # 0.63.0 readings 1: a refused draft can echo what the customer wrote; it reaches on_handoff, never a file
-        agent, handoffs = self.agent(model_says("Write to someone@example.org about it [KB:password-reset]."))
-        agent.on_handoff = lambda row: handoffs.append({"messageId": row["messageId"], "reasons": row["reasons"]})
-        got = agent.answer("m-1", "How do I reset my password?")
-        self.assertIn("someone@example.org", got["draft"])
-        stored = "".join(path.read_text() for path in self.dir.glob("*.jsonl"))
-        self.assertNotIn("someone@example.org", stored)
+        # 0.63.0 readings 1 and 2: a refused draft can echo what the customer wrote; it reaches the decision and
+        # on_handoff, never a file, the default outbox included
+        for redacting in (True, False):
+            with self.subTest(redacting=redacting):
+                shutil.rmtree(self.dir, ignore_errors=True)
+                self.dir.mkdir()
+                agent, handoffs = self.agent(model_says("Write to someone@example.org about it [KB:password-reset]."))
+                if redacting:
+                    agent.on_handoff = lambda row: handoffs.append({"messageId": row["messageId"]})
+                else:
+                    agent.on_handoff = agent._outbox
+                got = agent.answer("m-1", "How do I reset my password?")
+                self.assertIn("someone@example.org", got["draft"])
+                stored = "".join(path.read_text() for path in self.dir.glob("*.jsonl"))
+                self.assertNotIn("someone@example.org", stored)
+                self.assertNotIn('"draft"', stored)
+                repeat = agent.answer("m-1", "How do I reset my password?")
+                self.assertNotIn("draft", repeat, "a repeat returns the stored decision, which has no draft")
+                with self.assertRaises(sa.RecipeError):
+                    agent.answer("m-1-r1", "How do I reset my password?", repair=repeat)
 
     def test_a_rewrite_of_the_wrong_shape_keeps_the_last_good_version(self):
-        path = self.dir / "knowledge.json"
-        shutil.copy(RECIPE / "knowledge.example.json", path)
-        now = [1000.0]
-        source = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+        path, now, source = self.source_at(1000.0)
         first = source.current()
-        for n, shape in enumerate(('{"entries": null}', '{"entries": 5}', "[]", "{}", '"x"'), 1):
-            with self.subTest(shape=shape):
+        deep = '{"entries": ' + "[" * 200000 + "]" * 200000 + "}"
+        for n, shape in enumerate(('{"entries": null}', '{"entries": 5}', "[]", "{}", '"x"', deep), 1):
+            with self.subTest(shape=shape[:20]):
                 path.write_text(shape)
                 os.utime(path, (now[0] + n, now[0] + n))
-                self.assertIs(source.current(), first)
-                self.assertTrue(source.state()["degraded"])
+                for _ in range(2):  # the second look at the same broken file stays degraded
+                    self.assertIs(source.current(), first)
+                    self.assertTrue(source.state()["degraded"])
         agent, _ = self.agent(model_says("Open Settings, then Account [KB:password-reset]."), knowledge=source)
         self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "reply")
 
-    def test_an_unchanged_good_file_stays_fresh(self):
-        path = self.dir / "knowledge.json"
-        shutil.copy(RECIPE / "knowledge.example.json", path)
-        now = [1000.0]
-        source = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+    def test_an_unchanged_file_ages_while_it_is_read(self):
+        # 0.63.0 product reading 2: a knowledge file nobody rebuilt is stale past its maximum age, looks or not
+        path, now, source = self.source_at(1000.0)
         source.current()
-        for later in (1500.0, 2000.0, 2600.0):
+        for later in (1300.0, 1600.0):
             now[0] = later
             source.current()
-            self.assertEqual((source.state()["stale"], source.state()["age_s"]), (False, 0), later)
-        now[0] = 3201.0
-        self.assertTrue(source.state()["stale"], "past the maximum age with no check in between")
-        now[0] = 3800.0
-        self.assertEqual(sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0]).state()["age_s"], None)
+            self.assertFalse(source.state()["stale"], later)
+        now[0] = 1601.0
+        source.current()
+        self.assertEqual((source.state()["age_s"], source.state()["stale"]), (601, True))
+        restarted = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+        restarted.current()
+        self.assertTrue(restarted.state()["stale"], "a restart does not make old content new")
+        self.assertIsNone(sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0]).state()["age_s"])
 
     def test_the_maximum_age_is_a_whole_number_of_seconds(self):
         for bad in (0, -5, True, "60", 1.5):
             with self.subTest(bad=bad), self.assertRaises(sa.RecipeError):
                 sa.KnowledgeSource(self.dir / "k.json", max_age_s=bad)
-        now = [10.0]
-        source = sa.KnowledgeSource(self.dir / "k.json", max_age_s=1, clock=lambda: now[0])
-        (self.dir / "k.json").write_text('{"entries": []}')
+        path, now, source = self.source_at(10.0, max_age_s=1)
         source.current()
         now[0] = 11.0
         self.assertEqual(source.state()["age_s"], 1)
@@ -576,8 +594,8 @@ class Recipe(unittest.TestCase):
         agent = sa.from_config(self.dir / "config.json")
         self.assertIsInstance(agent.knowledge, sa.KnowledgeSource)
         self.assertEqual(agent.knowledge.max_age_s, 3600)
-        self.assertEqual((agent.knowledge.state()["age_s"], agent.knowledge.state()["stale"]), (0, False),
-                         "read at start: no alert at every start")
+        self.assertFalse(agent.knowledge.state()["degraded"], "read at start")
+        self.assertIsNotNone(agent.knowledge.state()["age_s"], "read at start: its age is known, never null")
         del config["knowledgeMaxAgeSeconds"]
         (self.dir / "config.json").write_text(json.dumps(config))
         self.assertIsInstance(sa.from_config(self.dir / "config.json").knowledge, sa.Knowledge)

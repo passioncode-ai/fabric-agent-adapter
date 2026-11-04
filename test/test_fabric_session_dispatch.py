@@ -1,4 +1,4 @@
-"""FAA-201: a session Fabric started on a board request (Fabric's spec at c02e97c2, sections 3.4 to 3.6). The session is
+"""FAA-201: a session Fabric started on a board request (Fabric's spec at 77bf16ac, sections 3.4 to 3.6). The session is
 told by FABRIC_DISPATCH_WORKFLOW (alone is enough: Switchboard's SB-247 sets only it), with FABRIC_DISPATCH_HANDOFF and
 FABRIC_DISPATCH_REQUEST when the launcher sets them; the prompt's first line `fabric-dispatch/1 workflow=... handoff=...
 request=...` fills what the environment left out and never wins over it. A line with no workflow in the environment is
@@ -79,6 +79,16 @@ class Parsing(unittest.TestCase):
                      "never wait for a person", "fabric_effect_request", "on-demand-session.md", "disagrees"):
             self.assertIn(word, text)
         self.assertNotIn("—", text)
+
+    def test_the_closing_write_names_its_workflow_and_the_board_reads_are_real_tools(self):
+        # 0.63.0 readings 2: a checkpoint_write without workflowId starts a new workflow; com.get takes a message id
+        text = cli.dispatch_contract(FULL)
+        step6 = text[text.index(" 6. "):text.index(" 7. ")]
+        self.assertIn("`workflowId` %s" % WF, step6)
+        for word in ("`com.get` {message: <request>}", "`com.list` {thread: <board-thread>}", "`com.status`",
+                     "expectedGeneration", "in_progress checkpoint", "the launcher's prompt names"):
+            self.assertIn(word, text)
+        self.assertNotIn("earlier checkpoints", text, "Observatory has no tool that reads them")
 
     def test_the_contract_points_at_the_packet_for_what_the_environment_left_out(self):
         text = cli.dispatch_contract({"workflow": WF})
@@ -162,6 +172,32 @@ class Hooks(Base):
         self.assertIn(REQUEST, context)
         self.assertNotIn("11111111-2222", context)
         self.assertIn("disagrees", context)
+
+    def test_a_session_inside_the_run_is_told_the_run_holds_the_dispatch(self):
+        # 0.63.0 seam r2: `claude -p` from the run's own shell inherits FABRIC_DISPATCH_*
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        self.assertIn("observatory_handoff_accept", self.context(self.start(ENV)[0]))
+        done, _ = self.run_hook("session-start", {"session_id": other, "cwd": str(self.repo), "source": "startup"},
+                                extra_env=ENV)
+        nested = self.context(done)
+        self.assertEqual(nested, cli.DISPATCH_NESTED.format(workflow=WF))
+        for word in ("observatory_handoff_accept", "com.responder_replace", "com.claim`"):
+            self.assertNotIn(word, nested)
+        self.assertIn("observatory_handoff_accept", self.context(self.start(ENV)[0]), "the holder is told again")
+        sb = {"FABRIC_DISPATCH_WORKFLOW": WF, "SWITCHBOARD_LAUNCH_ID": "launch-1"}
+        self.start(sb)
+        done, _ = self.run_hook("user-prompt-submit", {"session_id": other, "cwd": str(self.repo), "prompt": LINE},
+                                extra_env=sb)
+        self.assertEqual(done.stdout, "", "the line adds nothing to a nested session")
+
+    def test_watch_mail_refuses_a_dispatched_session(self):
+        mail = importlib.import_module("fabric_session_mail")
+        env = {"HOME": str(self.home), "FABRIC_DISPATCH_WORKFLOW": WF}
+        import contextlib, io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(mail.watch_mail_cli(["--session-id", SID, "--cwd", str(self.repo)], env=env), 2)
+        self.assertIn("started on a board request", err.getvalue())
 
     def test_a_dispatch_line_the_environment_already_told_adds_nothing(self):
         self.assertEqual(self.prompt(ENV, LINE)[0].stdout, "", "session start already printed the contract")

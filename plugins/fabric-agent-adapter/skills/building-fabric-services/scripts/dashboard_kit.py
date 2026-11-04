@@ -395,6 +395,8 @@ def notice() -> int:
     nothing else, when it owns none; every git call and the tree walk share NOTICE_BUDGET_S, and a notice that runs
     out of it says nothing rather than a half-measured line (FAA-69)."""
     until = time.monotonic() + NOTICE_BUDGET_S
+    if re.fullmatch(r"wf_[0-9a-f]{16}", os.environ.get("FABRIC_DISPATCH_WORKFLOW") or ""):
+        return 0  # a session started on a board request does that request only (FAA-201): no invitation to upgrade
     try:
         stdin_text = "" if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read(65536)
         root = repo_root(hook_cwd(stdin_text), until=until)

@@ -4,29 +4,34 @@
 
 ### Added
 
-- working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `c02e97c2`).
+- working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `77bf16ac`).
   `FABRIC_DISPATCH_WORKFLOW` tells it, alone (as Switchboard's `dispatch` sets it today, board thread `b3e60686`) or
   with `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`; the prompt's first line `fabric-dispatch/1
   workflow=wf_<16 hex> handoff=<id> request=<uuid>` fills a value the environment left out, for the same workflow, and
   never wins over it; a line with no workflow in the environment is quoted text. The session-start hook prints the
   exit contract in place of the preamble, also in a session Fabric launched: `fabric_whoami`, the packet
-  (`observatory_checkpoint_latest`) and the thread (`com.get`), the lease (`observatory_handoff_accept` with its
-  owner, key and executor), the claim, a run's request left accepted or in progress (`com.responder_replace`,
-  `com.reconcile`), renewals about every 20 s, the reply and `com.complete`, and the closing checkpoint (`done`, or for
-  `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with the reason). The prompt hook
-  prints it again when the line adds to the environment or disagrees with it. `references/on-demand-session.md` holds
-  the steps and every argument.
+  (`observatory_checkpoint_latest`), the request and its thread (`com.get`, `com.list`), the lease
+  (`observatory_handoff_accept` with its owner, key and the executor the launcher names), `com.status` and the claim,
+  a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
+  checkpoints, renewals about every 20 s, the reply and `com.complete`, and the closing checkpoint with its
+  `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
+  the reason). The prompt hook prints it again when the line adds to the environment or disagrees with it. Only the
+  run's first session holds the dispatch: a session the run starts itself inherits the environment and gets one line
+  telling it not to accept, claim, complete or close. `watch-mail` refuses to start in a dispatched session, and the
+  dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
+  hooks tell a dispatched session from this version on.
 - The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
   standard's rules for agents on a channel people write to (the ticket as the unit, one outcome per ticket, answer
   rather than route, repair before hand-off, declared sources with a maximum age, hand-off queues with their answered
   signal, metadata only, the declaration's form). The support-agent recipe:
-  - a hand-off its checks made carries the refused `draft` in the returned decision and to `on_handoff`, never into
-    `decisions.jsonl`; `answer(new_id, text, repair=decision)` rewrites it once with the refusal's reasons: a pass is
+  - a hand-off its checks made carries the refused `draft` in the returned decision and to an `on_handoff` the agent
+    passes, never into a file (`decisions.jsonl` or the default outbox), so a repeat of the id returns it without; `answer(new_id, text, repair=decision)` rewrites it once with the refusal's reasons: a pass is
     a reply with `repaired: true`, a second refusal a hand-off with `fallback: true` (the standard's 4.4 and its
     ticket's `fallback`), which `repair=` then refuses;
   - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config, which reads the file at once) reads the knowledge
     file as a source: read again when it changes, the last good version kept when a read fails or the file has the
-    wrong shape, `state()` with its age from the last check that found it good;
+    wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
+    time;
   - `Knowledge.load` refuses a file that is not an object with an `entries` list, where it took an empty set before;
   - `channel-agent.example.json`, one project's declaration under
     `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to
