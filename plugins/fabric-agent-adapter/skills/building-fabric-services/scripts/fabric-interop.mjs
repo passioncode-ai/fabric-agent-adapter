@@ -286,7 +286,7 @@ export class JobStore {
     const job = this.get(jobId);
     if (job.status !== 'input_required') return {};
     const matched = Object.fromEntries(Object.entries(inputResponses ?? {}).filter(([key, value]) =>
-      key in (job.inputRequests ?? {}) && ['accept', 'decline', 'cancel'].includes(value?.action)));
+      Object.hasOwn(job.inputRequests ?? {}, key) && ['accept', 'decline', 'cancel'].includes(value?.action))); // an asked key, never an inherited name (seam 36)
     // The answered question's kept steps go in the same write: none outlives its answer.
     if (Object.keys(matched).length) this.transition(jobId, 'working', {}, { steps: {} });
     return matched;

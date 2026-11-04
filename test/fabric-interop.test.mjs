@@ -377,6 +377,7 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   // A null step is refused and nothing is kept; a step that is a function is read as an object, as 0.60.0 read it (unit 35).
   store.working(job.id);
   assert.throws(() => store.requestInput(job.id, { 'approve-reply': request }, 'x', { steps: { 'approve-reply': null } }), i.InteropError);
+  assert.throws(() => store.requestInput(job.id, { 'approve-reply': request }, 'x', { steps: { 'approve-reply': undefined } }), i.InteropError);
   assert.equal(store.get(job.id).status, 'working');
   store.requestInput(job.id, { 'approve-reply': request }, 'Publish it?', { steps: { 'approve-reply': Object.assign(() => {}, { effect: 'reply' }) } });
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps, { 'approve-reply': { effect: 'reply' } });
@@ -384,6 +385,9 @@ test('requestInput keeps an approval step in the job\'s private part, the Python
   store.working(job.id);
   store.requestInput(job.id, JSON.parse('{"__proto__": ' + JSON.stringify(request) + '}'), 'Publish it?', { steps: JSON.parse('{"__proto__": {"effect": "reply"}}') });
   assert.deepEqual(Object.entries(JSON.parse(fs.readFileSync(path.join(dir, `${job.id}.json`), 'utf8')).private.steps), [['__proto__', { effect: 'reply' }]]);
+  // An answer keyed by an inherited name answers nothing: the asked question and its step stay (seam reading 36).
+  for (const name of ['constructor', 'toString', 'hasOwnProperty']) assert.deepEqual(store.answer(job.id, { [name]: { action: 'accept', content: {} } }), {});
+  assert.equal(store.get(job.id).status, 'input_required');
   // Each question replaces the kept steps: a later plain question under the same key keeps none (seam round 1).
   store.working(job.id);
   store.requestInput(job.id, { 'approve-reply': request }, 'Publish another?');

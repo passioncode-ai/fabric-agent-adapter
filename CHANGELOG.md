@@ -61,7 +61,9 @@ says that his approval holds for the whole task, at every link (FAA-195).
   reads it (`kept_step` / `keptStep`: a spend through `mandate_spend`, a project as an exact `str` or a primitive
   string, else `UNREADABLE_PROJECT`), and `job_step`, `action_gate` and McpToolServer read a project as an exact `str`
   too, as the board path does, so the start and the answer agree, and a value that only claims `str` never reaches the
-  job file (older than 0.61.0; 0.61.0 seam reading 32, readings 33). The same split held for an
+  job file (older than 0.61.0; 0.61.0 seam reading 32, readings 33). Node's `JobStore.answer` matched an answer
+  keyed by an inherited name (`constructor`, `toString`) as an asked question and cleared the real one; it matches an
+  own key only, as Python does (older than 0.61.0; 0.61.0 seam reading 36). The same split held for an
   effect: Python admitted a `str`-subclass effect (`isinstance`) that the core then refused at the start and the job
   file wrote as a plain string the answer covered; `job_step` (when a mandate travelled), `request_input(steps=)` and
   `add_tool` (with an action) now admit an effect as an exact `str` (an `InteropError` otherwise, as Node's `requestInput` already refused a `String` object),
@@ -109,13 +111,18 @@ says that his approval holds for the whole task, at every link (FAA-195).
 - A Python service that passes a job or tool project as a `(str, Enum)` member or another `str` subclass, under a
   mandate limited to projects, is now asked at a job's answer as at its start: pass the plain string (`member.value`).
   An effect passed that way to `approval_step`, `job_step` (when the start call carried a mandate), `request_input(steps=)` or `add_tool` with an action now raises
-  `InteropError`: pass `member.value` there too. A Node service that keeps a step through `requestInput({steps})` with
+  `InteropError`: pass `member.value` there too. A Node step that is a function, an array or an object whose members
+  are inherited or getters, which 0.60.0 kept without those members, is now kept with them, so a covering mandate on
+  the answer is read for it. A Node service that keeps a step through `requestInput({steps})` with
   a `String` object project (under a mandate limited to projects) or a `Number` object spend (under a `perCallMaxUsd`)
   is likewise asked at the answer: pass the primitive value.
 - A kept step holds only `effect`, `spendUsd` and `project`: a service that put its own keys in `steps=` keeps them
-  elsewhere.
+  elsewhere. Each of the three is read when the step is kept, so a Python step (a `dict` subclass) whose accessor
+  raises for its spend or project, which 0.60.0 kept as its storage, now raises that error from `request_input`.
 - A job waiting `input_required` whose approval step 0.60.0 kept keeps it as 0.60.0 wrote it (a `str`-subclass
-  project or effect, or a Node `String` or `Number` object, as its plain value), so its answer may still be covered: answer or cancel such jobs before upgrading.
+  project or effect, or a Node `String` or `Number` object, as its plain value, and a Node step whose members were
+  inherited or getters, or a function or an array, without them: with no project kept, a mandate limited to projects
+  covers its answer), so its answer may still be covered: answer or cancel such jobs before upgrading.
 
 ## 0.60.0 (2026-11-03)
 
