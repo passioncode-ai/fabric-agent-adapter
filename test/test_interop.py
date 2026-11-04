@@ -1115,6 +1115,36 @@ class JobApprovalStepTests(unittest.TestCase):
         for path in Path(self.temp.name, "jobs").rglob("*.json"):
             json.loads(path.read_text(), parse_constant=lambda c: self.fail("%s in %s" % (c, path.name)))
 
+    def test_a_project_that_is_no_exact_str_is_refused_at_the_start_and_at_the_answer(self):
+        """0.61.0 seam reading 32: a str subclass (a (str, Enum) member included) was refused at the start, by the core's
+        exact-type compare, but kept as given, written as its plain string, and then covered at the answer. The kept step
+        now holds it as unreadable, as the board path does, and a value that only claims str never reaches json.dumps."""
+        enum = importlib.import_module("enum")
+
+        class Site(str, enum.Enum):
+            ALPHA = "alpha"
+
+        class Text(str):
+            pass
+
+        class ClaimsStr:
+            @property
+            def __class__(self):
+                return str
+        scoped = lead_mandate(dict(REPLY_SCOPE, projects=["alpha"]))
+        for project in (Site.ALPHA, Text("alpha"), ClaimsStr()):
+            with self.subTest(project=type(project).__name__):
+                self.start({"mandate": scoped})
+                job_id, record = self.step(project=project)
+                self.assertIsNone(record)
+                self.assertIn("outside-mandate: project", self.jobs.get(job_id)["statusMessage"])
+                self.assertEqual(self.jobs.private(job_id)["steps"]["approve-reply"]["project"], fi.UNREADABLE_PROJECT)
+                call = dict(tier="T0", now=NOW, self_id="example-agent", capability="reviews.approve", key="approve-reply",
+                            effect="reply")
+                self.assertEqual(fi.job_step(scoped, spend_usd=0.5, project=project, **call)["detail"], "outside-mandate: project")
+        self.start({"mandate": scoped})
+        self.assertIsNotNone(self.step(project="alpha")[1], "a plain str is read as before")
+
     def test_an_expired_mandate_waits_saying_it_expired(self):
         stated = fm.operator_mandate("t", "answer the reviews", REPLY_SCOPE, "example-lead", at="2026-10-23T09:00:00Z",
                                      expires_at="2026-10-24T09:20:00Z")

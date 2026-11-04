@@ -535,7 +535,7 @@ class CallContext:
             self.server._fault(capability, step)  # the start hears it as the answer does, under the same name (MJ-1)
         spend = mandate_spend(spend_usd)  # a NaN or infinity reads as no estimate, and json would write a bare NaN
         kept = {"effect": effect, **({"spendUsd": spend} if spend is not None else {}),
-                **({"project": project if isinstance(project, str) else UNREADABLE_PROJECT} if project is not None else {})}
+                **({"project": project if type(project) is str else UNREADABLE_PROJECT} if project is not None else {})}
         self.server.jobs.request_input(job_id, {key: request}, step["message"] or message, steps={key: kept})
         return None
 
@@ -780,13 +780,13 @@ class McpToolServer:
             double = math.inf
         spend = number
         finite = math.isfinite(double)  # the service's own number goes on when it is finite (25 stays 25)
-        if project is _UNREADABLE or not (project is None or isinstance(project, str)):
+        if project is _UNREADABLE or not (project is None or type(project) is str):  # an exact str, as the core compares
             project = _UNREADABLE_PROJECT  # a function that raised or named no string: a scoped mandate refuses
         return {"self_id": self.agent_id, "effect": entry.get("effect"),
                 "caller_agent": caller_agent if isinstance(caller_agent, str) and caller_agent else None,
                 # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
                 "spend_usd": spend if finite else None,
-                "project": project if isinstance(project, str) else None}
+                "project": project if type(project) is str else None}
 
     @staticmethod
     def _read(value: Any, arguments: Dict[str, Any]) -> Any:

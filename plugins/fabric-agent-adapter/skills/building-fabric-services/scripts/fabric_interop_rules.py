@@ -349,7 +349,7 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
     if spend is not None:
         call["spendUsd"] = spend
     if project is not None:
-        call["project"] = project if isinstance(project, str) else UNREADABLE_PROJECT
+        call["project"] = project if type(project) is str else UNREADABLE_PROJECT  # exact, as the kept step (seam r32)
     covers: Dict[str, Any] = {"mandate": mandate, "tier": tier, "now": now, "self": self_id, "call": call}
     if isinstance(caller_agent, str) and caller_agent:
         covers["callerAgent"] = caller_agent
@@ -425,7 +425,7 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     if self_id is not None and isinstance(meta, dict) and "mandate" in meta:
         inputs.update({"mandate": meta["mandate"], "self": self_id})
         spend_usd = mandate_spend(spend_usd)
-        project = project if project is None or isinstance(project, str) else UNREADABLE_PROJECT
+        project = project if project is None or type(project) is str else UNREADABLE_PROJECT
         for name, value in (("effect", effect), ("callerAgent", caller_agent), ("spendUsd", spend_usd), ("project", project),
                             ("mandateCapability", mandate_capability)):
             if value is not None:

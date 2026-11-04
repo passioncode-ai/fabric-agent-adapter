@@ -54,7 +54,11 @@ says that his approval holds for the whole task, at every link (FAA-195).
   the core `mandate_covers` reads it as JavaScript's `Number()` does, as the contract's `mandateCovers` does (0.61.0
   seam readings 17 to 22, 24 and 26 to 29, product readings 18 to 20 and 22 to 27, unit readings 19, 21, 24, 26 and 28 to 30). `js_to_number` tested a bool with `isinstance`, which asks
   a number subclass's own `__class__`: one claiming `bool` was read as 1 under a ceiling, and one whose `__class__`
-  raised made the core raise (older than 0.61.0); it tests a bool by identity now (0.61.0 unit reading 30). `js_to_number`'s decimal
+  raised made the core raise (older than 0.61.0); it tests a bool by identity now (0.61.0 unit reading 30). A job's approval step kept a `str`-subclass project (a `(str, Enum)` member included) as given, which
+  the start refused by the core's exact-type compare but the job file then wrote as its plain string, so the answer
+  covered it; the kept step, `job_step`, `action_gate` and McpToolServer now read a project as an exact `str`, as the
+  board path does, so the start and the answer agree, and a value that only claims `str` never reaches the job file
+  (older than 0.61.0; 0.61.0 seam reading 32). `js_to_number`'s decimal
   pattern backtracked over a long digit string that fails to match, quadratic in its length; it now costs the length
   (0.61.0 seam reading 22).
 - `InstanceLock.acquire` (Python, `fabric_lock.py`): when writing the pid failed after the lock was taken (a full disk, an
