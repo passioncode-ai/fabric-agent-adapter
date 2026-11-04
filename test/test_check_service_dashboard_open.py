@@ -262,6 +262,27 @@ class LiveOpensInHostTests(LiveSample):
             _, reason = rules.service_checkout({"source": {"repository": source}, "paths": {"data": "/nonexistent"}}, None)
             self.assertNotIn("fixture-token", reason, "dashboard.opens-in-host prints it redacted (0.62.0 seam reading 4)")
             self.assertIn("github.com", reason)
+        for value, shown in (("git@github.com:example-org/r.git", "github.com:example-org/r.git"),  # 0.62.0 readings 4, 5
+                             ("bot:fixture-pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("bot:fixture?pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("git@github.com:example-org/r.git?token=fixture@pw", "github.com:example-org/r.git"),
+                             ("git@github.com:example-org/na@me.git", "github.com:example-org/na@me.git"),
+                             ("git@github.com:example-org/r#fixture-pw", "github.com:example-org/r"),
+                             ("/srv/git/me@corp/r.git", "/srv/git/me@corp/r.git"),
+                             ("/srv/x?token=fixture-pw", "/srv/x")):
+            self.assertEqual(rules.shown_repository(value), shown, value)
+        fake = "https://github.com/example-org/ghp_" + "Fx9k" * 9  # made up: shaped like a key in the path
+        self.assertNotIn("Fx9k", rules.shown_repository(fake))
+
+    def test_a_found_checkout_is_named_without_its_key(self):
+        rules = importlib.import_module("check_service_rules")  # the found message too (0.62.0 unit reading 5)
+        repo = self.checkout({"run.sh": "echo\n"})
+        git(repo, "remote", "add", "origin", "https://fixture-token@github.com/example-org/example-agent")
+        top, reason = rules.service_checkout({"source": {"repository": "https://fixture-token@github.com/example-org/example-agent"},
+                                              "commands": {"doctor": [str(repo / "run.sh")]}}, None)
+        self.assertEqual(top, repo.resolve())
+        self.assertNotIn("fixture-token", reason)
+        self.assertIn("github.com/example-org/example-agent", reason)
 
     def test_a_raw_safari_open_fails_and_the_hosts_link_passes(self):
         bad = self.checkout({"open.sh": "open -a Safari http://127.0.0.1:%d/\n" % self.port})

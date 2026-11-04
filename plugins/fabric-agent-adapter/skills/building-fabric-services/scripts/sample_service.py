@@ -569,11 +569,11 @@ def register(args: argparse.Namespace) -> int:
         return 1
     services = Path(args.services_dir) if args.services_dir else None
     installed = fs.descriptor_path(args.id, args.instance, services)
-    unread = object()  # an installed descriptor that cannot be read now is left alone on a failure, never removed
     try:  # what a failed rewrite puts back (unit reading 4)
-        old: Any = installed.read_bytes() if installed.is_file() else None
-    except OSError:
-        old = unread
+        old = installed.read_bytes() if installed.exists() else None
+    except OSError as exc:  # one it could not put back is never replaced (product reading 5)
+        print("The installed descriptor %s cannot be read (%s); nothing was written." % (installed, exc.strerror or exc), file=sys.stderr)
+        return 1
     try:
         path = fs.write_descriptor(descriptor, services)
         # After the descriptor, so a refusal of any kind (a port claim too) leaves no manifest naming it (unit reading 2);
@@ -581,11 +581,15 @@ def register(args: argparse.Namespace) -> int:
         try:
             write_manifest(args, data, board=bool(getattr(args, "board_project", None)))
         except OSError as exc:
-            if old is None:
-                fs.remove_descriptor(args.id, args.instance, services)
-            elif old is not unread:
-                fs.atomic_write(installed, old, 0o600)
-            raise fs.ServiceError("The manifest %s cannot be written: %s." % (manifest, exc.strerror or exc))
+            undo = ""
+            try:
+                if old is None:
+                    fs.remove_descriptor(args.id, args.instance, services)
+                else:
+                    fs.atomic_write(installed, old, 0o600)  # its bytes, 0600 as every descriptor the kit writes
+            except OSError as again:  # said in the same line, never a traceback (seam reading 5)
+                undo = "; %s could not be put back either: %s" % (installed, again.strerror or again)
+            raise fs.ServiceError("The manifest %s cannot be written: %s%s." % (manifest, exc.strerror or exc, undo))
     except fs.ServiceError as exc:
         print(str(exc), file=sys.stderr)
         return 1

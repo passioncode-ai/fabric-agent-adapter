@@ -196,6 +196,33 @@ class Writers(unittest.TestCase):
             finally:
                 (services / "data7").chmod(0o700)
             self.assertEqual((services / "example-agent.default.json").read_bytes(), before, "byte for byte (unit reading 4)")
+            (services / "example-agent.default.json").chmod(0)  # one it cannot read is never replaced (product reading 5)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47291", "--id", "example-agent", "--data-dir", str(services / "data8"),
+                                                         "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+                self.assertEqual(sample.register(args), 1)
+            finally:
+                (services / "example-agent.default.json").chmod(0o600)
+            self.assertEqual((services / "example-agent.default.json").read_bytes(), before)
+            self.assertFalse((services / "data8").exists(), "nothing was written")
+            from unittest import mock  # a put-back that fails too is said in the one line, never a traceback (seam reading 5)
+            (services / "data9").mkdir()
+            (services / "data9").chmod(0o500)
+            try:
+                args = sample.build_parser().parse_args(["register", "--port", "47290", "--id", "example-agent", "--data-dir", str(services / "data9"),
+                                                         "--services-dir", str(services), "--repository", "https://github.com/example-org/example-agent"])
+                real, seen = sample.fs.atomic_write, []
+
+                def failing(path, data, mode):  # the kit's own write goes through fabric_paths; this is the put-back only
+                    seen.append(Path(path).name)
+                    if Path(path).name == "example-agent.default.json":
+                        raise PermissionError(13, "Permission denied")
+                    return real(path, data, mode)
+                with mock.patch.object(sample.fs, "atomic_write", failing):
+                    self.assertEqual(sample.register(args), 1, "a ServiceError line, never a traceback")
+                self.assertIn("example-agent.default.json", seen, "the put-back was tried")
+            finally:
+                (services / "data9").chmod(0o700)
         args = sample.build_parser().parse_args(["register", "--port", "47295", "--id", "example-own", "--data-dir", str(services / "data4"),
                                                  "--services-dir", str(services)])
         self.assertEqual(sample.register(args), 0, "another --id still runs this sample's code, so it names this repository")

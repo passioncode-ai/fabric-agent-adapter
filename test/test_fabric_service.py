@@ -268,7 +268,8 @@ class DescriptorTests(unittest.TestCase):
             self.assertEqual({r["rule"]: r for r in p.results}["descriptor.source-repository"]["verdict"], "PASS", "seam reading 3")
             d["paths"] = json.loads(path.read_text())["paths"]
             for kept in ("https://fixture-token@github.com/example-org/example-agent",  # valid, yet a key rides in them
-                         "https://github.com/example-org/example-agent?access_token=fixture-token"):
+                         "https://github.com/example-org/example-agent?access_token=fixture-token",
+                         "bot:fixture-token@github.com:example-org/example-agent"):  # an scp form the kit accepts (FAA-200 (11))
                 d["source"] = {"repository": kept}
                 p = checker.Probe(path, d, root, True)
                 p.descriptor_rules()

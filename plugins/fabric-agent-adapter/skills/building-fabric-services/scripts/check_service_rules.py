@@ -19,15 +19,19 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
-
+from fabric_secrets import secret_argument  # noqa: E402
 
 def shown_repository(value: str) -> str:
-    """A repository or git origin as evidence: a URL through redact_url; an scp form (`user@host:path`) or a local path
-    without its user and query, so evidence names the repository and never a credential riding in it (0.62.0
-    readings 2 to 4)."""
+    """A repository or git origin as evidence: a URL through redact_url; otherwise the text up to its first `@` is a
+    user (and a password) when it holds no path separator, and is dropped whole, whatever it holds; then a query and a
+    fragment. A local path keeps its name. A value that still holds something shaped like a credential is not printed
+    (0.62.0 readings 2 to 5)."""
     if "://" in value:
-        return redact_url(value)
-    return value.split("?", 1)[0].rpartition("@")[2]
+        shown = redact_url(value)
+    else:
+        user, at, rest = value.partition("@")
+        shown = re.split(r"[?#]", rest if at and not re.search(r"[/\\]", user) else value, maxsplit=1)[0]
+    return "<a repository shaped like a credential>" if secret_argument(shown) else shown
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 

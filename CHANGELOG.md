@@ -27,12 +27,15 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   why an install would be refused, for an installer that checks before it validates or writes anything else (a `source`
   that is no object names nothing), and `names_repository` / `namesRepository` whether a descriptor names one.
   `check_service.py` names a descriptor without it, or with one `descriptor.valid` refuses
-  (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo or query, as
+  (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo, query or
+  fragment (a URL through `redact_url`; an scp form without its user and password; a local path by its name; one still
+  shaped like a credential not at all), as
   `state.outside-code` and `dashboard.opens-in-host` now do too for the source and for the data checkout's origin (they
   printed them as found).
   `sample_service.py register` writes this repository, whose code its descriptor runs whatever `--id` names, takes
   `--repository`, and writes its manifest only after the descriptor, so a refusal of any kind leaves none naming it, and
-  a manifest it cannot write takes a new descriptor back with it, or puts an installed one back as it was. No owner field is added: the
+  a manifest it cannot write takes a new descriptor back with it, or puts an installed one's bytes back; an installed
+  descriptor it cannot read is never replaced (it refuses before writing anything). No owner field is added: the
   organization follows from the repository (FAA-198).
 
 ### Upgrading
