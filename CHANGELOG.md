@@ -10,7 +10,7 @@
   `FABRIC_DISPATCH_REQUEST` (Switchboard's `dispatch` sets all three and writes the line, SB-247, released in
   Switchboard 0.7.8 on 2026-11-04); the environment alone makes no run, since a reader or a subshell inherits it, and a
   line that disagrees, or an environment without all three, makes none either: that session says so in the request's
-  thread and stops (Fabric's spec 3.5, agreed with Vesta on board thread `1add3c03`). A line with no workflow in the
+  thread and stops (Fabric's spec 3.5 on its main at `deaf51fe`, agreed with Vesta on board thread `1add3c03`). A line with no workflow in the
   environment is quoted text. The session-start hook, which sees no prompt yet, prints the exit contract on that
   condition in place of the preamble (naming the session's own `sessionId` when it is a UUID, and after a `/clear`
   the session id the clear replaced, which a replayed accept needs for its `leaseId` and a pending handoff is accepted
