@@ -4,7 +4,9 @@ The validator is held to every service-descriptor fixture of the contract at the
 (test/fixtures/contract/descriptor-fixtures.json, service-peer-vectors.json, app-descriptor-vectors.json, made by
 vendor_vectors.mjs). The local channel (DEC-0075) is not a kit surface yet: its six negatives are the only fixtures the
 validator does not refuse, and that set is pinned so a new one is noticed."""
+import contextlib
 import copy
+import io
 import json
 import os
 from pathlib import Path
@@ -218,8 +220,10 @@ class Writers(unittest.TestCase):
                     if Path(path).name == "example-agent.default.json":
                         raise PermissionError(13, "Permission denied")
                     return real(path, data, mode)
-                with mock.patch.object(sample.fs, "atomic_write", failing):
+                err = io.StringIO()
+                with mock.patch.object(sample.fs, "atomic_write", failing), contextlib.redirect_stderr(err):
                     self.assertEqual(sample.register(args), 1, "a ServiceError line, never a traceback")
+                self.assertIn("example-agent.default.json could not be put back either", err.getvalue())
                 self.assertIn("example-agent.default.json", seen, "the put-back was tried")
             finally:
                 (services / "data9").chmod(0o700)

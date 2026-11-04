@@ -122,6 +122,10 @@ test('a new install names its repository; a reinstall without it warns (FAA-198)
   assert.ok(k.sourceRefusal({ ...bare, id: 'folder' }, dir));
   assert.equal(k.sourceRefusal({ ...bare, instance: null }, dir), null, 'a null instance reads as default, as in Python');
   assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: null }, dir), 'a null source names nothing');
+  const named = { ...descriptor(47188), source: { repository: 'https://github.com/example-org/task-pipeline-dashboard' } };
+  assert.deepEqual(k.validateDescriptor(named), [], 'a repository name is no key (0.62.0 seam reading 6)');
+  const keyed = { ...named, source: { repository: `https://github.com/example-org/r?token=sk-${'Fx9k'.repeat(5)}` } };
+  assert.ok(k.validateDescriptor(keyed).some((p) => p.includes('FAC-SEM-086')), 'a key in the query still is');
   assert.ok(k.sourceRefusal({ ...bare, instance: ['default'] }, dir), 'a list instance names no file');
   assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: { repository: [] } }, dir));
   fs.symlinkSync(path.join(dir, 'missing.json'), path.join(dir, 'gone.default.json'));

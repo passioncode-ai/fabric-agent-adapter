@@ -265,13 +265,19 @@ class LiveOpensInHostTests(LiveSample):
         for value, shown in (("git@github.com:example-org/r.git", "github.com:example-org/r.git"),  # 0.62.0 readings 4, 5
                              ("bot:fixture-pw@github.com:example-org/r", "github.com:example-org/r"),
                              ("bot:fixture?pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("deploy:fixture/pw@github.com:example-org/r", "github.com:example-org/r"),  # unit reading 6
+                             ("bot:fixture\\pw@github.com:example-org/r", "github.com:example-org/r"),
+                             ("C:\\git\\me@corp\\r", "C:\\git\\me@corp\\r"),
+                             ("~/git/me@corp/r", "~/git/me@corp/r"),
                              ("git@github.com:example-org/r.git?token=fixture@pw", "github.com:example-org/r.git"),
                              ("git@github.com:example-org/na@me.git", "github.com:example-org/na@me.git"),
                              ("git@github.com:example-org/r#fixture-pw", "github.com:example-org/r"),
                              ("/srv/git/me@corp/r.git", "/srv/git/me@corp/r.git"),
                              ("/srv/x?token=fixture-pw", "/srv/x")):
             self.assertEqual(rules.shown_repository(value), shown, value)
-        fake = "https://github.com/example-org/ghp_" + "Fx9k" * 9  # made up: shaped like a key in the path
+        self.assertEqual(rules.shown_repository("https://github.com/example-org/task-pipeline-dashboard"),
+                         "https://github.com/example-org/task-pipeline-dashboard", "a name is no key (seam reading 6)")
+        fake = "ghp_" + "Fx9k" * 9 + ":x@github.com:example-org/r"  # made up: shaped like a key, as the user
         self.assertNotIn("Fx9k", rules.shown_repository(fake))
 
     def test_a_found_checkout_is_named_without_its_key(self):

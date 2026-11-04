@@ -588,7 +588,7 @@ def register(args: argparse.Namespace) -> int:
                 else:
                     fs.atomic_write(installed, old, 0o600)  # its bytes, 0600 as every descriptor the kit writes
             except OSError as again:  # said in the same line, never a traceback (seam reading 5)
-                undo = "; %s could not be put back either: %s" % (installed, again.strerror or again)
+                undo = "; %s could not be %s either: %s" % (installed, "removed" if old is None else "put back", again.strerror or again)
             raise fs.ServiceError("The manifest %s cannot be written: %s%s." % (manifest, exc.strerror or exc, undo))
     except fs.ServiceError as exc:
         print(str(exc), file=sys.stderr)

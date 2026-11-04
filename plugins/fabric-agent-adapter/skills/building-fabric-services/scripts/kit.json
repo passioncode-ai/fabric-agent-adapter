@@ -270,7 +270,7 @@
     "fabric_secrets",
     "fabric_usage"
    ],
-   "sha256": "5bfab0138502194504dfd5c1821bb70ec805d2ca6a29f81f2d82a25c227b16a3"
+   "sha256": "e639d3d5a2314b2062e423cf37bb0acd91322ff4762d12b1fe05dfceea0250fd"
   },
   {
    "module": "fabric_context",
@@ -762,7 +762,7 @@
     "fabric-secrets",
     "fabric-usage"
    ],
-   "sha256": "8b2edd33373fbf23175f87dfba38b159a13f99e19110202dc83c410d0fce3479"
+   "sha256": "cd519271f73144d34c8ec9698c1ef6b08edd302acb3d031fb679812fd8677ead"
   },
   {
    "module": "fabric-context",
@@ -4712,7 +4712,7 @@
    "fabric_lock.py": "dfaf92a7086cbb097d832a305869b7964e2d2a9da0e3365c8ec1685a7bb4fef9",
    "fabric_usage.py": "5cc2e03ccc5b06e81987ed7bc3eead7a7e6cbf1a7cb8e05c6c64315eed9d91b6",
    "fabric_backups.py": "1f3f0d7ecf361b29e9101e07f1c53e5dc304d598bf26fd59ec89f16b9fed2420",
-   "fabric_descriptor.py": "5bfab0138502194504dfd5c1821bb70ec805d2ca6a29f81f2d82a25c227b16a3",
+   "fabric_descriptor.py": "e639d3d5a2314b2062e423cf37bb0acd91322ff4762d12b1fe05dfceea0250fd",
    "fabric_context.py": "6ae311ddc7217a4aff915e7ce2646486931acd128462b7bebe4a52bbb5fbb6c7",
    "fabric_auth.py": "a7028fa6f8b1c24bc9e2c89adbce8ecb0ae01579d27b1ec4f625ae635e3f17b9",
    "fabric_events.py": "cd94b186e2a8f8cb4ad2b6bd44d83ec5021933075e28c5d655f387f16dff42b8",
@@ -4755,7 +4755,7 @@
    "fabric-lock.mjs": "02cf833c97a07a8b3c788f9c93f70c4b9c9066efa25318dccf0038e0fc79717f",
    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7",
    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
-   "fabric-descriptor.mjs": "8b2edd33373fbf23175f87dfba38b159a13f99e19110202dc83c410d0fce3479",
+   "fabric-descriptor.mjs": "cd519271f73144d34c8ec9698c1ef6b08edd302acb3d031fb679812fd8677ead",
    "fabric-context.mjs": "1112d695e872f9825cbc94f08484974bff3880087bc29b8be59f885f03e8f7be",
    "fabric-auth.mjs": "10ff37a39f9e3adb4d0f05db66c45f49b10eef582e9220c213907964109d7e52",
    "fabric-events.mjs": "c463d6ffcae24229a5c608d8fcea4268d2ccc5024b19fa10e5a452284068fa71",

@@ -28,7 +28,8 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   that is no object names nothing), and `names_repository` / `namesRepository` whether a descriptor names one.
   `check_service.py` names a descriptor without it, or with one `descriptor.valid` refuses
   (`descriptor.source-repository`, `NOT_RUN`, never a pass), and prints a repository without its userinfo, query or
-  fragment (a URL through `redact_url`; an scp form without its user and password; a local path by its name; one still
+  fragment (a URL through `redact_url`; a local path, one that starts with `/`, `~`, `.`, `\\` or a drive, by its name;
+  anything else without the text up to its first `@`, a user and a password whatever they hold; one whose host is
   shaped like a credential not at all), as
   `state.outside-code` and `dashboard.opens-in-host` now do too for the source and for the data checkout's origin (they
   printed them as found).
@@ -36,7 +37,9 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `--repository`, and writes its manifest only after the descriptor, so a refusal of any kind leaves none naming it, and
   a manifest it cannot write takes a new descriptor back with it, or puts an installed one's bytes back; an installed
   descriptor it cannot read is never replaced (it refuses before writing anything). No owner field is added: the
-  organization follows from the repository (FAA-198).
+  organization follows from the repository (FAA-198). FAC-SEM-086 reads a `source.repository` for a credential in its
+  user, query and fragment, never in its path, which is the repository's name: a name such as
+  `task-pipeline-dashboard`, which reads as an `sk-` key, is accepted (a source with it was refused before).
 
 ### Upgrading
 

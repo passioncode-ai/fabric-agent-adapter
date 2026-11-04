@@ -21,17 +21,22 @@ import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
 from fabric_secrets import secret_argument  # noqa: E402
 
+_LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
+
+
 def shown_repository(value: str) -> str:
-    """A repository or git origin as evidence: a URL through redact_url; otherwise the text up to its first `@` is a
-    user (and a password) when it holds no path separator, and is dropped whole, whatever it holds; then a query and a
-    fragment. A local path keeps its name. A value that still holds something shaped like a credential is not printed
-    (0.62.0 readings 2 to 5)."""
+    """A repository or git origin as evidence: a URL through redact_url; a local path (one that starts with `/`, `~`, `.`,
+    `\\` or a drive) by its name; anything else drops the text up to its first `@` whole, a user and a password whatever
+    they hold. Then a query and a fragment. A value that still holds something shaped like a credential is not printed
+    (0.62.0 readings 2 to 6)."""
     if "://" in value:
         shown = redact_url(value)
     else:
-        user, at, rest = value.partition("@")
-        shown = re.split(r"[?#]", rest if at and not re.search(r"[/\\]", user) else value, maxsplit=1)[0]
-    return "<a repository shaped like a credential>" if secret_argument(shown) else shown
+        path = bool(_LOCAL_PATH.match(value))
+        shown = re.split(r"[?#]", value if path or "@" not in value else value.partition("@")[2], maxsplit=1)[0]
+    # Only what is not the repository's name is read for a credential: a name such as task-pipeline-dashboard is no key.
+    head = re.split(r"[/:]", shown.partition("://")[2] if "://" in shown else shown, maxsplit=1)[0]
+    return "<a repository shaped like a credential>" if secret_argument(head) else shown
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 

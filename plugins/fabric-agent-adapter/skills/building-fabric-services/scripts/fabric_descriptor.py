@@ -312,7 +312,9 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
                 problems.append("source.repository carries no password: it names the repository, never a credential")
             elif not _authority_ok(repository):
                 problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
-            places.append(("/source/repository", repository))
+            # The path is the repository's name (`task-pipeline-dashboard` reads as an `sk-` key): a credential rides in
+            # the user, the query or the fragment, so only those are read for one (0.62.0 seam reading 6).
+            places.append(("/source/repository", _URI_PATH.sub(r"\1\2", repository) if isinstance(repository, str) else repository))
     if "peer" in descriptor:
         peer = descriptor.get("peer")
         if not isinstance(peer, dict):
@@ -447,6 +449,9 @@ class NoSourceRepositoryWarning(UserWarning):
 def names_repository(descriptor: Any) -> bool:
     source = descriptor.get("source") if isinstance(descriptor, dict) else None
     return isinstance(source, dict) and isinstance(source.get("repository"), str) and bool(source["repository"])
+
+
+_URI_PATH = re.compile(r"\A([A-Za-z][A-Za-z0-9+.-]*:(?://[^/?#]*)?)[^?#]*(.*)\Z", re.S)  # scheme and authority, then the rest
 
 
 def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None) -> Optional[str]:
