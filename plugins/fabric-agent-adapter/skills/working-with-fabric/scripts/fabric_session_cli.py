@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     HOOK_FEATURE,
@@ -94,6 +96,72 @@ DOWN_NOTICE = (
 QUIET_SOURCES = frozenset(("compact", "resume"))
 
 
+#: FAA-201: a session Fabric started on a board request (Fabric's on-demand spec, c02e97c2, sections 3.4 to 3.6). The
+#: three values come in the environment and on the prompt's first line, `fabric-dispatch/1 workflow=wf_<16 hex>
+#: handoff=<handoff id> request=<uuid>`, fields one space apart in that order; the environment wins over the line.
+DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
+                ("request", "FABRIC_DISPATCH_REQUEST"))
+_DISPATCH_VALUE = {"workflow": r"wf_[0-9a-f]{16}", "handoff": r"handoff:[A-Za-z0-9._:-]{1,120}",
+                   "request": r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"}
+DISPATCH_LINE = re.compile(r"fabric-dispatch/1 workflow=(%(workflow)s) handoff=(%(handoff)s) request=(%(request)s)"
+                           % _DISPATCH_VALUE)
+DISPATCH_CONTRACT = (
+    "[fabric-agent-adapter] Fabric started this session on board request {request} (workflow {workflow}, handoff "
+    "{handoff}). Do it and end; never wait for a person inside this run. 1. `observatory_checkpoint_latest` "
+    "{{workflowId: {workflow}}} reads the packet: the goal, the constraints (obey them first) and the thread. 2. "
+    "`observatory_handoff_accept` {{handoffId: {handoff}}} takes the workflow's lease; keep the `leaseId`. 3. "
+    "`com.enroll` for the request's capability, then `com.claim` {{request: {request}}}, `com.accept` and "
+    "`com.effect_begin` before the work. 4. Do the work the goal names; money, deletion and publication still go "
+    "through `fabric_effect_request`, and a sign-in, a typed secret or a payment is the person's: name it in the "
+    "answer instead. 5. `com.reply` in the thread with the answer, then `com.complete` with an observed outcome. 6. "
+    "`observatory_checkpoint_write` with that `leaseId`, `close: true`, status done for completed or failed for "
+    "failed_known, `done[]` and `notes` with no values. 7. End the run. On an error you cannot get past, complete "
+    "the request `failed_known` with the reason, close the workflow and end."
+)
+DISPATCH_MISMATCH = (" The prompt's first line disagrees with the environment on {fields}: the environment's values "
+                     "above are the ones to use; say so in the final checkpoint's notes.")
+
+
+def dispatch_from_env(env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, str]]:
+    """The dispatch the environment names, or None when any of the three is missing or malformed (FAA-201)."""
+    env = os.environ if env is None else env
+    found = {}
+    for field, name in DISPATCH_ENV:
+        value = env.get(name)
+        if not isinstance(value, str) or not re.fullmatch(_DISPATCH_VALUE[field], value):
+            return None
+        found[field] = value
+    return found
+
+
+def dispatch_from_line(text: Any) -> Optional[Dict[str, str]]:
+    """The dispatch a prompt's first line names, exactly as Fabric writes it, or None."""
+    if not isinstance(text, str):
+        return None
+    first = text.split("\n", 1)[0].rstrip("\r")
+    match = DISPATCH_LINE.fullmatch(first)
+    return dict(zip(("workflow", "handoff", "request"), match.groups())) if match else None
+
+
+def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Optional[Dict[str, str]], List[str]]:
+    """(the dispatch, the fields the prompt's line names otherwise): the environment wins over the line."""
+    told, line = dispatch_from_env(env), dispatch_from_line(prompt)
+    if told is None:
+        return line, []
+    return told, [field for field, _ in DISPATCH_ENV if line is not None and line[field] != told[field]]
+
+
+def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = ()) -> str:
+    return DISPATCH_CONTRACT.format(**dispatch) + (DISPATCH_MISMATCH.format(fields=", ".join(mismatch))
+                                                   if mismatch else "")
+
+
+def _host_output(host: str, event: str, context: str) -> str:
+    if host not in ("claude", "codex"):
+        return context
+    return json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": context}})
+
+
 def read_hook_input() -> Dict[str, Any]:
     try:
         text = "" if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read(1024 * 1024)
@@ -111,6 +179,9 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
     and in a session Fabric launched. How to read the machine's Fabric services is the host instructions' to say."""
     if host not in HOSTS or payload.get("source") in QUIET_SOURCES or fabric_launched(env):
         return None
+    dispatch = dispatch_from_env(env)
+    if dispatch is not None:  # FAA-201: the exit contract in place of the preamble, whatever the folder shows
+        return _host_output(host, "SessionStart", dispatch_contract(dispatch))
     cwd = Path(payload.get("cwd") or os.getcwd())
     registration = claude_registration(cwd, env) if host == "claude" else None
     registered = registration is not None if host == "claude" else host_registered(host, cwd, env)
@@ -161,7 +232,10 @@ def hook_user_prompt_submit(payload: Dict[str, Any], env: Optional[Dict[str, str
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id) or fabric_launched(env):
         return None
     directory = session_dir(session_id, env)
-    lines = [line for line in [_unread_line(directory)] if line] + [nudge_shown(line) for line in take_nudges(directory)]
+    dispatch, mismatch = dispatch_of(env, payload.get("prompt"))
+    told = dispatch_from_env(env) is not None
+    lines = [dispatch_contract(dispatch, mismatch)] if dispatch is not None and (not told or mismatch) else []
+    lines += [line for line in [_unread_line(directory)] if line] + [nudge_shown(line) for line in take_nudges(directory)]
     if not lines:
         return None
     return json.dumps({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",

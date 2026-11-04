@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 from typing import Dict
-from typing import List
+from typing import Callable, List, Optional, Tuple
 
 
 HUB_PROTOCOL = "fabric-hub/0.1"
@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.62.0"
+VERSION = "0.63.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",

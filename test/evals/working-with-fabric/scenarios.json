@@ -503,6 +503,18 @@
         "asks on the request's thread first, and with no answer cancels it while its effect is not_started; only when the cancel's receipt shows cancelled it resubmits and reads the new request again from step 1 (an active responder means wait; a change by hand only when nobody is live and the new request stays queued and unclaimed)",
         "with outcome_unknown in the receipt tells the person and changes nothing, and never waits for an accepted request to expire, since accepted work does not expire"
       ]
+    },
+    {
+      "id": "a-session-started-on-a-board-request",
+      "trap": "a session Fabric started on a board request runs the usual routine (fabric_whoami, the board, a work claim), asks the operator a question inside the run and waits, or ends without completing the request, so the request returns to the queue and a second run starts",
+      "request": "Your prompt starts with `fabric-dispatch/1 workflow=wf_0123456789abcdef handoff=handoff:example request=262ff4f7-6ba0-4a84-9704-cf830ace244d` and FABRIC_DISPATCH_WORKFLOW is set. What do you do?",
+      "expected": [
+        "reads the packet with observatory_checkpoint_latest for that workflow and takes its lease with observatory_handoff_accept on that handoff, and obeys the packet's constraints first",
+        "claims and accepts the named request (com.enroll for its capability, com.claim, com.accept, com.effect_begin before an effect), does the work, answers in the thread with com.reply and completes it with com.complete and an observed outcome",
+        "never waits for a person inside the run: a sign-in, a typed secret or a payment is named in the answer, and money, deletion and publication still go through fabric_effect_request",
+        "on an error it cannot get past completes the request failed_known with the reason, then writes the final checkpoint with the lease, close true and no values, and ends the run",
+        "when the prompt's line and the environment disagree, uses the environment's values and says so in the final checkpoint's notes"
+      ]
     }
   ]
 }

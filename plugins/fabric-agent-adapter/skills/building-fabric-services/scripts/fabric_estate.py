@@ -32,7 +32,7 @@ import math
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fabric_crypto import ed25519_verify, is_small_order_key  # noqa: E402,F401 - beside this file (FAA-65)

@@ -11,6 +11,7 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 - Codex and Kimi Code
 - `watch-mail`
 - A session Fabric launched
+- A session started on a board request
 - What they never do
 - Where they log, and how to turn them off
 - What they need from Fabric
@@ -147,6 +148,16 @@ only variable names are looked at, never a value (two of them carry the session'
    an empty `launched` file in the session's folder, so the walk runs once and nothing is spooled after it. A `ps`
    that fails or runs out of time is "unknown", never "not launched": that hook spools nothing (so no worker can
    release a launched session's claims) and the next one looks again.
+
+## A session started on a board request
+
+A session Fabric started to answer one board request (FAA-201) carries `FABRIC_DISPATCH_WORKFLOW`,
+`FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`, and its prompt's first line `fabric-dispatch/1 workflow=...
+handoff=... request=...`. SessionStart prints the exit contract with those values in place of the preamble, whatever
+the folder shows and without reading Fabric's files; the prompt hook prints it when only the line names the dispatch,
+or when the line and the environment disagree (the environment wins, and the contract says so). A partial or
+malformed set of the three variables reads as no dispatch. The turn and end hooks work as in any other session. What
+the session then does: [on-demand session](on-demand-session.md).
 
 ## What they never do
 

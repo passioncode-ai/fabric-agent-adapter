@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.62.0"
+  version: "0.63.0"
 ---
 
 # Working with Fabric
@@ -300,8 +300,7 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
    the next agent reads) or let go (why). Older Fabric: `fabric_task_release`.
 
-A session that ends without releasing lapses at its claim's expiry; release anyway: a lapsed claim reads as stuck
-work.
+Release even at the end: a claim left to lapse reads as stuck work.
 
 ## Refusals and lost answers
 
@@ -350,9 +349,8 @@ touched (read in memory from the transcript's last 512 KB, which can hold a secr
 `watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). Read
-[session hooks](references/session-hooks.md) when a person asks what the hooks do, where they log, how to turn them
-off, or what they need from Fabric.
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched; one Fabric started on a board request gets its exit contract instead ([on-demand session](references/on-demand-session.md), FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). Read
+[session hooks](references/session-hooks.md) for what they do, log and need, and how to turn them off.
 
 ## Completion format
 

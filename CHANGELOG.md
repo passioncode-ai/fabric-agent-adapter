@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.63.0 (unreleased)
+
+### Added
+
+- working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `c02e97c2`).
+  It is told by `FABRIC_DISPATCH_WORKFLOW`, `FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`, or by its
+  prompt's first line `fabric-dispatch/1 workflow=wf_<16 hex> handoff=<id> request=<uuid>`; the environment wins over
+  the line. The session-start hook prints the exit contract with those values in place of the preamble (read the
+  packet, take the lease with `observatory_handoff_accept`, claim, answer, complete, close the workflow, end; on an
+  error `failed_known` with the reason), and the prompt hook prints it when only the line names the dispatch or the
+  two disagree. `references/on-demand-session.md` holds the steps.
+
+### Fixed
+
+- Every annotation in the shipped scripts resolves with `typing.get_type_hints` (FAA-203, a board finding, thread
+  `9fd84d47`): `fabric_estate.py` and four working-with-fabric modules import the `typing` names they use, and
+  `LoginCodes`' `token` is written `Optional[Union[str, Callable[[], str]]]`, which Python 3.9 reads. A vendored copy
+  of `fabric_estate.py` or `fabric_auth.py` reads as older; it worked at run time before.
+
 ## 0.62.0 (2026-11-04)
 
 A new install names the repository of its code, and a service says what it uses, so a map of the installed agents can
