@@ -150,7 +150,7 @@ the `/clear` lost its `leaseId` with the context: Observatory replays an accept,
 `sessionId` and `idempotencyKey`, and a read never carries the lease. The hooks name the session id the clear replaced,
 so the holder replays the accept exactly: that `sessionId`, the same key (Switchboard's prompt fixes it,
 `accept-<handoff>`), the same `owner` and the `executor` as the first accept passed them. Once the handoff is taken
-(neither pending nor lapsed), the lease `observatory_checkpoint_latest` shows is that accept's and survives the clear: its `holder`
+(neither pending nor lapsed, and the lease's `handoffId` is this dispatch's handoff), the lease `observatory_checkpoint_latest` shows is that accept's and survives the clear: its `holder`
 is the first accept's owner, and its `executor` merges the offer (a provider only, Fabric's spec 3.5) with what was
 passed, so it is the passed executor when it carries an `accountRef`, and the first accept passed none when it shows
 a provider alone. A new accept under the new id is refused, and so is a replay with another owner or executor; after
@@ -164,7 +164,9 @@ spec 3.5 has the session narrow it), and Switchboard's fallback before 0.7.11 re
 ordinary CLI session, so after the run a limit on that account may continue it through `switchboard continue` before
 Fabric takes it back (SB-253 makes the fallback leave a board-request workflow to Fabric, due in 0.7.11; thread
 `b3e60686`). A lapsed handoff (`lapsedHandoff`) was never
-accepted and no longer can be: the session ends the run without touching the request. When
+accepted and no longer can be: the session ends the run without touching the request. Observatory shows the
+workflow's newest offer, which may be another hand-over's: the session reads only this dispatch's handoff, and when
+the one shown is another, it ends the run without touching the request. When
 the hooks cannot name the replaced id (no readable record, or Windows, where any `/clear` takes the record and the
 hooks name no id), the notice says first that nothing can be replayed and gives the new id: a pending handoff is accepted under it, and the next `/clear`
 names it, except on Windows, where it names no id either, so an accept made there cannot be replayed after another

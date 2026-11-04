@@ -215,7 +215,7 @@ DISPATCH_SESSION = " This session's sessionId: {session}."
 DISPATCH_CLEARED = (" This session was cleared: an accept already made stands, and its leaseId comes back only by "
                     "replaying it exactly: {session}, the same idempotencyKey ({key}), the same `owner` and the "
                     "`executor` as the first accept passed them. Once the handoff is taken (neither pending nor "
-                    "lapsed), the lease `observatory_checkpoint_latest` shows is that accept's: its `holder` is the "
+                    "lapsed, and the lease's `handoffId` is it), the lease `observatory_checkpoint_latest` shows is that accept's: its `holder` is the "
                     "owner, and its `executor` the one passed when it carries an `accountRef`, none when it shows a "
                     "provider alone. A replay Observatory refuses gets no lease back: end the run without touching "
                     "the request; Fabric takes the workflow over after it.{tail}")
@@ -226,7 +226,10 @@ DISPATCH_CLEARED_UNKNOWN = (" This session was cleared, and these hooks cannot n
                             "for it, end the run without touching the request; Fabric takes the workflow over after "
                             "it.{tail}")
 #: A pending handoff's lease is Fabric's; a lapsed one (`lapsedHandoff`) was never accepted and no longer can be.
-_CLEARED_TAIL = (" When `observatory_checkpoint_latest` shows the handoff lapsed, no accept was made and none can be: "
+#: Observatory shows the workflow's newest offer, which may be another hand-over's (0.63.0 seam reading 18).
+_CLEARED_TAIL = (" Read only this dispatch's handoff ({hname}): when `observatory_checkpoint_latest` shows another one, "
+                 "pending, lapsed or in the lease, end the run without touching the request."
+                 " When `observatory_checkpoint_latest` shows the handoff lapsed, no accept was made and none can be: "
                  "end the run without touching the request. When "
                  "`observatory_checkpoint_latest` still shows the handoff pending, no accept was made and the lease it "
                  "shows is Fabric's, not this run's: {pending}")
@@ -249,13 +252,14 @@ def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None)
     owner = ("`agent:<provider>` (such as `agent:claude-code`) when Switchboard started the run, else `agent:<name>`"
              if switchboard else "`agent:<name>` step 2 names")
     pkey = "the key %s" % key
+    hname = handoff if switchboard else "the one the packet names"
     if named:
-        tail = _CLEARED_TAIL.format(pending=_PENDING_NAMED.format(pkey=pkey, owner=owner))
+        tail = _CLEARED_TAIL.format(hname=hname, pending=_PENDING_NAMED.format(pkey=pkey, owner=owner))
         return DISPATCH_CLEARED.format(session="sessionId %s" % previous, key=key, tail=tail)
     own = isinstance(session_id, str) and _SESSION_UUID.fullmatch(session_id)
     pending = _PENDING_UNKNOWN.format(pkey=pkey, owner=owner, session=" (%s)" % session_id if own else "") + (
         _PENDING_WINDOWS if _WINDOWS else "")
-    return DISPATCH_CLEARED_UNKNOWN.format(tail=_CLEARED_TAIL.format(pending=pending))
+    return DISPATCH_CLEARED_UNKNOWN.format(tail=_CLEARED_TAIL.format(hname=hname, pending=pending))
 
 
 def dispatch_contract(dispatch: Dict[str, str], mismatch: Sequence[str] = (), session_id: Any = None) -> str:

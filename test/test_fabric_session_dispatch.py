@@ -469,7 +469,9 @@ class Hooks(Base):
         self.assertNotIn("holder", pending)
         # 0.63.0 unit reading 17: the owner's fallback, the scope of the lease reading, and a pending key from step 2
         self.assertIn("else `agent:<name>`", pending)
-        self.assertIn("Once the handoff is taken (neither pending nor lapsed)", cli.dispatch_cleared(uuid, HANDOFF))
+        self.assertIn("Once the handoff is taken (neither pending nor lapsed, and the lease's `handoffId` is it)",
+                      cli.dispatch_cleared(uuid, HANDOFF))
+        self.assertIn("Read only this dispatch's handoff (%s)" % HANDOFF, cli.dispatch_cleared(uuid, HANDOFF))
         self.assertIn("the key `accept-%s`" % HANDOFF, pending)
         tail = cli.dispatch_cleared(uuid).split("still shows the handoff pending")[1]
         self.assertIn("the key `accept-<handoff>`", tail)
@@ -579,6 +581,9 @@ class Hooks(Base):
                 self.assertIn(lapsed, text)
                 self.assertEqual(text.count("handoff lapsed"), 1)
                 self.assertEqual(text.count("still shows the handoff pending"), 1)
+                # 0.63.0 seam reading 18: only this dispatch's handoff decides the state
+                self.assertIn("Read only this dispatch's handoff (", text)
+                self.assertIn("shows another one, pending, lapsed or in the lease, end the run", text)
                 self.assertNotIn("end the run", text.split("still shows the handoff pending")[1])
 
     def test_an_unknown_id_gives_the_new_one_for_a_pending_handoff(self):
