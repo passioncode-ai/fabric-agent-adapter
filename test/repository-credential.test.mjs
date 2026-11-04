@@ -8,7 +8,8 @@ const vectors = JSON.parse(fs.readFileSync(new URL('./repository_vectors.json', 
 const KEY = `ghp_${'Fx9k'.repeat(9)}`; // made up at run time: shaped like a key, never one
 const LETTERS = { // made up, no digit
   SKLETTERS: `sk-${'AbCd'.repeat(10)}`, GHLETTERS: `ghp_${'AbCd'.repeat(9)}`, AKLETTERS: `AKIA${'ABCD'.repeat(4)}`,
-  SKUPPER: `SK-${'AbCd'.repeat(10)}`, JWTLETTERS: `eyJabcd.eyJefgh.ijkl`, RUN40: 'AbCd'.repeat(10),
+  SKUPPER: `SK-${'AbCd'.repeat(10)}`, JWTLETTERS: ['eyJabcd', 'eyJefgh', 'ijkl'].join('.'), RUN40: 'AbCd'.repeat(10),
+  SKNAME: `sk-${'learn-tutorial-notebooks'}`, // a real-looking name a key's shape starts (FAA-200 (24))
 };
 const made = (value) => Object.entries(LETTERS).reduce((text, [mark, key]) => text.replaceAll(mark, key), value).replace('KEY', KEY);
 

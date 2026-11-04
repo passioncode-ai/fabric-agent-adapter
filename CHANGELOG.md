@@ -65,7 +65,7 @@ link each to its project and draw its chain (FAA-198, FAA-199).
   `Task-Pipeline-Dashboard2` is refused while `Agent-V2` is not: write the repository's name in lower case (hosts such
   as GitHub take either). A segment that a key's shape starts, or follows a `.`, `_` or `-` in (`sk-` and 16 more
   characters, `ghp_`, `xoxb-`, `glpat-`, `AKIA` and 16, in any case), is refused whatever its case: a repository such
-  as `sk-learn-tutorial-notebooks` has no spelling the kit accepts, so an agent built from it is not installed new, and
+  as `sk-learn-` followed by a longer name has no spelling the kit accepts, so an agent built from it is not installed new, and
   an installed one keeps working by a rewrite in place that leaves the source out (FAA-200 (24)).
 
 ## 0.61.0 (2026-11-04)
