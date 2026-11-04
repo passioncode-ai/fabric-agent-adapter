@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.62.0 (unreleased)
+## 0.62.0 (2026-11-04)
 
 A new install names the repository of its code, and a service says what it uses, so a map of the installed agents can
 link each to its project and draw its chain (FAA-198, FAA-199).
