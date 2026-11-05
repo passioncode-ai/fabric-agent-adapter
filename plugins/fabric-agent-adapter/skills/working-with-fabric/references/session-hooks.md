@@ -185,7 +185,7 @@ close. The prompt hook prints no unread line and no nudges there, nor in a sessi
   `fabric-mcp.cmd`) cannot keep it waiting. Every hook exits 0, on every path, once `python3` starts (above; FAA-183).
 - **Keep a secret.** The hooks never open Fabric's door token or an enrollment credential; `fabric-mcp` holds
   those. Nothing secret is in argv (the worker's argv is the script and a spool folder) or in the log. Once Fabric
-  takes repositories, an `origin` URL that embeds a credential (`https://user:token@host/...`) is read by
+  takes repositories, an `origin` URL that embeds a credential (`<https>://user:token@host/...`) is read by
   `git config` with it; the Stop hook drops the credential in memory before anything is spooled, logged or sent.
 - **Send content, or use more than it reads for.** A turn is the HEAD commit, the number of files that differ from it
   (untracked included) and the lines added and removed against it, and, once Fabric takes them, the other repositories

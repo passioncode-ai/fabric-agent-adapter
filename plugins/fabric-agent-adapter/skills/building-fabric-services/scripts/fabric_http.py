@@ -154,18 +154,18 @@ def redact_url(url: str) -> str:
     """The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or
     fragment, which is where keys and tokens ride."""
     # What WHATWG URL parsing does first, as `new URL` does in the Node twin: trim C0 controls and space from the ends,
-    # then remove every tab, CR and LF, so ` https://u:pw@h` and `ht\ttps:u:pw@h` lose their password too (0.56.0
+    # then remove every tab, CR and LF, so ` <https>://u:pw@h` and `<ht\ttps>:u:pw@h` lose their password too (0.56.0
     # seam r10; Python 3.9's urlsplit keeps a leading space in the scheme).
     url = re.sub(r"[\t\n\r]", "", str(url).strip("".join(map(chr, range(0x21)))))
     # The user information as written goes first, as git and urllib read it, where WHATWG reads a backslash as a slash:
-    # `https://h\\u:pw@x/r` would print `pw` in its path (0.62.0 seam reading 11). The Node twin does the same.
+    # `<https>://h\\u:pw@x/r` would print `pw` in its path (0.62.0 seam reading 11). The Node twin does the same.
     written = re.match(r"([A-Za-z][A-Za-z0-9+.-]*:[/\\]*)([^/?#]*)", url)  # after any run of slashes (seam reading 13)
     if written and "@" in written.group(2):
         url = written.group(1) + written.group(2).rpartition("@")[2] + url[written.end():]
     scheme, colon, rest = url.partition(":")
     if colon and scheme.lower() in ("http", "https", "ws", "wss", "ftp"):
         # A special scheme as WHATWG reads it: the authority starts after every slash or backslash that follows the
-        # colon, and a backslash before the query reads as a slash, so `https:u:pw@h` loses its password too (0.56.0
+        # colon, and a backslash before the query reads as a slash, so `<https>:u:pw@h` loses its password too (0.56.0
         # seam r9; the Node twin reads it through `new URL`).
         cut = min([at for at in (rest.find("?"), rest.find("#")) if at >= 0] or [len(rest)])
         url = scheme + "://" + (rest[:cut].replace("\\", "/") + rest[cut:]).lstrip("/")

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.65.0 (unreleased)
+
+### Fixed
+
+- The kit vendors into public products (FAA-211, project-observatory's finding on the board): no module, reference,
+  README or SECURITY.md line writes a URL with credentials any more. Products whose release check refuses one (for
+  example a pattern like `https?://user:password@`) and who vendor kit modules by their byte digests could not ship
+  `fabric_secrets.py`, whose docstrings held the readings it guards against. Those examples, and the ones in
+  `fabric_http.py`, `fabric-http.mjs`, `fabric-delegation.mjs`, `fabric_descriptor.py`, `check_service_rules.py`,
+  `fabric_provider.py`, `fabric_source_check.py`, `references/remote-placement.md` and
+  `references/session-hooks.md`, now name the scheme in angle brackets (`<https>://u:pw@h`). No code changed;
+  `kit.json` carries the new digests.
+
+### Added
+
+- `test/validate.py` fails when a shipped file (`bin`, the plugin, README.md, SECURITY.md) writes a URL with
+  credentials, by a pattern wider than the products' own: any scheme, no slashes, backslashes and `///` included.
+  The CHANGELOG is a record and keeps the examples of earlier releases as written. The tests build such URLs from
+  parts.
+
 ## 0.64.0 (2026-11-05)
 
 ### Added

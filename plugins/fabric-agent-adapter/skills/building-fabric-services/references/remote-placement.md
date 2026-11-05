@@ -51,7 +51,7 @@ same objects (well-known document, events feed, login code) at the same paths.
   `task-pipeline-dashboard` and `Task-Pipeline-Dashboard` are accepted, a name that starts with `sk-` and 16 more
   characters is not, in any case, nor `%73k-` and the rest; a host is read for a key's shape anywhere in it, inside a word too, so
   `task-pipeline-dashboard.example.com` is refused, FAA-200 (32)). A path and a user information are read as written and with
-  their ASCII escapes decoded, and a password as written and as the URL standard reads it (`https://h\u:pw@x/r` is
+  their ASCII escapes decoded, and a password as written and as the URL standard reads it (`<https>://h\u:pw@x/r` is
   refused). A checkout's origin in scp form (`git@host:owner/name.git`) is refused: write it `https://host/owner/name`,
   the repository's own page with no path below it, no query and no fragment, which the estate's readers join.
 - `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or

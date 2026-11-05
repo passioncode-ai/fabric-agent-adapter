@@ -20,7 +20,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.64.0"
+VERSION = "0.65.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -692,6 +692,33 @@ def dollar_anchor_problems(root: Path = ROOT, allow: Optional[Dict[Tuple[str, st
     return problems
 
 
+# FAA-211: the kit vendors into public products whose release checks refuse a URL with credentials, and a product that
+# vendors kit modules by their byte digests cannot edit them. No shipped file but the CHANGELOG (a record) writes one:
+# an example names its scheme in angle brackets (`<https>://u:pw@h`), and a test builds the real URL from parts. The
+# pattern is wider than the products' (`https?://user:password@`): any scheme, no slashes, backslashes, `///`.
+CREDENTIAL_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:[/\\]*[^\s/@:`'\"]*:[^\s/@`'\"]+@")
+CREDENTIAL_URL_SCOPE = ("bin", "plugins/fabric-agent-adapter", "README.md", "SECURITY.md")
+
+
+def credential_url_problems(root: Path = ROOT) -> List[str]:
+    problems: List[str] = []
+    for name in CREDENTIAL_URL_SCOPE:
+        top = root / name
+        files = [top] if top.is_file() else sorted(p for p in top.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
+        for path in files:
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            for lineno, line in enumerate(text.splitlines(), 1):
+                found = CREDENTIAL_URL.search(line)
+                if found:
+                    problems.append("%s:%d writes a URL with credentials (%r): name the scheme in angle brackets, "
+                                    "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
+                                    % (path.relative_to(root).as_posix(), lineno, found.group(0)))
+    return problems
+
+
 # R5 and FAA-72/FAA-73: the hosted gates must be able to fail. Text checks, no YAML library (standard library only).
 WORKFLOW_USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
 PINNED_ACTION = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}")
@@ -904,6 +931,7 @@ def validate_repo() -> List[str]:
             errors.append("CI is missing: %s" % command)
     errors.extend(workflow_problems())
     errors.extend(dollar_anchor_problems())
+    errors.extend(credential_url_problems())
     return errors
 
 
