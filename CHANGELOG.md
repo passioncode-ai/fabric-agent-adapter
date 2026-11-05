@@ -84,6 +84,8 @@
   own prompt starts with the dispatch line naming the same three, even when Fabric launched it; with the workflow
   set but the handoff or the request missing or malformed, it gets one line that no session there is a run. Its prompt hook prints no unread line or reminder (the nudges file
   stays), and `watch-mail` refuses to start there. A launcher that sets the workflow alone starts no run any more.
+- The live docs name a closed module neutrally, as the organization edition (`references/package.md` in
+  building-fabric-services and two backlog rows), at its owner's request; dated reports and handoffs keep their words.
 - A session that does a board request with no person in its chat stops before a production step and names it for a
   person (working-with-fabric `references/project-board.md`, board thread `1add3c03`).
 
