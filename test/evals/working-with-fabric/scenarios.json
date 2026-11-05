@@ -579,8 +579,8 @@
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.enroll for the request's capability answers not_authorized. What do you do?",
       "expected": [
         "takes no slot, asks for no access (no fabric.access.request) and does none of the work",
-        "when com.get reads the request queued, answers it once with com.reply (replyTo the request) saying it cannot take it until Fabric ships CO-506",
-        "closes the workflow with status done only once com.get reads the request answered; in any other state follows the error rule and leaves the workflow open",
+        "when com.get reads the request queued, answers it once with com.reply (replyTo the request) declining it until Fabric ships CO-506 and asking the requester to send it again then, never saying it waits",
+        "closes the workflow with status done once com.get reads the request answered; in any other state follows the error rule: closes only once com.get reads it answered, terminal or outcome_unknown, else leaves it open",
         "writes the retro (observatory_lesson and insight/1 lines in insights/, or one line that there is nothing) and ends the run"
       ]
     },

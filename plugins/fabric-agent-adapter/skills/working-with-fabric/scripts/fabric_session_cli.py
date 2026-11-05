@@ -132,10 +132,10 @@ DISPATCH_IF = (
     " That line with other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3987 in 0.68.0: almost none left, so a new rule takes its characters back from the text around it).
+#: (3981 in 0.68.0: almost none left, so a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
-    "request and end: nobody watches, so never wait for a person. 1. `fabric_whoami`, then the packet "
+    "request and end; nobody watches, never wait for a person. 1. `fabric_whoami`, then the packet "
     "(`observatory_checkpoint_latest` {{workflowId: {workflow}}}): obey its constraints first; its goal describes "
     "the request; its artifacts: the capability, the deadline, run-ends-at. Read the request with `com.get` "
     "{{message: <request>}} and its thread with `com.list` {{thread: <the `thread` com.get answered>}}. 2. "
@@ -143,15 +143,15 @@ DISPATCH_CONTRACT = (
     "(when it names none: your `owner` `agent:<name>`, the key `accept-<handoff>`, no executor) and this session's own "
     "`sessionId` (the same on a retry) takes the lease; keep its `leaseId`. A lapsed or refused handoff holds "
     "no lease: end the run without touching the request. 3. `com.status` once (the "
-    "epoch, the slot's generation); `com.enroll` for the capability, then `com.claim` for the request, "
-    "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work; a queued request: one `com.reply` (replyTo it) that it waits "
-    "for Fabric's CO-506, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
-    "`com.reconcile` and an observed result; never complete what you did not observe. After the lease, the claim and the reply, write an in_progress checkpoint (`workflowId`, "
+    "epoch, slot generation); `com.enroll` for the capability, then `com.claim` for the request, "
+    "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued, one `com.reply` (replyTo it) "
+    "declining until Fabric's CO-506 (resend then), then step 6 (done) once `com.get` reads it answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "`com.reconcile` and an observed result; never complete what you did not observe. After the lease, the claim and the reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
     "`pack`) unchanged and adds `open`, `done` or `notes`, never a value. 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s, "
-    "finish before run-ends-at; work that cannot end by then posts its state (`com.progress`), "
-    "then: if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known (observed: true) saying so and steps 6 and 7; "
+    "finish before run-ends-at; work that cannot end by then posts its state (`com.progress`); "
+    "if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known (observed: true) saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication: `fabric_effect_request`; a sign-in, a one-time code, a typed "
     "secret or a payment is a person's (none is in this chat), and so is a production step unless the operator's "
@@ -163,7 +163,7 @@ DISPATCH_CONTRACT = (
     "failed_known blocked with the reason in notes (failed once Observatory takes it, OBS-323). 7. Write the retro "
     "(`observatory_lesson` and insight/1 lines in `insights/`, or one line that there is nothing; no "
     "values), then end the run: no board sweep, work claim or watch-mail. On an error you cannot get past: complete the request failed_known if you hold its fence; close the workflow "
-    "only once the request is settled (`com.get`: answered, terminal or outcome_unknown), else leave it open; then step 7. Details: working-with-fabric references/on-demand-session.md."
+    "only once the request is settled (`com.get`: answered, terminal or outcome_unknown), else leave it open; then the retro. Details: working-with-fabric references/on-demand-session.md."
 )
 #: A second session whose own prompt starts with the same dispatch line (another process under the run's environment):
 #: the first such session holds the dispatch, and any other gets this line (0.63.0 seam reading 2).

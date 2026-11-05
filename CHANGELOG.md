@@ -6,7 +6,7 @@
 
 - working-with-fabric: a run Fabric started on a board request whose first `com.enroll` is refused `not_authorized`
   takes no slot, asks for no access and does no work: when `com.get` reads the request queued it answers it once with
-  `com.reply` (`replyTo` the request) saying it cannot take it until Fabric ships CO-506, closes the workflow `done` once
+  `com.reply` (`replyTo` the request) declining it until Fabric ships CO-506 and asking for a resend then, closes the workflow `done` once
   `com.get` reads it answered, and writes the retro; in any other state the error rule holds (FAA-219). On Fabric 0.3.16
   a session has no route to that grant, and work without a slot has no fence. Fabric chose this in board thread
   `1add3c03` (option (b), 2026-11-05), the responder's run says the same, and after Fabric's CO-506 the grant comes at
@@ -19,7 +19,7 @@
   `observed: true` for every complete after `com.effect_begin`, and has a run on an error say its reason in a
   `com.progress` note before it completes the request.
 - The contract keeps its rules within Hermes' own 4000-character cap on a plugin's prompt section
-  (`MAX_SYSTEM_PROMPT_SECTION_CHARS`, Hermes v0.22.2), 3987 at its longest: the arguments a tool's schema already names
+  (`MAX_SYSTEM_PROMPT_SECTION_CHARS`, Hermes v0.22.2), 3981 at its longest: the arguments a tool's schema already names
   (`com.claim`'s, the closing write's `owner` and `idempotencyKey`) are left to the tool and the reference, and several
   sentences are shorter.
 

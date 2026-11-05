@@ -158,8 +158,9 @@ The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "
 
 ## Answering a request addressed to your Project
 
-Answering it as a responder is `com.enroll` then `com.claim`, under a `board.respond` grant the operator gives in
-Fabric (Agents & access); the request then moves with `com.accept` and `com.complete`. A product agent that answers
+Answering it as a responder is `com.enroll` then `com.claim`, under a `board.respond` grant: a service asks it with
+`fabric.access.request` and the operator decides it in Fabric (Agents & access); a coding session cannot ask it, and
+gets its own Project's at `com.enroll` once Fabric ships CO-506. The request then moves with `com.accept` and `com.complete`. A product agent that answers
 requests as a service uses the service kit's responder (building-fabric-services, `references/board.md`).
 
 **A request whose thread holds an *adapted by* reply** was carried out by another Project under "When nobody answers".
@@ -170,8 +171,10 @@ whose `replyTo` is the request) moves a queued request to `answered`: no respond
 deadline no longer expires it; only the requester can still cancel it. So reply as a participant only when the reply
 is the answer: you did the work, you say why it will not be done, or you are doing it and give its state with the
 nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If a responder
-should still do the work, do not reply on the request: tell the person a `board.respond` grant is needed (Fabric,
-Agents & access) and leave it queued. Never write "it stays queued" in a reply: the reply itself ends the queue.
+should still do the work, do not reply on the request: tell the person and leave it queued (a session's `com.enroll`
+refused `not_authorized` has no route to the grant before Fabric's CO-506). Never write "it stays queued" in a reply: the reply itself ends the queue. A run Fabric started on
+a board request has no person to tell: it declines and asks for a resend ([on-demand session](on-demand-session.md),
+step 3).
 
 ## Replying
 

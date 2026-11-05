@@ -426,8 +426,12 @@ class Hooks(Base):
         # FAA-219: on Fabric 0.3.16 a session has no tool to ask board.respond (Fabric, thread 1add3c03, 9d23b27c);
         # a reply from the target Project answers the request (DEC-0098, DEC-0102), and an answered request is settled
         text = cli.dispatch_contract(FULL)
-        self.assertIn("a not_authorized enroll: no slot, no work; a queued request: one `com.reply` (replyTo it) that it "
-                      "waits for Fabric's CO-506, then step 6 (done) once `com.get` reads answered, and 7;", text)
+        # 0.68.0 product reading 2: the reply answers the request, so it declines and asks for a resend, never "waits"
+        self.assertIn("a not_authorized enroll: no slot, no work and, if queued, one `com.reply` (replyTo it) declining "
+                      "until Fabric's CO-506 (resend then), then step 6 (done) once `com.get` reads it answered, and 7;", text)
+        branch = text[text.index("a not_authorized enroll"):text.index("CO-506")]
+        self.assertNotIn(";", branch, "0.68.0 unit reading 2: a queued request is the refused enroll's case, not its own")
+        self.assertEqual(text.count(" 7. "), 1, "' 7. ' is step 7 alone, so the step slices hold")
         self.assertIn("Details: working-with-fabric references/on-demand-session.md.", text, "a native host has no other pointer")
         self.assertNotIn("access.request", text)
         # FAA-215: Fabric refuses a complete after an effect began without observed: true (observation_required)
@@ -443,7 +447,7 @@ class Hooks(Base):
         text = cli.dispatch_contract(FULL)
         self.assertIn("On an error you cannot get past: complete the request failed_known if you hold its fence; close the "
                       "workflow only once the request is settled (`com.get`: answered, terminal or outcome_unknown), "
-                      "else leave it open; then step 7.", text)
+                      "else leave it open; then the retro.", text)
         self.assertLess(text.index("7. Write the retro"), text.index("On an error you cannot get past"))
         # D3: one meaning of settled in the contract; outcome_unknown waits on a reconcile, resolved
         self.assertIn("resolve `outcome_unknown` only with `com.reconcile`", text)
@@ -457,7 +461,7 @@ class Hooks(Base):
                       "no run comes after the deadline (0.63.0 product reading 12)")
         # FAA-210: after com.effect_begin the request is in_progress, which a next run could only reconcile as
         # outcome_unknown, so the run completes it failed_known with what it observed
-        self.assertIn("then: if it called `com.effect_begin`, or when the request's deadline", text)
+        self.assertIn("posts its state (`com.progress`); if it called `com.effect_begin`, or when the request's deadline", text)
 
     def test_the_prompt_hooks_confirmation_names_the_session_id(self):
         # 0.63.0 unit reading 9: the confirmation carries the id when it is a lowercase UUID
