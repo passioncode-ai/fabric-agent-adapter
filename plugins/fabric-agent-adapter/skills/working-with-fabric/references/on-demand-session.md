@@ -94,7 +94,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    proposed). Then:
    - after `com.effect_begin` the request is `in_progress`, which a next run could only settle as `outcome_unknown`
      with `com.reconcile`: `com.complete` `failed_known` with the state it observed, and steps 6 and 7 (FAA-210; the
-     same choice as Vesta's run, board thread `1add3c03`);
+     same choice as a responder's run, board thread `1add3c03`);
    - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 10 minutes, no
      run comes before the deadline and an accepted request does not expire by itself: `com.complete` `failed_known`
      saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
@@ -127,7 +127,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
 7. **End the run.** The one write left is the retro after work
-   (`observatory_lesson` and insight/1 lines in `insights/` (the project's data folder when it has one, else its repository; never a public repository), or one line that there is nothing; no values; ADR-0188's
+   (`observatory_lesson` and insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout), or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
    `watch-mail`, no question to the operator.
 

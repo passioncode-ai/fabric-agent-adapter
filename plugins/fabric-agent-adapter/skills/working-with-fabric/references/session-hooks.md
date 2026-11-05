@@ -43,9 +43,10 @@ An insight/1 line is one JSON object per line with seven required fields, `schem
 insight/1 without a shape; this is the shape in use across the estate's insight files (one JSONL file a month),
 stated here provisionally until ADR-0188's owner fixes it. A session writes them in the project's `insights/` folder,
 one JSONL file a month, the place Observatory named for its reader (OBS-331, board thread `f7758225`): in the
-project's data folder when it has one (`<name>-data/insights/` beside its checkout, as the estate keeps them), else in
-its repository, and never inside a public repository (Observatory's own copy rule keeps
-`insights/` out of a public copy). The retro line and the preamble say so since 0.67.0.
+project's data folder when it has one or the repository is public, else in the repository, never inside a public one
+(Observatory's own copy rule keeps `insights/` out of a public copy): a public repository with no data folder yet gets
+one. The data folder is the one the project's AGENTS.md names, else `<name>-data/` beside the main checkout (not beside a
+worktree), as the estate keeps them. The retro line and the preamble say so since 0.67.0.
 
 **A resumed session and a session Fabric does not hold** (since 0.42.0, board thread `02bf19c5`). `claude --resume`
 keeps the session id, so an end that was kept for a retry (its release got no answer) would be delivered to the resumed

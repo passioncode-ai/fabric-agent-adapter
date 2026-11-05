@@ -73,7 +73,7 @@ PREAMBLE = (
     "Before you start work, call `fabric_work_list` (who is working on what here) and "
     "claim your task with `fabric_work_claim`; release it with `fabric_work_release` when you stop. When a piece of "
     "work ends (released as done, or the session about to end), write its retro in the same turn: `observatory_lesson` "
-    "for what went wrong (or your answer without it), insight/1 lines in `insights/` (the project's data folder when it has one, else its repository; never a public repository) for what you "
+    "for what went wrong (or your answer without it), insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout) for what you "
     "learned, or one line that there "
     "is nothing. A Fabric older "
     "than v0.3.5 has `fabric_tasks_list`, `fabric_task_claim` and `fabric_task_release` instead. Link a backlog row "
@@ -410,7 +410,7 @@ def dispatch_held_elsewhere(dispatch: Dict[str, str], session_id: Any, env: Opti
 #: released as done is the moment the obligation names; the PostToolUse hook says it then, once per release.
 RETRO_LINE = ("[fabric-agent-adapter] You released this work as done: write its retro in this turn. What went wrong "
               "and what would have prevented it go to `observatory_lesson`, one class key per lesson; what you learned "
-              "about the product goes in insight/1 lines in `insights/` (the project's data folder when it has one, else its repository; never a public repository); with nothing worth saying, one line that says so. Without "
+              "about the product goes in insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout); with nothing worth saying, one line that says so. Without "
               "`observatory_lesson`, say it in this turn's answer. No values in either.")
 #: The release tools and the field that says done: Fabric's `fabric_work_release` (how, or its alias outcome when how is
 #: absent, as Fabric reads `how ?? outcome`) and the older `fabric_task_release` (outcome succeeded).

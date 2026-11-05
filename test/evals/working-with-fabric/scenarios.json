@@ -642,7 +642,7 @@
       "expected": [
         "writes the retro in the same turn",
         "records what went wrong and what would have prevented it with observatory_lesson, one class key per lesson",
-        "records what it learned about the product as insight/1 lines in insights/ (the project's data folder when it has one, else its repository; never a public repository), or says in one line that there is nothing",
+        "records what it learned about the product as insight/1 lines in insights/ (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else <name>-data/ beside the main checkout), or says in one line that there is nothing",
         "puts no secret, token or other value in either",
         "treats a release Fabric answered with released false as no release: no retro line came for it, and the session-end retro still stands"
       ]

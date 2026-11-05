@@ -5,8 +5,8 @@
 ### Fixed
 
 - working-with-fabric: a run Fabric started on a board request whose work outlasts it completes the request
-  `failed_known` with the state it observed once it called `com.effect_begin` (FAA-210; the same choice as Vesta's run,
-  board thread `1add3c03`). Before, the exit contract and `references/on-demand-session.md` step 4 left such a request
+  `failed_known` with the state it observed once it called `com.effect_begin` (FAA-210; the same choice as a responder's
+  run, board thread `1add3c03`). Before, the exit contract and `references/on-demand-session.md` step 4 left such a request
   for the next run, but after `com.effect_begin` it is `in_progress`, which a next run could only settle as
   `outcome_unknown` with `com.reconcile`. A request still accepted, with no effect begun, is still left for the next
   run. The contract says "if it called `com.effect_begin`" and leaves "no run starts that close to it" to the reference to stay under Hermes' 4000 characters
@@ -19,13 +19,15 @@
   its line on Windows before Python 3.15 (FAA-210).
 - The retro line after a release of finished work and the session-start preamble say where insight/1 lines go: `insights/`,
   as Observatory named it for its reader (OBS-331, board thread `f7758225`), in the project's data folder when it has
-  one (`<name>-data/insights/` beside its checkout), else in its repository, never inside a public repository;
+  one or the repository is public (the folder its AGENTS.md names, else `<name>-data/` beside the main checkout), else
+  in the repository, never inside a public repository;
   `references/session-hooks.md`, `references/on-demand-session.md` step 7 and the service guidance
   (creating-fabric-agents practices, adapting-projects-to-fabric) say the same; without Project Observatory only the
   lessons go to an agent's own retrospective file.
 - `references/on-demand-session.md` step 3 says what a run does with an `in_progress` request an earlier run left.
 - `hooks.json`'s description, AGENTS.md's hook list, README.md, the skill and `references/session-hooks.md` name every exception to "silent in a session Fabric launched":
-  the exit contract and the prompt hook's verdict on it in a session started on a board request, and the retro line.
+  the exit contract and the prompt hook's verdict on it in a session started on a board request, and the retro line;
+  the dashboard-kit notice speaks there too, and is silent only in a session started on a board request.
 
 ## 0.66.0 (2026-11-05)
 
