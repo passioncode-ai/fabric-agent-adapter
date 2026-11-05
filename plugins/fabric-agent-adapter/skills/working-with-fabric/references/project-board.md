@@ -241,7 +241,7 @@ request it moves the request to `answered` as any participant reply does (above)
 do the work, tell the person and leave the request queued instead. To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
 it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
 `com.complete` (DEC-0152 SA-6, proposed). Fabric's `fabric_whoami` gives a state as a `com.reply` and a slot holder's as a
-`com.progress` since its main at `fff4b6d9` (in no release yet); the responder's exception above is this page's.
+`com.progress` since Fabric 0.3.16 (`fff4b6d9`); the responder's exception above is this page's.
 The session-start preamble and the unread line both say it; a session started on a board request answers only that
 request and gets no unread line.
 

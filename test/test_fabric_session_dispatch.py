@@ -418,7 +418,7 @@ class Hooks(Base):
         self.assertIn(uuid, self.context(done))
 
     def test_step_7_names_the_retro_itself(self):
-        # 0.64.0 product reading 2: no released Fabric's fabric_whoami asks the retro yet
+        # 0.64.0 product reading 2: the contract names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
         self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines, or one line that there is nothing; "
                       "no values), then end the run", cli.dispatch_contract(FULL))
 

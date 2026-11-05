@@ -3,9 +3,8 @@
 When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
 project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person. The
-dispatcher is in no Fabric release yet: it is on Fabric's main, on by default since `a6f0ffda`, and in the tag
-`v0.3.16` (`bcead0ef`), not yet published as a release (2026-11-05). "Fabric's main" below is that
-main, with `babb2dc1` on top (CO-409); the hooks recognise a dispatched session from
+dispatcher ships in Fabric 0.3.16 (released 2026-11-05, tag `v0.3.16` at `bcead0ef`), on by default since
+`a6f0ffda`. "Fabric's main" below is 0.3.16 with `babb2dc1` on top (CO-409, in no release yet); the hooks recognise a dispatched session from
 adapter 0.63.0 on, so a launcher can start one today.
 
 ## Contents
