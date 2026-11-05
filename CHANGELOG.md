@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.64.0 (unreleased)
+
+### Added
+
+- working-with-fabric: the retro after work (FAA-206 part 1; Fabric's obligation `retro-after-work`, its
+  `fabric_whoami` since `e1eecec0`, ADR-0188 §5). A Claude Code `PostToolUse` hook on Fabric's release tools adds one
+  line of context when a claim is released as done (`fabric_work_release` with `how` or `outcome` done, or the older
+  `fabric_task_release` with `outcome` succeeded): write the retro in this turn, `observatory_lesson` with one class
+  key per lesson for what went wrong, insight/1 lines for what was learned about the product, or one line that there
+  is nothing, no values in either. Any other release, any other tool and a release Fabric answered with an error print
+  nothing; it says it in a session Fabric launched too. No hook can speak to the model when a session ends, so the
+  session-start preamble names the retro for the end of the work or the session. Measured on this machine under a
+  load average of about 70: median 64 ms per call, 113 ms at most over 20 calls.
+- creating-fabric-agents and adapting-projects-to-fabric: an agent built or adapted with the kit closes each piece of
+  work with the same retro (practices, *Reliability*).
+
+### Upgrading
+
+- The plugin's `hooks.json` gains a `PostToolUse` entry whose matcher names Fabric's two release tools only; nothing
+  to configure. Codex and Kimi get no post-tool hook from `install-host-hooks` in this release.
+
 ## 0.63.0 (2026-11-05)
 
 ### Added

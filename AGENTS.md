@@ -118,7 +118,7 @@ The org contract is [knowledge/lifecycle.md](https://github.com/passioncode-ai/f
 this repository both obeys it and ships its service layer
 ([`references/lifecycle.md`](plugins/fabric-agent-adapter/skills/building-fabric-services/references/lifecycle.md)).
 
-**Background footprint (LC-09): five session hooks, nothing resident.** The plugin is skills plus
+**Background footprint (LC-09): six session hooks, nothing resident.** The plugin is skills plus
 `plugins/fabric-agent-adapter/hooks/hooks.json`:
 
 - `SessionStart` (matcher `startup|clear`): `dashboard_kit.py notice` asks the repository for its identity
@@ -157,6 +157,10 @@ this repository both obeys it and ships its service layer
   with the feature absent: medians 282 / 271 / 329 ms for start / stop / end, of which 65 ms is Python's own start
   ([raw](docs/reports/2026-10-11-working-with-fabric/raw/hook-timing.log)); the prompt hook is measured in
   [FAA-12a's raw](docs/reports/2026-10-12-faa-12a-board-participants/raw/hook-timing.log).
+- `PostToolUse` (matcher: Fabric's two release tools): `fabric_session.py hook post-tool-use` reads the call it is
+  given on stdin and prints one line of context only for a release of finished work Fabric did not refuse (the retro
+  Fabric's `retro-after-work` asks for, FAA-206); it reads no file and calls nothing. Measured 2026-11-05 under a load
+  average of about 70: median 64 ms, 113 ms at most over 20 calls.
 - Codex and Kimi Code: `fabric_session.py hook session-start --host codex|kimi`, only where the person added it with
   `install-host-hooks --apply`; it prints the preamble and exits. In a session under a board request's environment it
   prints the conditional exit contract instead (on a `/clear` while another session holds the dispatch, that it is
@@ -173,6 +177,7 @@ long-lived process, `watch-mail`, runs only while an agent waits on the board, u
 | `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or `/clear` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook session-start\|stop\|session-end` (plugin hooks) | Claude Code | per session start or `/clear`, per turn, per session end | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook user-prompt-submit` (plugin hook) | Claude Code | per prompt | nothing | exits when done (≤ 5 s timeout) | 0 |
+| `fabric_session.py hook post-tool-use` (plugin hook) | Claude Code, after a call to Fabric's `fabric_work_release` or `fabric_task_release` only | per such call | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook session-start --host codex\|kimi` | Codex / Kimi Code, only after `install-host-hooks --apply` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py watch-mail` | a Claude Code agent, under its own background watcher, while it waits on the board | one look per interval (default 60 s ± 20 %, kept between 10 s and 15 min after the jitter; backoff to 15 min while Fabric is down; a look within a minute of the session's last rejoin waits; a look that finds turns the hooks spooled delivers them through its own rejoin, FAA-89) | nothing | its stdin's end, SIGTERM/SIGINT/SIGHUP, or its parent gone | 0 between looks (a sleeping process; each look one `fabric-mcp --rejoin-only` with a 10 s deadline) |
 | `fabric_session.py deliver` (detached worker) | the Stop / SessionEnd hook, only when Fabric advertises `session-hooks/1` | per turn, at most one start per session a minute (an end always starts one), one per session at a time | finishes its spool | its own 10 s deadline; closes `fabric-mcp`'s stdin, then ends its whole process group | 0 |

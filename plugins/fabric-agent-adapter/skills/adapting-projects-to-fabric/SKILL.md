@@ -248,6 +248,10 @@ shared reference above. An agent someone builds for themselves is not a PassionC
 its licence is its owner's choice and none of those files is required of it (an agent built new with
 creating-fabric-agents carries a `LICENSE` naming its holder; an existing one keeps what it has).
 
+**An adapted agent closes each piece of work with a retro**, as Fabric's `retro-after-work` asks every session:
+`observatory_lesson` for what went wrong (one class key per lesson), insight/1 lines for what it learned about the
+product, or one line that there is nothing (creating-fabric-agents practices, *Reliability*).
+
 ## Completion format
 
 Report:

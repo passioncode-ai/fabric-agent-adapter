@@ -97,6 +97,10 @@ finished. Organization members have the full page with every receipt: the Passio
 - **Parallelism is tested by counting overlapping work, not by the clock.**
 - **A reply agent never sends the same reply twice in a row.**
 - **Do not trust a hosted CI schedule to start; wake the workflow by a push**, and check that it ran.
+- **Close each piece of work with a retro** (Fabric's `retro-after-work`, ADR-0188 §5): when a claim is released as
+  done or the session is about to end, write in the same turn what went wrong and what would have prevented it
+  (`observatory_lesson`, one class key per lesson) and what was learned about the product (insight/1 lines), or one
+  line that there is nothing; no values in either. Observatory's daily reading counts them (FAA-206).
 
 ## Shipping
 

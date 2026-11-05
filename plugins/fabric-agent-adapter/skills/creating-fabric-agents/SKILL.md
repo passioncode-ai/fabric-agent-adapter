@@ -225,7 +225,8 @@ Before the first stage that calls a model or spends money, read
 a limit pauses and resumes, every model answer passes the call site's own acceptance, fallbacks
 and checkers cross vendors, spend is a persisted ledger with idempotency keys, open questions
 become recorded decisions, every fix has a test seen failing, and text a person reads carries no
-em dash (U+2014), held by its prompt and a test. Report its checklist with a
+em dash (U+2014), held by its prompt and a test; and each piece of work closes with a retro
+(`observatory_lesson` and insight/1 lines, practices.md *Reliability*). Report its checklist with a
 file and a test per line, or `NOT_RUN` where the agent has no such stage.
 
 ## Completion format
