@@ -78,6 +78,7 @@ class Released(unittest.TestCase):
                         release("mcp__evil__fabric_work_release", how="done"),
                         release("mcp__plugin_x__fabric_work_release", how="done"),
                         release("mcp__a__fabric__fabric_work_release", how="done"),
+                        release("mcp__fabric__x__fabric_work_release", how="done"),
                         release(how="done", response={"structuredContent": {"released": False, "code": "partial"}}),
                         {"tool_name": "mcp__fabric__fabric_work_release", "tool_input": "done"},
                         {"tool_name": None, "tool_input": {"how": "done"}}, [], None, "x"):
