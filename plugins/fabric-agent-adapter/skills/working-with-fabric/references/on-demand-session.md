@@ -1,6 +1,6 @@
 # A session started on a board request (FAA-201)
 
-When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
+When a board request reaches a project that has no live responder and no live session, Fabric starts a session in the
 project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person. The
 dispatcher ships in Fabric 0.3.16 (released 2026-11-05, tag `v0.3.16` at `bcead0ef`), on by default since
@@ -80,11 +80,11 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    session has no route to that grant (`fabric.access.request` is the door's and a binding's, never exposed by
    `fabric-mcp`, and Fabric's Agent access only decides a request already waiting), and work without a slot has no
    fence, no `com.progress` and a live session may take the request in parallel. When `com.get` reads the request
-   `queued` and `com.status` names no responder for its capability, the run answers it once with `com.reply` (`replyTo` the request, from the target Project, which answers
+   `queued` and `com.status` shows the capability's responder `absent` (none), the run answers it once with `com.reply` (`replyTo` the request, from the target Project, which answers
    it: DEC-0098, DEC-0102) declining it: this Project cannot take it until Fabric ships CO-506, and the requester sends
    it again then (the reply ends the queue, so nothing takes it later; never say it waits). Then it closes the workflow `done` once
-   `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with a responder listed (a service of this Project that is `stale` or `held` takes the request
-   when it returns, so a decline would take it from it), the error rule below holds and the request stays queued.
+   `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with a responder shown (`stale`, or marked `held`: a service of this Project takes the request when
+   it returns, so a decline would take it from it), the error rule below holds and the request stays queued.
    The target's request no longer waits for the operator (an answered request is settled: no second run, no unmoved or
    to-operator finding); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
    shows it on the requester's Project in «На проверке» as an answer nobody read,

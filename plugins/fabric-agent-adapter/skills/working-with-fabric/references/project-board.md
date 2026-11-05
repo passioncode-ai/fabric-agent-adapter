@@ -184,12 +184,13 @@ whose `replyTo` is the request) moves a queued request to `answered`: no respond
 deadline no longer expires it; only the requester can still cancel it. So reply as a participant only when the reply
 is the answer: you did the work, you say why it will not be done, or you are doing it and give its state with the
 nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If your Project's
-service responder should still do the work, do not reply on the request: tell the person and leave it queued. A
-session whose own `com.enroll` is refused `not_authorized` has no route to the grant before Fabric's CO-506: it answers
-the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's board rule
-on its `main` at `b8c0a38c`). Never write "it stays queued" in a reply: the reply itself ends the queue. A run Fabric started on
-a board request has no person to tell: it declines and asks for a resend ([on-demand session](on-demand-session.md),
-step 3).
+service responder should still do the work (`com.status` shows one for the capability, `active`, `stale` or `held`), do
+not reply on the request: tell the person and leave it queued. A session whose own `com.enroll` is refused
+`not_authorized` has no route to the grant before Fabric's CO-506: when its capability's responder is `absent`, it
+answers the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's
+board rule on its `main` at `b8c0a38c`). Never write "it stays queued" in a reply: the reply itself ends the queue. A
+run Fabric started on a board request has no person to tell: with the responder `absent` it declines and asks for a
+resend; with one shown it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
 
 ## Replying
 
@@ -257,7 +258,7 @@ answer for a merge, a release or the end of the task; the finished result goes l
 thread. A state with its nearest date is an answer (the operator's rule of 2026-11-04, board thread `11646774`): to a
 request it moves the request to `answered` as any participant reply does (above), so where your Project's service
 responder should still do the work, tell the person and leave the request queued instead (a session's own refused
-`com.enroll` answers once that it cannot be taken now, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
+`com.enroll` with the responder `absent` answers once that it cannot be taken now, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
 it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
 `com.complete` (DEC-0152 SA-6, proposed). Fabric's `fabric_whoami` gives a state as a `com.reply` and a slot holder's as a
 `com.progress` since Fabric 0.3.16 (`fff4b6d9`); the responder's exception above is this page's.

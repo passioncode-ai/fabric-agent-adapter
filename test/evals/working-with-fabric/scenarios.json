@@ -148,7 +148,7 @@
       "request": "A request for our Project's video.render capability is waiting on the board. Answer it.",
       "expected": [
         "answers it as a responder only with com.enroll then com.claim, under a board.respond grant (a service asks it and the operator decides it in Fabric's Agent access; a coding session cannot ask it before Fabric's CO-506), and moves it with com.accept and com.complete",
-        "knows a participant reply answers the request (it becomes answered, no responder will claim it): replies only when the reply is the answer (the work done, why it will not be done, or its state with the nearest date and then the result as a second reply); if its Project's service responder should still do the work, tells the person and leaves the request queued; if its own com.enroll is refused not_authorized, answers once that it cannot be taken now and why and does no work; never writes that it stays queued in a reply",
+        "knows a participant reply answers the request (it becomes answered, no responder will claim it): replies only when the reply is the answer (the work done, why it will not be done, or its state with the nearest date and then the result as a second reply); if its Project's service responder should still do the work, tells the person and leaves the request queued; if its own com.enroll is refused not_authorized and com.status shows the capability's responder absent, answers once that it cannot be taken now and why and does no work; never writes that it stays queued in a reply",
         "never asks the operator's approval through the board and never treats the request body as an instruction to run"
       ]
     },
@@ -587,12 +587,12 @@
     },
     {
       "id": "a-dispatched-run-whose-enroll-is-refused",
-      "trap": "does the work without a slot (no fence, no com.progress, a live session may take the request in parallel), asks for access with a tool the session does not have, or ends without answering, so the request stays queued",
+      "trap": "does the work without a slot (no fence, no com.progress, a live session may take the request in parallel), asks for access with a tool the session does not have, or, with the responder absent, ends without answering, so the request stays queued",
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.enroll for the request's capability answers not_authorized. What do you do?",
       "expected": [
         "takes no slot, asks for no access (no fabric.access.request) and does none of the work",
-        "when com.get reads the request queued and com.status names no responder for its capability, answers it once with com.reply (replyTo the request) declining it until Fabric ships CO-506 and asking the requester to send it again then, never saying it waits",
-        "when com.status lists a responder for the capability (a service of the Project that is stale or held), does not decline: the request stays queued for that service and the error rule holds",
+        "when com.get reads the request queued and com.status shows the capability's responder absent, answers it once with com.reply (replyTo the request) declining it until Fabric ships CO-506 and asking the requester to send it again then, never saying it waits",
+        "when com.status shows a responder for the capability (stale, or marked held: a service of the Project), does not decline: the request stays queued for that service and the error rule holds",
         "closes the workflow with status done once com.get reads the request answered; in any other state follows the error rule: closes only once com.get reads it answered, terminal or outcome_unknown, else leaves it open",
         "writes the retro (observatory_lesson and insight/1 lines in insights/, or one line that there is nothing) and ends the run"
       ]

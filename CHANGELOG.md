@@ -5,8 +5,8 @@
 ### Fixed
 
 - working-with-fabric: a run Fabric started on a board request whose first `com.enroll` is refused `not_authorized`
-  takes no slot, asks for no access and does no work: when `com.get` reads the request queued and `com.status` names no
-  responder for its capability (a stale service responder takes it when it returns), it answers it once with
+  takes no slot, asks for no access and does no work: when `com.get` reads the request queued and `com.status` shows its
+  capability's responder `absent` (a `stale` or `held` service responder takes it when it returns), it answers it once with
   `com.reply` (`replyTo` the request) declining it until Fabric ships CO-506 and asking for a resend then, closes the workflow `done` once
   `com.get` reads it answered, and writes the retro; in any other state the error rule holds (FAA-219). On Fabric 0.3.16
   a session has no route to that grant, and work without a slot has no fence. Fabric chose this in board thread
