@@ -111,7 +111,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
    a typed secret, a payment or a production step is the person's: name it in the answer rather than wait. A
    production step is the operator's to approve: no person is in this chat, the request alone never approves it, and
-   his own words relayed with a scope naming the step do (`project-board.md`, *No person in the chat*).
+   his own words do when relayed verbatim, with their date and source, from one of his own projects (provenance
+   `trusted`) and with a scope naming the step (`project-board.md`, *No person in the chat*).
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
    `completed`, or `failed_known` with the reason.
 6. **Close the workflow.** `observatory_checkpoint_write {workflowId, owner, idempotencyKey, stepId, status, body,

@@ -111,7 +111,8 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
 _DISPATCH_VALUE = {"workflow": DISPATCH_WORKFLOW, "handoff": r"handoff:[A-Za-z0-9._:-]{1,64}",
-                   # Switchboard takes a request in either case (uuid::Uuid::parse_str), so the hooks do too
+                   # Switchboard takes a request in either case (uuid::Uuid::parse_str) and writes one string to the
+                   # line and the environment, so the hooks take either case and compare exactly, as the contract says
                    "request": r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"}
 #: Fabric's dispatch id, a UUID, within the form Switchboard's `--dispatch-id` takes (board thread b3e60686): a value
 #: outside it keys nothing, and the holder falls back to the workflow, the handoff and the launcher's run id.
@@ -147,8 +148,10 @@ DISPATCH_CONTRACT = (
     "and finish before run-ends-at; work that cannot end by then gives its state as a `com.progress` note on the "
     "thread, then: when the request's deadline is not after run-ends-at plus 10 minutes (no next run starts that close to it), `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
-    "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
-    "typed secret, a payment or a production step is a person's (none is in this chat; the operator's own words, relayed and naming the step, count): name it in the answer. 5. `com.reply` in the thread, then "
+    "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a typed secret or a "
+    "payment is a person's (none is in this chat), and so is a production step unless the operator's words, relayed "
+    "verbatim and dated from his projects with a scope naming it, approve it: name what is left in "
+    "the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
     "the `leaseId`, `close: true`, a status and the packet's body with `done` and `notes` added: done for completed; for "
@@ -219,11 +222,8 @@ def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Opti
     told, line = dispatch_from_env(env), dispatch_from_line(prompt)
     if told is None or line is None:
         return None, []
-    # a UUID is case-free, so the request compares in either case (0.63.0 unit reading 20)
-    fields = [field for field, _ in DISPATCH_ENV if (told.get(field) or "").lower() != line[field].lower()
-              if field == "request"] + [field for field, _ in DISPATCH_ENV if field != "request"
-                                        and told.get(field) != line[field]]
-    fields = [field for field, _ in DISPATCH_ENV if field in fields]
+    # exactly, as the conditional contract tells a host with no prompt hook to compare (0.63.0 seam reading 21)
+    fields = [field for field, _ in DISPATCH_ENV if told.get(field) != line[field]]
     return (dict(told), []) if not fields else (None, fields)
 
 
@@ -347,15 +347,12 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
             return False
         if held.get("host") == record["host"]:
             # the session the clear replaced, the one an earlier accept named: only when this hook's parent wrote the
-            # record. A record
-            # already cleared keeps the id it named; one cleared with the id unknown names the session it started, which
-            # was told to accept a pending handoff under its own id (0.63.0 seam reading 13)
-            same = True
-            # an id the notice cannot name (not a lowercase UUID) is not carried on: the session it started was told
-            # to accept under its own id (0.63.0 unit reading 14)
-            kept = held.get("cleared_from") if same else None
-            named = kept if isinstance(kept, str) and _SESSION_UUID.fullmatch(kept) else (
-                held.get("session") if same else "")
+            # record. A record already cleared keeps the id it named; one cleared with the id unknown names the session
+            # it started, which was told to accept a pending handoff under its own id (0.63.0 seam reading 13). An id
+            # the notice cannot name (not a lowercase UUID) is not carried on: the session it started was told to
+            # accept under its own id (0.63.0 unit reading 14)
+            kept = held.get("cleared_from")
+            named = kept if isinstance(kept, str) and _SESSION_UUID.fullmatch(kept) else held.get("session")
             record["cleared_from"] = named if isinstance(named, str) else ""
             try:
                 folder.mkdir(parents=True, exist_ok=True, mode=0o700)

@@ -512,7 +512,7 @@
         "calls fabric_whoami first, then reads the packet with observatory_checkpoint_latest for that workflow and obeys its constraints first; reads the request with com.get {message} and its thread with com.list {thread}, since the packet carries references only",
         "takes the lease with observatory_handoff_accept on that handoff (its owner and an idempotencyKey, and executor only when the launcher's prompt names one) and keeps the leaseId, with this session's own sessionId (the same on a retry)",
         "claims and accepts the named request (com.enroll for its capability, com.claim, com.accept, com.effect_begin before an effect), renews about every 20 s in a long step, answers with com.reply and completes it with com.complete and an observed outcome",
-        "never waits for a person inside the run: a sign-in, a typed secret or a payment is named in the answer, and money, deletion and publication still go through fabric_effect_request",
+        "never waits for a person inside the run: a sign-in, a typed secret, a payment, or a production step no trusted relay of the operator's words names, is named in the answer, and money, deletion and publication still go through fabric_effect_request",
         "writes in_progress checkpoints after the lease, the claim and the reply, each repeating the packet's goal, constraints, artifacts and credentials unchanged; the closing one with workflowId, the lease and close true, the packet's body with done and notes added and no values: done for completed; for failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes; then ends the run",
         "when the prompt's line and the environment disagree, is no run: says so in the request's thread and stops"
       ]
@@ -575,13 +575,22 @@
     },
     {
       "id": "a-cleared-session-whose-replaced-id-is-unknown",
-      "trap": "replays an accept under an id it cannot know, or on Windows takes itself for the run after a /clear",
+      "trap": "replays an accept under an id it cannot know",
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three and you were just cleared; the hook cannot name the session id the clear replaced (the record names one that is not a lowercase UUID). What do you do about the lease?",
       "expected": [
         "when observatory_checkpoint_latest shows the handoff pending, accepts it with this session's own sessionId, the owner and key step 2 names and no executor",
         "when the handoff was already accepted and this session holds no leaseId for it, ends the run without touching the request and leaves the workflow to Fabric",
-        "when the handoff lapsed (no accept was made and none can be), ends the run without touching the request",
-        "on Windows, where a /clear holds nothing, reads as a helper after the clear and leaves the workflow to Fabric"
+        "when the handoff lapsed (no accept was made and none can be), ends the run without touching the request"
+      ]
+    },
+    {
+      "id": "a-windows-clear-holds-nothing",
+      "trap": "takes itself for the run after a /clear on Windows and accepts the handoff again",
+      "request": "On Windows, FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and you were just cleared; session start printed only the conditional contract, with no notice that you were cleared. What do you do?",
+      "expected": [
+        "is the run only when its own next prompt's first line is the fabric-dispatch/1 line naming the same three, and otherwise a helper",
+        "touches neither the handoff, the request nor the workflow as a helper, and leaves the workflow to Fabric",
+        "never replays an accept it cannot name the session id for"
       ]
     },
     {

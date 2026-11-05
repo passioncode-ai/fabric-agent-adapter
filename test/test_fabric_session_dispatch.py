@@ -85,6 +85,11 @@ class Parsing(unittest.TestCase):
                      "say so in the request's thread and stop"):
             self.assertIn(word, text)
         self.assertNotIn("—", text)
+        # 0.63.0 unit reading 21: the operator's relayed words lift the production stop only
+        self.assertIn("a sign-in, a typed secret or a payment is a person's (none is in this chat), and so is a "
+                      "production step unless the operator's words, relayed verbatim and dated from his projects with a "
+                      "scope naming it, approve it",
+                      " ".join(text.split()))
 
     def test_the_closing_write_names_its_workflow_and_the_board_reads_are_real_tools(self):
         # 0.63.0 readings 2: a checkpoint_write without workflowId starts a new workflow; com.get takes a message id
@@ -173,6 +178,17 @@ class Hooks(Base):
         self.assertLess(len(cli.dispatch_contract(longest, conditional=True)), 4000, "Hermes' MAX_CONTEXT_CHARS")
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
         self.assertLess(len(cli.dispatch_contract(longest, uuid, conditional=True)), 4000, "with a session id too")
+
+    def test_a_handoff_longer_than_the_contract_fits_is_no_dispatch(self):
+        # 0.63.0 unit reading 21: 64 characters keep the conditional contract under Hermes' 4000 with a session id
+        kept, dropped = "handoff:" + "x" * 64, "handoff:" + "x" * 65
+        self.assertEqual(cli.dispatch_from_env(dict(ENV, FABRIC_DISPATCH_HANDOFF=kept))["handoff"], kept)
+        long_env = dict(ENV, FABRIC_DISPATCH_HANDOFF=dropped)
+        self.assertNotIn("handoff", cli.dispatch_from_env(long_env))
+        self.assertFalse(cli.dispatch_complete(cli.dispatch_from_env(long_env)))
+        self.assertEqual(cli.dispatch_from_line(LINE.replace(HANDOFF, kept))["handoff"], kept)
+        self.assertIsNone(cli.dispatch_from_line(LINE.replace(HANDOFF, dropped)))
+        self.assertEqual(cli.dispatch_of(long_env, LINE.replace(HANDOFF, kept)), (None, ["handoff"]))
 
     def test_a_resumed_dispatch_is_quiet(self):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "resume"},
@@ -680,9 +696,12 @@ class Hooks(Base):
         upper = REQUEST.upper()
         env = dict(ENV, FABRIC_DISPATCH_REQUEST=upper)
         self.assertEqual(cli.dispatch_of(env, LINE.replace(REQUEST, upper)), (dict(FULL, request=upper), []))
-        self.assertEqual(cli.dispatch_of(ENV, LINE.replace(REQUEST, upper)), (FULL, []), "the same UUID in other case")
+        self.assertEqual(cli.dispatch_of(ENV, LINE.replace(REQUEST, upper)), (None, ["request"]),
+                         "compared exactly, as the conditional contract says")
         self.assertEqual(cli.dispatch_of(ENV, LINE.replace(HANDOFF, HANDOFF.upper().replace("HANDOFF:", "handoff:")))[1],
                          ["handoff"], "the handoff compares exactly")
+        other = "fabric-dispatch/1 workflow=wf_%s handoff=handoff:other request=%s" % ("f" * 16, "0" * 8 + REQUEST[8:])
+        self.assertEqual(cli.dispatch_of(ENV, other), (None, ["workflow", "handoff", "request"]), "in a fixed order")
 
     def test_a_take_over_with_no_session_id_holds_nothing(self):
         env = dict(self.env, **ENV)
