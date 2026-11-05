@@ -50,6 +50,9 @@ class Released(unittest.TestCase):
                         release(how="done", response={"released": True}),
                         release(how="done", response=[{"type": "text", "text": "ok"}]),
                         release(how="done", response=[{"type": "text", "text": '{"released": true, "claims": ["c1"]}'}]),
+                        release(how="done", taskId="t", response=[{"type": "text", "text":
+                            '{"released": true, "claim_id": "c", "how": "done", "task_moved_to": null, "seq": 7, '
+                            '"code": "task-not-moved"}'}]),
                         release(how="done", response={"content": [{"type": "text", "text": '{"released": true}'}]}),
                         release(how="done", response={"structuredContent": {"released": True}}),
                         release(how="done", response='{"released": true}'),
@@ -90,6 +93,11 @@ class Released(unittest.TestCase):
                         release("mcp__my_fabric__fabric_work_release", how="done"),
                         release("xmcp__fabric__fabric_work_release", how="done"),
                         release(how="done", response={"released": True, "code": "already-released"}),
+                        release(how="done", taskId="t", response=[{"type": "text", "text":
+                            '{"released": true, "claim_id": "c", "how": "done", "at": "2026-11-05T10:00:00Z", '
+                            '"task_moved_to": null, "code": "task-not-moved"}'}]),
+                        release(how="done", taskId="t", response={"released": False, "code": "released-by-operator",
+                                                                  "at": "2026-11-05T10:00:00Z"}),
                         release(how="done", claims="session", response=[{"type": "text", "text":
                             '{"released": true, "claims": [], "note": "this session holds no live claim"}'}]),
                         release("mcp__evil__fabric_work_release", how="done"),

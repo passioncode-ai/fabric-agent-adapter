@@ -161,7 +161,7 @@ DISPATCH_CONTRACT = (
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
     "the `leaseId`, `close: true`, a status and the packet's body with `done` and `notes` added: done for completed; for "
     "failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes. 7. Write the retro "
-    "`fabric_whoami` asks for (`observatory_lesson` and insight/1 lines, or one line that there is nothing; no "
+    "(`observatory_lesson` and insight/1 lines, or one line that there is nothing; no "
     "values), then end the run: no board sweep, no work claim, "
     "no watch-mail. Details: working-with-fabric "
     "references/on-demand-session.md."
@@ -466,10 +466,11 @@ def released_done(payload: Any) -> bool:
         return False
     said = _release_answer(answer)
     # an answer the hook cannot read keeps the reminder: the obligation is Fabric's, and a missed one costs more
-    # a refusal is said in so many words, and so is a release of nothing (claims: "session" with no live claim); any
-    # other answer keeps the line, an unreadable one included
+    # a refusal is said in so many words, and so is a release of nothing (claims: "session" with no live claim) or a
+    # repeat (Fabric answers a repeat with the first release's `at`, a first release with its `seq`; 0.64.0 seam reading
+    # 2); any other answer keeps the line, an unreadable one included
     return said is None or not (said.get("released") is False or said.get("code") == "already-released"
-                                or said.get("claims") == [])
+                                or said.get("claims") == [] or ("at" in said and "seq" not in said))
 
 
 def hook_post_tool_use(payload: Dict[str, Any]) -> Optional[str]:
