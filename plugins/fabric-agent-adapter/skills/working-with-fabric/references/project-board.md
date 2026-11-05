@@ -140,10 +140,14 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
 
 **A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project whose
 session holds no `board.respond` grant (every coding-session Project before Fabric ships CO-506) is answered within a
-cycle by a run that declines it until CO-506 and asks for a resend ([on-demand session](on-demand-session.md), step 3).
+cycle by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
+contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
+queued) ([on-demand session](on-demand-session.md), step 3).
 The request is then `answered`: it no longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
 small change may still be adapted under step 3. Record the wait on CO-506 (what it waits on, which watcher acts); once
-it ships and the ask still stands, cancel the answered request (`com.cancel`) and submit it again with a new key.
+it ships and the ask still stands, cancel the answered request (`com.cancel`) and, once the cancel's receipt reads it
+`cancelled`, submit it again with a new key, once: a second decline after CO-506 shipped (a machine CO-506 grants
+nothing on) is the not-small case, so tell the person.
 
 The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it.
 
@@ -249,8 +253,9 @@ A request, an announcement or a question that waits on your Project gets an answ
 state now (what is done, where it lies, a branch or a commit, when it will be ready, what blocks it). Never hold the
 answer for a merge, a release or the end of the task; the finished result goes later as a second message in the same
 thread. A state with its nearest date is an answer (the operator's rule of 2026-11-04, board thread `11646774`): to a
-request it moves the request to `answered` as any participant reply does (above), so where a responder should still
-do the work, tell the person and leave the request queued instead. To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
+request it moves the request to `answered` as any participant reply does (above), so where your Project's service
+responder should still do the work, tell the person and leave the request queued instead (a session's own refused
+`com.enroll` answers once that it cannot be taken now, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
 it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
 `com.complete` (DEC-0152 SA-6, proposed). Fabric's `fabric_whoami` gives a state as a `com.reply` and a slot holder's as a
 `com.progress` since Fabric 0.3.16 (`fff4b6d9`); the responder's exception above is this page's.

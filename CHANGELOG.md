@@ -12,7 +12,9 @@
   `1add3c03` (option (b), 2026-11-05), the responder's run says the same, and after Fabric's CO-506 the grant comes at
   `com.enroll` itself. Fabric keeps its dispatcher switch off on the operator's machine until this ships or CO-506 does. A declined
   request is settled: it never reaches «На проверке», and its workflow closes `done` with the decline in its notes;
-  `references/project-board.md` tells the requester what to do with it (record the wait on CO-506, resend then).
+  `references/project-board.md` tells the requester what to do with it (record the wait on CO-506, resend once then).
+  A declined request also leaves Fabric's home list of requests no agent answers, and its workflow counts among the
+  `done` ones; only its notes say it was declined.
 - The exit contract's other open steps (FAA-215): after `com.effect_begin` a run at its limit completes `failed_known`
   with `observed: true` (Fabric refuses a complete after an effect began without it, `observation_required`); the
   workflow closes only once the board took the complete, or `com.get` reads a replied request answered (a refused

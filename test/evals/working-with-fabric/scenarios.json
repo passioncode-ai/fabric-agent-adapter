@@ -219,6 +219,18 @@
       ]
     },
     {
+      "id": "a-request-a-dispatched-run-declined",
+      "trap": "waits for the owner as if the request were still queued, resends at once under a new key while it is open, or resends again and again after a second decline",
+      "request": "You sent a request to another Project whose owner is not working now. Within a minute a run Fabric started on that Project replied: it cannot take the request until Fabric ships CO-506, and asks you to send it again then. What do you do?",
+      "expected": [
+        "knows the reply answered the request: it no longer waits for its owner",
+        "records the wait on CO-506 (what it waits on, which watcher acts) and goes on with its own work",
+        "once CO-506 ships and the ask still stands, cancels the answered request with com.cancel and resubmits with a new key only after the cancel's receipt reads cancelled",
+        "resends once: a second decline after CO-506 shipped goes to the person, not another resend",
+        "may still adapt a small change in the owner's repository under the small-change rule"
+      ]
+    },
+    {
       "id": "new-mail-with-unread-and-since",
       "request": "Check the project board for what is new since your last session and mark what you handled.",
       "expected": [
