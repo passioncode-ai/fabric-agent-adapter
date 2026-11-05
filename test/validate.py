@@ -726,10 +726,11 @@ def credential_url_problems(root: Path = ROOT) -> List[str]:
                 continue
             for lineno, line in enumerate(text.splitlines(), 1):
                 found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
-                if found:
-                    problems.append("%s:%d writes a URL with credentials (%r): name the scheme in angle brackets, "
+                if found:  # the scheme alone: a real credential is never repeated into a log
+                    scheme = re.match(r"[A-Za-z][A-Za-z0-9+.-]*", found.group(0)).group(0)
+                    problems.append("%s:%d writes a URL with credentials (scheme %r): name the scheme in angle brackets, "
                                     "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
-                                    % (path.relative_to(root).as_posix(), lineno, found.group(0)))
+                                    % (path.relative_to(root).as_posix(), lineno, scheme))
     return problems
 
 

@@ -774,6 +774,9 @@ class CredentialUrlTests(unittest.TestCase):
                     self.assertEqual(len(problems), 1, problems)
                     self.assertIn("%s:2 writes a URL with credentials" % rel, problems[0])
                     self.assertIn("FAA-211", problems[0])
+                    finding = problems[0].split(": name the scheme")[0]  # the credential is never printed
+                    for secret in (":pw", ":p", ":tok", '"+pw+"'):
+                        self.assertNotIn(secret, finding)
 
     def test_the_scheme_in_angle_brackets_and_the_unshipped_record_pass(self):
         files = {self.KIT: "# `<https>://u:pw" + self.AT + "h`, `<https>:///h\\u:pw" + self.AT + "x`, git" + self.AT
