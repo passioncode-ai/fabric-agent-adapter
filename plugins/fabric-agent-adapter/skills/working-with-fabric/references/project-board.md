@@ -143,7 +143,8 @@ session holds no `board.respond` grant (every coding-session Project before Fabr
 cycle by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
 contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
 queued) ([on-demand session](on-demand-session.md), step 3).
-The request is then `answered`: it no longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
+The request is then `answered`: read the decline and `com.read_ack` it (unread, it shows in «На проверке»); it no
+longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
 small change may still be adapted under step 3. Record the wait on CO-506 (what it waits on, which watcher acts); once
 it ships and the ask still stands, cancel the answered request (`com.cancel`) and, once the cancel's receipt reads it
 `cancelled`, submit it again with a new key, once: a second decline after CO-506 shipped (a machine CO-506 grants

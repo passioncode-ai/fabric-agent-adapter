@@ -84,7 +84,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    it: DEC-0098, DEC-0102) declining it: this Project cannot take it until Fabric ships CO-506, and the requester sends
    it again then (the reply ends the queue, so nothing takes it later; never say it waits). Then it closes the workflow `done` once
    `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state the error rule below holds.
-   The decline does not reach the operator's «На проверке» (an answered request is settled); the requester reads it,
+   The target's request no longer waits for the operator (an answered request is settled: no second run, no unmoved or
+   to-operator finding); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
+   shows it on the requester's Project in «На проверке» as an answer nobody read,
    and the closing write's `notes` say the request was declined until CO-506.
    Fabric's dispatcher counts an answered request as settled and starts no second run for it. Once CO-506 ships
    (Fabric's `main` `027cb809`) a session's own Project grants it at `com.enroll` itself, and this branch is taken only

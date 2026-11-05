@@ -11,7 +11,8 @@
   a session has no route to that grant, and work without a slot has no fence. Fabric chose this in board thread
   `1add3c03` (option (b), 2026-11-05), the responder's run says the same, and after Fabric's CO-506 the grant comes at
   `com.enroll` itself. Fabric keeps its dispatcher switch off on the operator's machine until this ships or CO-506 does. A declined
-  request is settled: it never reaches «На проверке», and its workflow closes `done` with the decline in its notes;
+  request is settled: it no longer waits for the operator (no second run), an unread decline shows on the requester's
+  Project in «На проверке» as an answer nobody read, and its workflow closes `done` with the decline in its notes;
   `references/project-board.md` tells the requester what to do with it (record the wait on CO-506, resend once then).
   A declined request also leaves Fabric's home list of requests no agent answers, and its workflow counts among the
   `done` ones; only its notes say it was declined.
