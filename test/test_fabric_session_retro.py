@@ -91,6 +91,11 @@ class Released(unittest.TestCase):
                         release(how="done", response=[{"type": "text", "text": '{"released": false, "code": "x"}'},
                                                       {"type": "text", "text": "more"}]),
                         release("mcp__my_fabric__fabric_work_release", how="done"),
+                        release(how="done", response=[{"type": "text", "text": "note"},
+                                                      {"type": "text", "text": '{"released": false}'}]),
+                        release(how="done", response=json.dumps([{"type": "text", "text": '{"released": false}'}])),
+                        release(how="done", response={"structuredContent": {"ok": 1}, "content": [
+                            {"type": "text", "text": '{"released": false}'}]}),
                         release("xmcp__fabric__fabric_work_release", how="done"),
                         release(how="done", response={"released": True, "code": "already-released"}),
                         release(how="done", taskId="t", response=[{"type": "text", "text":

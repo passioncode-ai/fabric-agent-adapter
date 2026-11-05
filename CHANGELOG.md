@@ -11,8 +11,8 @@
   key per lesson for what went wrong, insight/1 lines for what was learned about the product, or one line that there
   is nothing, no values in either (without `observatory_lesson`, in the turn's answer). The ending is read as Fabric
   reads it (`how`, then `outcome`). Any other release, any other tool, a release Fabric refused (its answer says
-  `released: false`, which is how Fabric refuses one, `already-released`, or carries `isError`) and a session release
-  that released nothing (`claims: []`) print nothing; an answer the hook cannot read keeps the line. Fabric's
+  `released: false`, which is how Fabric refuses one, `already-released`, or carries `isError`), a session release
+  that released nothing (`claims: []`) and a repeat (Fabric answers it with the first release's `at`) print nothing; an answer the hook cannot read keeps the line. Fabric's
   `retro-after-work` is on its `main` (`e1eecec0`) and in no release yet, so neither the line nor the preamble sends
   the agent to `fabric_whoami` for it. It says it in a session Fabric
   launched too, the one hook that speaks there besides a dispatched run's exit contract. No hook can speak to the
@@ -26,8 +26,11 @@
 
 - The plugin's `hooks.json` gains a `PostToolUse` entry whose matcher names Fabric's two release tools on the `fabric`
   server (or a plugin's `plugin_<name>_fabric`) only; nothing to configure. Codex and Kimi get no post-tool hook from `install-host-hooks` in this release.
-- working-with-fabric SKILL.md no longer repeats how a reminder Fabric gave is tagged or where a turn `watch-mail`
-  delivered prints it, to stay within its word budget; `references/session-hooks.md` keeps both.
+- working-with-fabric SKILL.md, to stay within its word budget, no longer repeats five things its
+  `references/session-hooks.md` keeps (README, SKILL-CARD and SECURITY.md keep the first three too): that the
+  transcript's tail can hold a secret the session displayed, the off switch `FABRIC_SESSION_NO_REPOSITORIES=1`, that
+  session start ignores compact and resume, how a reminder Fabric gave is tagged, and where a turn `watch-mail`
+  delivered prints it.
 
 ## 0.63.0 (2026-11-05)
 

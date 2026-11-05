@@ -159,8 +159,8 @@ this repository both obeys it and ships its service layer
   [FAA-12a's raw](docs/reports/2026-10-12-faa-12a-board-participants/raw/hook-timing.log).
 - `PostToolUse` (matcher: Fabric's two release tools): `fabric_session.py hook post-tool-use` reads the call it is
   given on stdin and prints one line of context only for a release of finished work Fabric did not refuse (the retro
-  Fabric's `retro-after-work` asks for, FAA-206; a release Fabric's answer refuses with `released: false` gets
-  nothing); it reads no file and calls nothing, and it speaks in a session Fabric launched too. Measured 2026-11-05
+  Fabric's `retro-after-work` asks for, on its `main` and in no release yet, FAA-206; a release Fabric's answer refuses
+  with `released: false`, or one that released nothing, `already-released`, `claims: []` or a repeat, gets nothing); it reads no file and calls nothing, and it speaks in a session Fabric launched too. Measured 2026-11-05
   through the real CLI under a load average of about 68: median 155 ms (bare `python3 -S` 50 ms), 1006 ms at most over
   20 calls ([raw](docs/reports/2026-11-05-faa-206-retro/raw/hook-timing.log)).
 - Codex and Kimi Code: `fabric_session.py hook session-start --host codex|kimi`, only where the person added it with

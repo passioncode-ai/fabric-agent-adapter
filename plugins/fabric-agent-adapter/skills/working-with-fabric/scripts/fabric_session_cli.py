@@ -419,15 +419,18 @@ RETRO_DONE = {"fabric_work_release": (("how", "outcome"), "done"), "fabric_task_
 def _release_answer(answer: Any, depth: int = 0) -> Optional[Dict[str, Any]]:
     """Fabric's answer to a release as the object it wrote, when the hook can read it: Fabric refuses a release with an
     ordinary answer `{released: false, code, reason}` and never with isError (0.64.0 product reading 1), so the text
-    of the answer is what tells a refusal from a release. Every shape Claude Code may pass is unwrapped (a content
-    list, each text block alone first, a dict with content or structuredContent, a JSON string of any of them)."""
+    of the answer is what tells a refusal from a release. Every shape Claude Code may pass is unwrapped: a content
+    list (each text block alone, the first that reads wins), a dict with content or structuredContent (content when
+    structuredContent says nothing), a JSON string of any of them."""
     if depth > 6:
         return None
     if isinstance(answer, dict):
         if "released" in answer:
             return answer
         if isinstance(answer.get("structuredContent"), dict):
-            return _release_answer(answer["structuredContent"], depth + 1)
+            found = _release_answer(answer["structuredContent"], depth + 1)
+            if found is not None:
+                return found
         return _release_answer(answer.get("content"), depth + 1) if "content" in answer else None
     if isinstance(answer, list):
         for block in answer:
@@ -441,7 +444,7 @@ def _release_answer(answer: Any, depth: int = 0) -> Optional[Dict[str, Any]]:
             value = json.loads(answer)
         except (ValueError, RecursionError):  # 3.9 raises RecursionError on a deep text (0.64.0 unit reading 2)
             return None
-        return _release_answer(value, depth + 1) if isinstance(value, dict) else None
+        return _release_answer(value, depth + 1) if isinstance(value, (dict, list)) else None
     return None
 
 
