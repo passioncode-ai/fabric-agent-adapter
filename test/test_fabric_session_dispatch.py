@@ -120,7 +120,7 @@ class Parsing(unittest.TestCase):
         # Observatory's checkpoint_write takes in_progress, done and blocked today; failed arrives with OBS-323
         text = cli.dispatch_contract(FULL)
         self.assertIn("done for completed", text)
-        self.assertIn("until then blocked", text)
+        self.assertIn("failed_known blocked with the reason in notes (failed once Observatory takes it, OBS-323)", text)
 
 
 class Hooks(Base):
@@ -426,8 +426,9 @@ class Hooks(Base):
         # FAA-219: on Fabric 0.3.16 a session has no tool to ask board.respond (Fabric, thread 1add3c03, 9d23b27c);
         # a reply from the target Project answers the request (DEC-0098, DEC-0102), and an answered request is settled
         text = cli.dispatch_contract(FULL)
-        self.assertIn("a not_authorized enroll takes no slot: do the work, `com.reply` the answer, then steps 6 (done) "
-                      "and 7;", text)
+        self.assertIn("a not_authorized enroll: no slot, no work; a queued request: one `com.reply` (replyTo it) that it "
+                      "waits for Fabric's CO-506, then step 6 (done) once `com.get` reads answered, and 7;", text)
+        self.assertIn("Details: working-with-fabric references/on-demand-session.md.", text, "a native host has no other pointer")
         self.assertNotIn("access.request", text)
         # FAA-215: Fabric refuses a complete after an effect began without observed: true (observation_required)
         self.assertIn("`com.complete` failed_known (observed: true) saying so", text)

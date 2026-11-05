@@ -575,13 +575,12 @@
     },
     {
       "id": "a-dispatched-run-whose-enroll-is-refused",
-      "trap": "asks for access with a tool the session does not have, or ends without answering, so the request stays queued and two empty runs send it to the operator",
+      "trap": "does the work without a slot (no fence, no com.progress, a live session may take the request in parallel), asks for access with a tool the session does not have, or ends without answering, so the request stays queued",
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.enroll for the request's capability answers not_authorized. What do you do?",
       "expected": [
-        "takes no slot and asks for no access (no fabric.access.request)",
-        "does the work the request asks for and answers it with one com.reply in its thread",
-        "at run-ends-at without a result, replies with the state and its nearest date instead",
-        "closes the workflow with status done once the reply is taken, since an answered request is settled",
+        "takes no slot, asks for no access (no fabric.access.request) and does none of the work",
+        "when com.get reads the request queued, answers it once with com.reply (replyTo the request) saying it cannot take it until Fabric ships CO-506",
+        "closes the workflow with status done only once com.get reads the request answered; in any other state follows the error rule and leaves the workflow open",
         "writes the retro (observatory_lesson and insight/1 lines in insights/, or one line that there is nothing) and ends the run"
       ]
     },
