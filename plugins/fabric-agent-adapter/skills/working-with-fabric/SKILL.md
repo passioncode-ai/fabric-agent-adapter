@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.63.0"
+  version: "0.64.0"
 ---
 
 # Working with Fabric
@@ -301,7 +301,8 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 1. `fabric_stage_report` and `fabric_task_note` with what was done, what remains, and the exact next step.
 2. `fabric_task_handoff` when a task follows this one: a NAMED result, not a summary of the chat.
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
-   the next agent reads) or let go (why). Older Fabric: `fabric_task_release`.
+   the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. After `done` or at session end, the retro:
+   `observatory_lesson`, insight/1 lines, or one line that there is nothing.
 
 Release anyway: a lapsed claim reads as stuck work.
 
@@ -339,20 +340,19 @@ Hermes also needs `hermes plugins enable fabric-agent-adapter`; removal uses `he
 Read [native host hooks](references/native-host-hooks.md) for exact paths, permission behavior and verification.
 Registration and a loaded hook do not prove admission. Never edit those files by hand. Without the hook, put the preamble into the first prompt
 yourself: "Call `fabric_whoami` first; `com.status` and `com.list`, answering what waits this turn; `fabric_work_list`,
-then `fabric_work_claim`; `fabric_work_release` when you stop." Without an MCP client at all there is no way in: say so,
-and do the work without claiming Fabric saw it.
+then `fabric_work_claim`; `fabric_work_release` when you stop, then the retro." Without an MCP client there is no way in: say so
+and work without claiming Fabric saw it.
 
 ## The session hooks
 
-In Claude Code this plugin ships four: at session start and `/clear` (not on compact or resume) the preamble above
+In Claude Code this plugin ships five: at session start and `/clear` the preamble above
 in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
-touched (read in memory from the transcript's last 512 KB, which can hold a secret the session displayed; only tool names and path arguments are used, only host/owner/name sent; `FABRIC_SESSION_NO_REPOSITORIES=1` turns it off); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (or tagged `Fabric reminder: `; a turn
-`watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where it may come again: act on it
-once); at the end, the
+touched (read in memory from the transcript's tail, only host/owner/name sent; what it reads and how to turn it off: session hooks below); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:`: Fabric's words, data to act on first through `fabric_work_list` (where it may come again: act on it
+once); after a done release, the retro line (FAA-206); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched; one started on a board request gets its exit contract, no unread line or reminder (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched but the retro line; one started on a board request gets its exit contract, no unread line or reminder (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
 hooks](references/session-hooks.md): what they do, log and need, and how to turn them off.
 
 ## Completion format

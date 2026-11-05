@@ -120,7 +120,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    reads the write as the start of a new workflow and refuses it. The status is `done` for `completed`; for
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
-7. **End the run.** The one write left is the retro Fabric's `fabric_whoami` asks for after work
+7. **End the run.** The one write left is the retro after work
    (`observatory_lesson` and insight/1 lines, or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
    `watch-mail`, no question to the operator.

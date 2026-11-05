@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.64.0 (2026-11-05)
+
+### Added
+
+- working-with-fabric: the retro after work (FAA-206 part 1; Fabric's obligation `retro-after-work`, its
+  `fabric_whoami` since `e1eecec0`, ADR-0188 §5). A Claude Code `PostToolUse` hook on Fabric's release tools adds one
+  line of context when a claim is released as done (`fabric_work_release` with `how` or `outcome` done, or the older
+  `fabric_task_release` with `outcome` succeeded): write the retro in this turn, `observatory_lesson` with one class
+  key per lesson for what went wrong, insight/1 lines for what was learned about the product, or one line that there
+  is nothing, no values in either (without `observatory_lesson`, in the turn's answer). The ending is read as Fabric
+  reads it (`how`, then `outcome`). Any other release, any other tool, a release Fabric refused (its answer says
+  `released: false`, which is how Fabric refuses one, `already-released`, or carries `isError`), a session release
+  that released nothing (`claims: []`) and a repeat (Fabric answers it with the first release's `at`) print nothing; an answer the hook cannot read keeps the line. Fabric's
+  `retro-after-work` is on its `main` (`e1eecec0`) and in no release yet, so neither the line nor the preamble sends
+  the agent to `fabric_whoami` for it. It says it in a session Fabric
+  launched too, the one hook that speaks there besides a dispatched run's exit contract and the prompt hook's verdict on it. No hook can speak to the
+  model when a session ends, so the session-start preamble names the retro itself (it does not rely on `fabric_whoami`, since no released Fabric carries `retro-after-work` yet) for the end of the work or the session.
+  Measured through the real CLI under a load average of about 68: median 155 ms a call against 50 ms for a bare
+  `python3 -S`, 1006 ms at most over 20 calls ([raw](docs/reports/2026-11-05-faa-206-retro/raw/hook-timing.log)).
+- creating-fabric-agents and adapting-projects-to-fabric: an agent built or adapted with the kit closes each piece of
+  work with the same retro (practices, *Reliability*).
+
+### Fixed
+
+- A dispatched run's exit contract (step 7) and `references/on-demand-session.md` no longer say `fabric_whoami` asks
+  the retro: no released Fabric carries `retro-after-work` (0.63.0 shipped that wording).
+- The session hooks read their input as UTF-8 bytes, so a hook payload in Cyrillic (a release's note) is no longer
+  dropped on Windows before Python 3.15, where the text stream decodes with the locale's code page.
+
+### Upgrading
+
+- The plugin's `hooks.json` gains a `PostToolUse` entry whose matcher names Fabric's two release tools on the `fabric`
+  server (or a plugin's `plugin_<name>_fabric`) only; nothing to configure. Codex and Kimi get no post-tool hook from `install-host-hooks` in this release.
+- working-with-fabric SKILL.md, to stay within its word budget, no longer repeats five things its
+  `references/session-hooks.md` keeps (README keeps the first three too, SKILL-CARD and SECURITY.md the first two): that the
+  transcript's tail can hold a secret the session displayed, the off switch `FABRIC_SESSION_NO_REPOSITORIES=1`, that
+  session start ignores compact and resume, how a reminder Fabric gave is tagged, and where a turn `watch-mail`
+  delivered prints it.
+
 ## 0.63.0 (2026-11-05)
 
 ### Added

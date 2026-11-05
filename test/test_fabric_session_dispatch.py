@@ -416,6 +416,11 @@ class Hooks(Base):
                                 extra_env=ENV)
         self.assertIn(uuid, self.context(done))
 
+    def test_step_7_names_the_retro_itself(self):
+        # 0.64.0 product reading 2: no released Fabric's fabric_whoami asks the retro yet
+        self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines, or one line that there is nothing; "
+                      "no values), then end the run", cli.dispatch_contract(FULL))
+
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
         self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")

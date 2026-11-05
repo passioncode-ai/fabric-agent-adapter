@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.63.0"
+  version: "0.64.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -225,7 +225,8 @@ Before the first stage that calls a model or spends money, read
 a limit pauses and resumes, every model answer passes the call site's own acceptance, fallbacks
 and checkers cross vendors, spend is a persisted ledger with idempotency keys, open questions
 become recorded decisions, every fix has a test seen failing, and text a person reads carries no
-em dash (U+2014), held by its prompt and a test. Report its checklist with a
+em dash (U+2014), held by its prompt and a test; and each piece of work closes with a retro
+(`observatory_lesson` and insight/1 lines, practices.md *Reliability*). Report its checklist with a
 file and a test per line, or `NOT_RUN` where the agent has no such stage.
 
 ## Completion format
