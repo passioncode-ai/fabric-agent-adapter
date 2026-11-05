@@ -12,8 +12,7 @@
   `fabric_provider.py`, `fabric_source_check.py`, `references/remote-placement.md`,
   `references/session-hooks.md` and SECURITY.md, now name the scheme in angle brackets (`<https>://u:pw@h`; read
   `<https>` as `https`). No code changed. Five kit modules have new digests in `kit.json`: `fabric_secrets.py`,
-  `fabric_descriptor.py`, `fabric_http.py`, `fabric-http.mjs` and `fabric-delegation.mjs`; a copy from 0.64.0 behaves
-  the same and reads `older` (`fabric_kit.py status` exits 1) until `install --force` refreshes it.
+  `fabric_descriptor.py`, `fabric_http.py`, `fabric-http.mjs` and `fabric-delegation.mjs`.
 
 ### Added
 
@@ -22,6 +21,12 @@
   slashes, backslashes, `///`, a tab among the slashes). The CHANGELOG ships too, but is a record of released notes
   and no kit module, and keeps the examples of earlier releases as written. AGENTS.md states the rule; the
   test that checks it builds its URLs from parts, while the other tests (not shipped) keep theirs as written.
+
+### Upgrading
+
+- A service holding 0.64.0 copies of those five modules behaves the same, but `fabric_kit.py status` reads them as
+  `older` and exits 1 until `fabric_kit.py install <service-dir>` with the same `--module` names refreshes them; an
+  `older` copy needs no `--force`.
 
 ## 0.64.0 (2026-11-05)
 
