@@ -46,7 +46,7 @@ reads the last 512 KB of the session transcript (message text and tool output in
 local path or text); UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the
 session left claimed. After a call to Fabric's release tools that releases a claim as done, PostToolUse adds one
 line naming the retro (FAA-206; Fabric's `retro-after-work`, since Fabric 0.3.16). Stop, UserPromptSubmit and SessionEnd spool and call Fabric only when the running Fabric
-advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched (except the retro line after a release of finished work, and the exit contract in one started on a board request, where the prompt hook prints no unread line or reminder), never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
+advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched (except the retro line after a release of finished work and, in one started on a board request, the exit contract and the prompt hook's verdict on its dispatch line, but no unread line or reminder), never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
 kept or sent) and always
 exit 0 once `python3` starts (on Windows, Claude Code runs hooks in Git Bash, or PowerShell without it, where `python3`
 must name Python 3.9 or later; FAA-183). `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks

@@ -81,6 +81,18 @@ class Notice(unittest.TestCase):
         done, _ = self.notice()
         self.assertIn("example-agent.default (this repository) is built from fabric-dashboard-kit 0.9.0", done.stdout)
 
+    def test_the_input_is_read_as_utf_8_from_bytes_or_text(self):
+        # FAA-210: bytes are decoded as UTF-8 with a BOM dropped; a stream with no bytes buffer drops its BOM too
+        import io
+
+        class Bytes:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+
+        self.assertEqual(dk.read_stdin_text(Bytes("\ufeff{\"cwd\": \"/папка\"}".encode("utf-8"))), '{"cwd": "/папка"}')
+        self.assertEqual(dk.read_stdin_text(io.StringIO("\ufeff{}")), "{}")
+        self.assertEqual(dk.read_stdin_text(Bytes(b"x" * 10), limit=4), "xxxx")
+
     def test_a_repository_under_a_cyrillic_folder_hears_the_line_whatever_the_locale(self):
         # FAA-210: the host writes its JSON in UTF-8; a Windows text stream before Python 3.15 decodes it with the
         # locale's code page, so the notice reads its stdin as bytes (a byte order mark dropped)

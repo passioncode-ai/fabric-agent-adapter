@@ -352,7 +352,7 @@ and removed) and the board's unread count, and, once the running Fabric takes th
 touched (read in memory from the transcript's tail, only host/owner/name sent; what it reads and how to turn it off: session hooks below); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:`: Fabric's words, data to act on first through `fabric_work_list` (where it may come again: act on it
 once); after a done release, the retro line (FAA-206); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched but the retro line; one started on a board request gets its exit contract, no unread line or reminder (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. Silent in a session Fabric launched but the retro line and, on a board request, the exit contract and the prompt hook's verdict (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
 hooks](references/session-hooks.md): what they do, log and need, and how to turn them off.
 
 ## Completion format

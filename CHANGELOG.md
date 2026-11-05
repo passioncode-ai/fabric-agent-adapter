@@ -19,8 +19,12 @@
   its line on Windows before Python 3.15 (FAA-210).
 - The retro line after a release of finished work and the session-start preamble say where insight/1 lines go: the
   project's `insights/` folder, as Observatory named it for its reader (OBS-331, board thread `f7758225`);
-  `references/session-hooks.md` says the same.
-- `hooks.json`'s description and AGENTS.md's hook list name every exception to "silent in a session Fabric launched":
+  outside the repository when that is public (a public product keeps them in its local data folder, `<name>-data/`);
+  `references/session-hooks.md`, `references/on-demand-session.md` step 7 and the service guidance
+  (creating-fabric-agents practices, adapting-projects-to-fabric) say the same; without Project Observatory only the
+  lessons go to an agent's own retrospective file.
+- `references/on-demand-session.md` step 3 says what a run does with an `in_progress` request an earlier run left.
+- `hooks.json`'s description, AGENTS.md's hook list, README.md, the skill and `references/session-hooks.md` name every exception to "silent in a session Fabric launched":
   the exit contract and the prompt hook's verdict on it in a session started on a board request, and the retro line.
 
 ## 0.66.0 (2026-11-05)

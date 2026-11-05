@@ -100,8 +100,9 @@ finished. Organization members have the full page with every receipt: the Passio
 - **Close each piece of work with a retro** (Fabric's `retro-after-work`, ADR-0188 §5): when a claim is released as
   done or the session is about to end (for a resident service, when a job ends), write in the same turn what went
   wrong and what would have prevented it (`observatory_lesson`, one class key per lesson) and what was learned about
-  the product (insight/1 lines), or one line that there is nothing; no values in either. Where Project Observatory is
-  not installed, write the same lines to the agent's own retrospective file. Fabric and Observatory are to count them
+  the product (insight/1 lines, in the project's `insights/` folder, one JSONL file a month, where Observatory's reader
+  looks; outside the repository when that is public), or one line that there is nothing; no values in either. Where Project Observatory is not installed, write
+  the lessons to the agent's own retrospective file; the insight/1 lines stay in `insights/`. Fabric and Observatory are to count them
   (ADR-0188 §§4-5; Observatory's daily reading is OBS-331, not shipped on 2026-11-05).
 
 ## Shipping

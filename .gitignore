@@ -13,3 +13,5 @@ dist/
 # local git worktrees of this repository
 .worktrees/
 .task-pipeline/
+# insight/1 lines of a public repository live outside it (references/session-hooks.md)
+/insights/

@@ -78,7 +78,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `com.effect_begin` before the work has an effect. An earlier run may have left the request taken: `com.get` on the
    request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
-   attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result. Never complete what
+   attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result; so is an `in_progress` one an
+   earlier run left (its effect begun, as before 0.67.0), which the takeover makes `outcome_unknown`: what the run cannot
+   observe it leaves to the operator, to whom Fabric shows the request (step 4). Never complete what
    you did not observe. After the lease, after the claim or the takeover, and after the reply, write an `in_progress`
    checkpoint (`workflowId`, `leaseId`), so a later run has something to read. Observatory keeps only the latest
    body, so every checkpoint the session writes repeats `goal`, `constraints`, `artifacts` and `credentials` of
@@ -125,7 +127,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
 7. **End the run.** The one write left is the retro after work
-   (`observatory_lesson` and insight/1 lines, or one line that there is nothing; no values; ADR-0188's
+   (`observatory_lesson` and insight/1 lines in the project's `insights/` folder, outside a public repository, or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
    `watch-mail`, no question to the operator.
 
