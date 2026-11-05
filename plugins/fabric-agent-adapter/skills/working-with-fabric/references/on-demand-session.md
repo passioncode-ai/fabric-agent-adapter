@@ -104,8 +104,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      itself (`observatory_handoff_create` with reason `restart`, or `crash` when Switchboard reports the run failed,
      to `service:fabric`), takes the new lease and routes it to the next run; when the request goes to «На проверке» or
      its deadline passes, Fabric closes it `blocked` the same way (Fabric's spec at `c560d97e`, sections 3.4 and 3.6;
-     its decision on thread `b3e60686`, 2026-11-04; its code at that commit does not do it yet, so a second run on
-     Fabric's main meets a workflow whose lease is still this run's). This run only leaves it open.
+     its decision on thread `b3e60686`, 2026-11-04; Fabric's main takes it back since `a6f0ffda`, in no release yet).
+     This run only leaves it open.
 
    A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
@@ -130,8 +130,9 @@ request `failed_known` with the reason when it holds a fence for it. It closes t
 settled: the board accepted the complete or a reconcile, or `com.get` reads the request answered, terminal or
 `outcome_unknown`. Otherwise (the request still `queued`, `claimed`, `accepted` or `in_progress`, and not this run's to
 settle) it leaves the workflow open, with a checkpoint without `close` naming the reason when it holds the lease, and
-ends: a workflow closed over an unsettled request makes Fabric's next dispatch fail at the take-back on every cycle,
-while an open one is taken back for the next run (FAA-213).
+writes the retro (step 7) and ends: a workflow closed over an unsettled request makes the next dispatch fail at the
+take-back on every cycle (Fabric's main at `a6f0ffda`; its 0.3.16 candidate opens a new workflow then), while an open
+one is taken back for the next run (FAA-213).
 
 A run started with `--permissions ask` may find the board or Observatory tools not allowed by the person's settings.
 It cannot answer then: it says so in its final output and ends; Fabric records the outcome and does not retry the same

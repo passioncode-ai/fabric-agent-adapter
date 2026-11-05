@@ -425,7 +425,7 @@ class Hooks(Base):
         # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request makes
         # Fabric's next dispatch fail at the take-back on every cycle
         text = cli.dispatch_contract(FULL)
-        self.assertIn("On an error you cannot get past: complete it failed_known if you hold its fence; close the "
+        self.assertIn("On an error you cannot get past: complete the request failed_known if you hold its fence; close the "
                       "workflow only once the request is settled (`com.get`: answered, terminal or outcome_unknown), "
                       "else leave it open.", text)
         self.assertLess(text.index("7. Write the retro"), text.index("On an error you cannot get past"))

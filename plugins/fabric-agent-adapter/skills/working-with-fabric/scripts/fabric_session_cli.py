@@ -130,10 +130,11 @@ DISPATCH_IF = (
     "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; do your task only, touching neither the handoff, the "
     "request nor the workflow. That line with other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
-#: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words.
+#: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
+#: (3995 in 0.66.0: almost none left, so a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
-    "request and end: nobody watches this run, so never wait for a person. 1. `fabric_whoami`, then read the packet "
+    "request and end: nobody watches, so never wait for a person. 1. `fabric_whoami`, then read the packet "
     "with `observatory_checkpoint_latest` {{workflowId: {workflow}}}: obey its constraints first; its goal describes "
     "the request; its artifacts name the capability, the deadline and run-ends-at. Read the request with `com.get` "
     "{{message: <request>}} and its thread with `com.list` {{thread: <the `thread` com.get answered>}}. 2. "
@@ -144,7 +145,7 @@ DISPATCH_CONTRACT = (
     "epoch and the slot's generation; `com.enroll` for the capability, then `com.claim` (`idempotency`, `capability`, "
     "`request`), `com.accept` and `com.effect_begin` before an effect. When `com.get` shows the request accepted or in "
     "progress (an earlier run), take an accepted one over with `com.responder_replace` (`expectedGeneration`) and its "
-    "transfer, settle `outcome_unknown` only with `com.reconcile` and an observed result, and never complete what you "
+    "transfer, resolve `outcome_unknown` only with `com.reconcile` and an observed result, and never complete what you "
     "did not observe. After the lease, the claim and the reply, write an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (never its top-level `credentials` or the accept answer's "
@@ -162,7 +163,7 @@ DISPATCH_CONTRACT = (
     "failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes. 7. Write the retro "
     "(`observatory_lesson` and insight/1 lines, or one line that there is nothing; no "
     "values), then end the run: no board sweep, no work claim, "
-    "no watch-mail. On an error you cannot get past: complete it failed_known if you hold its fence; close the workflow "
+    "no watch-mail. On an error you cannot get past: complete the request failed_known if you hold its fence; close the workflow "
     "only once the request is settled (`com.get`: answered, terminal or outcome_unknown), else leave it open. Details: working-with-fabric references/on-demand-session.md."
 )
 #: A second session whose own prompt starts with the same dispatch line (another process under the run's environment):

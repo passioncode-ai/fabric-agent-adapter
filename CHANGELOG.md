@@ -10,14 +10,19 @@
   request could still be `queued` or `claimed`, and Fabric's next dispatch then failed at the take-back on every cycle.
   Now the run completes the request `failed_known` when it holds its fence, closes the workflow only when `com.get`
   reads the request answered, terminal or `outcome_unknown`, and otherwise leaves it open (with a checkpoint without
-  `close` naming the reason when it holds the lease) for the next run. The exit contract the session hook prints in a
-  run says the same; it had no rule for an error before.
+  `close` naming the reason when it holds the lease) for the next run, then writes the retro and ends. The exit
+  contract the session hook prints in a run states the rule and points to the reference for the rest; it had no rule
+  for an error before. Step 3 of the contract now says to resolve (not settle) `outcome_unknown` with `com.reconcile`,
+  so the word keeps one meaning beside the new rule.
+- `references/on-demand-session.md` step 4 no longer says Fabric's code leaves an open workflow's lease with the
+  ended run: Fabric's `main` takes it back since `a6f0ffda` (in no release yet).
 
 ### Changed
 
-- The exit contract stays under Hermes' 4000 characters at its longest (3994 with a 64-character handoff and a session
-  id) by leaving two explanations to `references/on-demand-session.md`: why a checkpoint repeats the packet's body,
-  and why Observatory refuses the packet's top-level `credentials` and the accept answer's `pack` in it. The rules
+- The exit contract stays under Hermes' 4000 characters at its longest (3995 with a 64-character handoff and a session
+  id) by leaving three explanations to `references/on-demand-session.md`, which holds each: that Observatory's write
+  redacts the packet's board artifacts, why a checkpoint repeats the packet's body, and why Observatory refuses the
+  packet's top-level `credentials` and the accept answer's `pack` in it; a few phrases are shorter too. The rules
   themselves are unchanged.
 
 ## 0.65.0 (2026-11-05)
