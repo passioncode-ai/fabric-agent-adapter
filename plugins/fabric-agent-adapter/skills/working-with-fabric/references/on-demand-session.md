@@ -4,7 +4,7 @@ When a board request reaches a project that has no responder and no live session
 project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person. The
 dispatcher ships in Fabric 0.3.16 (released 2026-11-05, tag `v0.3.16` at `bcead0ef`), on by default since
-`a6f0ffda`. "Fabric's main" below is 0.3.16 with `babb2dc1` on top (CO-409, in no release yet); the hooks recognise a dispatched session from
+`a6f0ffda`. "Fabric's main" below is 0.3.16 with CO-409 on top (`babb2dc1`, `09ddb2fc`, in no release yet); the hooks recognise a dispatched session from
 adapter 0.63.0 on, so a launcher can start one today.
 
 ## Contents
@@ -136,9 +136,9 @@ main counts such a run finished, not empty, since `babb2dc1`). Otherwise (the re
 unsettled request made the next dispatch fail at the take-back on every cycle (Fabric's main at `a6f0ffda`; since
 `bcead0ef` Fabric opens a new workflow instead), while an open one is taken back for the next run when the project has
 no live session (a live session holds the request), and after two runs with no answer Fabric shows the request to the
-operator whatever its state. A workflow left open because another session holds the request is to be closed by Fabric
-once that request settles (CO-409's second part, promised on thread `1add3c03` for 2026-11-12, not yet on its main;
-FAA-213). Switchboard's appended exit contract says the same from
+operator whatever its state. A workflow left open because another session holds the request is closed by Fabric once
+that request settles, and a request a run's `com.enroll` left `outcome_unknown` shows in «На проверке» at once
+(Fabric's main since `09ddb2fc`, in no release yet; FAA-213). Switchboard's appended exit contract says the same from
 0.7.13 (SB-258); an earlier Switchboard tells the run to close the workflow whatever the request's state, and this
 rule, the later one, is the one to follow.
 
