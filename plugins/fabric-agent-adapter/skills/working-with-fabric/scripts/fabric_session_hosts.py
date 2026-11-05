@@ -9,6 +9,7 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     CONFIG_CAP,
@@ -300,7 +301,9 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
             out("Apply it, on the person's go-ahead: fabric_session.py install-host-hooks --host %s --apply "
                 "--expect-sha256 %s" % (args.host, digest))
             out("The hook only prints the preamble at session start (no turn observation, no unread count: %s "
-                "cannot rejoin its Fabric session yet). It is silent in a session Fabric launched.%s" % (
+                "cannot rejoin its Fabric session yet), or the exit contract in a session Fabric started on a board "
+                "request, where it also records which session holds that request (its session id and, after a /clear, the one it replaced, the agent's process id and a time, 0600, in "
+                "the user's cache folder) and prunes such records after 7 days; otherwise it is silent in a session Fabric launched.%s" % (
                     HOSTS[args.host], " Codex may ask you to trust the new hook (/hooks) before it runs."
                     if args.host == "codex" else ""))
             return 0

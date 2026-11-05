@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
+    DISPATCH_WORKFLOW,
     BOARD_STATUS_TOOL,
     HOOK_FEATURE,
     SESSION_ID,
@@ -178,6 +180,11 @@ def watch_mail_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = None) ->
         return 2
     if fabric_launched(env):
         sys.stderr.write("watch-mail: this session was launched by Fabric; call com.status with your own tools.\n")
+        return 2
+    if re.fullmatch(DISPATCH_WORKFLOW, env.get("FABRIC_DISPATCH_WORKFLOW") or ""):
+        sys.stderr.write("watch-mail: this session runs under a board request's environment (its run or a helper "
+                         "of it); watch-mail does not start here (working-with-fabric "
+                         "references/on-demand-session.md).\n")
         return 2
     cwd = Path(args.cwd).expanduser()
     if not claude_registration(cwd, env):

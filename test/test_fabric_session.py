@@ -131,7 +131,9 @@ class Base(unittest.TestCase):
         self.env = {k: v for k, v in os.environ.items()
                     if k not in ("XDG_DATA_HOME", "XDG_CACHE_HOME", "LOCALAPPDATA", "CODEX_HOME", "CLAUDE_CODE_SESSION_ID",
                                  "FABRIC_SERVICES_DIR", "FABRIC_LAUNCHED_SESSION", "FABRIC_ACP_SESSION",
-                                 "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT")}
+                                 "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT", "FABRIC_DISPATCH_WORKFLOW",
+                                 "FABRIC_DISPATCH_HANDOFF", "FABRIC_DISPATCH_REQUEST",
+                                 "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"
@@ -772,6 +774,10 @@ class Active(Base):
 
 
 class BoardUnread(Active):
+    def test_the_line_keeps_the_prefix_watchers_match(self):
+        # FAA-205 widened the line; a watcher matching `N unread on the project board: com.list` still matches it
+        self.assertTrue((fs.UNREAD_LINE % 2).startswith("2 unread on the project board: com.list"))
+
     def test_the_stop_worker_writes_the_unread_count_to_the_session_spool(self):
         self.unread(3)
         directory = self.turn()
@@ -811,14 +817,14 @@ class BoardUnread(Active):
         self.assertIsNone(self.prompt(), "no count yet: silent")
         self.unread(2)
         self.turn()
-        self.assertEqual(self.prompt(), "2 unread on the project board: com.list")
+        self.assertEqual(self.prompt(), fs.UNREAD_LINE % 2)
         self.assertIsNone(self.prompt(), "the same count is not repeated")
         self.unread(1)
         self.turn()
         self.assertIsNone(self.prompt(), "a fall is not news")
         self.unread(4)
         self.turn()
-        self.assertEqual(self.prompt(), "4 unread on the project board: com.list")
+        self.assertEqual(self.prompt(), fs.UNREAD_LINE % 4)
         self.unread(0)
         self.turn()
         self.assertIsNone(self.prompt())
@@ -863,7 +869,7 @@ class TurnNudges(Active):
         self.unread(2)
         self.answer({"nudges": [{"kind": "board", "says": "Mark what you handled read."}]})
         self.turn()
-        self.assertEqual(self.prompt(), "2 unread on the project board: com.list\nFabric reminder: Mark what you handled read.")
+        self.assertEqual(self.prompt(), fs.UNREAD_LINE % 2 + "\nFabric reminder: Mark what you handled read.")
 
     def test_two_turns_before_a_prompt_keep_both_without_repeats(self):
         first = {"kind": "claim", "says": "One.", "task_id": "t1"}
@@ -1082,7 +1088,7 @@ class WatchMail(Active):
         counts = iter([0, 2, 2, 1, 3])
         code, printed, sleeps = self.watch(5, poll=lambda: ("ok", next(counts)))
         self.assertEqual(code, 0)
-        self.assertEqual(printed, ["2 unread on the project board: com.list", "3 unread on the project board: com.list"])
+        self.assertEqual(printed, [fs.UNREAD_LINE % 2, fs.UNREAD_LINE % 3])
         self.assertEqual(sleeps, [60.0] * 5)
 
     def test_jitter_stays_within_twenty_percent(self):
@@ -1102,7 +1108,7 @@ class WatchMail(Active):
         answers = iter([("down", "x"), ("down", "x"), ("ok", 1), ("ok", 1)])
         _, printed, sleeps = self.watch(4, poll=lambda: next(answers))
         self.assertEqual(sleeps, [120.0, 240.0, 60.0, 60.0])
-        self.assertEqual(printed[-1], "1 unread on the project board: com.list")
+        self.assertEqual(printed[-1], fs.UNREAD_LINE % 1)
 
     def test_the_interval_has_a_floor_so_it_never_spins(self):
         _, _, sleeps = self.watch(2, interval=0, poll=lambda: ("ok", 0))
@@ -1174,7 +1180,7 @@ class WatchMail(Active):
                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
                                 env=dict(self.env, CLAUDE_CODE_SESSION_ID=SID))
         line = proc.stdout.readline()
-        self.assertEqual(line.strip(), "1 unread on the project board: com.list")
+        self.assertEqual(line.strip(), fs.UNREAD_LINE % 1)
         started = time.perf_counter()
         proc.stdin.close()
         self.assertEqual(proc.wait(timeout=10), 0)
@@ -1731,6 +1737,10 @@ class NoServicesLine(Base):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
         context = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
         self.assertEqual(context, fs.PREAMBLE.format(host="Claude Code"))
+        for said in (context, fs.UNREAD_LINE % 1):  # FAA-205: what waits on the Project is answered in the same turn
+            self.assertIn("in the same turn" if said is context else "in this turn", said)
+            self.assertIn("the result later", said)
+        self.assertIn("a request a responder should take stays queued", context)
         self.assertNotIn("TOKEN-PATH", done.stdout)
 
     def test_default_services_folder_per_os(self):

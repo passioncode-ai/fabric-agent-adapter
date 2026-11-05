@@ -1,7 +1,8 @@
 # Agents that answer people: what they carry from the first release
 
 **Load this when the agent you are building answers people**: private chats, mail, store reviews, group chats, any
-channel where a person asks and the agent writes back. Every item below is a part of the agent, built and tested in its
+channel where a person asks and the agent writes back. An agent on such a channel also follows the channel-agent
+standard: [practices](practices.md#agents-on-a-channel-people-write-to). Every item below is a part of the agent, built and tested in its
 first release, not a later improvement. Each comes from the sources below: what the quality standard requires (A1,
 A5), and what an audit of five production agents found working or failing (P1 to P8). The practices are field
 evidence: one estate, five agents, no control; their numbers are that estate's, never a forecast.
@@ -18,7 +19,9 @@ per-channel targets, A3 (the rubric), A4 (the judge and its calibration), A6 (an
 default) and the rest of its checks that caught real defects, and the practices' other items of P1, P3, P5, P6, P7 and
 P8. Read both sources before you design the reply pipeline. The kit's support-agent recipe (building-fabric-services,
 `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: used alone it hands the message
-to a person at the first refusal (the refused draft is not kept), where this page repairs, researches and holds.
+to a person at the first refusal; with a repairing `on_handoff` it rewrites a refused draft once (`repair=`, a
+spent repair being `fallback: true`: a second refusal, a declined repair or no knowledge on the retry; a `model:*`
+outage during the repair is a plain hand-off), and research and the hold stay this page's.
 
 ## Contents
 

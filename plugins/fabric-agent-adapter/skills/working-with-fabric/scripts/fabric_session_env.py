@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 from typing import Dict
-from typing import List
+from typing import Callable, List, Optional, Tuple
 
 
 HUB_PROTOCOL = "fabric-hub/0.1"
@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.62.0"
+VERSION = "0.63.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -77,12 +77,21 @@ LAUNCH_MARKER = "FABRIC_LAUNCHED_SESSION"
 LAUNCH_SIGNALS = ("FABRIC_ACP_SESSION", "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT")
 
 
+#: FAA-201: the workflow id a launcher names in FABRIC_DISPATCH_WORKFLOW (Observatory's WORKFLOW_ID); the one copy the
+#: session modules read. dashboard_kit.py keeps its own (it is a kit module) and a test holds the two equal.
+DISPATCH_WORKFLOW = r"wf_[0-9a-f]{16}"
+
+
 #: Files that make a folder a Fabric project: the provider manifest and the contract pin adapt_project.py writes, and
 #: a fabric-package/1 folder's manifest.
 FABRIC_MARKERS = ("fabric-agent.json", "fabric-contract.lock.json", "fabric.package.json")
 
 
-UNREAD_LINE = "%d unread on the project board: com.list"
+#: FAA-205 (the operator's rule of 2026-11-04, relayed on the board, thread 11646774): what waits on the Project gets
+#: an answer in the same turn, its state now, the result later in a second message. The line keeps its prefix, which
+#: watchers match on.
+UNREAD_LINE = ("%d unread on the project board: com.list; answer what waits on you in this turn: its state now (done, "
+               "where, when, what blocks), the result later")
 
 #: FAA-142 (Fabric 0.3.14, ask dfb43ffb): a turn's `fabric_session_observe` answer may carry `nudges`, each
 #: {kind, says, task_id?, request_id?}, shown on a turn once (at most five) and kept for fabric_work_list. The worker keeps their `says` here and the prompt hook prints
@@ -574,14 +583,14 @@ def spool(directory: Path, entry: Dict[str, Any]) -> Path:
 def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[float] = None,
                          keep: Optional[str] = None) -> int:
     """Remove session folders whose newest file is older than SESSION_STALE_S (a running worker's lock is a fresh file,
-    so its folder is never stale); never the folder of the session `keep`. Returns how many were removed. Never
-    raises."""
+    so its folder is never stale), and dispatch records as old (FAA-201); never the folder of the session `keep`.
+    Returns how many were removed. Never raises."""
     now = time.time() if now is None else now
     removed = 0
     try:
         folders = list((state_root(env=env) / "sessions").iterdir())
     except OSError:
-        return 0
+        folders = []
     for folder in folders:
         try:
             if folder.name == keep or not SESSION_ID.fullmatch(folder.name) or not folder.is_dir():
@@ -589,6 +598,26 @@ def prune_stale_sessions(env: Optional[Dict[str, str]] = None, now: Optional[flo
             newest = max([folder.stat().st_mtime] + [f.stat().st_mtime for f in folder.iterdir()])
             if now - newest > SESSION_STALE_S:
                 _remove_tree(folder)
+                removed += 1
+        except OSError:
+            continue
+    return removed + prune_dispatch_records(env, now)
+
+
+def prune_dispatch_records(env: Optional[Dict[str, str]] = None, now: Optional[float] = None) -> int:
+    """FAA-201: remove the dispatch records (which session holds a dispatch) older than SESSION_STALE_S, and the
+    temporary file of a write a full disk cut short; nothing else. Returns how many. Never raises."""
+    now = time.time() if now is None else now
+    removed = 0
+    try:
+        folder = state_root(env=env) / "dispatch"
+        records = list(folder.glob("*.json")) + list(folder.glob(".*.tmp"))  # a write a full disk cut short
+    except OSError:
+        records = []
+    for record in records:
+        try:
+            if now - record.stat().st_mtime > SESSION_STALE_S:
+                record.unlink()
                 removed += 1
         except OSError:
             continue

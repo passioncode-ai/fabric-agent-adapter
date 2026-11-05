@@ -15,7 +15,7 @@ import threading
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import sys as _sys  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
@@ -136,7 +136,7 @@ class LoginCodes:
 
     def __init__(self, state_dir: Optional[Path], ttl: int = LOGIN_CODE_TTL_SECONDS, *,
                  store: Optional["MemoryCodeStore"] = None, key: Optional[bytes] = None,
-                 token: "Optional[str | Callable[[], str]]" = None,
+                 token: "Optional[Union[str, Callable[[], str]]]" = None,
                  idle_seconds: int = OPERATOR_SESSION_IDLE_SECONDS,
                  max_seconds: int = OPERATOR_SESSION_MAX_SECONDS,
                  clock: Callable[[], float] = time.time):

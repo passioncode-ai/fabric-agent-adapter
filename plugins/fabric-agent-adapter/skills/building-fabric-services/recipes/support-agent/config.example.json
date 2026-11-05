@@ -1,5 +1,6 @@
 {
   "knowledge": "knowledge.example.json",
+  "knowledgeMaxAgeSeconds": 7200,
   "stateDir": "state",
   "model": "deepseek/deepseek-v4.1-flash",
   "fallback": "qwen/qwen3.8-flash",

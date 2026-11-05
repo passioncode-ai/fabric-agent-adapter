@@ -1,5 +1,102 @@
 # Changelog
 
+## 0.63.0 (2026-11-05)
+
+### Added
+
+- working-with-fabric: a session Fabric started on a board request (FAA-201, Fabric's on-demand spec at `1329b60f`).
+  A session is the run only when its own prompt's first line `fabric-dispatch/1 workflow=wf_<16 hex> handoff=<id>
+  request=<uuid>` names the same three as `FABRIC_DISPATCH_WORKFLOW`, `FABRIC_DISPATCH_HANDOFF` and
+  `FABRIC_DISPATCH_REQUEST` (Switchboard's `dispatch` sets all three and writes the line, SB-247, released in
+  Switchboard 0.7.8 on 2026-11-04); the environment alone makes no run, since a reader or a subshell inherits it, and a
+  line that disagrees, or an environment without all three, makes none either: that session says so in the request's
+  thread and stops (Fabric's spec 3.5 on its main at `deaf51fe`, agreed on the project board, 2026-11-05). A line with no workflow in the
+  environment is quoted text. The session-start hook, which sees no prompt yet, prints the exit contract on that
+  condition in place of the preamble (naming the session's own `sessionId` when it is a UUID, and after a `/clear`
+  the session id the clear replaced, which a replayed accept needs for its `leaseId` and a pending handoff is accepted
+  under, or the new id when the replaced one is unknown), a retro before the run ends, also in a session
+  Fabric launched: `fabric_whoami`, the packet
+  (`observatory_checkpoint_latest`), the request and its thread (`com.get`, `com.list`), the lease
+  (`observatory_handoff_accept` with its owner, key and the executor the launcher names), `com.status` and the claim,
+  a request an earlier run left accepted or in progress (`com.responder_replace`, `com.reconcile`), in_progress
+  checkpoints, renewals about every 20 s (work that outlasts the run gives its state in a `com.progress` note and is left accepted for the next run,
+  which Fabric's dispatcher starts since its main at `fff4b6d9`, in no release yet, Fabric itself moving the open
+  Observatory workflow to that run, as its spec at `c560d97e` says (sections 3.4 and 3.6; its code does not yet); when the request's deadline is not after
+  run-ends-at plus 10 minutes, since no next run starts that close to it (`RUN_END_TO_DEADLINE_MS` on Fabric's main at
+  `afe28a60`, in no release yet), it fails known instead), the reply and `com.complete`, and the closing checkpoint with its
+  `workflowId` (`done`, or for `failed_known` `failed` once Observatory takes it, OBS-323, until then `blocked` with
+  the reason). The prompt hook, which sees the line, tells the session it is the run (or, for a line that disagrees,
+  that it is none), and prints no unread line or nudge in such a session. Only the
+  first session whose line names the dispatch holds it: another one gets one line
+  telling it not to accept, claim, complete or close (the dispatch is told by its `FABRIC_DISPATCH_ID` when the
+  launcher sets one in the form `[A-Za-z0-9._-]{1,64}`, as Switchboard 0.7.8 does), and a `/clear` in the holding session keeps the contract (the
+  hooks keep one record per run under `dispatch/`, pruned after 7 days by the Claude Code turn and end hooks and by the next session start on a board request). Every
+  checkpoint the session writes repeats the goal, constraints, artifacts and credentials of the packet's
+  `checkpoint.body`, since Observatory keeps only the latest body; the session takes the request from the environment
+  or the first line and its thread from `com.get`, since Observatory's write redacts the packet's board references. A
+  Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes carry the person's trust since 0.7.8); a host whose hook gets no session id (the native bridges) is always told
+  the conditional contract and writes no record; on Windows, where each hook runs under a new Git Bash, a `/clear` holds
+  nothing (it cannot tell the holder from a helper), so the cleared session is told it runs inside a run that holds it,
+  stays a helper and Fabric takes the workflow over after the run. On any system, a `/clear` while another session
+  holds the dispatch (a nested session's clear) is told the same.
+  `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
+  hooks tell a dispatched session from this version on.
+- working-with-fabric: whatever waits on the Project is answered in the same turn (FAA-205, the operator's rule of
+  2026-11-04, board thread `11646774`): the session-start preamble, the unread line (`N unread on the project board:
+  com.list; answer what waits on you in this turn: ...`, its prefix unchanged for watchers) and the skill's board step
+  say to answer a request, an announcement or a question with its state now (done, where, when, what blocks) and send
+  the result later in a second message; `references/project-board.md` gains "Answering at once".
+- The owner's word is done the first time (FAA-207, the operator's rule of 2026-11-04 relayed on the board, thread
+  `a7a9d05d`; the contract's CT-220): working-with-fabric's Step 5 and creating-fabric-agents' practices say the agent
+  does it itself, hands the person no command to run, asks one short question on a risk and then acts, and passes on
+  only a human gate with its reason; money limits and secrets stay.
+- The channel-agent standard v1 at its round 4 (FAA-197): creating-fabric-agents' practices gain a section of the
+  standard's rules for agents on a channel people write to (the ticket as the unit, one outcome per ticket, answer
+  rather than route, repair before hand-off, declared sources with a maximum age, hand-off queues with their answered
+  signal, text from a channel as data (the contract's proposed CA-8), metadata only, the declaration's form, with a
+  holding reply owing a final text, FAC-SEM-164). The support-agent recipe:
+  - a hand-off its checks made carries the refused `draft` in the returned decision and to an `on_handoff` the agent
+    passes, never into a file (`decisions.jsonl` or the default outbox), so a repeat of the id returns it without; `answer(new_id, text, repair=decision)` rewrites it once with the refusal's reasons: a pass is
+    a reply with `repaired: true`, and a repair that ends otherwise (a second refusal, a model `HANDOFF`, no knowledge on
+    the retry; not a `model:*` outage) a hand-off with `fallback: true` (the standard's 4.4 and its ticket's
+    `fallback`), which `repair=` then refuses, as it refuses a repair under the refused decision's own message id;
+  - `KnowledgeSource` (or `knowledgeMaxAgeSeconds` in the config, which reads the file at once) reads the knowledge
+    file as a source: read again when it changes (its time, size, inode or status-change time, the last a creation time on Windows), the last good version kept when a read fails or the file has the
+    wrong shape (nested too deep included), `state()` with the age of that version, from its file's modification
+    time;
+  - `Knowledge.load` refuses a file that is not JSON, one nested deeper than 32 levels (on every Python), a file that is not an object with an `entries` list, an entry whose tags are not a list
+    of text or whose question is not text, each as a `RecipeError`;
+  - `channel-agent.example.json`, one project's declaration under
+    `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` in the round 4 form, held to it and to
+    the example config's maximum age by `test/test_channel_agent_example.py`.
+
+### Upgrading
+
+- A recopied `support_agent.py` refuses at start (exit 1, a `RecipeError` naming the entry or the file's shape) a knowledge file 0.62.0
+  took in other ways, so an agent that ran on 0.62.0 can stop at start now. Per shape, 0.62.0: a file that is not an
+  object with an `entries` list (`[]`, `{}`, a string) loaded as an empty set and handed every message off as
+  `no-knowledge`; `{"entries": null}` or `{"entries": <number>}` stopped it at start with a `TypeError`; an entry with `tags: null`
+  failed each message with a `TypeError`; an entry whose `tags` is a string or holds something other than text, or
+  whose `question` is not text, was read and answered from. A file nested deeper than 32 levels, which 0.62.0
+  loaded, is refused too. Fix the file before upgrading.
+- A custom `on_handoff` that stores the row it is given now receives the refused `draft`, which can echo what the
+  customer wrote: drop `draft` before storing it (the default outbox does).
+- A session carrying `FABRIC_DISPATCH_WORKFLOW` now gets the exit contract at session start, on the condition that its
+  own prompt starts with the dispatch line naming the same three, even when Fabric launched it; with the workflow
+  set but the handoff or the request missing or malformed, it gets one line that no session there is a run. Its prompt hook prints no unread line or reminder (the nudges file
+  stays), and `watch-mail` refuses to start there. A launcher that sets the workflow alone starts no run any more.
+- The live docs name a closed module neutrally, as the organization edition (`references/package.md` in
+  building-fabric-services and two backlog rows), at its owner's request; dated reports and handoffs keep their words.
+- A session that does a board request with no person in its chat stops before a production step and names it for a
+  person, unless the operator's own words, relayed verbatim with their date and source from one of his own projects (provenance `trusted`) and with a scope naming the step, approve it (working-with-fabric `references/project-board.md`; board threads `1add3c03` and `24e0c88e`; Fabric's board rule at `108239c0`).
+
+### Fixed
+
+- Every annotation in the shipped scripts (the kit, the skills' scripts, the recipe and the Hermes adapter) resolves
+  with `typing.get_type_hints` (FAA-203, a board finding, thread `9fd84d47`): `fabric_estate.py` and four working-with-fabric modules import the `typing` names they use, and
+  `LoginCodes`' `token` is written `Optional[Union[str, Callable[[], str]]]`, which Python 3.9 reads. A vendored copy
+  of `fabric_estate.py` or `fabric_auth.py` reads as older; it worked at run time before.
+
 ## 0.62.0 (2026-11-04)
 
 A new install names the repository of its code, and a service says what it uses, so a map of the installed agents can

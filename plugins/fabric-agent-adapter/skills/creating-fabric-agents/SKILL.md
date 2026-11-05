@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.62.0"
+  version: "0.63.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -91,7 +91,7 @@ prior art of its own:
 
 - [practices.md](references/practices.md): the rules production agents taught us, each with
   the check that catches it (judges and evals, numbers, money, people in the loop,
-  reliability, shipping). Organization members also read the knowledge base's
+  reliability, shipping, agents on a channel people write to). Organization members also read the knowledge base's
   `knowledge/agent-practices.md` and add to it what this agent learns.
 - [where-agents-run.md](references/where-agents-run.md): this machine, a personal cloud, an
   organization; contexts; connecting a machine; sharing into an organization; selling.

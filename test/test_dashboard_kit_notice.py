@@ -81,6 +81,29 @@ class Notice(unittest.TestCase):
         done, _ = self.notice()
         self.assertIn("example-agent.default (this repository) is built from fabric-dashboard-kit 0.9.0", done.stdout)
 
+    def test_a_session_started_on_a_board_request_hears_nothing(self):
+        # FAA-201: a dispatched run does its one request; no invitation to upgrade the dashboard (0.63.0 readings 2)
+        self.own()
+        os.environ["FABRIC_DISPATCH_WORKFLOW"] = "wf_0123456789abcdef"
+        try:
+            done, _ = self.notice()
+        finally:
+            del os.environ["FABRIC_DISPATCH_WORKFLOW"]
+        self.assertEqual((done.returncode, done.stdout), (0, ""))
+        self.assertEqual(self.calls(), [], "it looks at nothing")
+
+    def test_a_malformed_dispatch_workflow_does_not_silence_the_line(self):
+        # 0.63.0 unit reading 6: the notice reads the workflow as the session hooks do, well formed or not at all
+        self.own()
+        for junk in ("wf_xyz", "1"):
+            with self.subTest(junk=junk):
+                os.environ["FABRIC_DISPATCH_WORKFLOW"] = junk
+                try:
+                    done, _ = self.notice()
+                finally:
+                    del os.environ["FABRIC_DISPATCH_WORKFLOW"]
+                self.assertIn("is built from fabric-dashboard-kit", done.stdout)
+
     def test_a_malformed_source_elsewhere_does_not_silence_the_line(self):
         # Another service's descriptor with a string or list source is refused by the validator; the notice skips it.
         (self.services / "a-string.default.json").write_text(json.dumps({"id": "a-string", "source": "https://github.com/x/y"}))

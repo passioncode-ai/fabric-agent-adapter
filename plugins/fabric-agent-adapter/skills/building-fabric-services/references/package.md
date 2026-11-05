@@ -141,8 +141,8 @@ key, the partner and the organization contexts, and `placement_trust` / `placeme
 one of those contexts and to no other (FAC-SEM-122, [the estate record reference](estate-record.md)). The partner's own
 agents call the company's agents with the partner innermost in the delegation chain ([delegation](delegation.md)).
 
-Still to come, each waiting on its owner: a partner's own space in a catalog and publishing to it (FAA-44, Vesta
-PA-03).
+Still to come, each waiting on its owner: a partner's own space in a catalog and publishing to it (FAA-44, the organization
+edition's PA-03).
 
 ## What this version does not do
 

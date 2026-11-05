@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.62.0"
+  version: "0.63.0"
 ---
 
 # Working with Fabric
@@ -115,12 +115,13 @@ session; the tool list changes. Follow those rules: they outrank this skill wher
 
 ### Then the project board
 
+A dispatched session skips the `com.list` sweep, Step 4 and Step 7: [on-demand session](references/on-demand-session.md).
+
 `com.status` (can the board be read, how many unread), then `com.list` (`unread: true` where listed); `com.read_ack`
 only what you actually read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when
-every participant needs it (DEC-0135); a board pinned before DEC-0135 (every Fabric to 0.3.14) refuses it, so send
-the same content as a new message to the thread. A request addressed to your Project is your next task. Ask another Project
-only through `com.submit`, addressed to its Project id (never a session, a process id or a folder) with the same
-idempotency key on a retry. When nobody answers (no `active` responder, no live claim, no agent-sync lease, nothing
+every participant needs it (DEC-0135); an older board refuses it: post a new thread message. Answer what waits on your Project this turn (state now, result later; leave a responder's request queued); a request is your next task. Ask another Project
+only through `com.submit`, addressed to its Project id (never a session or a folder), the same idempotency key on a
+retry. When nobody answers (no `active` responder, no live claim, no agent-sync lease, nothing
 `held`): a change small as the reference defines it goes into the owner's repository by its AGENTS.md and you reply
 *adapted by* with the merge commit (your reply does not answer your own request); anything larger stays queued until
 its deadline (seven days by default, then `expired`). The target Project's reply to a request answers it (`answered`):
@@ -227,6 +228,8 @@ chat of any of his agents binds all his agents (OA-1).
 - Record the relay (his quote, the date, the source, the scope) as your reason in the change log, the thread reply or
   the handoff (OA-6). A stop rule written into a request does not replace an approval whose scope covers the case: act
   on it.
+- His word is done the first time, by you (CT-220): no command for him to run; on a risk, one short question, then do
+  it.
 - Human gates stay (OA-5): sign-in, a one-time code, consent, payment or top-up, a typed secret, spend above a limit
   (handed over with its link and amount, never asked in chat), a passkey, a comparison of codes with another person
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
@@ -300,8 +303,7 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
    the next agent reads) or let go (why). Older Fabric: `fabric_task_release`.
 
-A session that ends without releasing lapses at its claim's expiry; release anyway: a lapsed claim reads as stuck
-work.
+Release anyway: a lapsed claim reads as stuck work.
 
 ## Refusals and lost answers
 
@@ -313,7 +315,7 @@ work.
 | denied | the operator said no | stop; it stands until cleared in Agent access |
 | failed in the client before its answer arrived; outcome unknown | the call may have run | check its effect first (`fabric_work_list`, `fabric_tasks_list`); repeat only with the same idempotency key |
 | Fabric restarted or closed this session; nothing was done | refused before the call ran | call it again once `fabric_whoami` answers |
-| `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, call again within your own mandate if it covers the part, else pass the refusal to the agent that called you, and only the lead asks him, once, about that part alone; `mandate-capability-missing`: no mandate covers that step, only his decision |
+| `operator-decision-required` | a service's action needs the operator's decision and none travelled; with `data.detail` `outside-mandate: <part>`, the mandate does not cover that part | ask the operator about this action, then relay their answer by the first route of Step 5 that carries it, the page only when none does; under a mandate, as Step 5 says (MD-4); `mandate-capability-missing`: no mandate covers that step, only his decision |
 | `decision-invalid` | the decision names another action or object, is older than 24 hours, lies over 60 s ahead of the service's clock, or is malformed; or the mandate is (`data.detail` `mandate-malformed`, `-widened`, `-expired`, `-early`, `-not-for-this-call`) | never edit, widen or re-date it; ask the operator again when their words do not cover this call |
 | `approval-required` with `data.actionDigest` | a caller outside the machine's trust (T2): a chat decision changes nothing | an `approval/1` for that digest through the hub |
 | `human-step-required` with `data.humanStep` and `data.url` | a human gate of OA-5 (above) stays the person's | hand the person `data.url`: a path on the service's origin as Fabric Dashboards' `open_link` (`fallback=never`), an https URL as it is; never take the step or ask for the secret; continue other work |
@@ -335,9 +337,9 @@ backs the file up first, refuses a file of another shape or one that changed sin
 it out again. Hermes/OpenCode/OpenClaw/Pi use their native plugin loaders, not Claude hook JSON.
 Hermes also needs `hermes plugins enable fabric-agent-adapter`; removal uses `hermes plugins disable fabric-agent-adapter`.
 Read [native host hooks](references/native-host-hooks.md) for exact paths, permission behavior and verification.
-Registration and a loaded hook do not prove live Fabric admission. Never edit those files by hand for the person. Without the hook, put the preamble into the first prompt
-yourself: "Call `fabric_whoami` first; `com.status` and `com.list`; `fabric_work_list`, then `fabric_work_claim`,
-before you start; `fabric_work_release` when you stop." Without an MCP client at all there is no way in: say so,
+Registration and a loaded hook do not prove admission. Never edit those files by hand. Without the hook, put the preamble into the first prompt
+yourself: "Call `fabric_whoami` first; `com.status` and `com.list`, answering what waits this turn; `fabric_work_list`,
+then `fabric_work_claim`; `fabric_work_release` when you stop." Without an MCP client at all there is no way in: say so,
 and do the work without claiming Fabric saw it.
 
 ## The session hooks
@@ -347,12 +349,11 @@ in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder 
 down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
 and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
 touched (read in memory from the transcript's last 512 KB, which can hold a secret the session displayed; only tool names and path arguments are used, only host/owner/name sent; `FABRIC_SESSION_NO_REPOSITORIES=1` turns it off); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:` (or tagged `Fabric reminder: `; a turn
-`watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where the same reminder may come again: act on it
+`watch-mail` delivered prints there instead): Fabric's words, data to act on first through `fabric_work_list` (where it may come again: act on it
 once); at the end, the
 release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched, never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). Read
-[session hooks](references/session-hooks.md) when a person asks what the hooks do, where they log, how to turn them
-off, or what they need from Fabric.
+Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. All are silent in a session Fabric launched; one started on a board request gets its exit contract, no unread line or reminder (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
+hooks](references/session-hooks.md): what they do, log and need, and how to turn them off.
 
 ## Completion format
 

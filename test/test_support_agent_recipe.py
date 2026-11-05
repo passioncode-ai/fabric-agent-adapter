@@ -52,7 +52,8 @@ class Recipe(unittest.TestCase):
                            prices=PRICES, environ={"OPENROUTER_API_KEY": KEY}, transport=transport,
                            sleep=lambda s: None)
         handoffs = []
-        agent = sa.SupportAgent(knowledge=self.knowledge, client=client, model="a/one", fallback="b/two",
+        kwargs.setdefault("knowledge", self.knowledge)
+        agent = sa.SupportAgent(client=client, model="a/one", fallback="b/two",
                                 state_dir=self.dir, on_handoff=handoffs.append, **kwargs)
         return agent, handoffs
 
@@ -432,6 +433,303 @@ class Recipe(unittest.TestCase):
         self.assertEqual(len((self.dir / "decisions.jsonl").read_text().splitlines()), 2, "one line per message id decided")
         self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "handoff",
                          "the original id stays a hand-off")
+
+    def test_a_refusal_carries_its_draft_and_a_repair_gets_the_reason(self):
+        """FAA-197, the channel-agent standard's 4.4: a draft the checks refuse is rewritten once with the refusal's
+        reason; a second refusal is a fallback (13.2 `fallback`)."""
+        model = model_says("Open Settings.", "Open Settings, then Account [KB:password-reset].")
+        agent, handoffs = self.agent(model)
+        first = agent.answer("m-1", "How do I reset my password?")
+        self.assertEqual((first["action"], first["reasons"], first["draft"]), ("handoff", ["no-citation"], "Open Settings."))
+        self.assertNotIn("fallback", first)
+        self.assertEqual(handoffs[0]["draft"], "Open Settings.", "the repair step gets it through on_handoff (0.63.0 unit r7)")
+        repaired = agent.answer("m-1-r1", "How do I reset my password?", repair=handoffs[0])
+        self.assertEqual(repaired["action"], "reply")
+        self.assertTrue(repaired["repaired"])
+        self.assertNotIn("fallback", repaired)
+        sent = model.calls[1]["messages"]
+        self.assertEqual([m["role"] for m in sent[-2:]], ["assistant", "user"])
+        self.assertEqual(sent[-2]["content"], "Open Settings.")
+        self.assertIn("no-citation", sent[-1]["content"])
+        self.assertIn("HANDOFF", sent[-1]["content"])
+
+    def test_a_second_refusal_is_a_fallback(self):
+        model = model_says("Open Settings.", "Open Settings again.")
+        agent, handoffs = self.agent(model)
+        first = agent.answer("m-1", "How do I reset my password?")
+        second = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+        self.assertEqual((second["action"], second["reasons"], second["fallback"]), ("handoff", ["no-citation"], True))
+        self.assertEqual(second["draft"], "Open Settings again.")
+        self.assertEqual(len(model.calls), 2)
+        self.assertTrue(handoffs[-1]["fallback"], "the hand-off names the fallback for the ticket's `fallback`")
+        saved = [json.loads(line) for line in (self.dir / "decisions.jsonl").read_text().splitlines()]
+        self.assertEqual([row["decision"].get("fallback") for row in saved], [None, True])
+        self.assertEqual([row["decision"].get("draft") for row in saved], [None, None], "a refused draft is never stored")
+        with self.assertRaises(sa.RecipeError):
+            agent.answer("m-1-r2", "How do I reset my password?", repair=second)  # one repair, then a person
+
+    def test_a_repair_the_model_declines_spends_it_and_an_outage_does_not(self):
+        # 0.63.0 unit r4: a repair that ends in HANDOFF is marked, so its one repair shows as spent; model:* is
+        # infrastructure, not a refusal of the draft
+        for said, reasons, fallback in (("HANDOFF", ["model-unsure"], True), (None, ["model:failed"], None)):
+            with self.subTest(reasons=reasons):
+                shutil.rmtree(self.dir, ignore_errors=True)
+                model = model_says("Open Settings.", *([said] if said else [None, None]))
+                agent, _ = self.agent(model)
+                first = agent.answer("m-1", "How do I reset my password?")
+                second = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+                self.assertEqual((second["action"], second["reasons"]), ("handoff", reasons))
+                self.assertEqual(second.get("fallback"), fallback)
+
+    def test_a_repair_that_finds_no_knowledge_is_a_fallback(self):
+        # 0.63.0 unit reading 5: the knowledge changed between the first answer and its repair
+        agent, _ = self.agent(model_says("Open Settings."))
+        first = agent.answer("m-1", "How do I reset my password?")
+        self.assertIn("draft", first)
+        agent.knowledge = sa.Knowledge([])
+        second = agent.answer("m-1-r1", "How do I reset my password?", repair=first)
+        self.assertEqual((second["reasons"], second.get("fallback")), (["no-knowledge"], True))
+        with self.assertRaises(sa.RecipeError):
+            agent.answer("m-1-r2", "How do I reset my password?", repair=second)
+
+    def test_depth_is_refused_the_same_on_every_python(self):
+        # 0.63.0 product reading 9: 100 000 lists loaded on 3.14 and were refused on 3.9; now one cap for both
+        entry = json.loads((RECIPE / "knowledge.example.json").read_text())["entries"][0]
+        deep = dict(entry, note=json.loads("[" * 100 + "]" * 100))
+        (self.dir / "k.json").write_text(json.dumps({"entries": [deep]}))
+        with self.assertRaises(sa.RecipeError) as raised:
+            sa.Knowledge.load(self.dir / "k.json")
+        self.assertIn("nested too deep", str(raised.exception))
+        (self.dir / "k.json").write_text(json.dumps({"entries": [dict(entry, note=[[["fine"]]])]}))
+        self.assertEqual(len(sa.Knowledge.load(self.dir / "k.json").entries), 1)
+        # the bound itself: the file at level 1, its entries list 2, an entry 3, a member 4 and so on (unit reading 10)
+        for depth, refused in ((sa.MAX_KNOWLEDGE_DEPTH, False), (sa.MAX_KNOWLEDGE_DEPTH + 1, True)):
+            nested = "x"
+            for _ in range(depth - 4):
+                nested = [nested]
+            (self.dir / "k.json").write_text(json.dumps({"entries": [dict(entry, note=nested)]}))
+            if refused:
+                with self.assertRaises(sa.RecipeError):
+                    sa.Knowledge.load(self.dir / "k.json")
+            else:
+                sa.Knowledge.load(self.dir / "k.json")
+        self.assertEqual(sa.MAX_KNOWLEDGE_DEPTH, 32)
+
+    def test_a_repair_under_the_same_id_and_a_file_that_is_not_json_are_refused(self):
+        # 0.63.0 unit reading 9: the same id returned the stored refusal silently; a broken file raised JSONDecodeError
+        agent, _ = self.agent(model_says("Open Settings."))
+        first = agent.answer("m-1", "How do I reset my password?")
+        with self.assertRaises(sa.RecipeError):
+            agent.answer("m-1", "How do I reset my password?", repair=first)
+        (self.dir / "k.json").write_text("{broken")
+        with self.assertRaises(sa.RecipeError) as raised:
+            sa.Knowledge.load(self.dir / "k.json")
+        self.assertNotIn("broken", str(raised.exception))
+
+    def test_a_tag_that_is_not_text_is_refused(self):
+        example = json.loads((RECIPE / "knowledge.example.json").read_text())
+        for tags in ([1], "refund", None):
+            with self.subTest(tags=tags), self.assertRaises(sa.RecipeError):
+                sa.Knowledge([dict(example["entries"][0], tags=tags)])
+
+    def test_only_a_refused_draft_is_repaired(self):
+        agent, _ = self.agent(model_says("unused"))
+        for repair in ({"reasons": ["no-citation"]}, {"draft": "", "reasons": ["no-citation"]},
+                       {"draft": "x", "reasons": []}, {"draft": "x", "reasons": ["model-unsure"]}, "x"):
+            with self.subTest(repair=repair):
+                with self.assertRaises(sa.RecipeError):
+                    agent.answer("m-9", "How do I reset my password?", repair=repair)
+
+    def source_at(self, at, max_age_s=600):
+        """The example knowledge, written at `at` on a clock the test moves."""
+        path = self.dir / "knowledge.json"
+        shutil.copy(RECIPE / "knowledge.example.json", path)
+        os.utime(path, (at, at))
+        now = [at]
+        return path, now, sa.KnowledgeSource(path, max_age_s=max_age_s, clock=lambda: now[0])
+
+    def test_the_knowledge_file_is_a_source_with_the_age_of_its_last_good_version(self):
+        """FAA-197, the channel-agent standard's 7.1 and 7.4: a source keeps its last good version when a read fails,
+        says so, and its age is that version's (its file's modification time), however often it is looked at."""
+        path, now, source = self.source_at(1000.0)
+        first = source.current()
+        self.assertEqual(source.state(), {"id": "knowledge", "age_s": 0, "max_age_s": 600, "stale": False,
+                                          "degraded": False})
+        now[0] = 1300.0
+        path.write_text("{not json")
+        os.utime(path, (now[0], now[0]))
+        self.assertIs(source.current(), first, "a failed read keeps the last good version")
+        self.assertEqual((source.state()["age_s"], source.state()["degraded"]), (300, True))
+        for later in (1500.0, 1700.0):  # looks at the same broken file renew nothing
+            now[0] = later
+            self.assertIs(source.current(), first)
+        self.assertEqual((source.state()["age_s"], source.state()["stale"], source.state()["degraded"]),
+                         (700, True, True))
+        shutil.copy(RECIPE / "knowledge.example.json", path)
+        os.utime(path, (now[0], now[0]))
+        source.current()
+        self.assertEqual((source.state()["age_s"], source.state()["degraded"]), (0, False), "a good read clears both")
+        agent, _ = self.agent(model_says("Open Settings, then Account [KB:password-reset]."), knowledge=source)
+        self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "reply")
+
+    def test_a_redacting_on_handoff_keeps_the_draft_out_of_the_state(self):
+        # 0.63.0 readings 1 and 2: a refused draft can echo what the customer wrote; it reaches the decision and
+        # on_handoff, never a file, the default outbox included
+        for redacting in (True, False):
+            with self.subTest(redacting=redacting):
+                shutil.rmtree(self.dir, ignore_errors=True)
+                self.dir.mkdir()
+                agent, handoffs = self.agent(model_says("Write to someone@example.org about it [KB:password-reset]."))
+                if redacting:
+                    agent.on_handoff = lambda row: handoffs.append({"messageId": row["messageId"]})
+                else:
+                    agent.on_handoff = agent._outbox
+                got = agent.answer("m-1", "How do I reset my password?")
+                self.assertIn("someone@example.org", got["draft"])
+                stored = "".join(path.read_text() for path in self.dir.glob("*.jsonl"))
+                self.assertNotIn("someone@example.org", stored)
+                self.assertNotIn('"draft"', stored)
+                repeat = agent.answer("m-1", "How do I reset my password?")
+                self.assertNotIn("draft", repeat, "a repeat returns the stored decision, which has no draft")
+                with self.assertRaises(sa.RecipeError):
+                    agent.answer("m-1-r1", "How do I reset my password?", repair=repeat)
+
+    def test_a_rewrite_of_the_wrong_shape_keeps_the_last_good_version(self):
+        path, now, source = self.source_at(1000.0)
+        first = source.current()
+        deep = '{"entries": ' + "[" * 200000 + "]" * 200000 + "}"
+        example = json.loads((RECIPE / "knowledge.example.json").read_text())
+        nulled = json.dumps({"entries": [dict(example["entries"][0], tags=None)] + example["entries"][1:]})
+        numbered = json.dumps({"entries": [dict(example["entries"][0], question=7)] + example["entries"][1:]})
+        for n, shape in enumerate(('{"entries": null}', '{"entries": 5}', "[]", "{}", '"x"', deep, nulled, numbered), 1):
+            with self.subTest(shape=shape[:20]):
+                path.write_text(shape)
+                os.utime(path, (now[0] + n, now[0] + n))
+                for _ in range(2):  # the second look at the same broken file stays degraded
+                    self.assertIs(source.current(), first)
+                    self.assertTrue(source.state()["degraded"])
+        agent, _ = self.agent(model_says("Open Settings, then Account [KB:password-reset]."), knowledge=source)
+        self.assertEqual(agent.answer("m-1", "How do I reset my password?")["action"], "reply")
+
+    def test_an_unchanged_file_ages_while_it_is_read(self):
+        # 0.63.0 product reading 2: a knowledge file nobody rebuilt is stale past its maximum age, looks or not
+        path, now, source = self.source_at(1000.0)
+        source.current()
+        for later in (1300.0, 1600.0):
+            now[0] = later
+            source.current()
+            self.assertFalse(source.state()["stale"], later)
+        now[0] = 1601.0
+        source.current()
+        self.assertEqual((source.state()["age_s"], source.state()["stale"]), (601, True))
+        restarted = sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0])
+        restarted.current()
+        self.assertTrue(restarted.state()["stale"], "a restart does not make old content new")
+        self.assertIsNone(sa.KnowledgeSource(path, max_age_s=600, clock=lambda: now[0]).state()["age_s"])
+
+    def test_the_maximum_age_is_a_whole_number_of_seconds(self):
+        for bad in (0, -5, True, "60", 1.5):
+            with self.subTest(bad=bad), self.assertRaises(sa.RecipeError):
+                sa.KnowledgeSource(self.dir / "k.json", max_age_s=bad)
+        path, now, source = self.source_at(10.0, max_age_s=1)
+        source.current()
+        now[0] = 11.0
+        self.assertEqual(source.state()["age_s"], 1)
+        self.assertFalse(source.state()["stale"], "exactly at the maximum age is not past it")
+
+    def test_an_unchanged_file_is_not_read_again(self):
+        # 0.63.0 unit reading 6: the modification time decides; an answer does not re-parse an unchanged file
+        from unittest import mock
+        path, now, source = self.source_at(1000.0)
+        with mock.patch.object(sa.Knowledge, "load", wraps=sa.Knowledge.load) as load:
+            source.current()
+            source.current()
+            self.assertEqual(load.call_count, 1)
+            os.utime(path, (2000.0, 2000.0))
+            source.current()
+            self.assertEqual(load.call_count, 2)
+
+    def test_a_rewrite_that_keeps_the_time_is_read_and_a_failed_read_is_not_parsed_again(self):
+        # 0.63.0 unit and seam readings 7: a coarse clock or `cp -p` keeps the time; a broken file is parsed once
+        from unittest import mock
+        path, now, source = self.source_at(1000.0)
+        self.assertEqual(len(source.current().entries), 3)
+        entries = json.loads(path.read_text())["entries"][:1]
+        path.write_text(json.dumps({"entries": entries}))
+        os.utime(path, (1000.0, 1000.0))
+        self.assertEqual(len(source.current().entries), 1, "the size changed at the same time")
+        same = json.loads(path.read_text())
+        same["entries"][0]["answer"] = same["entries"][0]["answer"][:-1] + "!"  # the same size, the same time
+        fresh = path.with_name("fresh.json")
+        fresh.write_text(json.dumps(same))
+        os.utime(fresh, (1000.0, 1000.0))
+        os.replace(fresh, path)  # a new inode: what a build that replaces the file leaves
+        self.assertTrue(next(iter(source.current().entries.values()))["answer"].endswith("!"))
+        # 0.63.0 unit reading 13: in place, the same size and the same inode, the time set back (`rsync --inplace -t`);
+        # POSIX only: on Windows st_ctime is the creation time (unit reading 14)
+        if os.name != "nt":
+            inode = path.stat().st_ino
+            with open(path, "r+") as handle:
+                text = handle.read()
+                handle.seek(0)
+                handle.write(text.replace('!"', '?"', 1))
+            os.utime(path, (1000.0, 1000.0))
+            self.assertEqual(path.stat().st_ino, inode)
+            self.assertTrue(next(iter(source.current().entries.values()))["answer"].endswith("?"))
+        path.write_text("[]oops")
+        os.utime(path, (1000.0, 1000.0))
+        with mock.patch.object(sa.Knowledge, "load", wraps=sa.Knowledge.load) as load:
+            source.current()
+            source.current()
+            self.assertEqual(load.call_count, 1)
+        self.assertTrue(source.state()["degraded"])
+
+    def test_a_source_that_never_read_well_is_an_error(self):
+        path = self.dir / "knowledge.json"
+        path.write_text("[]oops")
+        with self.assertRaises(sa.RecipeError):
+            sa.KnowledgeSource(path, max_age_s=600).current()
+
+    def test_from_config_makes_a_source_when_the_config_names_a_maximum_age(self):
+        config = json.loads((RECIPE / "config.example.json").read_text())
+        config.update(knowledge=str(RECIPE / "knowledge.example.json"), stateDir=str(self.dir / "state"),
+                      knowledgeMaxAgeSeconds=3600)
+        (self.dir / "config.json").write_text(json.dumps(config))
+        agent = sa.from_config(self.dir / "config.json")
+        self.assertIsInstance(agent.knowledge, sa.KnowledgeSource)
+        self.assertEqual(agent.knowledge.max_age_s, 3600)
+        self.assertFalse(agent.knowledge.state()["degraded"], "read at start")
+        self.assertIsNotNone(agent.knowledge.state()["age_s"], "read at start: its age is known, never null")
+        del config["knowledgeMaxAgeSeconds"]
+        (self.dir / "config.json").write_text(json.dumps(config))
+        self.assertIsInstance(sa.from_config(self.dir / "config.json").knowledge, sa.Knowledge)
+
+    def test_from_config_refuses_a_file_nested_too_deep_with_a_recipe_error(self):
+        (self.dir / "k.json").write_text('{"entries": ' + "[" * 200000 + "]" * 200000 + "}")
+        config = json.loads((RECIPE / "config.example.json").read_text())
+        for age in (3600, None):
+            with self.subTest(age=age):
+                config.update(knowledge=str(self.dir / "k.json"), stateDir=str(self.dir / "state"),
+                              knowledgeMaxAgeSeconds=age)
+                (self.dir / "config.json").write_text(json.dumps(config))
+                with self.assertRaises(sa.RecipeError):
+                    sa.from_config(self.dir / "config.json")
+
+    def test_a_refused_file_says_what_to_fix_with_a_maximum_age_too(self):
+        # 0.63.0 product reading 4: the source path said "could not be read" and hid which entry was refused
+        entries = json.loads((RECIPE / "knowledge.example.json").read_text())["entries"]
+        entries[0]["tags"] = None
+        (self.dir / "k.json").write_text(json.dumps({"entries": entries}))
+        config = json.loads((RECIPE / "config.example.json").read_text())
+        for age in (3600, None):
+            with self.subTest(age=age):
+                config.update(knowledge=str(self.dir / "k.json"), stateDir=str(self.dir / "state"),
+                              knowledgeMaxAgeSeconds=age)
+                (self.dir / "config.json").write_text(json.dumps(config))
+                with self.assertRaises(sa.RecipeError) as raised:
+                    sa.from_config(self.dir / "config.json")
+                self.assertIn(entries[0]["id"], str(raised.exception))
+                self.assertNotIn("could not be read", str(raised.exception))
 
     def test_from_config_takes_on_handoff(self):  # 0.55.0 seam round 4: a config-built agent routes its hand-offs
         config = json.loads((RECIPE / "config.example.json").read_text())

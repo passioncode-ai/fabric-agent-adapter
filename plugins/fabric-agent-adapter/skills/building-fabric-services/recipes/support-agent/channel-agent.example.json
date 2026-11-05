@@ -1,0 +1,103 @@
+{
+  "https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1": {
+    "standard": "channel-agent-standard/1",
+    "projects": [
+      {
+        "project": "project:example-shop",
+        "side": "example-side",
+        "lead_agent": "example-agent",
+        "adopted_at": "2026-11-10",
+        "taxonomy": {
+          "version": "2026-11-04",
+          "codes": [
+            {
+              "code": "orders.status",
+              "label": "Where is my order"
+            },
+            {
+              "code": "payments.refund",
+              "label": "A refund"
+            }
+          ]
+        },
+        "tiers": [
+          {
+            "code": "premium",
+            "label": "Premium",
+            "rule": "open_orders > 10",
+            "escalate": "at_once"
+          }
+        ],
+        "question_route": {
+          "capability": "operator.ask",
+          "target": "00000000-0000-4000-8000-000000000001",
+          "daily_cap": 10,
+          "days": "mon-fri",
+          "tz": "Europe/Warsaw",
+          "send_at": "09:00",
+          "expires": "P7D"
+        },
+        "gap_registry": {
+          "none": "not_yet",
+          "until": "2026-11-30"
+        },
+        "channels": [
+          {
+            "id": "mail",
+            "kind": "mail",
+            "replies_enabled": true,
+            "decision": null,
+            "final_limit": "P7D",
+            "first_reply_limit": "PT24H",
+            "holding_reply": true,
+            "clarifying_question": true,
+            "quiet_window": null,
+            "late_answer_window": null,
+            "items_seen_unit": "mails",
+            "texts": {
+              "holding": {
+                "en": "Thank you, we are looking into it and will answer here."
+              },
+              "final": {
+                "en": "Here is the answer to your question. Write again if anything is still unclear."
+              }
+            }
+          }
+        ],
+        "sources": [
+          {
+            "id": "knowledge",
+            "owner": "example-agent",
+            "read": "file",
+            "cadence": "PT1H",
+            "max_age": "PT2H"
+          }
+        ],
+        "declined_sources": [],
+        "handoff_queues": [
+          {
+            "id": "support-mailbox",
+            "owner": "example-team",
+            "limit": "P2D",
+            "answered_signal": "none",
+            "recommendation": "5d1f0a3c-8b2e-4c7a-9e6f-1a2b3c4d5e6f"
+          }
+        ],
+        "evals": {
+          "suite": "test/evals/support",
+          "judge_budget_usd": 0,
+          "replay_budget_usd": 0,
+          "spend_record": null
+        },
+        "tickets": {
+          "outbox": "state/tickets-outbox.jsonl",
+          "token_slot": "example-shop/prod/SIGNAL_TICKETS_TOKEN",
+          "pd_check": {
+            "none": "not_used"
+          }
+        },
+        "recorded_decisions": []
+      }
+    ]
+  }
+}

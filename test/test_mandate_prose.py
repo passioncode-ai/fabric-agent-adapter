@@ -31,6 +31,13 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
         self.body = body("working-with-fabric")
         self.rule = section("working-with-fabric", "Step 5: while you work")
 
+    def test_his_word_is_done_the_first_time(self):  # the-operators-word-is-done-the-first-time (FAA-207)
+        for words in ("His word is done the first time, by you (CT-220)", "no command for him to run",
+                      "one short question, then do"):
+            self.assertIn(words, " ".join(self.rule.split()), words)
+        practices = flat("creating-fabric-agents/references/practices.md")
+        self.assertIn("The owner's word is done the first time, by the agent", practices)
+
     def test_one_approval_binds_all_his_agents(self):  # operator-approval-binds-all-his-agents
         for words in ("binds all his agents", "verbatim", "the date", "the source", "the approved scope",
                       "3e8f706c", "provenance `trusted`", "his local session", "asks once only about what he did not see",

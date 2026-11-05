@@ -143,46 +143,57 @@ STEP_0_ROW = (
     "counted or judged as answers, a commitments ledger, a knowledge client that reads the service's `answer` flag,"
     ' a gap queue and a feed re-read on a new event kind (references/agents-that-answer-people.md) |')
 RECIPE_PARAGRAPH = (
-    'This recipe is the draft-and-check step of an agent that answers people, not that agent, and used alone it '
-    'falls short of one. Every hand-off goes to `on_handoff`, by default the outbox a person reads, at the first '
-    'refusal: the practices name that as the failing pattern (P2). An agent that repairs passes its own '
-    '`on_handoff=` so a failed check reaches its repair step rather than a person; the recipe returns the failed '
-    'checks by name in `reasons`, but takes no reason in and returns no refused draft yet, and it calls again under'
-    ' a new message id, since the stored decision answers any repeat of the same id. `on_handoff` runs under the '
-    "agent's lock, before the decision is saved, so it queues the hand-off and returns: since 0.55.0 a call to "
-    '`answer` from inside it, on the same thread, is refused with `ReentryError` (a `RecipeError`), and unless '
-    '`on_handoff` catches it the first call raises it too, its draft paid and nothing saved or delivered. A call it'
-    ' hands to another thread and waits for waits for the lock forever, so it never waits: the repair step calls '
-    '`answer` once the first call has returned. The original id stays a hand-off, which a repeat of it returns; the'
-    " repair step sends the retry's reply and records the turn as answered in the agent's own turn record, which, "
-    "not `decisions.jsonl` (one line per message id decided), counts turns. The retry's own hand-off reaches "
-    "`on_handoff` again, so the repair step bounds its retries (one repair is the practices') and passes any "
-    "further hand-off to the person's channel. A copy of `support_agent.py` made before 0.55.0 takes no "
-    '`on_handoff` in `from_config` and hangs on such a call (`grep -c ReentryError support_agent.py` prints 0 for '
-    'it; `fabric_kit.py status` covers the kit modules only): copy it again. The recipe also lacks three parts of '
-    'such an agent: the Lookup (shared words, best three) is a relevance rule of its own, where the agent reads the'
-    " knowledge service's per-item `answer` flag and puts small closed rule sets into the prompt whole; "
-    '`from_config` accepts a same-vendor fallback, refused only per call as `model:config`; and the decision does '
-    'not record which model answered, so fallback recoveries are not counted. The recipe hands off nothing for '
-    '`policy`: the calling service routes the categories a person must handle (refunds, unbans, account recovery) '
-    "before it calls the recipe, or a model's `HANDOFF` on them is counted as a false knowledge gap. Count its "
-    'hand-offs by cause: a failed check is a refusal for the agent to repair, research and hold, and only a hold on'
-    ' the material counts as `inability` (a hold after an outage or at the research time cap is `infrastructure`); '
-    '`unsupported:amount` is a money reason, never researched, and so is `unsupported:number` while the decision '
-    'returns no draft to tell a price from another number; `no-knowledge` and `model-unsure` are `inability`; every'
-    ' `inability` opens a gap; `model:*` is `infrastructure`, and `model:ceiling` and `model:payment` are also the '
-    "turn's `limit` outcome. The rest of the agent's parts with checks come from [agents that answer "
+    'This recipe is the draft-and-check step of an agent that answers people, not that agent, and used alone it falls'
+    ' short of one. Every hand-off goes to `on_handoff`, by default the outbox a person reads, at the first refusal: '
+    'the practices name that as the failing pattern (P2). An agent that repairs passes its own `on_handoff=` so a '
+    'failed check reaches its repair step rather than a person; a hand-off the checks made carries the failed checks '
+    'in `reasons` and the refused `draft`, and the repair step passes that decision back as `answer(new_id, text, '
+    'repair=decision)`: the model gets its draft and the reasons, and a pass comes back as a reply with `repaired: '
+    "true`, a second refusal as a hand-off with `fallback: true` (the channel-agent standard's 4.4 and its ticket's "
+    '`fallback`, FAA-197). It calls under a new message id, since the stored decision answers any repeat of the same '
+    "id (`repair=` under the refused decision's own id is refused with a `RecipeError`); `repair=` takes only a hand-off"
+    ' the checks made (not `no-knowledge`, `model-unsure` or `model:*`), and never'
+    ' a repeat: a repeat of the id returns the stored decision, which has no draft, so the repair step keeps the '
+    'decision it was handed and passes each first decision to `repair=` once. A repair the model declines (`HANDOFF`)'
+    " or that finds no knowledge is marked `fallback: true` too: it marks a spent repair; a"
+    " `model:*` outage is not one. `on_handoff` runs under the agent's lock, before the"
+    ' decision is saved, so it queues the hand-off and returns: since 0.55.0 a call to `answer` from inside it, on '
+    'the same thread, is refused with `ReentryError` (a `RecipeError`), and unless `on_handoff` catches it the first '
+    'call raises it too, its draft paid and nothing saved or delivered. A call it hands to another thread and waits '
+    'for waits for the lock forever, so it never waits: the repair step calls `answer` once the first call has '
+    "returned. The original id stays a hand-off, which a repeat of it returns; the repair step sends the retry's "
+    "reply and records the turn as answered in the agent's own turn record, which, not `decisions.jsonl` (one line "
+    "per message id decided), counts turns. The retry's own hand-off reaches `on_handoff` again, so the repair step "
+    "bounds its retries (one repair is the practices') and passes any further hand-off to the person's channel. A "
+    'copy of `support_agent.py` made before 0.55.0 takes no `on_handoff` in `from_config` and hangs on such a call '
+    '(`grep -c ReentryError support_agent.py` prints 0 for it; `fabric_kit.py status` covers the kit modules only): '
+    'copy it again. The recipe also lacks three parts of such an agent: the Lookup (shared words, best three) is a '
+    "relevance rule of its own, where the agent reads the knowledge service's per-item `answer` flag and puts small "
+    'closed rule sets into the prompt whole; `from_config` accepts a same-vendor fallback, refused only per call as '
+    '`model:config`; and the decision does not record which model answered, so fallback recoveries are not counted. '
+    'The recipe hands off nothing for `policy`: the calling service routes the categories a person must handle '
+    "(refunds, unbans, account recovery) before it calls the recipe, or a model's `HANDOFF` on them is counted as a "
+    'false knowledge gap. Count its hand-offs by cause: a failed check is a refusal for the agent to repair, research'
+    ' and hold, and only a hold on the material counts as `inability` (a hold after an outage or at the research time'
+    ' cap is `infrastructure`); `unsupported:amount` is a money reason, never researched, and so is '
+    '`unsupported:number` unless the refused `draft` shows the number is not a price; `no-knowledge` and '
+    '`model-unsure` are `inability`; every `inability` opens a gap; `model:*` is `infrastructure`, and '
+    "`model:ceiling` and `model:payment` are also the turn's `limit` outcome. The rest of the agent's parts with "
+    'checks come from [agents that answer '
     'people](../../../creating-fabric-agents/references/agents-that-answer-people.md): the turn record, the daily '
     "`support.quality_daily` report, the other-vendor model checker that sees the material first (this recipe's "
-    'checks are code only), the false-state gates, numbers and account state from tools, the live-tail re-read, the'
-    ' commitments ledger and the gap queue.')
+    'checks are code only), the false-state gates, numbers and account state from tools, the live-tail re-read, the '
+    'commitments ledger and the gap queue.')
 RECIPE_RETENTION = (
     "Every handoff row in `handoffs.jsonl` holds the customer's own message, which can carry an email address, a "
     "phone number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy "
     "states, at most 30 days for an agent that answers people (the standard's A1). A1 also asks for the text "
     'redacted: the outbox keeps it as written, and `prune` takes any `--keep-days`, so such an agent passes an '
-    '`on_handoff` that redacts what it stores, which replaces the outbox, and keeps 30 days or fewer. Prune on a '
-    'schedule:')
+    '`on_handoff` that redacts what it stores, which replaces the outbox, and keeps 30 days or fewer. A refused '
+    '`draft`, which can echo what the customer wrote, reaches the returned decision and an `on_handoff` the agent '
+    'passes, never a file: neither `decisions.jsonl` nor the default outbox stores it. A capability handler returns '
+    "the decision without it: a kit job's result is written to the job's file (`fabric_interop`'s job store), so pass"
+    ' `draft` only to the repair step. Prune on a schedule:')
 CHANGELOG_ENTRY = (
     '- **creating-fabric-agents: agents that answer people** (FAA-162, board request `1ad39d4e`). A new reference, '
     '`references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, '
@@ -313,13 +324,15 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         self.assertIn(RECIPE_RETENTION, paragraphs)
         for words in ("the draft-and-check step of an agent that answers people, not that agent",
                       "agents-that-answer-people.md", "`infrastructure`", "`inability`", "`policy`",
-                      "and so is `unsupported:number` while the decision returns no draft", "model checker",
+                      "and so is `unsupported:number` unless the refused `draft` shows", "model checker",
                       "at most 30",
                       "only a hold on the material counts as `inability`", "at the first refusal", "`on_handoff=`",
                       "per-item `answer` flag", "under a new message id",
-                      "same-vendor fallback", "`model:payment`", "an `on_handoff` that redacts what it stores"):
+                      "same-vendor fallback", "`model:payment`", "an `on_handoff` that redacts what it stores",
+                      "neither `decisions.jsonl` nor the default outbox stores it", "a repeat of the id returns the stored decision"):
             self.assertIn(words, recipe, words)
         self.assertIn("recipes/support-agent/", flat(REFERENCE))
+        self.assertIn("practices.md#agents-on-a-channel-people-write-to", text(REFERENCE), "the channel doctrine is reached")
         self.assertIn("agents-that-answer-people.md", flat("building-fabric-services/SKILL.md"))
         self.assertNotIn("](../../", text(REFERENCE), "the reference names a sibling skill's page in prose")
 

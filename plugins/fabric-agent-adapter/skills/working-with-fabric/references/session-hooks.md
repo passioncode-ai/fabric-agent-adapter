@@ -2,7 +2,8 @@
 
 Read this when a person asks what the plugin's Fabric hooks do, where they log, how to turn them off, or what they
 need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` and run
-`scripts/fabric_session.py hook <event>`. Codex and Kimi Code get one hook, the session-start preamble, which
+`scripts/fabric_session.py hook <event>`. Codex and Kimi Code get one hook, the session-start preamble (or the exit contract in a session started on a board
+request), which
 `install-host-hooks` adds to their own config on the person's consent.
 
 ## Contents
@@ -11,6 +12,7 @@ need from Fabric. In Claude Code they live in the plugin's `hooks/hooks.json` an
 - Codex and Kimi Code
 - `watch-mail`
 - A session Fabric launched
+- A session started on a board request
 - What they never do
 - Where they log, and how to turn them off
 - What they need from Fabric
@@ -25,9 +27,9 @@ session start and turn; FAA-183 tracks making the plugin find the interpreter it
 
 | Event | When it acts | What it does |
 |---|---|---|
-| SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running, in a project that uses Fabric (below): adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read; `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric running in a folder with no such sign (a user-scope registration reaches every folder): one line pointing at `fabric_whoami`, which names the project when Fabric serves the folder anyway (FAA-60). Fabric down, in a project that uses Fabric: one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
+| SessionStart (`startup`, `clear`; the plugin's matcher, and the script ignores `compact` and `resume` for every host) | Claude Code has an MCP server named `fabric` (local, project or user scope) | Fabric running, in a project that uses Fabric (below): adds the preamble: `fabric_whoami` first; `com.status` and `com.list`, `com.read_ack` only what was read, and what waits on the Project answered in the same turn with its state, the result later (FAA-205); `fabric_work_list`, then `fabric_work_claim`; `fabric_work_release` at the end; ask another Project only through `com.submit`. Fabric running in a folder with no such sign (a user-scope registration reaches every folder): one line pointing at `fabric_whoami`, which names the project when Fabric serves the folder anyway (FAA-60). Fabric down, in a project that uses Fabric: one line, skip `fabric_whoami` and the board, start Fabric through the lifecycle broker only if the task needs it. Fabric down anywhere else, or not registered: nothing. |
 | Stop (each turn) | as for SessionStart, and the running Fabric's `hub.json` lists `"session-hooks/1"` in `features` | measures the turn's facts (HEAD, files changed, lines added and removed: counts and ids only, git sharing 1.5 s) and names the other Git repositories the turn touched (FAA-140, below: only once Fabric takes them), spools them in one entry and starts a detached worker that sends `fabric_session_observe {event: "turn", head, filesChanged, linesAdded, linesRemoved, …}` as stored (with `repositories` only where that tool's input schema lists the field as an array of items with host, owner and name requiring nothing else, at most its `maxItems`, each item meeting what the schema says of its fields or left out; a turn spooled with the mark and delivered to a Fabric whose schema no longer takes them goes without them, and the log says so once per session; with a Fabric that never took them nothing is read and nothing is logged), keeps the `nudges` its answer carries (Fabric 0.3.14: each `{kind, says, task_id?, request_id?}`, shown on a turn once, at most five; it stays for `fabric_work_list` and `fabric_heartbeat`, so it may come again there) in `nudges.json`, then reads `com.status` and keeps the unread count in the session's spool (`board.json`) |
-| UserPromptSubmit | the session's spool holds a count or nudges | adds ONE line, `N unread on the project board: com.list`, only when the count rose since the last line (a fall or the same count says nothing), then each nudge's `says` once, as Fabric writes it (Fabric 0.3.14 starts each with `Fabric:`; any other line gets the tag `Fabric reminder: `), one line each, at most five lines of at most 400 characters; the nudges file is taken by renaming it away before they are printed (FAA-142). It reads, renames and writes small files in the session's folder and never calls Fabric. |
+| UserPromptSubmit | the session's spool holds a count or nudges, and the session was not started on a board request (nor runs inside such a run) | adds ONE line, `N unread on the project board: com.list; answer what waits on you in this turn: ...` (FAA-205: its state now, the result later), only when the count rose since the last line (a fall or the same count says nothing), then each nudge's `says` once, as Fabric writes it (Fabric 0.3.14 starts each with `Fabric:`; any other line gets the tag `Fabric reminder: `), one line each, at most five lines of at most 400 characters; the nudges file is taken by renaming it away before they are printed (FAA-142). It reads, renames and writes small files in the session's folder and never calls Fabric. |
 | SessionEnd | as for Stop | spools the end; the worker sends `fabric_work_release {claims: "session", outcome: "let-go", …}` (with `observedAt`, the time the hook fired, where the tool's input schema names it: Fabric 0.3.9 then refuses an end from before the session enrolled), then `fabric_session_observe {event: "end", reason}`, and removes the session's spool. Reason `clear` ends nothing: `/clear` keeps the agent process and its fabric-mcp, so no claim is released and no end observed; turns already spooled still go out (since 0.42.0). Their nudges stay in the old id's folder and are not printed here; Fabric 0.3.14 only shows a nudge on a turn's answer and keeps it for `fabric_work_list` and `fabric_heartbeat`, so the new session gets it there (board `b605a636`; decision of 0.51.2, FAA-142) |
 
 **A resumed session and a session Fabric does not hold** (since 0.42.0, board thread `02bf19c5`). `claude --resume`
@@ -130,11 +132,13 @@ delivered the session's end, which removes the folder. More than five pending, o
 the rest from this output (Fabric keeps them for `fabric_work_list`): the log names how many (`dropped=`, `lost=`), never
 what they say; those the Stop worker delivered wait for the next prompt (FAA-142). While Fabric is down or
 the board unreadable it says so once and backs off, doubling to at most 15 minutes. It exits on its stdin's end (when started with a pipe), SIGTERM, SIGINT or SIGHUP,
-or when its parent is gone. It refuses to start in a session Fabric launched, and without a `fabric` registration.
+or when its parent is gone. It refuses to start in a session Fabric launched, in a session started on a board request, and without a `fabric`
+registration.
 
 ## A session Fabric launched
 
-Every hook, and `watch-mail`, is silent there: Fabric briefed that session itself. The signals, cheapest first;
+Every hook, and `watch-mail`, is silent there: Fabric briefed that session itself. The one exception is a session
+started on a board request, which gets its exit contract (below). The signals, cheapest first;
 only variable names are looked at, never a value (two of them carry the session's credential):
 
 1. `FABRIC_LAUNCHED_SESSION=1`: the marker Fabric is asked to set (D6). `0` or empty is not the marker.
@@ -147,6 +151,21 @@ only variable names are looked at, never a value (two of them carry the session'
    an empty `launched` file in the session's folder, so the walk runs once and nothing is spooled after it. A `ps`
    that fails or runs out of time is "unknown", never "not launched": that hook spools nothing (so no worker can
    release a launched session's claims) and the next one looks again.
+
+## A session started on a board request
+
+A session Fabric started to answer one board request (FAA-201) carries `FABRIC_DISPATCH_WORKFLOW`,
+`FABRIC_DISPATCH_HANDOFF` and `FABRIC_DISPATCH_REQUEST`, and its prompt's first line `fabric-dispatch/1 workflow=...
+handoff=... request=...` names the same three: only that makes it the run (Fabric's spec 3.5), since a reader or a
+subshell inherits the environment. SessionStart, which sees no prompt yet, prints the exit contract on that condition
+in place of the preamble, whatever the folder shows, without reading Fabric's files, and also in a session Fabric
+launched: there the contract is the one thing it prints; an environment without all three gets one line saying no
+session under it is a run. The prompt hook, which sees the line, says the session is the run, or, for a line that
+disagrees, that it is none and stops after saying so in the request's thread; a line with no workflow in the
+environment is quoted text. The first session whose line names the dispatch holds it (a record in `dispatch/`, below;
+a `/clear` in its process keeps it): another gets one line instead, telling it not to accept, claim, complete or
+close. The prompt hook prints no unread line and no nudges there, nor in a session inside the run, and leaves the nudges file where it is. The turn and end hooks work as in any other session (silent in a launched one); their worker still reads the count and keeps the nudges, which nothing prints. What the session then does:
+[on-demand session](on-demand-session.md).
 
 ## What they never do
 
@@ -189,6 +208,11 @@ Stop or SessionEnd hook, even while the hooks are inert; an end entry whose rele
 for the next worker, and the folder goes only once the end is delivered; a stale worker lock is taken by renaming it, never by a
 check and a delete),
 removed at the session's end.
+`dispatch/<key>.json` beside it records which session holds a dispatch (FAA-201: the first session id for its
+`FABRIC_DISPATCH_ID` when set, else for the workflow, the handoff and `SWITCHBOARD_LAUNCH_ID`, with the agent's process
+id, 0600; a `/clear` in that process moves it to the new session id and keeps
+`cleared_from`, the id the first clear replaced (or, when that was unknown, the session the first clear started), for a
+replayed accept; on Windows, where each hook's parent is a new Git Bash, a `/clear` never moves it and holds nothing, and the cleared session is told it is nested; on a host whose shell does not exec the hook command (dash before 0.5.11) the holder's own `/clear` is told it is nested and stays a helper, unmeasured; a `/clear` with no record yet is told the conditional contract; the prompt hook writes it, on the first prompt whose line names the dispatch; a missing or unreadable record holds nothing on a `/clear`), a hook given no session id (a native bridge) writes none and is told the conditional contract; removed after 7 days by the Stop and SessionEnd hooks and by the next session start on a board request (Codex and Kimi have only that hook).
 
 Turn only the transcript read off with `FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file in the folder
 above (FAA-160). That folder is a cache: a cache cleaner may remove the file, and the read is on again; the variable,

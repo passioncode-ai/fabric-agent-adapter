@@ -22,9 +22,14 @@ service that calls it owns its channel (mail, a chat, a store review) and its re
 This recipe is the draft-and-check step of an agent that answers people, not that agent, and used alone it falls short
 of one. Every hand-off goes to `on_handoff`, by default the outbox a person reads, at the first refusal: the practices
 name that as the failing pattern (P2). An agent that repairs passes its own `on_handoff=` so a failed check reaches
-its repair step rather than a person; the recipe returns the failed checks by name in `reasons`, but takes no reason
-in and returns no refused draft yet, and it calls again under a new message id, since the stored decision answers any
-repeat of the same id. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
+its repair step rather than a person; a hand-off the checks made carries the failed checks in `reasons` and the
+refused `draft`, and the repair step passes that decision back as `answer(new_id, text, repair=decision)`: the model
+gets its draft and the reasons, and a pass comes back as a reply with `repaired: true`, a second refusal as a hand-off
+with `fallback: true` (the channel-agent standard's 4.4 and its ticket's `fallback`, FAA-197). It calls under a new message id, since the stored decision answers any repeat of the same id (`repair=` under the
+refused decision's own id is refused with a `RecipeError`); `repair=` takes only a hand-off the checks
+made (not `no-knowledge`, `model-unsure` or `model:*`), and never a repeat: a repeat of the id returns the stored
+decision, which has no draft, so the repair step keeps the decision it was handed and passes each first decision to
+`repair=` once. A repair the model declines (`HANDOFF`) or that finds no knowledge is marked `fallback: true` too: it marks a spent repair; a `model:*` outage is not one. `on_handoff` runs under the agent's lock, before the decision is saved, so it queues the
 hand-off and returns: since 0.55.0 a call to `answer` from inside it, on the same thread, is refused with
 `ReentryError` (a `RecipeError`), and unless `on_handoff` catches it the first call raises it too, its draft paid and
 nothing saved or delivered. A call it hands to another thread and waits for waits for the lock forever, so it never
@@ -42,8 +47,8 @@ are not counted. The recipe hands off nothing for `policy`: the calling service 
 handle (refunds, unbans, account recovery) before it calls the recipe, or a model's `HANDOFF` on them is counted as a
 false knowledge gap. Count its hand-offs by cause: a failed check is a refusal for the agent to repair, research and
 hold, and only a hold on the material counts as `inability` (a hold after an outage or at the research time cap is
-`infrastructure`); `unsupported:amount` is a money reason, never researched, and so is `unsupported:number` while the
-decision returns no draft to tell a price from another number; `no-knowledge` and `model-unsure` are `inability`;
+`infrastructure`); `unsupported:amount` is a money reason, never researched, and so is `unsupported:number` unless the
+refused `draft` shows the number is not a price; `no-knowledge` and `model-unsure` are `inability`;
 every `inability` opens a gap; `model:*` is `infrastructure`, and `model:ceiling` and `model:payment` are also the
 turn's `limit` outcome. The rest of the agent's parts with checks come from [agents that answer
 people](../../../creating-fabric-agents/references/agents-that-answer-people.md): the turn record, the daily
@@ -85,6 +90,34 @@ cp <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/recipe
 python3 <adapter>/.../fabric_kit.py status <service>/support      # current, older or modified, per file
 ```
 
+## The knowledge file as a source
+
+The channel-agent standard declares every source with its owner, how it is read, its cadence and its maximum age, and a source that fails
+keeps its last good version and says so (its 7.1 and 7.4). `KnowledgeSource(path, max_age_s=...)` is the knowledge
+file read that way: it reads the file again when it changes, keeps the last good version when a read fails, and
+`state()` gives `{id, age_s, max_age_s, stale, degraded}`. The age is the last good version's, from its file's
+modification time: a file nobody rebuilt grows old however often it is read, and a restart does not make it new.
+The standard ages a source from its last finished sync, so the knowledge build writes or touches the file at every
+successful rebuild, unchanged or not, and never keeps the source's time (`cp -p`, `rsync -t`). Pass it as `knowledge=`, or set
+`knowledgeMaxAgeSeconds` in the config, which reads the file at once (a file never read well fails there). The calling service shows `state()`
+on its page and opens one alert when `stale` turns true: the recipe has no page and sends no alert itself.
+
+## Declaring the channel-agent standard
+
+An agent that answers people on a channel declares what it follows under
+`https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (the contract's proposed DEC-0150, not
+merged yet, so the key and the form may change), in its `fabric-agent.json` or its
+well-known `extensions` (the standard's 11 and 13.6; the doctrine: creating-fabric-agents
+[practices](../../../creating-fabric-agents/references/practices.md#agents-on-a-channel-people-write-to)).
+`channel-agent.example.json` is one project's declaration in the standard's round 4 form: a required member that is
+not there yet reads `{"none": "not_yet", "until": "<date>"}`, one not used `{"none": "not_used"}`, never null except
+where nothing is decided (a channel's `decision`); a final text never `not_used` beside a holding reply with replies
+on (FAC-SEM-164); `recommendation` only with `answered_signal: "none"`, the id of the
+board thread where the queue's owner was told; a channel's `items_seen_unit` one of `mails`, `updates`, `messages`,
+`reviews`; durations in ISO 8601; the knowledge file as a source with its
+maximum age. `test/test_channel_agent_example.py` holds the example to that form; `check_service.py` reads the
+declaration once the contract publishes its schema.
+
 ## Configure
 
 `config.example.json`, paths relative to the config's folder:
@@ -92,6 +125,7 @@ python3 <adapter>/.../fabric_kit.py status <service>/support      # current, old
 | Key | Meaning |
 |---|---|
 | `knowledge` | the knowledge file: `{"entries": [{"id", "question", "answer", "tags"}]}`, ids unique |
+| `knowledgeMaxAgeSeconds` | optional: the knowledge file is then a source with an age and a last good version (above) |
 | `stateDir` | the decisions (`decisions.jsonl`), the handoff outbox (`handoffs.jsonl`) and the usage ledger (`usage.jsonl`) |
 | `model`, `fallback` | two models of different vendors; a lane that reads what customers write runs on an open-vendor model (DEC-0083) |
 | `keyEnv` | the environment variable that holds the agent's own OpenRouter key; never a value in the file |
@@ -111,7 +145,11 @@ the store's runner, which puts the named key into this one process's environment
 `python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only <project> OPENROUTER_API_KEY --
 python3 support_agent.py answer ...`); a long-running
 service gets it the same way from its service manager. The decision
-prints as JSON: `{"messageId", "action": "reply"|"handoff", "reply"?, "citations", "reasons", "costUsd", "repeated"}`.
+prints as JSON: `{"messageId", "action": "reply"|"handoff", "reply"?, "citations", "reasons", "costUsd", "repeated"}`,
+with `"draft"` on a hand-off the checks made, `"repaired": true` on a reply after `repair=` and `"fallback": true` on
+a repair that ended in a second refusal, a declined repair (`HANDOFF`) or no knowledge; a `model:*` outage during a
+repair is a plain hand-off without a draft. Two meanings of the word: the config's `fallback` is the second model; a decision's `fallback: true`
+is the channel-agent standard's fallback, a spent repair (a second refusal, a declined repair or no knowledge on the retry, never a `model:*` outage). `repair=` refuses a decision that is already `fallback: true`.
 Exit 1 on a broken config or knowledge file. A missing key is not a crash: the message is handed off with
 `model:config`.
 
@@ -126,7 +164,10 @@ Every handoff row in `handoffs.jsonl` holds the customer's own message, which ca
 number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy states, at most
 30 days for an agent that answers people (the standard's A1). A1 also asks for the text redacted: the outbox keeps it
 as written, and `prune` takes any `--keep-days`, so such an agent passes an `on_handoff` that redacts what it stores,
-which replaces the outbox, and keeps 30 days or fewer. Prune on a schedule:
+which replaces the outbox, and keeps 30 days or fewer. A refused `draft`, which can echo what the customer wrote,
+reaches the returned decision and an `on_handoff` the agent passes, never a file: neither `decisions.jsonl` nor the
+default outbox stores it. A capability handler returns the decision without it: a kit job's result is written to
+the job's file (`fabric_interop`'s job store), so pass `draft` only to the repair step. Prune on a schedule:
 
 ```bash
 python3 support_agent.py prune --config config.json --keep-days 30
