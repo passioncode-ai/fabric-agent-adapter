@@ -126,7 +126,12 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `watch-mail`, no question to the operator.
 
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
-request `failed_known` with the reason when it holds a fence for it, closes the workflow and ends.
+request `failed_known` with the reason when it holds a fence for it. It closes the workflow only once the request is
+settled: the board accepted the complete or a reconcile, or `com.get` reads the request answered, terminal or
+`outcome_unknown`. Otherwise (the request still `queued`, `claimed`, `accepted` or `in_progress`, and not this run's to
+settle) it leaves the workflow open, with a checkpoint without `close` naming the reason when it holds the lease, and
+ends: a workflow closed over an unsettled request makes Fabric's next dispatch fail at the take-back on every cycle,
+while an open one is taken back for the next run (FAA-213).
 
 A run started with `--permissions ask` may find the board or Observatory tools not allowed by the person's settings.
 It cannot answer then: it says so in its final output and ends; Fabric records the outcome and does not retry the same

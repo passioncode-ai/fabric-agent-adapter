@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.66.0 (unreleased)
+
+### Fixed
+
+- working-with-fabric: a run Fabric started on a board request closes its workflow only once the request is settled
+  (FAA-213, passioncode-vesta's finding on the board; Fabric agrees). On an error the run cannot get past (a refused
+  claim, a missing key, a tool that fails twice) `references/on-demand-session.md` closed the workflow while the
+  request could still be `queued` or `claimed`, and Fabric's next dispatch then failed at the take-back on every cycle.
+  Now the run completes the request `failed_known` when it holds its fence, closes the workflow only when `com.get`
+  reads the request answered, terminal or `outcome_unknown`, and otherwise leaves it open (with a checkpoint without
+  `close` naming the reason when it holds the lease) for the next run. The exit contract the session hook prints in a
+  run says the same; it had no rule for an error before.
+
+### Changed
+
+- The exit contract stays under Hermes' 4000 characters at its longest (3994 with a 64-character handoff and a session
+  id) by leaving two explanations to `references/on-demand-session.md`: why a checkpoint repeats the packet's body,
+  and why Observatory refuses the packet's top-level `credentials` and the accept answer's `pack` in it. The rules
+  themselves are unchanged.
+
 ## 0.65.0 (2026-11-05)
 
 ### Fixed

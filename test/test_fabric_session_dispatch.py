@@ -421,6 +421,15 @@ class Hooks(Base):
         self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines, or one line that there is nothing; "
                       "no values), then end the run", cli.dispatch_contract(FULL))
 
+    def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
+        # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request makes
+        # Fabric's next dispatch fail at the take-back on every cycle
+        text = cli.dispatch_contract(FULL)
+        self.assertIn("On an error you cannot get past: complete it failed_known if you hold its fence; close the "
+                      "workflow only once the request is settled (`com.get`: answered, terminal or outcome_unknown), "
+                      "else leave it open.", text)
+        self.assertLess(text.index("7. Write the retro"), text.index("On an error you cannot get past"))
+
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
         self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")

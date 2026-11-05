@@ -562,6 +562,17 @@
       ]
     },
     {
+      "id": "a-dispatched-run-whose-claim-is-refused",
+      "trap": "closes the workflow while the request is still queued or claimed, so Fabric's next dispatch fails at the take-back on every cycle",
+      "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.claim on the request is refused and you hold no fence for it. What do you do?",
+      "expected": [
+        "does not complete the request, since it holds no fence for it",
+        "reads the request with com.get and closes the workflow only if it reads answered, terminal or outcome_unknown",
+        "otherwise leaves the workflow open: a checkpoint without close naming the refused claim, no close: true",
+        "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) and ends the run"
+      ]
+    },
+    {
       "id": "a-cleared-holder-replays-its-accept",
       "trap": "accepts the handoff again under the new session id, replays with another owner or executor than the first accept passed, or after a refused replay accepts again or completes the request",
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three and you were just cleared; the hook names the session id the clear replaced. What do you do about the lease?",
