@@ -33,8 +33,10 @@ class Words(unittest.TestCase):
 
     def test_the_preamble_names_the_retro_at_the_end(self):
         text = " ".join(cli.PREAMBLE.split())
-        self.assertIn("When a piece of work ends (released as done, or the session about to end), write the retro "
-                      "`fabric_whoami` asks for in the same turn.", text)
+        # self-contained: a released Fabric (0.3.15) does not carry retro-after-work yet (0.64.0 seam reading 1)
+        self.assertIn("When a piece of work ends (released as done, or the session about to end), write its retro in "
+                      "the same turn: `observatory_lesson` for what went wrong, insight/1 lines for what you learned, or "
+                      "one line that there is nothing.", text)
         self.assertNotIn("—", text)
 
 
@@ -72,6 +74,10 @@ class Released(unittest.TestCase):
                         release("mcp__fabric__fabric_task_release", outcome="succeeded",
                                 response=[{"type": "text", "text": '{"released": false, "reason": "you do not hold that task"}'}]),
                         release(how="done", response={"released": "true"}),
+                        release(how="done", response={"released": True, "code": "already-released"}),
+                        release("mcp__evil__fabric_work_release", how="done"),
+                        release("mcp__plugin_x__fabric_work_release", how="done"),
+                        release("mcp__a__fabric__fabric_work_release", how="done"),
                         release(how="done", response={"structuredContent": {"released": False, "code": "partial"}}),
                         {"tool_name": "mcp__fabric__fabric_work_release", "tool_input": "done"},
                         {"tool_name": None, "tool_input": {"how": "done"}}, [], None, "x"):
@@ -91,12 +97,13 @@ class Registration(unittest.TestCase):
     def test_hooks_json_registers_the_release_tools_only(self):
         hooks = json.loads(HOOKS.read_text(encoding="utf-8"))["hooks"]["PostToolUse"]
         self.assertEqual(len(hooks), 1)
-        matcher = re.compile(hooks[0]["matcher"])
+        matcher = re.compile(hooks[0]["matcher"])  # Claude Code tests it unanchored (RegExp.test), as re.search does
         for name in ("mcp__fabric__fabric_work_release", "mcp__fabric__fabric_task_release",
                      "mcp__plugin_x_fabric__fabric_work_release"):
-            self.assertTrue(matcher.fullmatch(name), name)
-        for name in ("mcp__fabric__fabric_work_claim", "Bash", "mcp__fabric__fabric_whoami", "fabric_work_release"):
-            self.assertFalse(matcher.fullmatch(name), name)
+            self.assertTrue(matcher.search(name), name)
+        for name in ("mcp__fabric__fabric_work_claim", "Bash", "mcp__fabric__fabric_whoami", "fabric_work_release",
+                     "mcp__evil__fabric_work_release", "mcp__fabric__fabric_work_release_all"):
+            self.assertFalse(matcher.search(name), name)
         (command,) = hooks[0]["hooks"]
         self.assertEqual(command["timeout"], 5)
         self.assertTrue(command["command"].endswith("fabric_session.py\" hook post-tool-use"), command["command"])

@@ -58,7 +58,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__.*__fabric_work_release|mcp__.*__fabric_task_release",
+        "matcher": "^mcp__(fabric|plugin_[A-Za-z0-9_-]+_fabric)__fabric_(work|task)_release$",
         "hooks": [
           {
             "type": "command",

@@ -13,7 +13,7 @@
   any other tool, and a release Fabric refused (its answer says `released: false`, which is how Fabric refuses one,
   or carries `isError`) print nothing; an answer the hook cannot read keeps the line. It says it in a session Fabric
   launched too, the one hook that speaks there besides a dispatched run's exit contract. No hook can speak to the
-  model when a session ends, so the session-start preamble names the retro for the end of the work or the session.
+  model when a session ends, so the session-start preamble names the retro itself (it does not rely on `fabric_whoami`, since no released Fabric carries `retro-after-work` yet) for the end of the work or the session.
   Measured through the real CLI under a load average of about 68: median 155 ms a call against 50 ms for a bare
   `python3 -S`, 1006 ms at most over 20 calls ([raw](docs/reports/2026-11-05-faa-206-retro/raw/hook-timing.log)).
 - creating-fabric-agents and adapting-projects-to-fabric: an agent built or adapted with the kit closes each piece of
@@ -21,8 +21,8 @@
 
 ### Upgrading
 
-- The plugin's `hooks.json` gains a `PostToolUse` entry whose matcher names Fabric's two release tools only; nothing
-  to configure. Codex and Kimi get no post-tool hook from `install-host-hooks` in this release.
+- The plugin's `hooks.json` gains a `PostToolUse` entry whose matcher names Fabric's two release tools on the `fabric`
+  server (or a plugin's `plugin_<name>_fabric`) only; nothing to configure. Codex and Kimi get no post-tool hook from `install-host-hooks` in this release.
 - working-with-fabric SKILL.md no longer repeats how a reminder Fabric gave is tagged or where a turn `watch-mail`
   delivered prints it, to stay within its word budget; `references/session-hooks.md` keeps both.
 
