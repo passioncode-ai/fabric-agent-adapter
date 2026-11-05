@@ -95,11 +95,13 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      executor's silence and one 60 s cycle after `run-ends-at`, and starts none with less than 5 minutes to the
      deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (`RUN_END_TO_DEADLINE_MS` and spec 3.6 on
      Fabric's main at `afe28a60`, in no release yet); a request Fabric's watch counts unanswered at its
-     deadline goes to the operator, with its workflow closed `blocked` from Fabric's 0.3.16 candidate on;
+     deadline goes to the operator with its workflow closed `blocked` in Fabric's 0.3.16 candidate (on its main only a
+     request still `queued` reaches the operator, so an accepted one waits unseen until that release);
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
-     with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
-     at `fff4b6d9`, in no release yet; a Fabric before it dispatches no accepted request). The open workflow is Fabric's
+     with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator in its 0.3.16
+     candidate (Fabric's main decides to dispatch it since `fff4b6d9` and runs the dispatcher since `a6f0ffda`, in no release
+     yet, but shows the operator only a request still `queued`; a Fabric before it dispatches no accepted request). The open workflow is Fabric's
      to move, not the run's: after the run ends, and no sooner than 120 s of the executor's silence, Fabric hands it to
      itself (`observatory_handoff_create` with reason `restart`, to `service:fabric`), takes the new lease and routes it
      to the next run; when the request goes to «На проверке» or its deadline passes, Fabric closes it `blocked` (Fabric's
@@ -152,7 +154,8 @@ stays queued, `claimed` is taken again under a new attempt, `accepted` is held u
 `in_progress` stays until the next holder registers, when the board records the lost result; an `outcome_unknown`
 attempt is resolved only by `com.reconcile` with an observed result. Fabric may start one more run for a request
 still queued, claimed with a lapsed lease, or accepted or in progress with no live holder (an accepted one since its
-main at `fff4b6d9`); after two runs with no answer it shows the request to the operator in «На проверке», unchanged. A run past its time limit is stopped
+main at `fff4b6d9`, the dispatcher since `a6f0ffda`); after two runs with no answer it shows the request to the operator in «На проверке», unchanged (any request in its
+0.3.16 candidate; on its main only a request still `queued`). A run past its time limit is stopped
 and ends `timed-out`.
 
 ## A session inside the run
