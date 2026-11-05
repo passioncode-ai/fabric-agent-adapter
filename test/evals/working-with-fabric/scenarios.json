@@ -557,7 +557,7 @@
       "expected": [
         "gives its state (what is done, where it lies, what is left) as a com.progress note on the request's thread",
         "when the request's deadline is not after run-ends-at plus 10 minutes, completes it failed_known saying the deadline came first and closes the workflow",
-        "after com.effect_begin (the request in_progress) completes it failed_known with the state it observed, never leaves it for the next run",
+        "after com.effect_begin (the request in_progress) completes it failed_known with observed: true and the state it observed, never leaves it for the next run",
         "otherwise leaves the request accepted for the next run: an in_progress checkpoint without close, no com.complete",
         "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) before it ends"
       ]
@@ -571,6 +571,18 @@
         "reads the request with com.get and closes the workflow only if it reads answered, terminal or outcome_unknown",
         "otherwise leaves the workflow open: an in_progress checkpoint without close naming the refused claim, no close: true",
         "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) and ends the run"
+      ]
+    },
+    {
+      "id": "a-dispatched-run-whose-enroll-is-refused",
+      "trap": "asks for access with a tool the session does not have, or ends without answering, so the request stays queued and two empty runs send it to the operator",
+      "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.enroll for the request's capability answers not_authorized. What do you do?",
+      "expected": [
+        "takes no slot and asks for no access (no fabric.access.request)",
+        "does the work the request asks for and answers it with one com.reply in its thread",
+        "at run-ends-at without a result, replies with the state and its nearest date instead",
+        "closes the workflow with status done once the reply is taken, since an answered request is settled",
+        "writes the retro (observatory_lesson and insight/1 lines in insights/, or one line that there is nothing) and ends the run"
       ]
     },
     {

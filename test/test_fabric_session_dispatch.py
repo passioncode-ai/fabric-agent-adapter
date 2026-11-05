@@ -419,8 +419,22 @@ class Hooks(Base):
 
     def test_step_7_names_the_retro_itself(self):
         # 0.64.0 product reading 2: the contract names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
-        self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines, or one line that there is nothing; "
-                      "no values), then end the run", cli.dispatch_contract(FULL))
+        self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines in `insights/`, or one line that there "
+                      "is nothing; no values), then end the run", cli.dispatch_contract(FULL))
+
+    def test_a_refused_enroll_answers_with_a_reply_and_the_close_waits_for_the_board(self):
+        # FAA-219: on Fabric 0.3.16 a session has no tool to ask board.respond (Fabric, thread 1add3c03, 9d23b27c);
+        # a reply from the target Project answers the request (DEC-0098, DEC-0102), and an answered request is settled
+        text = cli.dispatch_contract(FULL)
+        self.assertIn("a not_authorized enroll takes no slot: do the work, `com.reply` the answer, then steps 6 (done) "
+                      "and 7;", text)
+        self.assertNotIn("access.request", text)
+        # FAA-215: Fabric refuses a complete after an effect began without observed: true (observation_required)
+        self.assertIn("`com.complete` failed_known (observed: true) saying so", text)
+        # FAA-215: step 6 only once the board took the complete or the reply; a refused one is the error rule
+        self.assertIn("6. Once the board took it, `observatory_checkpoint_write`", text)
+        self.assertLess(text.index("3. "), text.index(" 6. "))
+        self.assertLess(text.index(" 6. "), text.index(" 7. "), "no ' 7. ' before step 6 (the closing-write test slices on it)")
 
     def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
         # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made
@@ -428,7 +442,7 @@ class Hooks(Base):
         text = cli.dispatch_contract(FULL)
         self.assertIn("On an error you cannot get past: complete the request failed_known if you hold its fence; close the "
                       "workflow only once the request is settled (`com.get`: answered, terminal or outcome_unknown), "
-                      "else leave it open.", text)
+                      "else leave it open; then step 7.", text)
         self.assertLess(text.index("7. Write the retro"), text.index("On an error you cannot get past"))
         # D3: one meaning of settled in the contract; outcome_unknown waits on a reconcile, resolved
         self.assertIn("resolve `outcome_unknown` only with `com.reconcile`", text)

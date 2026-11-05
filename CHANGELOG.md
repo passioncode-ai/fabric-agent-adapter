@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.68.0 (unreleased)
+
+### Fixed
+
+- working-with-fabric: a run Fabric started on a board request whose first `com.enroll` is refused `not_authorized`
+  takes no slot and asks for no access: it does the work and answers the request with one `com.reply` from the target
+  Project, which answers it, then closes the workflow `done` and writes the retro (FAA-219). On Fabric 0.3.16 a session
+  has no tool to ask `board.respond`; the sentence in 0.3.16's `com.enroll` description that says to ask it is Fabric's
+  defect, corrected on its `main` at `fae5df68`, and after Fabric's CO-506 the grant comes at `com.enroll` itself
+  (board thread `1add3c03`). Fabric keeps its dispatcher switch off on the operator's machine until this ships or
+  CO-506 does.
+- The exit contract's other open steps (FAA-215): after `com.effect_begin` a run at its limit completes `failed_known`
+  with `observed: true` (Fabric refuses a complete after an effect began without it, `observation_required`); the
+  workflow closes only once the board took the complete or the reply (a refused complete is the error rule); the error
+  rule ends with the retro; the retro names `insights/`. `references/on-demand-session.md` says the same and adds the
+  reason in a `com.progress` note before a complete on an error.
+- The contract keeps its rules within Hermes' own 4000-character cap on a plugin's prompt section
+  (`MAX_SYSTEM_PROMPT_SECTION_CHARS`, Hermes v0.22.2), 3987 at its longest: the arguments a tool's schema already names
+  (`com.claim`'s, the closing write's `owner` and `idempotencyKey`) and the skill's name before the reference went to
+  the reference.
+
 ## 0.67.0 (2026-11-05)
 
 ### Fixed
