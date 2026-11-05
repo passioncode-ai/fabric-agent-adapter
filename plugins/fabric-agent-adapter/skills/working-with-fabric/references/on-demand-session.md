@@ -181,8 +181,9 @@ the record names a replaced id the hooks cannot pass on (one that is not a lower
 nothing can be replayed and gives the new id: a pending handoff is accepted under it, and the next `/clear` names it;
 an accept already made under that id cannot be replayed, so the session ends the run without touching the request,
 and Fabric takes the workflow over after it (step 4). On Windows, where each hook's parent is a new Git Bash, a
-`/clear` cannot tell the holder from a helper: it holds nothing, the session gets the conditional contract and reads
-as a helper, and Fabric takes the workflow over after the run. A second session whose own first line names the
+`/clear` cannot tell the holder from a helper: it holds nothing, and while the record names the replaced session the
+cleared session is told at once that it runs inside a run that holds it, stays a helper whatever its prompt's line
+says, and Fabric takes the workflow over after the run. A second session whose own first line names the
 dispatch gets one line at its first prompt, after the conditional contract its start printed: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start under a board request's environment, the run's or a helper's,

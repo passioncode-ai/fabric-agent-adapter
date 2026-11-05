@@ -36,8 +36,8 @@
   or the first line and its thread from `com.get`, since Observatory's write redacts the packet's board references. A
   Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes carry the person's trust since 0.7.8); a host whose hook gets no session id (the native bridges) is always told
   the conditional contract and writes no record; on Windows, where each hook runs under a new Git Bash, a `/clear` holds
-  nothing (it cannot tell the holder from a helper), so the cleared session reads as a helper and Fabric takes the
-  workflow over after the run.
+  nothing (it cannot tell the holder from a helper), so the cleared session is told it runs inside a run that holds it,
+  stays a helper and Fabric takes the workflow over after the run.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.
 - working-with-fabric: whatever waits on the Project is answered in the same turn (FAA-205, the operator's rule of
@@ -87,7 +87,7 @@
 - The live docs name a closed module neutrally, as the organization edition (`references/package.md` in
   building-fabric-services and two backlog rows), at its owner's request; dated reports and handoffs keep their words.
 - A session that does a board request with no person in its chat stops before a production step and names it for a
-  person, unless the operator's own words, relayed with a scope naming the step, approve it (working-with-fabric `references/project-board.md`; board threads `1add3c03` and `24e0c88e`; Fabric's board rule at `108239c0`).
+  person, unless the operator's own words, relayed verbatim with their date and source from one of his own projects (provenance `trusted`) and with a scope naming the step, approve it (working-with-fabric `references/project-board.md`; board threads `1add3c03` and `24e0c88e`; Fabric's board rule at `108239c0`).
 
 ### Fixed
 

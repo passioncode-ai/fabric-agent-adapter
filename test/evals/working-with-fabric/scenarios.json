@@ -586,9 +586,9 @@
     {
       "id": "a-windows-clear-holds-nothing",
       "trap": "takes itself for the run after a /clear on Windows and accepts the handoff again",
-      "request": "On Windows, FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and you were just cleared; session start printed only the conditional contract, with no notice that you were cleared. What do you do?",
+      "request": "On Windows, FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and you were just cleared; session start said this session runs inside a run that holds it, and your next prompt's first line is the fabric-dispatch/1 line naming the same three. What do you do?",
       "expected": [
-        "is the run only when its own next prompt's first line is the fabric-dispatch/1 line naming the same three, and otherwise a helper",
+        "stays a helper even with that line, since the hooks say the run that holds the dispatch is another session",
         "touches neither the handoff, the request nor the workflow as a helper, and leaves the workflow to Fabric",
         "never replays an accept it cannot name the session id for"
       ]

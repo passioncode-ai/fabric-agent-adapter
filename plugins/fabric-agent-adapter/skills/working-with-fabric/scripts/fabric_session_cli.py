@@ -145,12 +145,12 @@ DISPATCH_CONTRACT = (
     "`leaseId`). Every checkpoint you write repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (from `observatory_checkpoint_latest`; never its top-level `credentials` or the accept answer's "
     "`pack`, which Observatory refuses back) unchanged and adds `open`, `done` or `notes`, never a value: Observatory keeps only the latest body. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
-    "and finish before run-ends-at; work that cannot end by then gives its state as a `com.progress` note on the "
-    "thread, then: when the request's deadline is not after run-ends-at plus 10 minutes (no next run starts that close to it), `com.complete` failed_known saying so and steps 6 and 7; "
+    "and finish before run-ends-at; work that cannot end by then gives its state as a `com.progress` note, "
+    "then: when the request's deadline is not after run-ends-at plus 10 minutes (no run starts that close to it), `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
-    "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a typed secret or a "
-    "payment is a person's (none is in this chat), and so is a production step unless the operator's words, relayed "
-    "verbatim and dated from his projects with a scope naming it, approve it: name what is left in "
+    "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a one-time code, a typed "
+    "secret or a payment is a person's (none is in this chat), and so is a production step unless the operator's "
+    "words, relayed verbatim, dated and sourced, from his projects with a scope naming it, approve it: name it in "
     "the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
@@ -383,6 +383,18 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     return True
 
 
+def dispatch_held_elsewhere(dispatch: Dict[str, str], session_id: Any, env: Optional[Dict[str, str]] = None) -> bool:
+    """Whether a record for the dispatch exists and does not name this session: dispatch_holder then answers no for
+    it at every prompt (a record that cannot be read counts as another session's)."""
+    folder, key = _dispatch_record(dispatch, env)
+    if not (folder / (key + ".json")).exists():
+        return False
+    try:
+        return json.loads(read_small(folder / (key + ".json")) or "null").get("session") != session_id
+    except (ValueError, AttributeError):
+        return True
+
+
 def _host_output(host: str, event: str, context: str) -> str:
     if host not in ("claude", "codex"):
         return context
@@ -419,6 +431,10 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
                 and dispatch_holder(dispatch, session_id, env, take_over=True):
             return _host_output(host, "SessionStart", dispatch_contract(dispatch) + dispatch_cleared(
                 dispatch_cleared_from(dispatch, env), dispatch["handoff"], session_id))
+        # a clear that holds nothing while another session holds the record (on Windows, or a nested session's
+        # clear): its prompt hook answers nested whatever its line says, so it is told so now (0.63.0 unit reading 22)
+        if payload.get("source") == "clear" and dispatch_held_elsewhere(dispatch, session_id, env):
+            return _host_output(host, "SessionStart", DISPATCH_NESTED.format(**dispatch))
         # the prompt is not seen yet: the run is the session whose own first line names these three
         return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id, conditional=True))
     if fabric_launched(env):

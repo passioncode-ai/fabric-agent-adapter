@@ -86,9 +86,9 @@ class Parsing(unittest.TestCase):
             self.assertIn(word, text)
         self.assertNotIn("—", text)
         # 0.63.0 unit reading 21: the operator's relayed words lift the production stop only
-        self.assertIn("a sign-in, a typed secret or a payment is a person's (none is in this chat), and so is a "
-                      "production step unless the operator's words, relayed verbatim and dated from his projects with a "
-                      "scope naming it, approve it",
+        self.assertIn("a sign-in, a one-time code, a typed secret or a payment is a person's (none is in this chat), "
+                      "and so is a production step unless the operator's words, relayed verbatim, dated and sourced, "
+                      "from his projects with a scope naming it, approve it",
                       " ".join(text.split()))
 
     def test_the_closing_write_names_its_workflow_and_the_board_reads_are_real_tools(self):
@@ -179,8 +179,9 @@ class Hooks(Base):
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
         self.assertLess(len(cli.dispatch_contract(longest, uuid, conditional=True)), 4000, "with a session id too")
 
-    def test_a_handoff_longer_than_the_contract_fits_is_no_dispatch(self):
-        # 0.63.0 unit reading 21: 64 characters keep the conditional contract under Hermes' 4000 with a session id
+    def test_the_handoff_form_takes_at_most_64_characters(self):
+        # 0.63.0 unit reading 21: the form limit; Switchboard and Observatory write 24 (`handoff:` and 16 hex), and the
+        # Hermes length test above holds the contract at this limit under 4000
         kept, dropped = "handoff:" + "x" * 64, "handoff:" + "x" * 65
         self.assertEqual(cli.dispatch_from_env(dict(ENV, FABRIC_DISPATCH_HANDOFF=kept))["handoff"], kept)
         long_env = dict(ENV, FABRIC_DISPATCH_HANDOFF=dropped)
@@ -418,7 +419,7 @@ class Hooks(Base):
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
         self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")
-        self.assertIn("when the request's deadline is not after run-ends-at plus 10 minutes (no next run starts that close to it), "
+        self.assertIn("when the request's deadline is not after run-ends-at plus 10 minutes (no run starts that close to it), "
                       "`com.complete` failed_known", text,
                       "no run comes after the deadline (0.63.0 product reading 12)")
 
@@ -678,8 +679,9 @@ class Hooks(Base):
         only = {"FABRIC_DISPATCH_WORKFLOW": WF}
         self.assertEqual(self.context(self.prompt(only, LINE)[0]), cli.DISPATCH_INCOMPLETE.format(workflow=WF))
 
-    def test_on_windows_a_clear_is_told_the_condition(self):
-        # 0.63.0 product reading 20: the clear holds nothing there, so the notice is the conditional contract alone
+    def test_on_windows_a_clear_is_told_it_is_nested(self):
+        # 0.63.0 unit reading 22: the clear holds nothing there and its prompt hook answers nested whatever its line
+        # says, so session start says so too, not the conditional contract
         from unittest import mock
         env = dict(self.env, **ENV)
         with mock.patch.object(cli.os, "getppid", return_value=111):
@@ -687,9 +689,19 @@ class Hooks(Base):
         cleared = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
         with mock.patch.object(cli.os, "getppid", return_value=111), mock.patch.object(cli, "_WINDOWS", True):
             said = cli.hook_session_start({"session_id": cleared, "cwd": str(self.repo), "source": "clear"}, env)
+            text = json.loads(said)["hookSpecificOutput"]["additionalContext"]
+            self.assertEqual(text, cli.DISPATCH_NESTED.format(**FULL))
+            self.assertFalse(cli.dispatch_holder(FULL, cleared, env), "its prompt is answered nested too")
+
+    def test_a_clear_with_no_record_is_told_the_condition(self):
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        cleared = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        with mock.patch.object(cli, "_WINDOWS", True):
+            said = cli.hook_session_start({"session_id": cleared, "cwd": str(self.repo), "source": "clear"}, env)
         text = json.loads(said)["hookSpecificOutput"]["additionalContext"]
         self.assertEqual(text, cli.dispatch_contract(FULL, cleared, conditional=True))
-        self.assertNotIn("This session was cleared", text)
+        self.assertTrue(cli.dispatch_held_elsewhere(FULL, cleared, env) is False)
 
     def test_an_uppercase_request_is_a_request(self):
         # Switchboard parses the request with uuid::Uuid::parse_str, which takes either case
