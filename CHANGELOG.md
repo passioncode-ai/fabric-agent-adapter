@@ -12,7 +12,7 @@
   Now the run completes the request `failed_known` when it holds its fence, closes the workflow only when `com.get`
   reads the request answered, terminal or `outcome_unknown`, and otherwise leaves it open (with a checkpoint without
   `close` naming the reason when it holds the lease) for the next run, then writes the retro and ends. Fabric then
-  starts the next run, and after two runs with no answer shows the request to the operator in «На проверке» (any
+  starts the next run (in its 0.3.16 candidate only when the project has no live session), and after two runs with no answer shows the request to the operator in «На проверке» (any
   request in its 0.3.16 candidate; on its `main`, only a request still `queued`). The exit
   contract the session hook prints in a run states the rule and points to the reference for the rest; it had no rule
   for an error before. Step 3 of the contract now says to resolve (not settle) `outcome_unknown` with `com.reconcile`,
@@ -21,7 +21,10 @@
   ended run: Fabric's `main` takes it back at the next dispatch since `a6f0ffda`, and the close at «На проверке» or
   the deadline is in its 0.3.16 candidate (neither in a release yet). The reference also names Switchboard 0.7.13 as
   the first launcher whose appended contract keeps an unsettled request's workflow open, and says `resolved` for an
-  `outcome_unknown` request that waits on `com.reconcile`.
+  `outcome_unknown` request that waits on `com.reconcile`; its opening says the dispatcher is on by default on Fabric's
+  `main` (since `a6f0ffda`), no longer off.
+- The exit contract's checkpoint rule names the answer whose top-level `credentials` a body never carries (shortening
+  it had left `its` pointing at `checkpoint.body`).
 
 ### Changed
 

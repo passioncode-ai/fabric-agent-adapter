@@ -107,7 +107,8 @@ class Parsing(unittest.TestCase):
         # and refuses the decorated credentials of the top-level answer or the accept's pack
         self.assertNotIn("<board-thread>", text)
         self.assertNotIn("its goal names the request", text)
-        self.assertIn("never its top-level `credentials` or the accept answer's `pack`", text)
+        self.assertIn("(not the answer's top-level `credentials` or the accept's `pack`)", text)
+        self.assertNotIn("never its top-level", text)  # 0.66.0 product reading 5: `its` read as the body
 
     def test_an_incomplete_environment_is_told_it_holds_no_run(self):
         text = cli.DISPATCH_INCOMPLETE.format(workflow=WF)

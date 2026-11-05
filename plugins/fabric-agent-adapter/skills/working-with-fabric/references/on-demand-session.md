@@ -3,7 +3,7 @@
 When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
 project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person. The
-dispatcher is in no Fabric release yet (its wave 1 is off by default); the hooks recognise a dispatched session from
+dispatcher is in no Fabric release yet (on by default on Fabric's main since `a6f0ffda`); the hooks recognise a dispatched session from
 adapter 0.63.0 on, so a launcher can start one today.
 
 ## Contents
@@ -94,8 +94,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
      executor's silence and one 60 s cycle after `run-ends-at`, and starts none with less than 5 minutes to the
      deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (`RUN_END_TO_DEADLINE_MS` and spec 3.6 on
-     Fabric's main at `afe28a60`, in no release yet); a request Fabric's watch counts unanswered at its
-     deadline goes to the operator with its workflow closed `blocked` in Fabric's 0.3.16 candidate (on its main only a
+     Fabric's main at `afe28a60`, in no release yet); an accepted or in-progress request with no live holder
+     past its deadline goes to the operator with its workflow closed `blocked` in Fabric's 0.3.16 candidate (on its main only a
      request still `queued` reaches the operator, so an accepted one waits unseen until that release);
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
@@ -136,7 +136,8 @@ watch still counts it unanswered until CO-409, which Fabric agreed on thread `1a
 `in_progress`, and not this run's to settle) it leaves the workflow open, with an `in_progress` checkpoint without
 `close` naming the reason when it holds the lease, and writes the retro (step 7) and ends: a workflow closed over an
 unsettled request makes the next dispatch fail at the take-back on every cycle (Fabric's main at `a6f0ffda`; its 0.3.16
-candidate opens a new workflow then), while an open one is taken back for the next run, and after two runs with no
+candidate opens a new workflow then), while an open one is taken back for the next run (in the 0.3.16 candidate only when the project has no live
+session, which otherwise holds the request), and after two runs with no
 answer Fabric shows the request to the operator (in its 0.3.16 candidate whatever the request's state; on its main only
 a request still `queued`). A workflow left open because another session holds the request is closed by Fabric once
 that request settles (CO-409, agreed on thread `1add3c03`, after 0.3.16; FAA-213). Switchboard's appended exit contract says the same from
@@ -152,7 +153,7 @@ run unchanged.
 Fabric watches the request and the run (spec 3.6). The request keeps the state the board contract gives it: `queued`
 stays queued, `claimed` is taken again under a new attempt, `accepted` is held until a responder takes it over, and
 `in_progress` stays until the next holder registers, when the board records the lost result; an `outcome_unknown`
-attempt is resolved only by `com.reconcile` with an observed result. Fabric may start one more run for a request
+attempt is resolved only by `com.reconcile` with an observed result. Fabric may start one more run (in its 0.3.16 candidate only when the project has no live session) for a request
 still queued, claimed with a lapsed lease, or accepted or in progress with no live holder (an accepted one since its
 main at `fff4b6d9`, the dispatcher since `a6f0ffda`); after two runs with no answer it shows the request to the operator in «На проверке», unchanged (any request in its
 0.3.16 candidate; on its main only a request still `queued`). A run past its time limit is stopped

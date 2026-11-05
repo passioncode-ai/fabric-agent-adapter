@@ -148,7 +148,7 @@ DISPATCH_CONTRACT = (
     "transfer, resolve `outcome_unknown` only with `com.reconcile` and an observed result, and never complete what you "
     "did not observe. After the lease, the claim and the reply, write an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
-    "`checkpoint.body` (never its top-level `credentials` or the accept answer's "
+    "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
     "`pack`) unchanged and adds `open`, `done` or `notes`, never a value. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
     "and finish before run-ends-at; work that cannot end by then posts its state with `com.progress`, "
     "then: when the request's deadline is not after run-ends-at plus 10 minutes (no run starts that close to it), `com.complete` failed_known saying so and steps 6 and 7; "
