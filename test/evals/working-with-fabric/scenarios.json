@@ -632,7 +632,7 @@
         "records what went wrong and what would have prevented it with observatory_lesson, one class key per lesson",
         "records what it learned about the product as insight/1 lines, or says in one line that there is nothing",
         "puts no secret, token or other value in either",
-        "treats a release Fabric answered with released false as not done: no retro line came and none is owed for it"
+        "treats a release Fabric answered with released false as no release: no retro line came for it, and the session-end retro still stands"
       ]
     }
   ]

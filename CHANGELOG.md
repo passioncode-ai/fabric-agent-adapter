@@ -9,9 +9,12 @@
   line of context when a claim is released as done (`fabric_work_release` with `how` or `outcome` done, or the older
   `fabric_task_release` with `outcome` succeeded): write the retro in this turn, `observatory_lesson` with one class
   key per lesson for what went wrong, insight/1 lines for what was learned about the product, or one line that there
-  is nothing, no values in either. The ending is read as Fabric reads it (`how`, then `outcome`). Any other release,
-  any other tool, and a release Fabric refused (its answer says `released: false`, which is how Fabric refuses one,
-  or carries `isError`) print nothing; an answer the hook cannot read keeps the line. It says it in a session Fabric
+  is nothing, no values in either (without `observatory_lesson`, in the turn's answer). The ending is read as Fabric
+  reads it (`how`, then `outcome`). Any other release, any other tool, a release Fabric refused (its answer says
+  `released: false`, which is how Fabric refuses one, `already-released`, or carries `isError`) and a session release
+  that released nothing (`claims: []`) print nothing; an answer the hook cannot read keeps the line. Fabric's
+  `retro-after-work` is on its `main` (`e1eecec0`) and in no release yet, so neither the line nor the preamble sends
+  the agent to `fabric_whoami` for it. It says it in a session Fabric
   launched too, the one hook that speaks there besides a dispatched run's exit contract. No hook can speak to the
   model when a session ends, so the session-start preamble names the retro itself (it does not rely on `fabric_whoami`, since no released Fabric carries `retro-after-work` yet) for the end of the work or the session.
   Measured through the real CLI under a load average of about 68: median 155 ms a call against 50 ms for a bare

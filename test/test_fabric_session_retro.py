@@ -25,18 +25,20 @@ def release(name="mcp__fabric__fabric_work_release", response=None, **given):
 
 class Words(unittest.TestCase):
     def test_the_line_says_what_fabric_asks(self):
-        for word in ("released this work as done", "in this turn", "`fabric_whoami`", "retro-after-work",
-                     "`observatory_lesson`", "one class key per lesson", "insight/1", "one line that says so",
+        for word in ("released this work as done", "in this turn", "`observatory_lesson`", "one class key per lesson",
+                     "insight/1", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
                      "No values"):
             self.assertIn(word, cli.RETRO_LINE)
+        # 0.64.0 product reading 2: no released Fabric's fabric_whoami asks it yet (retro-after-work is on its main)
+        self.assertNotIn("fabric_whoami", cli.RETRO_LINE)
         self.assertNotIn("—", cli.RETRO_LINE)
 
     def test_the_preamble_names_the_retro_at_the_end(self):
         text = " ".join(cli.PREAMBLE.split())
         # self-contained: a released Fabric (0.3.15) does not carry retro-after-work yet (0.64.0 seam reading 1)
         self.assertIn("When a piece of work ends (released as done, or the session about to end), write its retro in "
-                      "the same turn: `observatory_lesson` for what went wrong, insight/1 lines for what you learned, or "
-                      "one line that there is nothing.", text)
+                      "the same turn: `observatory_lesson` for what went wrong (or your answer without it), insight/1 "
+                      "lines for what you learned, or one line that there is nothing.", text)
         self.assertNotIn("—", text)
 
 
@@ -47,10 +49,18 @@ class Released(unittest.TestCase):
                         release("mcp__fabric__fabric_task_release", outcome="succeeded"),
                         release(how="done", response={"released": True}),
                         release(how="done", response=[{"type": "text", "text": "ok"}]),
-                        release(how="done", response=[{"type": "text", "text": '{"released": true, "claims": []}'}]),
+                        release(how="done", response=[{"type": "text", "text": '{"released": true, "claims": ["c1"]}'}]),
                         release(how="done", response={"content": [{"type": "text", "text": '{"released": true}'}]}),
                         release(how="done", response={"structuredContent": {"released": True}}),
                         release(how="done", response='{"released": true}'),
+                        release(how="done", response="[1]"),
+                        release(how="done", response="null"),
+                        release(how="done", response={"structuredContent": {"ok": True}}),
+                        release(how="done", response={"released": 1}),
+                        release(how="done", response={"released": 0}),
+                        release(how="done", response={"released": ["c1"]}),
+                        release(how="done", response="[" * 100000 + "]" * 100000),
+                        release(how="done", response=[{"type": "image", "text": '{"released": false}'}]),
                         release(how="done", outcome="let-go"),
                         release(outcome="done", how=None)):
             with self.subTest(payload=payload):
@@ -73,8 +83,15 @@ class Released(unittest.TestCase):
                         release(how="done", response={"content": [{"type": "text", "text": '{"released": false}'}]}),
                         release("mcp__fabric__fabric_task_release", outcome="succeeded",
                                 response=[{"type": "text", "text": '{"released": false, "reason": "you do not hold that task"}'}]),
-                        release(how="done", response={"released": "true"}),
+                        release(how="done", response=json.dumps({"content": [{"type": "text",
+                                                                                "text": '{"released": false}'}]})),
+                        release(how="done", response=[{"type": "text", "text": '{"released": false, "code": "x"}'},
+                                                      {"type": "text", "text": "more"}]),
+                        release("mcp__my_fabric__fabric_work_release", how="done"),
+                        release("xmcp__fabric__fabric_work_release", how="done"),
                         release(how="done", response={"released": True, "code": "already-released"}),
+                        release(how="done", claims="session", response=[{"type": "text", "text":
+                            '{"released": true, "claims": [], "note": "this session holds no live claim"}'}]),
                         release("mcp__evil__fabric_work_release", how="done"),
                         release("mcp__plugin_x__fabric_work_release", how="done"),
                         release("mcp__a__fabric__fabric_work_release", how="done"),
@@ -103,7 +120,9 @@ class Registration(unittest.TestCase):
                      "mcp__plugin_x_fabric__fabric_work_release"):
             self.assertTrue(matcher.search(name), name)
         for name in ("mcp__fabric__fabric_work_claim", "Bash", "mcp__fabric__fabric_whoami", "fabric_work_release",
-                     "mcp__evil__fabric_work_release", "mcp__fabric__fabric_work_release_all"):
+                     "mcp__evil__fabric_work_release", "mcp__fabric__fabric_work_release_all",
+                     "xmcp__fabric__fabric_work_release", "mcp__plugin_x__fabric_work_release",
+                     "mcp__my_fabric__fabric_work_release", "mcp__plugin_x_fabric__fabric_work_release__x"):
             self.assertFalse(matcher.search(name), name)
         (command,) = hooks[0]["hooks"]
         self.assertEqual(command["timeout"], 5)
