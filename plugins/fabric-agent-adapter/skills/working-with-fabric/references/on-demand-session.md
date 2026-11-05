@@ -138,7 +138,8 @@ unsettled request made the next dispatch fail at the take-back on every cycle (F
 `bcead0ef` Fabric opens a new workflow instead), while an open one is taken back for the next run when the project has
 no live session (a live session holds the request), and after two runs with no answer Fabric shows the request to the
 operator whatever its state. A workflow left open because another session holds the request is to be closed by Fabric
-once that request settles (CO-409, agreed on thread `1add3c03`, not yet on its main; FAA-213). Switchboard's appended exit contract says the same from
+once that request settles (CO-409's second part, promised on thread `1add3c03` for 2026-11-12, not yet on its main;
+FAA-213). Switchboard's appended exit contract says the same from
 0.7.13 (SB-258); an earlier Switchboard tells the run to close the workflow whatever the request's state, and this
 rule, the later one, is the one to follow.
 

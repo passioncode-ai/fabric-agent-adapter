@@ -563,7 +563,7 @@
     },
     {
       "id": "a-dispatched-run-whose-claim-is-refused",
-      "trap": "closes the workflow while the request is still queued or claimed, so Fabric's next dispatch fails at the take-back on every cycle",
+      "trap": "closes the workflow while the request is still queued or claimed, so Fabric's next dispatch failed at the take-back on every cycle (Fabric's main at a6f0ffda; a later Fabric opens a new workflow and the run's checkpoint is lost)",
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.claim on the request is refused and you hold no fence for it. What do you do?",
       "expected": [
         "does not complete the request, since it holds no fence for it",
