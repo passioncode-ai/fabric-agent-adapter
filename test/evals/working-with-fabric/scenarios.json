@@ -224,7 +224,7 @@
       "request": "You sent a request to another Project whose owner is not working now. Within a minute a run Fabric started on that Project replied: it cannot take the request until Fabric ships CO-506, and asks you to send it again then. What do you do?",
       "expected": [
         "knows the reply answered the request: it no longer waits for its owner",
-        "records the wait on CO-506 (what it waits on, which watcher acts) and goes on with its own work",
+        "reads the decline and marks it read with com.read_ack (unread, it shows on its own Project in «На проверке»), and records the wait on CO-506 (what it waits on, which watcher acts)",
         "once CO-506 ships and the ask still stands, cancels the answered request with com.cancel and resubmits with a new key only after the cancel's receipt reads cancelled",
         "resends once: a second decline after CO-506 shipped goes to the person, not another resend",
         "may still adapt a small change in the owner's repository under the small-change rule"
@@ -591,7 +591,8 @@
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.enroll for the request's capability answers not_authorized. What do you do?",
       "expected": [
         "takes no slot, asks for no access (no fabric.access.request) and does none of the work",
-        "when com.get reads the request queued, answers it once with com.reply (replyTo the request) declining it until Fabric ships CO-506 and asking the requester to send it again then, never saying it waits",
+        "when com.get reads the request queued and com.status names no responder for its capability, answers it once with com.reply (replyTo the request) declining it until Fabric ships CO-506 and asking the requester to send it again then, never saying it waits",
+        "when com.status lists a responder for the capability (a service of the Project that is stale or held), does not decline: the request stays queued for that service and the error rule holds",
         "closes the workflow with status done once com.get reads the request answered; in any other state follows the error rule: closes only once com.get reads it answered, terminal or outcome_unknown, else leaves it open",
         "writes the retro (observatory_lesson and insight/1 lines in insights/, or one line that there is nothing) and ends the run"
       ]

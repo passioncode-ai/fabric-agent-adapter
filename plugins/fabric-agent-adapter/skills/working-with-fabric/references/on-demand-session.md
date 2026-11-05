@@ -80,10 +80,11 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    session has no route to that grant (`fabric.access.request` is the door's and a binding's, never exposed by
    `fabric-mcp`, and Fabric's Agent access only decides a request already waiting), and work without a slot has no
    fence, no `com.progress` and a live session may take the request in parallel. When `com.get` reads the request
-   `queued`, the run answers it once with `com.reply` (`replyTo` the request, from the target Project, which answers
+   `queued` and `com.status` names no responder for its capability, the run answers it once with `com.reply` (`replyTo` the request, from the target Project, which answers
    it: DEC-0098, DEC-0102) declining it: this Project cannot take it until Fabric ships CO-506, and the requester sends
    it again then (the reply ends the queue, so nothing takes it later; never say it waits). Then it closes the workflow `done` once
-   `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state the error rule below holds.
+   `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with a responder listed (a service of this Project that is `stale` or `held` takes the request
+   when it returns, so a decline would take it from it), the error rule below holds and the request stays queued.
    The target's request no longer waits for the operator (an answered request is settled: no second run, no unmoved or
    to-operator finding); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
    shows it on the requester's Project in «На проверке» as an answer nobody read,
@@ -93,8 +94,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    where CO-506 grants nothing (a machine marked as an organization's, no live credential for the session or its runner,
    or a standing denial of that ask); the reply then names CO-506 though it shipped, and the real gate is that grant (left open in FAA-215).
    FAA-219; Fabric's answer in board thread `1add3c03` (option (b), 2026-11-05), the same rule as the responder's run;
-   Fabric's `com.enroll` description in 0.3.16 tells a session to ask the grant, which it cannot (corrected on its
-   `main`). An earlier run may have left the request taken: `com.get` on the
+   Fabric's `com.enroll` description in 0.3.16 tells a session to ask the grant, which it cannot, and 0.3.16's own
+   `not_authorized` refusal says to reply with the answer; step 3 wins over both (corrected on Fabric's `main`, the
+   refusal text with its CO-507). An earlier run may have left the request taken: `com.get` on the
    request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
    attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result; so is an `in_progress` one an

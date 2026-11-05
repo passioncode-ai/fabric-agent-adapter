@@ -138,8 +138,9 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
    ask still stands, submit it again.
 
-**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project whose
-session holds no `board.respond` grant (every coding-session Project before Fabric ships CO-506) is answered within a
+**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project with no
+responder for the capability, whose session holds no `board.respond` grant (every coding-session Project before
+Fabric ships CO-506), is answered within a
 cycle by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
 contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
 queued) ([on-demand session](on-demand-session.md), step 3).
@@ -148,7 +149,7 @@ longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
 small change may still be adapted under step 3. Record the wait on CO-506 (what it waits on, which watcher acts); once
 it ships and the ask still stands, cancel the answered request (`com.cancel`) and, once the cancel's receipt reads it
 `cancelled`, submit it again with a new key, once: a second decline after CO-506 shipped (a machine CO-506 grants
-nothing on) is the not-small case, so tell the person.
+nothing on) goes to the person.
 
 The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it.
 

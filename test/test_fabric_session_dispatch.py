@@ -420,15 +420,17 @@ class Hooks(Base):
     def test_step_7_names_the_retro_itself(self):
         # 0.64.0 product reading 2: the contract names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
         self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines in `insights/`, or one line that there "
-                      "is nothing; no values), then end the run", cli.dispatch_contract(FULL))
+                      "is nothing; no values), then end:", cli.dispatch_contract(FULL))
 
     def test_a_refused_enroll_answers_with_a_reply_and_the_close_waits_for_the_board(self):
         # FAA-219: on Fabric 0.3.16 a session has no tool to ask board.respond (Fabric, thread 1add3c03, 9d23b27c);
         # a reply from the target Project answers the request (DEC-0098, DEC-0102), and an answered request is settled
         text = cli.dispatch_contract(FULL)
         # 0.68.0 product reading 2: the reply answers the request, so it declines and asks for a resend, never "waits"
-        self.assertIn("a not_authorized enroll: no slot, no work and, if queued, one `com.reply` (replyTo it) declining "
-                      "until Fabric's CO-506 (resend then), then step 6 (done) once `com.get` reads it answered, and 7;", text)
+        # 0.68.0 product reading 5: a service Project's stale responder takes it when it comes back; decline only with none
+        self.assertIn("a not_authorized enroll: no slot, no work and, if queued with no responder in `com.status`, one "
+                      "`com.reply` (replyTo it) declining until Fabric's CO-506 (resend then), then step 6 (done) once "
+                      "`com.get` reads it answered, and 7;", text)
         branch = text[text.index("a not_authorized enroll"):text.index("CO-506")]
         self.assertNotIn(";", branch, "0.68.0 unit reading 2: a queued request is the refused enroll's case, not its own")
         self.assertEqual(text.count(" 7. "), 1, "' 7. ' is step 7 alone, so the step slices hold")
