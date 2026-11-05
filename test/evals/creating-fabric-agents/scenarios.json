@@ -249,7 +249,7 @@
       "expected": [
         "closes each job with a retro: observatory_lesson for what went wrong, insight/1 lines for what it learned, or one line that there is nothing",
         "puts no values in the retro",
-        "writes the same lines to its own retrospective file where Project Observatory is not installed",
+        "writes the insight/1 lines in insights/ (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else <name>-data/ beside the main checkout), and its lessons to its own retrospective file where Project Observatory is not installed",
         "lists the retro in the resilience-and-autonomy checklist it reports"
       ]
     }

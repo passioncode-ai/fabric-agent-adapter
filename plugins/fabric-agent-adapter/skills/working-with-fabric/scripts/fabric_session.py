@@ -144,6 +144,7 @@ from fabric_session_cli import (  # noqa: F401
     POINTER,
     DOWN_NOTICE,
     QUIET_SOURCES,
+    HOOK_INPUT_CAP,
     read_hook_input,
     hook_session_start,
     _read_count,

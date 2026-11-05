@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.66.0"
+  version: "0.67.0"
   contract-version: "0.1.0"
   contract-commit: "3830a3353923e20f826d466610e1c479f120bec0"
 ---
@@ -250,8 +250,8 @@ creating-fabric-agents carries a `LICENSE` naming its holder; an existing one ke
 
 **An adapted agent closes each piece of work with a retro**, as Fabric's `retro-after-work` (since Fabric 0.3.16) asks every session:
 `observatory_lesson` for what went wrong (one class key per lesson), insight/1 lines for what it learned about the
-product, or one line that there is nothing; a resident service does it when a job ends, and without Project
-Observatory it writes the lines to its own retrospective file (creating-fabric-agents practices, *Reliability*).
+product (in `insights/`: the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout), or one line that there is nothing; a resident service does it when a
+job ends, and without Project Observatory it writes its lessons to its own retrospective file (creating-fabric-agents practices, *Reliability*).
 
 ## Completion format
 

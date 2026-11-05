@@ -73,7 +73,8 @@ PREAMBLE = (
     "Before you start work, call `fabric_work_list` (who is working on what here) and "
     "claim your task with `fabric_work_claim`; release it with `fabric_work_release` when you stop. When a piece of "
     "work ends (released as done, or the session about to end), write its retro in the same turn: `observatory_lesson` "
-    "for what went wrong (or your answer without it), insight/1 lines for what you learned, or one line that there "
+    "for what went wrong (or your answer without it), insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout) for what you "
+    "learned, or one line that there "
     "is nothing. A Fabric older "
     "than v0.3.5 has `fabric_tasks_list`, `fabric_task_claim` and `fabric_task_release` instead. Link a backlog row "
     "as `source: {{repository, path, id}}`, never copy it. Ask another Project only through `com.submit`, addressed "
@@ -131,7 +132,7 @@ DISPATCH_IF = (
     "request nor the workflow. That line with other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3995 in 0.66.0: almost none left, so a new rule takes its characters back from the text around it).
+#: (3998 in 0.67.0: almost none left, so a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
     "request and end: nobody watches, so never wait for a person. 1. `fabric_whoami`, then read the packet "
@@ -151,7 +152,7 @@ DISPATCH_CONTRACT = (
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
     "`pack`) unchanged and adds `open`, `done` or `notes`, never a value. 4. Do the work; renew with `com.renew` or `com.progress` about every 20 s in a long step "
     "and finish before run-ends-at; work that cannot end by then posts its state with `com.progress`, "
-    "then: when the request's deadline is not after run-ends-at plus 10 minutes (no run starts that close to it), `com.complete` failed_known saying so and steps 6 and 7; "
+    "then: if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a one-time code, a typed "
     "secret or a payment is a person's (none is in this chat), and so is a production step unless the operator's "
@@ -409,7 +410,7 @@ def dispatch_held_elsewhere(dispatch: Dict[str, str], session_id: Any, env: Opti
 #: released as done is the moment the obligation names; the PostToolUse hook says it then, once per release.
 RETRO_LINE = ("[fabric-agent-adapter] You released this work as done: write its retro in this turn. What went wrong "
               "and what would have prevented it go to `observatory_lesson`, one class key per lesson; what you learned "
-              "about the product goes in insight/1 lines; with nothing worth saying, one line that says so. Without "
+              "about the product goes in insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout); with nothing worth saying, one line that says so. Without "
               "`observatory_lesson`, say it in this turn's answer. No values in either.")
 #: The release tools and the field that says done: Fabric's `fabric_work_release` (how, or its alias outcome when how is
 #: absent, as Fabric reads `how ?? outcome`) and the older `fabric_task_release` (outcome succeeded).
@@ -491,15 +492,22 @@ def _host_output(host: str, event: str, context: str) -> str:
     return json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": context}})
 
 
+#: A hook reads at most this many bytes of its input; more is read as nothing. 4 MiB holds a million characters in any
+#: script (0.63.0 read a million characters as text; 0.64.0 counted bytes and lost a long Cyrillic prompt, FAA-210).
+HOOK_INPUT_CAP = 4 * 1024 * 1024
+
+
 def read_hook_input() -> Dict[str, Any]:
     try:
         if sys.stdin is None or sys.stdin.isatty():
             return {}
         # the bytes, decoded as UTF-8: a host writes its JSON in UTF-8, and on Windows before Python 3.15 the text
         # stream decodes with the locale's code page, which drops a release whose note is in Cyrillic (0.64.0 seam
-        # reading 5)
-        raw = sys.stdin.buffer.read(1024 * 1024) if hasattr(sys.stdin, "buffer") else sys.stdin.read(1024 * 1024)
-        text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
+        # reading 5); a byte order mark is dropped and a byte that is no UTF-8 reads as U+FFFD (FAA-210)
+        raw = sys.stdin.buffer.read(HOOK_INPUT_CAP + 1) if hasattr(sys.stdin, "buffer") else sys.stdin.read(HOOK_INPUT_CAP + 1)
+        if len(raw) > HOOK_INPUT_CAP:
+            return {}
+        text = raw.decode("utf-8-sig", errors="replace") if isinstance(raw, bytes) else raw.lstrip("\ufeff")
         payload = json.loads(text) if text.strip() else {}
         return payload if isinstance(payload, dict) else {}
     except Exception:  # noqa: BLE001

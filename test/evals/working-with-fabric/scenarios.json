@@ -557,6 +557,7 @@
       "expected": [
         "gives its state (what is done, where it lies, what is left) as a com.progress note on the request's thread",
         "when the request's deadline is not after run-ends-at plus 10 minutes, completes it failed_known saying the deadline came first and closes the workflow",
+        "after com.effect_begin (the request in_progress) completes it failed_known with the state it observed, never leaves it for the next run",
         "otherwise leaves the request accepted for the next run: an in_progress checkpoint without close, no com.complete",
         "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) before it ends"
       ]
@@ -641,7 +642,7 @@
       "expected": [
         "writes the retro in the same turn",
         "records what went wrong and what would have prevented it with observatory_lesson, one class key per lesson",
-        "records what it learned about the product as insight/1 lines, or says in one line that there is nothing",
+        "records what it learned about the product as insight/1 lines in insights/ (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else <name>-data/ beside the main checkout), or says in one line that there is nothing",
         "puts no secret, token or other value in either",
         "treats a release Fabric answered with released false as no release: no retro line came for it, and the session-end retro still stands"
       ]

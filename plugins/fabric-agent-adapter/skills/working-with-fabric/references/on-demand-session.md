@@ -78,7 +78,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `com.effect_begin` before the work has an effect. An earlier run may have left the request taken: `com.get` on the
    request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
-   attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result. Never complete what
+   attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result; so is an `in_progress` one an
+   earlier run left (its effect begun, as before 0.67.0), which the takeover makes `outcome_unknown`: what the run cannot
+   observe it leaves to the operator, to whom Fabric shows the request (step 4). Never complete what
    you did not observe. After the lease, after the claim or the takeover, and after the reply, write an `in_progress`
    checkpoint (`workflowId`, `leaseId`), so a later run has something to read. Observatory keeps only the latest
    body, so every checkpoint the session writes repeats `goal`, `constraints`, `artifacts` and `credentials` of
@@ -90,6 +92,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    stops the run. Work that cannot end by then gives its state (what is done, where it lies, what is left), before
    `run-ends-at`, as the note of a `com.progress` on the request's thread (the slot holder's state, DEC-0152 SA-6,
    proposed). Then:
+   - after `com.effect_begin` the request is `in_progress`, which a next run could only settle as `outcome_unknown`
+     with `com.reconcile`: `com.complete` `failed_known` with the state it observed, and steps 6 and 7 (FAA-210; the
+     same choice as a responder's run, board thread `1add3c03`);
    - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 10 minutes, no
      run comes before the deadline and an accepted request does not expire by itself: `com.complete` `failed_known`
      saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
@@ -97,7 +102,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (`RUN_END_TO_DEADLINE_MS` and spec 3.6 on
      Fabric's main since `afe28a60`); an accepted or in-progress request with no live holder past its deadline goes
      to the operator, with its workflow closed `blocked`;
-   - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
+   - otherwise (accepted, no effect begun) the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
      decides to dispatch an accepted request since `fff4b6d9`; a Fabric before it dispatches none). The open workflow is Fabric's
@@ -122,7 +127,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
 7. **End the run.** The one write left is the retro after work
-   (`observatory_lesson` and insight/1 lines, or one line that there is nothing; no values; ADR-0188's
+   (`observatory_lesson` and insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout), or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
    `watch-mail`, no question to the operator.
 

@@ -267,5 +267,5 @@ and idempotency keys live; what happens to an unknown outcome; which waits are d
 run lock; what the next start sweeps; how a cancel reaches paid inner work; which outputs are
 capped; how a secret reaches a child; which test was seen failing for each fix; and, for an agent
 that writes text for people, where its prompt says no em dash and which test fails on U+2014 in its
-output; and where each piece of work's retro is written (`observatory_lesson`, or the agent's own retrospective file
-without Project Observatory) and which test shows it.
+output; and where each piece of work's retro is written (its lessons through `observatory_lesson`, or the agent's own retrospective
+file without Project Observatory; its insight/1 lines in `insights/`, practices.md *Reliability*) and which test shows it.

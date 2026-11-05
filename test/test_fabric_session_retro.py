@@ -32,7 +32,7 @@ def release(name="mcp__fabric__fabric_work_release", response=None, **given):
 class Words(unittest.TestCase):
     def test_the_line_says_what_fabric_asks(self):
         for word in ("released this work as done", "in this turn", "`observatory_lesson`", "one class key per lesson",
-                     "insight/1", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
+                     "insight/1", "insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout)", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
                      "No values"):
             self.assertIn(word, cli.RETRO_LINE)
         # 0.64.0 product reading 2: the line names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
@@ -44,7 +44,7 @@ class Words(unittest.TestCase):
         # self-contained: Fabric 0.3.15 and earlier do not carry retro-after-work (0.64.0 seam reading 1)
         self.assertIn("When a piece of work ends (released as done, or the session about to end), write its retro in "
                       "the same turn: `observatory_lesson` for what went wrong (or your answer without it), insight/1 "
-                      "lines for what you learned, or one line that there is nothing.", text)
+                      "lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout) for what you learned, or one line that there is nothing.", text)
         self.assertNotIn("—", text)
 
 
@@ -177,6 +177,46 @@ class Hook(Base):
                                   capture_output=True, env=dict(self.env, PYTHONIOENCODING=encoding), timeout=10)
             self.assertEqual(done.returncode, 0, encoding)
             self.assertIn(b"PostToolUse", done.stdout, encoding)
+
+    def _raw(self, payload):
+        import subprocess, sys
+        script = ROOT / "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py"
+        return subprocess.run([sys.executable, "-S", str(script), "hook", "post-tool-use"], input=payload,
+                              capture_output=True, env=dict(self.env, PYTHONIOENCODING="cp1252"), timeout=20)
+
+    def test_the_input_is_read_as_its_bytes(self):
+        # FAA-210: a BOM, a long Cyrillic note under the cap and a stray byte are read; a payload over the cap is not
+        body = json.dumps(release(how="done", note="Сделано"), ensure_ascii=False).encode("utf-8")
+        self.assertIn(b"PostToolUse", self._raw(b"\xef\xbb\xbf" + body).stdout, "a UTF-8 BOM")
+        long_note = json.dumps(release(how="done", note="ж" * 700000), ensure_ascii=False).encode("utf-8")
+        self.assertGreater(len(long_note), 1024 * 1024)
+        self.assertIn(b"PostToolUse", self._raw(long_note).stdout, "about 1.4 MB of Cyrillic, under the cap")
+        stray = body.replace("Сделано".encode("utf-8"), b"\xff\xfe")
+        self.assertIn(b"PostToolUse", self._raw(stray).stdout, "a byte that is no UTF-8 reads as a replacement")
+        over = json.dumps(release(how="done", note="x" * (cli.HOOK_INPUT_CAP + 10))).encode("utf-8")
+        done = self._raw(over)
+        self.assertEqual((done.returncode, done.stdout), (0, b""), "over the cap is read as nothing")
+
+    def test_the_cap_and_a_text_stream_in_process(self):
+        # FAA-210: exactly the cap is read, one byte over it is nothing; a stream with no bytes buffer drops its BOM
+        import io
+        from unittest import mock
+
+        class Bytes:
+            def __init__(self, data):
+                self.buffer = io.BytesIO(data)
+
+            def isatty(self):
+                return False
+
+        body = json.dumps({"hook_event_name": "PostToolUse"}).encode("utf-8")
+        exact = body + b" " * (cli.HOOK_INPUT_CAP - len(body))
+        with mock.patch.object(cli.sys, "stdin", Bytes(exact)):
+            self.assertEqual(cli.read_hook_input(), {"hook_event_name": "PostToolUse"}, "exactly the cap")
+        with mock.patch.object(cli.sys, "stdin", Bytes(exact + b" ")):
+            self.assertEqual(cli.read_hook_input(), {}, "one byte over the cap")
+        with mock.patch.object(cli.sys, "stdin", io.StringIO("\ufeff" + body.decode("utf-8"))):
+            self.assertEqual(cli.read_hook_input(), {"hook_event_name": "PostToolUse"}, "a text stream with a BOM")
 
     def test_other_hosts_get_no_post_tool_hook(self):
         for host in ("codex", "kimi", "hermes"):
