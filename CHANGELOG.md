@@ -13,7 +13,7 @@
   `references/session-hooks.md` and SECURITY.md, now name the scheme in angle brackets (`<https>://u:pw@h`; read
   `<https>` as `https`). No code changed. Five kit modules have new digests in `kit.json`: `fabric_secrets.py`,
   `fabric_descriptor.py`, `fabric_http.py`, `fabric-http.mjs` and `fabric-delegation.mjs`; a copy from 0.64.0 behaves
-  the same and reads `older` until it is refreshed.
+  the same and reads `older` (`fabric_kit.py status` exits 1) until `install --force` refreshes it.
 
 ### Added
 
