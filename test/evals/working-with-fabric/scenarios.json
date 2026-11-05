@@ -575,13 +575,13 @@
     },
     {
       "id": "a-cleared-session-whose-replaced-id-is-unknown",
-      "trap": "replays an accept under an id it cannot know, or on Windows promises that a later /clear will name this session",
-      "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three and you were just cleared; the hook cannot name the session id the clear replaced (on Windows, or with no readable record). What do you do about the lease?",
+      "trap": "replays an accept under an id it cannot know, or on Windows takes itself for the run after a /clear",
+      "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three and you were just cleared; the hook cannot name the session id the clear replaced (the record names one that is not a lowercase UUID). What do you do about the lease?",
       "expected": [
         "when observatory_checkpoint_latest shows the handoff pending, accepts it with this session's own sessionId, the owner and key step 2 names and no executor",
         "when the handoff was already accepted and this session holds no leaseId for it, ends the run without touching the request and leaves the workflow to Fabric",
         "when the handoff lapsed (no accept was made and none can be), ends the run without touching the request",
-        "on Windows says that a later /clear names no id, so an accept made now cannot be replayed after it"
+        "on Windows, where a /clear holds nothing, reads as a helper after the clear and leaves the workflow to Fabric"
       ]
     },
     {

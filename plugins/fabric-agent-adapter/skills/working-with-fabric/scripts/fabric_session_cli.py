@@ -110,7 +110,7 @@ QUIET_SOURCES = frozenset(("compact", "resume"))
 #: is quoted text.
 DISPATCH_ENV = (("workflow", "FABRIC_DISPATCH_WORKFLOW"), ("handoff", "FABRIC_DISPATCH_HANDOFF"),
                 ("request", "FABRIC_DISPATCH_REQUEST"))
-_DISPATCH_VALUE = {"workflow": DISPATCH_WORKFLOW, "handoff": r"handoff:[A-Za-z0-9._:-]{1,120}",
+_DISPATCH_VALUE = {"workflow": DISPATCH_WORKFLOW, "handoff": r"handoff:[A-Za-z0-9._:-]{1,64}",
                    # Switchboard takes a request in either case (uuid::Uuid::parse_str), so the hooks do too
                    "request": r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"}
 #: Fabric's dispatch id, a UUID, within the form Switchboard's `--dispatch-id` takes (board thread b3e60686): a value
@@ -148,14 +148,14 @@ DISPATCH_CONTRACT = (
     "thread, then: when the request's deadline is not after run-ends-at plus 10 minutes (no next run starts that close to it), `com.complete` failed_known saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a "
-    "typed secret, a payment or a production step is the person's (no person is in this chat): name it in the answer. 5. `com.reply` in the thread, then "
+    "typed secret, a payment or a production step is a person's (none is in this chat; the operator's own words, relayed and naming the step, count): name it in the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
     "the `leaseId`, `close: true`, a status and the packet's body with `done` and `notes` added: done for completed; for "
     "failed_known failed once Observatory takes it (OBS-323), until then blocked with the reason in notes. 7. Write the retro "
     "`fabric_whoami` asks for (`observatory_lesson` and insight/1 lines, or one line that there is nothing; no "
     "values), then end the run: no board sweep, no work claim, "
-    "no watch-mail. The steps and every argument: working-with-fabric "
+    "no watch-mail. Details: working-with-fabric "
     "references/on-demand-session.md."
 )
 #: A second session whose own prompt starts with the same dispatch line (another process under the run's environment):
@@ -219,7 +219,11 @@ def dispatch_of(env: Optional[Dict[str, str]], prompt: Any = None) -> Tuple[Opti
     told, line = dispatch_from_env(env), dispatch_from_line(prompt)
     if told is None or line is None:
         return None, []
-    fields = [field for field, _ in DISPATCH_ENV if told.get(field) != line[field]]
+    # a UUID is case-free, so the request compares in either case (0.63.0 unit reading 20)
+    fields = [field for field, _ in DISPATCH_ENV if (told.get(field) or "").lower() != line[field].lower()
+              if field == "request"] + [field for field, _ in DISPATCH_ENV if field != "request"
+                                        and told.get(field) != line[field]]
+    fields = [field for field, _ in DISPATCH_ENV if field in fields]
     return (dict(told), []) if not fields else (None, fields)
 
 
@@ -257,7 +261,6 @@ _CLEARED_TAIL = (" Read only this dispatch's handoff ({hname}): when `observator
                  "shows is Fabric's, not this run's: {pending}")
 _PENDING_NAMED = ("accept it now with that same sessionId, {pkey}, the owner {owner} and no executor (the launcher's "
                   "prompt is gone). Never accept it under the new id.")
-_PENDING_WINDOWS = " On Windows a later /clear names no id either: an accept made now cannot be replayed after it."
 _PENDING_UNKNOWN = ("accept it as step 2 says, with {pkey}, the owner {owner}, no executor and this session's own "
                     "sessionId{session}.")
 
@@ -279,8 +282,7 @@ def dispatch_cleared(previous: Any, handoff: Any = None, session_id: Any = None)
         tail = _CLEARED_TAIL.format(hname=hname, pending=_PENDING_NAMED.format(pkey=pkey, owner=owner))
         return DISPATCH_CLEARED.format(session="sessionId %s" % previous, key=key, tail=tail)
     own = isinstance(session_id, str) and _SESSION_UUID.fullmatch(session_id)
-    pending = _PENDING_UNKNOWN.format(pkey=pkey, owner=owner, session=" (%s)" % session_id if own else "") + (
-        _PENDING_WINDOWS if _WINDOWS else "")
+    pending = _PENDING_UNKNOWN.format(pkey=pkey, owner=owner, session=" (%s)" % session_id if own else "")
     return DISPATCH_CLEARED_UNKNOWN.format(tail=_CLEARED_TAIL.format(hname=hname, pending=pending))
 
 
@@ -329,7 +331,7 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     moment) counts as held by another session: the session it names may be at work."""
     env = os.environ if env is None else env
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
-        return True
+        return not take_over  # outside a take-over the contract twice rather than never; a clear holds nothing
     folder, key = _dispatch_record(dispatch, env)
     record = {"session": session_id, "at": int(time.time()), "host": os.getppid()}
     if take_over:
@@ -337,18 +339,18 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
             held = json.loads(read_small(folder / (key + ".json")) or "null")
         except ValueError:
             held = None
-        # On Windows the hook's parent is the Git Bash a hook runs in, a new one each time (0.63.0 unit reading 5):
-        # there any /clear takes the record, the contract twice rather than never
-        # no record: no prompt of this process confirmed the run (Fabric's spec 3.5), so the clear holds nothing
-        if not isinstance(held, dict):
+        # no record: no prompt of this process confirmed the run (Fabric's spec 3.5), so the clear holds nothing. On
+        # Windows the hook's parent is the Git Bash a hook runs in, a new one each time, so a /clear cannot tell the
+        # holder from a helper there: it holds nothing either, and Fabric takes the workflow over after the run
+        # (0.63.0 product reading 20)
+        if not isinstance(held, dict) or _WINDOWS:
             return False
-        if held.get("host") == record["host"] or _WINDOWS:
+        if held.get("host") == record["host"]:
             # the session the clear replaced, the one an earlier accept named: only when this hook's parent wrote the
-            # record (on Windows, where any /clear takes it, a nested session must not learn the holder's id). A record
+            # record. A record
             # already cleared keeps the id it named; one cleared with the id unknown names the session it started, which
             # was told to accept a pending handoff under its own id (0.63.0 seam reading 13)
-            # on Windows never: a reused process id must not tell a nested session the holder's id (unit reading 15)
-            same = not _WINDOWS and held.get("host") == record["host"]
+            same = True
             # an id the notice cannot name (not a lowercase UUID) is not carried on: the session it started was told
             # to accept under its own id (0.63.0 unit reading 14)
             kept = held.get("cleared_from") if same else None
@@ -418,9 +420,8 @@ def hook_session_start(payload: Dict[str, Any], env: Optional[Dict[str, str]] = 
         # a /clear in the run's own process keeps the run its prompt confirmed; a clear with no record holds nothing
         if payload.get("source") == "clear" and isinstance(session_id, str) and SESSION_ID.fullmatch(session_id) \
                 and dispatch_holder(dispatch, session_id, env, take_over=True):
-            # on Windows any /clear takes the record, a helper's too: there the run is still the line's to name
-            return _host_output(host, "SessionStart", dispatch_contract(dispatch, conditional=_WINDOWS)
-                                + dispatch_cleared(dispatch_cleared_from(dispatch, env), dispatch["handoff"], session_id))
+            return _host_output(host, "SessionStart", dispatch_contract(dispatch) + dispatch_cleared(
+                dispatch_cleared_from(dispatch, env), dispatch["handoff"], session_id))
         # the prompt is not seen yet: the run is the session whose own first line names these three
         return _host_output(host, "SessionStart", dispatch_contract(dispatch, session_id, conditional=True))
     if fabric_launched(env):

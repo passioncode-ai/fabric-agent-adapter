@@ -169,7 +169,7 @@ class Hooks(Base):
                 self.assertIn("observatory_handoff_accept", done.stdout, host)
                 self.assertIn("only when its own prompt's first line", done.stdout, host)
         self.assertFalse((cli.state_root(env=self.env) / "dispatch").exists())
-        longest = dict(FULL, handoff="handoff:" + "x" * 120)
+        longest = dict(FULL, handoff="handoff:" + "x" * 64)
         self.assertLess(len(cli.dispatch_contract(longest, conditional=True)), 4000, "Hermes' MAX_CONTEXT_CHARS")
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
         self.assertLess(len(cli.dispatch_contract(longest, uuid, conditional=True)), 4000, "with a session id too")
@@ -255,19 +255,21 @@ class Hooks(Base):
         self.assertFalse(cli.dispatch_holder(FULL, other, env, take_over=True))
         self.assertEqual(record.read_text(), "not json", "a record that is not one is left alone")
 
-    def test_on_windows_any_clear_takes_the_record(self):
+    def test_on_windows_a_clear_holds_nothing(self):
+        # 0.63.0 product reading 20: a new Git Bash every hook, so a Windows /clear cannot tell the holder from a helper
         from unittest import mock
         env = dict(self.env, **ENV)
         with mock.patch.object(cli.os, "getppid", return_value=111):
             cli.dispatch_holder(FULL, SID, env)
-        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
-        with mock.patch.object(cli.os, "getppid", return_value=222), mock.patch.object(cli, "_WINDOWS", True):
-            self.assertTrue(cli.dispatch_holder(FULL, other, env, take_over=True), "a new Git Bash every hook")
         record = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
-        self.assertEqual(json.loads(record.read_text())["session"], other, "the record moved")
+        before = record.read_text()
+        other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        for ppid in (111, 222):
+            with mock.patch.object(cli.os, "getppid", return_value=ppid), mock.patch.object(cli, "_WINDOWS", True):
+                self.assertFalse(cli.dispatch_holder(FULL, other, env, take_over=True))
+        self.assertEqual(record.read_text(), before, "the record stays the holder's")
         with mock.patch.object(cli.os, "getppid", return_value=333):
-            self.assertTrue(cli.dispatch_holder(FULL, other, env), "the cleared session holds it at its next prompt")
-            self.assertFalse(cli.dispatch_holder(FULL, SID, env))
+            self.assertTrue(cli.dispatch_holder(FULL, SID, env), "the holder keeps it at its next prompt")
 
     def test_a_clear_moves_the_record_only_in_the_holders_process(self):
         from unittest import mock
@@ -539,26 +541,6 @@ class Hooks(Base):
                                 extra_env=ENV)
         self.assertIn("this session's own sessionId (%s)" % new, self.context(done))
 
-    def test_on_windows_a_reused_process_id_names_no_holder(self):
-        # 0.63.0 unit reading 15: Windows reuses process ids, so the same parent proves nothing there
-        from unittest import mock
-        env = dict(self.env, **ENV)
-        holder, nested = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab", "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
-        with mock.patch.object(cli.os, "getppid", return_value=777), mock.patch.object(cli, "_WINDOWS", True):
-            cli.dispatch_holder(FULL, holder, env)
-            cli.dispatch_holder(FULL, nested, env, take_over=True)
-            self.assertEqual(cli.dispatch_cleared_from(FULL, env), "")
-            self.assertIn("On Windows a later /clear names no id either",
-                          cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env), HANDOFF, nested))
-
-    def test_on_windows_the_new_id_is_said_not_to_be_named_again(self):
-        # 0.63.0 unit reading 14: a later clear on Windows names no id, so the notice does not promise a replay
-        from unittest import mock
-        new = "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
-        with mock.patch.object(cli, "_WINDOWS", True):
-            self.assertIn("On Windows a later /clear names no id either", cli.dispatch_cleared("", HANDOFF, new))
-        self.assertNotIn("On Windows", cli.dispatch_cleared("", HANDOFF, new))
-
     def test_an_id_the_notice_cannot_name_is_not_carried_on(self):
         # 0.63.0 unit reading 14: a first holder outside the UUID form, then two clears: the next names the second
         from unittest import mock
@@ -607,16 +589,6 @@ class Hooks(Base):
         env = dict(self.env, **ENV)
         self.assertFalse(cli.dispatch_holder(FULL, SID, env, take_over=True))
         self.assertIsNone(cli.dispatch_cleared_from(FULL, env), "no record: nothing was cleared")
-
-    def test_on_windows_a_clear_names_no_holder(self):
-        from unittest import mock
-        env = dict(self.env, **ENV)
-        holder, nested = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab", "2b3c4d5e-1b2c-4d6e-9fa0-123456789abc"
-        with mock.patch.object(cli.os, "getppid", return_value=111):
-            cli.dispatch_holder(FULL, holder, env)
-        with mock.patch.object(cli.os, "getppid", return_value=222), mock.patch.object(cli, "_WINDOWS", True):
-            cli.dispatch_holder(FULL, nested, env, take_over=True)
-        self.assertEqual(cli.dispatch_cleared_from(FULL, env), "", "a nested session must not learn the holder's id")
 
     def test_the_contract_names_this_sessions_id_for_the_accept(self):
         # 0.63.0 seam reading 7: Observatory asks a retry of the acceptance to send the same sessionId
@@ -691,23 +663,33 @@ class Hooks(Base):
         self.assertEqual(self.context(self.prompt(only, LINE)[0]), cli.DISPATCH_INCOMPLETE.format(workflow=WF))
 
     def test_on_windows_a_clear_is_told_the_condition(self):
-        # 0.63.0 seam reading 19: any Windows /clear takes the record, so the run stays the line's to name
+        # 0.63.0 product reading 20: the clear holds nothing there, so the notice is the conditional contract alone
         from unittest import mock
         env = dict(self.env, **ENV)
         with mock.patch.object(cli.os, "getppid", return_value=111):
             cli.dispatch_holder(FULL, SID, env)
         cleared = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
-        with mock.patch.object(cli.os, "getppid", return_value=222), mock.patch.object(cli, "_WINDOWS", True):
+        with mock.patch.object(cli.os, "getppid", return_value=111), mock.patch.object(cli, "_WINDOWS", True):
             said = cli.hook_session_start({"session_id": cleared, "cwd": str(self.repo), "source": "clear"}, env)
         text = json.loads(said)["hookSpecificOutput"]["additionalContext"]
-        self.assertTrue(text.startswith(cli.DISPATCH_IF.format(**FULL)))
-        self.assertIn("On Windows a later /clear names no id either", text)
+        self.assertEqual(text, cli.dispatch_contract(FULL, cleared, conditional=True))
+        self.assertNotIn("This session was cleared", text)
 
     def test_an_uppercase_request_is_a_request(self):
         # Switchboard parses the request with uuid::Uuid::parse_str, which takes either case
         upper = REQUEST.upper()
         env = dict(ENV, FABRIC_DISPATCH_REQUEST=upper)
         self.assertEqual(cli.dispatch_of(env, LINE.replace(REQUEST, upper)), (dict(FULL, request=upper), []))
+        self.assertEqual(cli.dispatch_of(ENV, LINE.replace(REQUEST, upper)), (FULL, []), "the same UUID in other case")
+        self.assertEqual(cli.dispatch_of(ENV, LINE.replace(HANDOFF, HANDOFF.upper().replace("HANDOFF:", "handoff:")))[1],
+                         ["handoff"], "the handoff compares exactly")
+
+    def test_a_take_over_with_no_session_id_holds_nothing(self):
+        env = dict(self.env, **ENV)
+        for bad in (None, "a b"):
+            self.assertFalse(cli.dispatch_holder(FULL, bad, env, take_over=True))
+            self.assertTrue(cli.dispatch_holder(FULL, bad, env), "outside a take-over it counts as the holder")
+        self.assertFalse((cli.state_root(env=env) / "dispatch").exists())
 
     def test_without_the_line_the_prompt_hook_prints_no_contract(self):
         # agreed on the project board, 2026-11-05: without FABRIC_DISPATCH_* no exit contract; with it and no line, none

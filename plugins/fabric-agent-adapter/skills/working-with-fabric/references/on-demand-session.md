@@ -109,7 +109,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
 
    A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
-   a typed secret or a payment is the person's: name it in the answer rather than wait.
+   a typed secret, a payment or a production step is the person's: name it in the answer rather than wait. A
+   production step is the operator's to approve: no person is in this chat, the request alone never approves it, and
+   his own words relayed with a scope naming the step do (`project-board.md`, *No person in the chat*).
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
    `completed`, or `failed_known` with the reason.
 6. **Close the workflow.** `observatory_checkpoint_write {workflowId, owner, idempotencyKey, stepId, status, body,
@@ -174,12 +176,13 @@ Fabric takes it back (SB-253 makes the fallback leave a board-request workflow t
 accepted and no longer can be: the session ends the run without touching the request. Observatory shows the
 workflow's newest offer, which may be another hand-over's: the session reads only this dispatch's handoff, and when
 the one shown is another, it ends the run without touching the request. When
-the hooks cannot name the replaced id (no readable record, or Windows, where any `/clear` takes the record and the
-hooks name no id), the notice says first that nothing can be replayed and gives the new id: a pending handoff is accepted under it, and the next `/clear`
-names it, except on Windows, where it names no id either, so an accept made there cannot be replayed after another
-`/clear`. An accept already made under an id the hooks could not name cannot be replayed, so the session ends the run
-without touching the request, and Fabric takes the workflow over after it (step 4). Any other session gets one line in place of the
-contract: do the task
+the record names a replaced id the hooks cannot pass on (one that is not a lowercase UUID), the notice says first that
+nothing can be replayed and gives the new id: a pending handoff is accepted under it, and the next `/clear` names it;
+an accept already made under that id cannot be replayed, so the session ends the run without touching the request,
+and Fabric takes the workflow over after it (step 4). On Windows, where each hook's parent is a new Git Bash, a
+`/clear` cannot tell the holder from a helper: it holds nothing, the session gets the conditional contract and reads
+as a helper, and Fabric takes the workflow over after the run. A second session whose own first line names the
+dispatch gets one line at its first prompt, after the conditional contract its start printed: do the task
 you were given, and never accept the handoff, claim, replace the responder, complete the request or write the
 workflow's checkpoints. `watch-mail` refuses to start under a board request's environment, the run's or a helper's,
 and the dashboard-kit notice says nothing there. A host whose hook gets no session id (the native bridges: Hermes,
