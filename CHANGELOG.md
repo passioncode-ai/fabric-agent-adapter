@@ -87,7 +87,7 @@
 - The live docs name a closed module neutrally, as the organization edition (`references/package.md` in
   building-fabric-services and two backlog rows), at its owner's request; dated reports and handoffs keep their words.
 - A session that does a board request with no person in its chat stops before a production step and names it for a
-  person, unless the operator's own words, relayed with a scope naming the step, approve it (working-with-fabric `references/project-board.md`, board thread `1add3c03`).
+  person, unless the operator's own words, relayed with a scope naming the step, approve it (working-with-fabric `references/project-board.md`; board threads `1add3c03` and `24e0c88e`; Fabric's board rule at `108239c0`).
 
 ### Fixed
 
