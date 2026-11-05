@@ -55,7 +55,7 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   pruned after 7 days),
   and the delivery worker starts `fabric-mcp` in its own process group and ends that group
   (`killpg`, or `taskkill /T /F` on Windows) at its 10 s deadline. They read no Fabric token. An
-  `origin` URL that embeds a credential (`https://user:token@host/...`) is read by `git config`
+  `origin` URL that embeds a credential (`<https>://user:token@host/...`) is read by `git config`
   with it; the credential, the port and `.git` are dropped in memory before anything is spooled,
   logged or sent.
 - `adapting-projects-to-fabric/scripts/adapt_project.py` reads the target project without

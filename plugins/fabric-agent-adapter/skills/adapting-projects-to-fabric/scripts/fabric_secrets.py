@@ -144,10 +144,10 @@ def _percent_encode(text: str, also: str) -> str:
 
 def _url_parts(value: str) -> Tuple[str, str, str]:
     """The password, query and fragment of an absolute URL as WHATWG URL parsing splits them, read by hand: urlsplit
-    refuses a `[` or `]` outside an IPv6 host (`https://u:p[w@h/`), where `new URL` reads the password (0.56.0 unit
+    refuses a `[` or `]` outside an IPv6 host (`<https>://u:p[w@h/`), where `new URL` reads the password (0.56.0 unit
     r7). The fragment starts at the first `#`, the query at the first `?` before it. A special scheme's authority starts
     after every slash or backslash that follows `scheme:` (the special authority ignore slashes state) and ends at the
-    next slash, backslash, `?` or `#`, so `https:u:p@h` and `https:\\u:p@h` carry the password p; any other scheme
+    next slash, backslash, `?` or `#`, so `<https>:u:p@h` and `<https>:\\u:p@h` carry the password p; any other scheme
     has an authority only after `//`, and `file` has no user information. The user information ends at the authority's
     last `@`, and the password follows its first `:`. A host `new URL` would refuse is not checked: such a URL is read
     for its password and parameters all the same, the safe direction for a detector."""
@@ -212,8 +212,8 @@ def ascii_decoded(text: str) -> str:
 def repository_password(value: str) -> bool:
     """Whether a repository URI's user information holds a password, in any scheme, `file` too: every slash and
     backslash after the colon skipped, then up to the next `/`, `?` or `#`, a backslash kept in the user. That one
-    reading holds git's (`https://h\\u:pw@x/r`), curl's (`https:///h\\u:pw@x`) and the URL standard's
-    (`https:///u:pw@h`, which stops at a backslash, a prefix of it) (0.62.0 readings 10 to 14). The user information
+    reading holds git's (`<https>://h\\u:pw@x/r`), curl's (`<https>:///h\\u:pw@x`) and the URL standard's
+    (`<https>:///u:pw@h`, which stops at a backslash, a prefix of it) (0.62.0 readings 10 to 14). The user information
     ends at the last `@`; a password follows its first `:`, as written or ascii_decoded. The Node twin is
     repositoryPassword."""
     value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))

@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.65.0 (2026-11-05)
+
+### Fixed
+
+- The kit vendors into public products (FAA-211, project-observatory's finding on the board): no file the npm package
+  ships writes a URL with credentials any more, the CHANGELOG aside. Products whose release check refuses one (for
+  example a pattern like `https?://user:password@`) and who vendor kit modules by their byte digests could not ship
+  `fabric_secrets.py`, whose docstrings held the readings it guards against. Those examples, and the ones in
+  `fabric_http.py`, `fabric-http.mjs`, `fabric-delegation.mjs`, `fabric_descriptor.py`, `check_service_rules.py`,
+  `fabric_provider.py`, `fabric_source_check.py`, `references/remote-placement.md`,
+  `references/session-hooks.md` and SECURITY.md, now name the scheme in angle brackets (`<https>://u:pw@h`; read
+  `<https>` as `https`). No code changed. Five kit modules have new digests in `kit.json`: `fabric_secrets.py`,
+  `fabric_descriptor.py`, `fabric_http.py`, `fabric-http.mjs` and `fabric-delegation.mjs`.
+
+### Added
+
+- `test/validate.py` fails when a file the npm package ships (package.json `files`, and package.json itself) writes a
+  URL with credentials. It searches the products' own pattern and a wider one in scheme and slashes (any scheme, no
+  slashes, backslashes, `///`, a tab among the slashes). The CHANGELOG ships too, but is a record of released notes
+  and no kit module, and keeps the examples of earlier releases as written. A finding names the file, the line and the
+  scheme, never the URL. AGENTS.md states the rule; the
+  test that checks it builds its URLs from parts, while the other tests (not shipped) keep theirs as written.
+
+### Upgrading
+
+- A service holding 0.64.0 copies of those five modules behaves the same, but `fabric_kit.py status` reads them as
+  `older` and exits 1 until `fabric_kit.py install <service-dir>` with the same `--lang` and `--module` names (`--lang node`
+  for the two `.mjs` modules) refreshes them; an
+  `older` copy needs no `--force`.
+
 ## 0.64.0 (2026-11-05)
 
 ### Added

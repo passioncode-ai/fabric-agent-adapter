@@ -752,6 +752,63 @@ class DollarAnchorTests(unittest.TestCase):
         self.assertEqual(validate.dollar_anchor_problems(), [])
 
 
+class CredentialUrlTests(unittest.TestCase):
+    """FAA-211: no shipped file writes a URL with credentials, so products whose release checks refuse one can vendor
+    the kit. The URLs are built from parts here, so this file holds none either."""
+
+    KIT = "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_example.py"
+    AT = "@"
+    SHAPES = ("https" + "://u:pw" + AT + "h", "https" + ":u:pw" + AT + "h", "https" + ":\\\\u:p" + AT + "h",
+              "https" + ":///h\\u:pw" + AT + "x/r", "ht\ttps" + "://h\\u:pw" + AT + "x/r", "ws" + "://bot:tok" + AT + "h", "https" + ":/\t/u:pw" + AT + "h",
+              # the products' own pattern takes quotes and backticks in the password, the wider one does not
+              '"https' + '://u:"+pw+"' + AT + 'h"', "https" + "://u:p'w" + AT + "h", "https" + "://u:p`w" + AT + "h")
+
+    def test_every_shape_fails_in_every_shipped_place(self):
+        for rel in (self.KIT, "plugins/fabric-agent-adapter/skills/working-with-fabric/references/x.md",
+                    "bin/fabric-agent-adapter.js", "README.md", "SECURITY.md"):
+            for shape in self.SHAPES:
+                with self.subTest(rel=rel, shape=shape):
+                    tmp, root = _tree({rel: "intro\n# so `%s` loses it\n" % shape})
+                    with tmp:
+                        problems = validate.credential_url_problems(root)
+                    self.assertEqual(len(problems), 1, problems)
+                    self.assertIn("%s:2 writes a URL with credentials" % rel, problems[0])
+                    self.assertIn("FAA-211", problems[0])
+                    finding = problems[0].split(": name the scheme")[0]  # the credential is never printed
+                    for secret in (":pw", ":p", ":tok", '"+pw+"'):
+                        self.assertNotIn(secret, finding)
+
+    def test_the_scheme_in_angle_brackets_and_the_unshipped_record_pass(self):
+        files = {self.KIT: "# `<https>://u:pw" + self.AT + "h`, `<https>:///h\\u:pw" + self.AT + "x`, git" + self.AT
+                 + "github.com:o/r, ssh://git" + self.AT + "host:22/r\n",
+                 "CHANGELOG.md": "`" + self.SHAPES[0] + "`\n", "test/test_x.py": self.SHAPES[0] + "\n"}
+        tmp, root = _tree(files)
+        with tmp:
+            self.assertEqual(validate.credential_url_problems(root), [])
+
+    def test_the_scope_is_what_the_package_ships(self):
+        """package.json `files` decides: a second plugin folder and package.json itself are read, the CHANGELOG is not."""
+        files = {"package.json": '{"files": ["bin", "plugins", "CHANGELOG.md", "!**/*.pyc"]}\n',
+                 "plugins/another/x.md": "`%s`\n" % self.SHAPES[0], "CHANGELOG.md": "`%s`\n" % self.SHAPES[0],
+                 "README.md": "`%s`\n" % self.SHAPES[0]}
+        tmp, root = _tree(files)
+        with tmp:
+            self.assertEqual(validate.credential_url_scope(root), ["bin", "plugins", "package.json"])
+            problems = validate.credential_url_problems(root)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("plugins/another/x.md:1", problems[0])
+
+    def test_a_binary_file_is_skipped(self):
+        tmp, root = _tree({})
+        with tmp:
+            (root / "bin").mkdir()
+            (root / "bin/blob").write_bytes(b"\xff\xfe" + self.SHAPES[0].encode())
+            self.assertEqual(validate.credential_url_problems(root), [])
+
+    def test_the_real_tree_passes(self):
+        self.assertEqual(validate.credential_url_problems(), [])
+
+
 class WorkflowGuardTests(unittest.TestCase):
     """R5 and FAA-72/FAA-73: the hosted gates must be able to fail, and the release path must be safe."""
 

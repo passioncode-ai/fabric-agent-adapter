@@ -482,7 +482,7 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     """A path as it may be printed: an owner's string as `<line N>` (its line in the owner's list), a real home
     folder's name as `<home>`, and each segment in which `_secret_finding` finds a credential as `<secret>`, whole
     (a span inside a segment can miss a second value the first one runs into). While the segments left still hold a
-    credential together (`https:\\/\\/app:<pw>@db/x`), the segments that finding's spans touch are masked, else the
+    credential together (`<https>:\\/\\/app:<pw>@db/x`), the segments that finding's spans touch are masked, else the
     last one left, so what is printed holds no finding and its first folders still name the place. With `seen`, what the
     check found elsewhere in the tree is masked too: a home name at every occurrence, and a segment holding a run of 8
     characters of a found value as `<secret>`."""

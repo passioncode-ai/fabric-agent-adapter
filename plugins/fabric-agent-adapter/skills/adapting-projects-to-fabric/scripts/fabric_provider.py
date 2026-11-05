@@ -51,7 +51,7 @@ ENV_MAX = 64
 _ID = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z")
 _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*\Z")
 # A special scheme (http, https, ws, wss, ftp) reads a user:password@ after any run of slashes, none included, as
-# `new URL` does: https:bot:pw@host carries the password too (0.56.0 seam r7).
+# `new URL` does: <https>:bot:pw@host carries the password too (0.56.0 seam r7).
 _URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#]*:[^/\\?#]*@"
                            # any other scheme: a backslash belongs to the user information (seam r8)
                            r"|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*:[^/?#]*@)")

@@ -88,6 +88,10 @@ These come from `CONTRIBUTING.md`, `SECURITY.md` and `README.md`:
 - Keep the marketplace, plugin, skill metadata and changelog versions in sync.
 - SKILL.md front matter must survive a strict YAML reader, not only Claude Code: a value holding
   `: ` or ` #` goes in a folded block (`description: >-`) or quotes. `test/validate.py` enforces it.
+- An example of a URL with credentials in a file the npm package ships (its `files`, the CHANGELOG aside) names its
+  scheme in angle brackets, `<https>://u:pw@h` (read `<https>` as `https`), so a product that vendors kit modules by
+  their digests passes its own release check. `test/validate.py` enforces it on the shipped files (FAA-211); tests
+  are not shipped and may keep literal URLs, while the test of this check builds its own from parts.
 - Never write secret values to manifests, fixtures, probes, logs or command arguments. Treat
   generated files and provider outputs as untrusted.
 - The repository and the npm package are public (since 2026-09-29). Everything in the `files`

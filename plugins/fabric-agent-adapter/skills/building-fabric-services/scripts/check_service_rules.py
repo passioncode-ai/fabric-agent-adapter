@@ -29,12 +29,12 @@ _URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the val
 
 def shown_repository(value: str) -> str:
     """A repository or git origin as evidence: a URL through redact_url, which drops its user information as written
-    first (git's reading, `https://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
+    first (git's reading, `<https>://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
     `\\` or a drive) by its name; an scp form (user[:password]@host:path) from its host, its user and password dropped
     whatever they hold, up to the last `@` that a host and `:` follow; anything else by its name. Then a query and a
     fragment. A value with a piece shaped like a credential that is no name (fabric_secrets.repository_name) is not
     printed (0.62.0 readings 2 to 11). Read first as redact_url reads it: C0 controls and space off its ends, every tab,
-    CR and LF out, so `https:/<tab>/u:pw@h` is the URL it is (unit reading 11)."""
+    CR and LF out, so `<https>://u:pw@h` with a tab between its two slashes is the URL it is (unit reading 11)."""
     value = re.sub(r"[\t\n\r]", "", value.strip("".join(map(chr, range(0x21)))))
     if _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
         shown = redact_url(value)  # which drops the user information as written first (seam readings 10 and 11)
