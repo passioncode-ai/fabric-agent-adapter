@@ -84,11 +84,12 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    it: DEC-0098, DEC-0102) declining it: this Project cannot take it until Fabric ships CO-506, and the requester sends
    it again then (the reply ends the queue, so nothing takes it later; never say it waits). Then it closes the workflow `done` once
    `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state the error rule below holds.
-   The decline does not reach the operator's «На проверке» (an answered request is settled); the requester reads it.
+   The decline does not reach the operator's «На проверке» (an answered request is settled); the requester reads it,
+   and the closing write's `notes` say the request was declined until CO-506.
    Fabric's dispatcher counts an answered request as settled and starts no second run for it. Once CO-506 ships
    (Fabric's `main` `027cb809`) a session's own Project grants it at `com.enroll` itself, and this branch is taken only
-   where CO-506 grants nothing (a machine marked as an organization's, or no live credential for the session or its
-   runner); the reply then names CO-506 though it shipped, and the real gate is that grant (left open in FAA-215).
+   where CO-506 grants nothing (a machine marked as an organization's, no live credential for the session or its runner,
+   or a standing denial of that ask); the reply then names CO-506 though it shipped, and the real gate is that grant (left open in FAA-215).
    FAA-219; Fabric's answer in board thread `1add3c03` (option (b), 2026-11-05), the same rule as the responder's run;
    Fabric's `com.enroll` description in 0.3.16 tells a session to ask the grant, which it cannot (corrected on its
    `main`). An earlier run may have left the request taken: `com.get` on the

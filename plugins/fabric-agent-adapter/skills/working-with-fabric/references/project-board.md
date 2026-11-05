@@ -138,6 +138,13 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
    ask still stands, submit it again.
 
+**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project whose
+session holds no `board.respond` grant (every coding-session Project before Fabric ships CO-506) is answered within a
+cycle by a run that declines it until CO-506 and asks for a resend ([on-demand session](on-demand-session.md), step 3).
+The request is then `answered`: it no longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
+small change may still be adapted under step 3. Record the wait on CO-506 (what it waits on, which watcher acts); once
+it ships and the ask still stands, cancel the answered request (`com.cancel`) and submit it again with a new key.
+
 The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it.
 
 ## The project directory
@@ -159,7 +166,7 @@ The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "
 ## Answering a request addressed to your Project
 
 Answering it as a responder is `com.enroll` then `com.claim`, under a `board.respond` grant: a service asks it with
-`fabric.access.request` and the operator decides it in Fabric (Agents & access); a coding session cannot ask it, and
+`fabric.access.request` and the operator decides it in Fabric (Agent access); a coding session cannot ask it, and
 gets its own Project's at `com.enroll` once Fabric ships CO-506. The request then moves with `com.accept` and `com.complete`. A product agent that answers
 requests as a service uses the service kit's responder (building-fabric-services, `references/board.md`).
 
@@ -170,9 +177,11 @@ Review the merged change; then reply on the request (that answers it): kept, or 
 whose `replyTo` is the request) moves a queued request to `answered`: no responder claims it any more and its
 deadline no longer expires it; only the requester can still cancel it. So reply as a participant only when the reply
 is the answer: you did the work, you say why it will not be done, or you are doing it and give its state with the
-nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If a responder
-should still do the work, do not reply on the request: tell the person and leave it queued (a session's `com.enroll`
-refused `not_authorized` has no route to the grant before Fabric's CO-506). Never write "it stays queued" in a reply: the reply itself ends the queue. A run Fabric started on
+nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If your Project's
+service responder should still do the work, do not reply on the request: tell the person and leave it queued. A
+session whose own `com.enroll` is refused `not_authorized` has no route to the grant before Fabric's CO-506: it answers
+the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's board rule
+on its `main` at `b8c0a38c`). Never write "it stays queued" in a reply: the reply itself ends the queue. A run Fabric started on
 a board request has no person to tell: it declines and asks for a resend ([on-demand session](on-demand-session.md),
 step 3).
 
