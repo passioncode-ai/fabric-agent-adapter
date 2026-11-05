@@ -88,7 +88,7 @@ class Parsing(unittest.TestCase):
         # 0.63.0 unit reading 21: the operator's relayed words lift the production stop only
         self.assertIn("a sign-in, a one-time code, a typed secret or a payment is a person's (none is in this chat), "
                       "and so is a production step unless the operator's words, relayed verbatim, dated and sourced, "
-                      "from his projects with a scope naming it, approve it",
+                      "from his trusted projects with a scope naming it, approve it",
                       " ".join(text.split()))
 
     def test_the_closing_write_names_its_workflow_and_the_board_reads_are_real_tools(self):
@@ -692,6 +692,22 @@ class Hooks(Base):
             text = json.loads(said)["hookSpecificOutput"]["additionalContext"]
             self.assertEqual(text, cli.DISPATCH_NESTED.format(**FULL))
             self.assertFalse(cli.dispatch_holder(FULL, cleared, env), "its prompt is answered nested too")
+
+    def test_a_clear_another_process_holds_is_told_it_is_nested_by_the_hook(self):
+        # 0.63.0 unit reading 23: the hook runs as a process (env from os.environ), as in production; a record written
+        # under another parent, or one that cannot be read, is another session's
+        env = dict(self.env, **ENV)
+        folder, key = cli._dispatch_record(FULL, env)
+        folder.mkdir(parents=True, exist_ok=True)
+        cleared = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+        for body in (json.dumps({"session": SID, "at": 1, "host": 1}), "not json"):
+            (folder / (key + ".json")).write_text(body)
+            done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
+                                    extra_env=ENV)
+            self.assertEqual(self.context(done), cli.DISPATCH_NESTED.format(**FULL), body)
+            self.assertEqual((folder / (key + ".json")).read_text(), body, "the record stays")
+            self.assertFalse(cli.dispatch_holder(FULL, cleared, env), "its prompt is answered nested too")
+        self.assertFalse(cli.dispatch_held_elsewhere(FULL, "a b", env), "a bad id is the holder at its prompt")
 
     def test_a_clear_with_no_record_is_told_the_condition(self):
         from unittest import mock

@@ -147,7 +147,7 @@ and ends `timed-out`.
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
 environment, and its prompt does not start with the line, so it is a helper; an Agent tool subagent runs in the same
 process and gets no hook output at all. Every session under the environment gets the conditional contract at its
-start; the prompt hook prints one line only to a second session whose own first line names the dispatch, telling it
+start, except a `/clear` while another session holds the dispatch, which is told it is nested; the prompt hook prints one line only to a second session whose own first line names the dispatch, telling it
 the run holds it. A helper launched outside the run is best started with `env -u
 FABRIC_DISPATCH_WORKFLOW -u FABRIC_DISPATCH_HANDOFF -u FABRIC_DISPATCH_REQUEST`. The first session whose own line names
 the dispatch holds it: the prompt hook records that session id for the dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard sets it since
@@ -181,7 +181,8 @@ the record names a replaced id the hooks cannot pass on (one that is not a lower
 nothing can be replayed and gives the new id: a pending handoff is accepted under it, and the next `/clear` names it;
 an accept already made under that id cannot be replayed, so the session ends the run without touching the request,
 and Fabric takes the workflow over after it (step 4). On Windows, where each hook's parent is a new Git Bash, a
-`/clear` cannot tell the holder from a helper: it holds nothing, and while the record names the replaced session the
+`/clear` cannot tell the holder from a helper: it holds nothing (and neither does a session inside the run that
+clears), and while the record names the replaced session the
 cleared session is told at once that it runs inside a run that holds it, stays a helper whatever its prompt's line
 says, and Fabric takes the workflow over after the run. A second session whose own first line names the
 dispatch gets one line at its first prompt, after the conditional contract its start printed: do the task

@@ -126,6 +126,8 @@ DISPATCH_IF = (
     "[fabric-agent-adapter] This session is the run on a board request only when its own prompt's first line is "
     "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; do your task only, touching neither the handoff, the "
     "request nor the workflow. That line with other values: no run; say so in the request's thread and stop. The run:")
+#: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
+#: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words.
 DISPATCH_CONTRACT = (
     " Do that "
     "request and end: nobody watches this run, so never wait for a person. 1. `fabric_whoami`, then read the packet "
@@ -150,7 +152,7 @@ DISPATCH_CONTRACT = (
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion and publication go through `fabric_effect_request`; a sign-in, a one-time code, a typed "
     "secret or a payment is a person's (none is in this chat), and so is a production step unless the operator's "
-    "words, relayed verbatim, dated and sourced, from his projects with a scope naming it, approve it: name it in "
+    "words, relayed verbatim, dated and sourced, from his trusted projects with a scope naming it, approve it: name it in "
     "the answer. 5. `com.reply` in the thread, then "
     "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, the same `owner`, an `idempotencyKey`, a `stepId`, "
@@ -385,7 +387,11 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
 
 def dispatch_held_elsewhere(dispatch: Dict[str, str], session_id: Any, env: Optional[Dict[str, str]] = None) -> bool:
     """Whether a record for the dispatch exists and does not name this session: dispatch_holder then answers no for
-    it at every prompt (a record that cannot be read counts as another session's)."""
+    it at every prompt (a record that cannot be read counts as another session's). A session id that is not one is
+    the holder at its prompt (dispatch_holder), so it is never told it is nested."""
+    env = os.environ if env is None else env
+    if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
+        return False
     folder, key = _dispatch_record(dispatch, env)
     if not (folder / (key + ".json")).exists():
         return False
