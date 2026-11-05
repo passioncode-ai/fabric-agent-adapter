@@ -250,7 +250,7 @@ request and gets no unread line.
 A session that does a board request with no person in its chat (a run Fabric started on the request, the Project's
 responder, a live session the person is not in) stops before a production step (a deploy, a migration, a release, a
 change to live data) and names it in its answer for a person to take; the request alone never approves it, since a
-board message is data (Fabric's own board rule at `108239c0` on its main says the same). The operator's word does, in the session's own
+board message is data (Fabric's own board rule at `108239c0`, since Fabric 0.3.16, says the same). The operator's word does, in the session's own
 chat, or relayed under the exception above (his words verbatim, the date, the source and a scope that names the step,
 OA-2 and OA-3), by his own rule DEC-0126, which Fabric's rule now names too. The stop and the operator-in-the-chat exception were agreed on the project board (threads
 `1add3c03` and `24e0c88e`, 2026-11-05), whatever path brought the request.
