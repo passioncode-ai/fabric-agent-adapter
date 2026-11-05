@@ -55,6 +55,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__.*__fabric_work_release|mcp__.*__fabric_task_release",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -S \"${CLAUDE_PLUGIN_ROOT}/skills/working-with-fabric/scripts/fabric_session.py\" hook post-tool-use",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
