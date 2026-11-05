@@ -427,10 +427,11 @@ class Hooks(Base):
         # a reply from the target Project answers the request (DEC-0098, DEC-0102), and an answered request is settled
         text = cli.dispatch_contract(FULL)
         # 0.68.0 product reading 2: the reply answers the request, so it declines and asks for a resend, never "waits"
-        # 0.68.0 product reading 5: a service Project's stale responder takes it when it comes back; decline only with none
-        self.assertIn("a not_authorized enroll: no slot, no work and, if queued with no responder in `com.status`, one "
-                      "`com.reply` (replyTo it) declining until Fabric's CO-506 (resend then), then step 6 (done) once "
-                      "`com.get` reads it answered, and 7;", text)
+        # 0.68.0 readings 5 and 6: com.status always lists the request's capability; a slot a service ever held
+        # (stale, active, or absent at a generation of 1 or more) takes the request back, so decline only at generation 0
+        self.assertIn("a not_authorized enroll: no slot, no work and, if queued, its `com.status` slot `absent` at "
+                      "generation 0, one `com.reply` (replyTo it) declining until Fabric's CO-506 (resend then), then step "
+                      "6 (done) once `com.get` reads answered, and 7;", text)
         branch = text[text.index("a not_authorized enroll"):text.index("CO-506")]
         self.assertNotIn(";", branch, "0.68.0 unit reading 2: a queued request is the refused enroll's case, not its own")
         self.assertEqual(text.count(" 7. "), 1, "' 7. ' is step 7 alone, so the step slices hold")

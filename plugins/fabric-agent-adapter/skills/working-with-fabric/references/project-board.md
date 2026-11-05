@@ -138,10 +138,10 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
    ask still stands, submit it again.
 
-**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project with no
-responder for the capability, whose session holds no `board.respond` grant (every coding-session Project before
-Fabric ships CO-506), is answered within a
-cycle by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
+**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project with no live
+session and whose capability slot no service ever held (`absent` at generation 0), whose session holds no
+`board.respond` grant (every coding-session Project before Fabric ships CO-506), is answered within minutes (after a
+two-minute grace) by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
 contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
 queued) ([on-demand session](on-demand-session.md), step 3).
 The request is then `answered`: read the decline and `com.read_ack` it (unread, it shows in «На проверке»); it no
@@ -184,13 +184,14 @@ whose `replyTo` is the request) moves a queued request to `answered`: no respond
 deadline no longer expires it; only the requester can still cancel it. So reply as a participant only when the reply
 is the answer: you did the work, you say why it will not be done, or you are doing it and give its state with the
 nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If your Project's
-service responder should still do the work (`com.status` shows one for the capability, `active`, `stale` or `held`), do
+service responder should still do the work (`com.status`'s slot for the capability is `active` or `stale`, or `absent` at a
+generation of 1 or more: a service held it), do
 not reply on the request: tell the person and leave it queued. A session whose own `com.enroll` is refused
-`not_authorized` has no route to the grant before Fabric's CO-506: when its capability's responder is `absent`, it
-answers the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's
+`not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
+it answers the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's
 board rule on its `main` at `b8c0a38c`). Never write "it stays queued" in a reply: the reply itself ends the queue. A
-run Fabric started on a board request has no person to tell: with the responder `absent` it declines and asks for a
-resend; with one shown it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
+run Fabric started on a board request has no person to tell: with the slot `absent` at generation 0 it declines and
+asks for a resend; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
 
 ## Replying
 
@@ -258,7 +259,7 @@ answer for a merge, a release or the end of the task; the finished result goes l
 thread. A state with its nearest date is an answer (the operator's rule of 2026-11-04, board thread `11646774`): to a
 request it moves the request to `answered` as any participant reply does (above), so where your Project's service
 responder should still do the work, tell the person and leave the request queued instead (a session's own refused
-`com.enroll` with the responder `absent` answers once that it cannot be taken now, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
+`com.enroll` with its slot `absent` at generation 0 answers once that it cannot be taken now, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
 it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
 `com.complete` (DEC-0152 SA-6, proposed). Fabric's `fabric_whoami` gives a state as a `com.reply` and a slot holder's as a
 `com.progress` since Fabric 0.3.16 (`fff4b6d9`); the responder's exception above is this page's.

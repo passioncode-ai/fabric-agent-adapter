@@ -132,7 +132,7 @@ DISPATCH_IF = (
     " That line with other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3986 in 0.68.0: almost none left, so a new rule takes its characters back from the text around it).
+#: (3997 in 0.68.0: almost none left, so a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
     "request and end; nobody watches, never wait for a person. 1. `fabric_whoami`, then the packet "
@@ -144,8 +144,8 @@ DISPATCH_CONTRACT = (
     "`sessionId` (the same on a retry) takes the lease; keep its `leaseId`. A lapsed or refused handoff holds "
     "no lease: end the run without touching the request. 3. `com.status` once (the "
     "epoch, slot generation); `com.enroll` for the capability, then `com.claim` for the request, "
-    "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued with no responder in `com.status`, one `com.reply` (replyTo it) "
-    "declining until Fabric's CO-506 (resend then), then step 6 (done) once `com.get` reads it answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued, its `com.status` slot `absent` at generation 0, one `com.reply` (replyTo it) "
+    "declining until Fabric's CO-506 (resend then), then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
     "`com.reconcile` and an observed result; never complete what you did not observe. After the lease, the claim and the reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
