@@ -94,8 +94,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
      executor's silence and one 60 s cycle after `run-ends-at`, and starts none with less than 5 minutes to the
      deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (`RUN_END_TO_DEADLINE_MS` and spec 3.6 on
-     Fabric's main at `afe28a60`, in no release yet); a request whose deadline passed unsettled goes
-     to the operator, with its workflow closed `blocked` from Fabric's 0.3.16 candidate on;
+     Fabric's main at `afe28a60`, in no release yet); a request Fabric's watch counts unanswered at its
+     deadline goes to the operator, with its workflow closed `blocked` from Fabric's 0.3.16 candidate on;
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
@@ -129,14 +129,17 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
 request `failed_known` with the reason when it holds a fence for it. It closes the workflow only once the request is
 settled: the board accepted the complete or a reconcile, or `com.get` reads the request answered, terminal or
-`outcome_unknown` (no Fabric starts a run for an `outcome_unknown` request, so its workflow is closed safely, though
-Fabric's own watch counts it unanswered). Otherwise (the request still `queued`, `claimed`, `accepted` or
+`outcome_unknown` (no Fabric starts a run for an `outcome_unknown` request, so its workflow is closed safely; Fabric's
+watch still counts it unanswered until CO-409, which Fabric agreed on thread `1add3c03`). Otherwise (the request still `queued`, `claimed`, `accepted` or
 `in_progress`, and not this run's to settle) it leaves the workflow open, with an `in_progress` checkpoint without
 `close` naming the reason when it holds the lease, and writes the retro (step 7) and ends: a workflow closed over an
 unsettled request makes the next dispatch fail at the take-back on every cycle (Fabric's main at `a6f0ffda`; its 0.3.16
 candidate opens a new workflow then), while an open one is taken back for the next run, and after two runs with no
-answer Fabric shows the request to the operator (FAA-213). Switchboard's appended exit contract says the same from
-0.7.13 (SB-258); an earlier Switchboard tells the run to close the workflow whatever the request's state.
+answer Fabric shows the request to the operator (in its 0.3.16 candidate whatever the request's state; on its main only
+a request still `queued`). A workflow left open because another session holds the request is closed by Fabric once
+that request settles (CO-409, agreed on thread `1add3c03`, after 0.3.16; FAA-213). Switchboard's appended exit contract says the same from
+0.7.13 (SB-258); an earlier Switchboard tells the run to close the workflow whatever the request's state, and this
+rule, the later one, is the one to follow.
 
 A run started with `--permissions ask` may find the board or Observatory tools not allowed by the person's settings.
 It cannot answer then: it says so in its final output and ends; Fabric records the outcome and does not retry the same

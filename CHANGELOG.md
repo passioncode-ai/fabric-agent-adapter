@@ -7,11 +7,13 @@
 - working-with-fabric: a run Fabric started on a board request closes its workflow only once the request is settled
   (FAA-213, passioncode-vesta's finding on the board; Fabric agrees). On an error the run cannot get past (a refused
   claim, a missing key, a tool that fails twice) `references/on-demand-session.md` closed the workflow while the
-  request could still be `queued` or `claimed`, and Fabric's next dispatch then failed at the take-back on every cycle.
+  request could still be `queued` or `claimed`, and Fabric's next dispatch then failed at the take-back on every cycle
+  (Fabric's dispatcher, on its `main` and in no release yet).
   Now the run completes the request `failed_known` when it holds its fence, closes the workflow only when `com.get`
   reads the request answered, terminal or `outcome_unknown`, and otherwise leaves it open (with a checkpoint without
   `close` naming the reason when it holds the lease) for the next run, then writes the retro and ends. Fabric then
-  starts the next run, and after two runs with no answer shows the request to the operator in «На проверке». The exit
+  starts the next run, and after two runs with no answer shows the request to the operator in «На проверке» (any
+  request in its 0.3.16 candidate; on its `main`, only a request still `queued`). The exit
   contract the session hook prints in a run states the rule and points to the reference for the rest; it had no rule
   for an error before. Step 3 of the contract now says to resolve (not settle) `outcome_unknown` with `com.reconcile`,
   so the word keeps one meaning beside the new rule.
