@@ -437,9 +437,12 @@ class Hooks(Base):
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)
         self.assertIn("otherwise it is left accepted for the next run", text, "Fabric dispatches it since fff4b6d9")
-        self.assertIn("when the request's deadline is not after run-ends-at plus 10 minutes (no run starts that close to it), "
+        self.assertIn("when the request's deadline is not after run-ends-at plus 10 minutes, "
                       "`com.complete` failed_known", text,
                       "no run comes after the deadline (0.63.0 product reading 12)")
+        # FAA-210: after com.effect_begin the request is in_progress, which a next run could only reconcile as
+        # outcome_unknown, so the run completes it failed_known with what it observed
+        self.assertIn("then: after `com.effect_begin`, or when the request's deadline", text)
 
     def test_the_prompt_hooks_confirmation_names_the_session_id(self):
         # 0.63.0 unit reading 9: the confirmation carries the id when it is a lowercase UUID

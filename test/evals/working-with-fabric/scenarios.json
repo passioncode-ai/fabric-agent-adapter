@@ -557,6 +557,7 @@
       "expected": [
         "gives its state (what is done, where it lies, what is left) as a com.progress note on the request's thread",
         "when the request's deadline is not after run-ends-at plus 10 minutes, completes it failed_known saying the deadline came first and closes the workflow",
+        "after com.effect_begin (the request in_progress) completes it failed_known with the state it observed, never leaves it for the next run",
         "otherwise leaves the request accepted for the next run: an in_progress checkpoint without close, no com.complete",
         "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) before it ends"
       ]

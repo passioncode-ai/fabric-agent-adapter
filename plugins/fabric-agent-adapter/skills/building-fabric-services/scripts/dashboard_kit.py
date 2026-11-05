@@ -390,6 +390,13 @@ def hook_cwd(stdin_text: str) -> Path:
     return Path(cwd or os.getcwd())
 
 
+def read_stdin_text(stream, limit: int = 65536) -> str:
+    """The hook's input as UTF-8 bytes (a byte order mark dropped, a stray byte read as U+FFFD): a host writes its JSON
+    in UTF-8, and a Windows text stream before Python 3.15 decodes it with the locale's code page (FAA-210)."""
+    raw = stream.buffer.read(limit) if hasattr(stream, "buffer") else stream.read(limit)
+    return raw.decode("utf-8-sig", errors="replace") if isinstance(raw, bytes) else raw.lstrip("\ufeff")
+
+
 def notice() -> int:
     """The SessionStart hook. Asks first whether the repository owns a service and says nothing, having looked at
     nothing else, when it owns none; every git call and the tree walk share NOTICE_BUDGET_S, and a notice that runs
@@ -398,7 +405,7 @@ def notice() -> int:
     if re.fullmatch(r"wf_[0-9a-f]{16}", os.environ.get("FABRIC_DISPATCH_WORKFLOW") or ""):
         return 0  # a session started on a board request does that request only (FAA-201): no invitation to upgrade
     try:
-        stdin_text = "" if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read(65536)
+        stdin_text = "" if sys.stdin is None or sys.stdin.isatty() else read_stdin_text(sys.stdin)
         root = repo_root(hook_cwd(stdin_text), until=until)
         if root is None:
             return 0

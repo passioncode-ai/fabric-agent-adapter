@@ -90,6 +90,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    stops the run. Work that cannot end by then gives its state (what is done, where it lies, what is left), before
    `run-ends-at`, as the note of a `com.progress` on the request's thread (the slot holder's state, DEC-0152 SA-6,
    proposed). Then:
+   - after `com.effect_begin` the request is `in_progress`, which a next run could only settle as `outcome_unknown`
+     with `com.reconcile`: `com.complete` `failed_known` with the state it observed, and steps 6 and 7 (FAA-210; the
+     same choice as Vesta's run, board thread `1add3c03`);
    - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 10 minutes, no
      run comes before the deadline and an accepted request does not expire by itself: `com.complete` `failed_known`
      saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
@@ -97,7 +100,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (`RUN_END_TO_DEADLINE_MS` and spec 3.6 on
      Fabric's main since `afe28a60`); an accepted or in-progress request with no live holder past its deadline goes
      to the operator, with its workflow closed `blocked`;
-   - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
+   - otherwise (accepted, no effect begun) the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
      decides to dispatch an accepted request since `fff4b6d9`; a Fabric before it dispatches none). The open workflow is Fabric's

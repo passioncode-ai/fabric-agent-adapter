@@ -81,6 +81,24 @@ class Notice(unittest.TestCase):
         done, _ = self.notice()
         self.assertIn("example-agent.default (this repository) is built from fabric-dashboard-kit 0.9.0", done.stdout)
 
+    def test_a_repository_under_a_cyrillic_folder_hears_the_line_whatever_the_locale(self):
+        # FAA-210: the host writes its JSON in UTF-8; a Windows text stream before Python 3.15 decodes it with the
+        # locale's code page, so the notice reads its stdin as bytes (a byte order mark dropped)
+        moved = self.base / "папка" / "repo"
+        moved.parent.mkdir()
+        shutil.move(str(self.repo), str(moved))
+        self.repo = moved
+        self.own()
+        env = dict(os.environ, HOME=str(self.base), FABRIC_SERVICES_DIR=str(self.services), GIT_LOG=str(self.log),
+                   GIT_SLOW="", GIT_SLEEP="0", PYTHONIOENCODING="cp1252",
+                   PATH="%s:%s" % (self.base / "bin", os.environ.get("PATH", "")))
+        for prefix in (b"", b"\xef\xbb\xbf"):
+            with self.subTest(bom=bool(prefix)):
+                done = subprocess.run([sys.executable, str(SCRIPT), "notice"],
+                                      input=prefix + json.dumps({"cwd": str(self.repo)}, ensure_ascii=False).encode("utf-8"),
+                                      capture_output=True, env=env, timeout=30)
+                self.assertIn(b"example-agent.default (this repository)", done.stdout, done.stderr[-400:])
+
     def test_a_session_started_on_a_board_request_hears_nothing(self):
         # FAA-201: a dispatched run does its one request; no invitation to upgrade the dashboard (0.63.0 readings 2)
         self.own()

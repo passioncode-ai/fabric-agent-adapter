@@ -37,8 +37,9 @@ An insight/1 line is one JSON object per line with seven required fields, `schem
 `agent`, `kind` (in use: `lesson`, `finding`, `metric`, `pattern`, `tool`), `title` and `body`, and usually
 `evidence` (a list), `tags`, `audience`, `numbers` and `next`; it never holds a value. Fabric's ADR-0188 §5 names
 insight/1 without a shape; this is the shape in use across the estate's insight files (one JSONL file a month),
-stated here provisionally until ADR-0188's owner fixes it. Where a session writes them is not named yet either: with the session's own project data, until Observatory's
-reader (OBS-331) names the place it reads.
+stated here provisionally until ADR-0188's owner fixes it. A session writes them in the project's `insights/` folder,
+one JSONL file a month, the place Observatory named for its reader (OBS-331, board thread `f7758225`); the retro line
+and the preamble say so since 0.67.0.
 
 **A resumed session and a session Fabric does not hold** (since 0.42.0, board thread `02bf19c5`). `claude --resume`
 keeps the session id, so an end that was kept for a retry (its release got no answer) would be delivered to the resumed
