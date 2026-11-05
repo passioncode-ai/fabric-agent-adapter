@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.64.0 (unreleased)
+## 0.64.0 (2026-11-05)
 
 ### Added
 
