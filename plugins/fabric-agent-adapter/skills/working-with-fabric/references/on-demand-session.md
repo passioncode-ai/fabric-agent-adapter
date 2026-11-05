@@ -3,7 +3,8 @@
 When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
 project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person. The
-dispatcher is in no Fabric release yet (its wave 1 is off by default); the hooks recognise a dispatched session from
+dispatcher ships in Fabric 0.3.16 (released 2026-11-05, tag `v0.3.16` at `bcead0ef`), on by default since
+`a6f0ffda`. "Fabric's main" below is 0.3.16 with CO-409 on top (`babb2dc1`, `09ddb2fc`, in no release yet); the hooks recognise a dispatched session from
 adapter 0.63.0 on, so a launcher can start one today.
 
 ## Contents
@@ -77,7 +78,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `com.effect_begin` before the work has an effect. An earlier run may have left the request taken: `com.get` on the
    request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
-   attempt). An `outcome_unknown` one is settled only by `com.reconcile` with an observed result. Never complete what
+   attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result. Never complete what
    you did not observe. After the lease, after the claim or the takeover, and after the reply, write an `in_progress`
    checkpoint (`workflowId`, `leaseId`), so a later run has something to read. Observatory keeps only the latest
    body, so every checkpoint the session writes repeats `goal`, `constraints`, `artifacts` and `credentials` of
@@ -94,18 +95,18 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      saying the deadline came first, and steps 6 and 7. Fabric decides on a next run no later than 120 s of the
      executor's silence and one 60 s cycle after `run-ends-at`, and starts none with less than 5 minutes to the
      deadline (`LAUNCH_MARGIN_MS`): 8 minutes, 10 with room for a slow launch (`RUN_END_TO_DEADLINE_MS` and spec 3.6 on
-     Fabric's main at `afe28a60`, in no release yet); a request whose deadline passed unsettled goes
-     to the operator with its workflow closed `blocked`;
+     Fabric's main since `afe28a60`); an accepted or in-progress request with no live holder past its deadline goes
+     to the operator, with its workflow closed `blocked`;
    - otherwise the request is left accepted for the next run: an `in_progress` checkpoint without `close`, steps 5 and
      6 skipped. Fabric's dispatcher starts that run for an accepted request whose holder is gone, which takes it over
      with `com.responder_replace` (step 3), and after two runs with no answer shows it to the operator (Fabric's main
-     at `fff4b6d9`, in no release yet; a Fabric before it dispatches no accepted request). The open workflow is Fabric's
+     decides to dispatch an accepted request since `fff4b6d9`; a Fabric before it dispatches none). The open workflow is Fabric's
      to move, not the run's: after the run ends, and no sooner than 120 s of the executor's silence, Fabric hands it to
-     itself (`observatory_handoff_create` with reason `restart`, or `crash` when Switchboard reports the run failed,
-     to `service:fabric`), takes the new lease and routes it to the next run; when the request goes to «На проверке» or
-     its deadline passes, Fabric closes it `blocked` the same way (Fabric's spec at `c560d97e`, sections 3.4 and 3.6;
-     its decision on thread `b3e60686`, 2026-11-04; its code at that commit does not do it yet, so a second run on
-     Fabric's main meets a workflow whose lease is still this run's). This run only leaves it open.
+     itself (`observatory_handoff_create` with reason `restart`, to `service:fabric`), takes the new lease and routes it
+     to the next run; when the request goes to «На проверке» or its deadline passes, Fabric closes it `blocked` (Fabric's
+     spec at `c560d97e`, sections 3.4 and 3.6, which also names reason `crash` when Switchboard reports the run failed;
+     its decision on thread `b3e60686`, 2026-11-04). Fabric's main does both (the take-back since `a6f0ffda`, the
+     close since `bcead0ef`), and no code uses `crash` yet. This run only leaves it open.
 
    A launcher that stops a run gives no time to answer:
    Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
@@ -126,7 +127,20 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `watch-mail`, no question to the operator.
 
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
-request `failed_known` with the reason when it holds a fence for it, closes the workflow and ends.
+request `failed_known` with the reason when it holds a fence for it. It closes the workflow only once the request is
+settled: the board accepted the complete or a reconcile, or `com.get` reads the request answered, terminal or
+`outcome_unknown` (no Fabric starts a run for an `outcome_unknown` request, so its workflow is closed safely; Fabric's
+main counts such a run finished, not empty, since `babb2dc1`). Otherwise (the request still `queued`, `claimed`, `accepted` or
+`in_progress`, and not this run's to settle) it leaves the workflow open, with an `in_progress` checkpoint without
+`close` naming the reason when it holds the lease, and writes the retro (step 7) and ends: a workflow closed over an
+unsettled request made the next dispatch fail at the take-back on every cycle (Fabric's main at `a6f0ffda`; since
+`bcead0ef` Fabric opens a new workflow instead), while an open one is taken back for the next run when the project has
+no live session (a live session holds the request), and after two runs with no answer Fabric shows the request to the
+operator whatever its state. A workflow left open because another session holds the request is closed by Fabric once
+that request settles, and a request a run's `com.enroll` left `outcome_unknown` shows in «На проверке» at once
+(Fabric's main since `09ddb2fc`, in no release yet; FAA-213). Switchboard's appended exit contract says the same from
+0.7.13 (SB-258); an earlier Switchboard tells the run to close the workflow whatever the request's state, and this
+rule, the later one, is the one to follow.
 
 A run started with `--permissions ask` may find the board or Observatory tools not allowed by the person's settings.
 It cannot answer then: it says so in its final output and ends; Fabric records the outcome and does not retry the same
@@ -137,9 +151,9 @@ run unchanged.
 Fabric watches the request and the run (spec 3.6). The request keeps the state the board contract gives it: `queued`
 stays queued, `claimed` is taken again under a new attempt, `accepted` is held until a responder takes it over, and
 `in_progress` stays until the next holder registers, when the board records the lost result; an `outcome_unknown`
-attempt is settled only by `com.reconcile` with an observed result. Fabric may start one more run for a request
-still queued, claimed with a lapsed lease, or accepted or in progress with no live holder (an accepted one since its
-main at `fff4b6d9`); after two runs with no answer it shows the request to the operator in «На проверке», unchanged. A run past its time limit is stopped
+attempt is resolved only by `com.reconcile` with an observed result. Fabric may start one more run, when the project has no live session, for a request
+still queued, claimed with a lapsed lease, or accepted or in progress with no live holder; after two runs with no
+answer it shows the request to the operator in «На проверке», unchanged, whatever its state. A run past its time limit is stopped
 and ends `timed-out`.
 
 ## A session inside the run

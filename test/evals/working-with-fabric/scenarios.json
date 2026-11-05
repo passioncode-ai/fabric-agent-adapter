@@ -524,7 +524,7 @@
       "expected": [
         "reads com.status once for the epoch and the slot's generation, com.get on the request for its state, and the latest checkpoint for what the earlier run recorded",
         "takes the accepted request over with com.responder_replace (expectedGeneration) and its transfer, never com.claim (an accepted request is never claimed)",
-        "settles outcome_unknown only with com.reconcile and an observed result, and never completes what it did not observe",
+        "resolves outcome_unknown only with com.reconcile and an observed result, and never completes what it did not observe",
         "answers no other request, and renews the board lease with com.renew or com.progress about every 20 s in a long step, finishing before run-ends-at"
       ]
     },
@@ -559,6 +559,17 @@
         "when the request's deadline is not after run-ends-at plus 10 minutes, completes it failed_known saying the deadline came first and closes the workflow",
         "otherwise leaves the request accepted for the next run: an in_progress checkpoint without close, no com.complete",
         "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) before it ends"
+      ]
+    },
+    {
+      "id": "a-dispatched-run-whose-claim-is-refused",
+      "trap": "closes the workflow while the request is still queued or claimed, so Fabric's next dispatch failed at the take-back on every cycle (Fabric's main at a6f0ffda; a later Fabric opens a new workflow and the run's checkpoint is lost)",
+      "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.claim on the request is refused and you hold no fence for it. What do you do?",
+      "expected": [
+        "does not complete the request, since it holds no fence for it",
+        "reads the request with com.get and closes the workflow only if it reads answered, terminal or outcome_unknown",
+        "otherwise leaves the workflow open: an in_progress checkpoint without close naming the refused claim, no close: true",
+        "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) and ends the run"
       ]
     },
     {

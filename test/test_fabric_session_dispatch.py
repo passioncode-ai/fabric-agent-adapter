@@ -107,7 +107,8 @@ class Parsing(unittest.TestCase):
         # and refuses the decorated credentials of the top-level answer or the accept's pack
         self.assertNotIn("<board-thread>", text)
         self.assertNotIn("its goal names the request", text)
-        self.assertIn("never its top-level `credentials` or the accept answer's `pack`", text)
+        self.assertIn("(not the answer's top-level `credentials` or the accept's `pack`)", text)
+        self.assertNotIn("never its top-level", text)  # 0.66.0 product reading 5: `its` read as the body
 
     def test_an_incomplete_environment_is_told_it_holds_no_run(self):
         text = cli.DISPATCH_INCOMPLETE.format(workflow=WF)
@@ -417,9 +418,21 @@ class Hooks(Base):
         self.assertIn(uuid, self.context(done))
 
     def test_step_7_names_the_retro_itself(self):
-        # 0.64.0 product reading 2: no released Fabric's fabric_whoami asks the retro yet
+        # 0.64.0 product reading 2: the contract names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
         self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines, or one line that there is nothing; "
                       "no values), then end the run", cli.dispatch_contract(FULL))
+
+    def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
+        # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made
+        # Fabric's next dispatch fail at the take-back on every cycle (Fabric's main at a6f0ffda; later a new workflow)
+        text = cli.dispatch_contract(FULL)
+        self.assertIn("On an error you cannot get past: complete the request failed_known if you hold its fence; close the "
+                      "workflow only once the request is settled (`com.get`: answered, terminal or outcome_unknown), "
+                      "else leave it open.", text)
+        self.assertLess(text.index("7. Write the retro"), text.index("On an error you cannot get past"))
+        # D3: one meaning of settled in the contract; outcome_unknown waits on a reconcile, resolved
+        self.assertIn("resolve `outcome_unknown` only with `com.reconcile`", text)
+        self.assertEqual(text.count("settle"), 1)
 
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)

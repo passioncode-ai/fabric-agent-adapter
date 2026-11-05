@@ -35,13 +35,13 @@ class Words(unittest.TestCase):
                      "insight/1", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
                      "No values"):
             self.assertIn(word, cli.RETRO_LINE)
-        # 0.64.0 product reading 2: no released Fabric's fabric_whoami asks it yet (retro-after-work is on its main)
+        # 0.64.0 product reading 2: the line names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
         self.assertNotIn("fabric_whoami", cli.RETRO_LINE)
         self.assertNotIn("—", cli.RETRO_LINE)
 
     def test_the_preamble_names_the_retro_at_the_end(self):
         text = " ".join(cli.PREAMBLE.split())
-        # self-contained: a released Fabric (0.3.15) does not carry retro-after-work yet (0.64.0 seam reading 1)
+        # self-contained: Fabric 0.3.15 and earlier do not carry retro-after-work (0.64.0 seam reading 1)
         self.assertIn("When a piece of work ends (released as done, or the session about to end), write its retro in "
                       "the same turn: `observatory_lesson` for what went wrong (or your answer without it), insight/1 "
                       "lines for what you learned, or one line that there is nothing.", text)

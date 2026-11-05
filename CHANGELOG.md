@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.66.0 (2026-11-05)
+
+### Fixed
+
+- working-with-fabric: a run Fabric started on a board request closes its workflow only once the request is settled
+  (FAA-213, passioncode-vesta's finding on the board; Fabric agrees). On an error the run cannot get past (a refused
+  claim, a missing key, a tool that fails twice) `references/on-demand-session.md` closed the workflow while the
+  request could still be `queued` or `claimed`, and Fabric's next dispatch then failed at the take-back on every cycle
+  (Fabric's main at `a6f0ffda`, before 0.3.16).
+  Now the run completes the request `failed_known` when it holds its fence, closes the workflow only when `com.get`
+  reads the request answered, terminal or `outcome_unknown`, and otherwise leaves it open (with a checkpoint without
+  `close` naming the reason when it holds the lease) for the next run, then writes the retro and ends. Fabric 0.3.16
+  (released 2026-11-05) then starts the next run when the project has no live session, and after two runs with no
+  answer shows the request to the operator in «На проверке» whatever its state; its `main` since `babb2dc1` (in no
+  release yet) counts a run that ends on `outcome_unknown` finished. The exit
+  contract the session hook prints in a run states the rule and points to the reference for the rest; it had no rule
+  for an error before. Step 3 of the contract now says to resolve (not settle) `outcome_unknown` with `com.reconcile`,
+  so the word keeps one meaning beside the new rule.
+- `references/on-demand-session.md` step 4 no longer says Fabric's code leaves an open workflow's lease with the
+  ended run: Fabric's `main` takes it back at the next dispatch since `a6f0ffda`, and closes it at «На проверке» or
+  the deadline since `bcead0ef`; both ship in Fabric 0.3.16 (released 2026-11-05). The reference also names Switchboard 0.7.13 as
+  the first launcher whose appended contract keeps an unsettled request's workflow open, and says `resolved` for an
+  `outcome_unknown` request that waits on `com.reconcile`; its opening says the dispatcher ships in Fabric 0.3.16, on by
+  default, no longer off.
+- README, AGENTS.md, adapting-projects-to-fabric SKILL.md, `references/session-hooks.md` and
+  `references/project-board.md` say `retro-after-work` and the `com.progress` state ship since Fabric 0.3.16, no longer
+  "on its main, in no release yet".
+- The exit contract's checkpoint rule names the answer whose top-level `credentials` a body never carries (shortening
+  it had left `its` pointing at `checkpoint.body`).
+
+### Changed
+
+- The exit contract stays under Hermes' 4000 characters at its longest (3995 with a 64-character handoff and a session
+  id) by leaving three explanations to `references/on-demand-session.md`, which holds each: that Observatory's write
+  redacts the packet's board artifacts, why a checkpoint repeats the packet's body, and why Observatory refuses the
+  packet's top-level `credentials` and the accept answer's `pack` in it; a few phrases are shorter too. The rules
+  themselves are unchanged.
+
 ## 0.65.0 (2026-11-05)
 
 ### Fixed
