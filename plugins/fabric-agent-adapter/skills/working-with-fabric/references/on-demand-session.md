@@ -171,7 +171,7 @@ accepts it now under that same `sessionId`, with the key and owner step 2 names 
 replays it with no executor; the lease then records the provider alone, not the account Switchboard chose (Fabric's
 spec 3.5 has the session narrow it), and Switchboard's fallback before 0.7.11 reads such a lease as the person's
 ordinary CLI session, so after the run a limit on that account may continue it through `switchboard continue` before
-Fabric takes it back (SB-253 makes the fallback leave a board-request workflow to Fabric, due in 0.7.11; thread
+Fabric takes it back (SB-253 makes the fallback leave a board-request workflow to Fabric, released in Switchboard 0.7.11 on 2026-11-05; thread
 `b3e60686`). A lapsed handoff (`lapsedHandoff`) was never
 accepted and no longer can be: the session ends the run without touching the request. Observatory shows the
 workflow's newest offer, which may be another hand-over's: the session reads only this dispatch's handoff, and when
