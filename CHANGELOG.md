@@ -15,12 +15,19 @@
   that released nothing (`claims: []`) and a repeat (Fabric answers it with the first release's `at`) print nothing; an answer the hook cannot read keeps the line. Fabric's
   `retro-after-work` is on its `main` (`e1eecec0`) and in no release yet, so neither the line nor the preamble sends
   the agent to `fabric_whoami` for it. It says it in a session Fabric
-  launched too, the one hook that speaks there besides a dispatched run's exit contract. No hook can speak to the
+  launched too, the one hook that speaks there besides a dispatched run's exit contract and the prompt hook's verdict on it. No hook can speak to the
   model when a session ends, so the session-start preamble names the retro itself (it does not rely on `fabric_whoami`, since no released Fabric carries `retro-after-work` yet) for the end of the work or the session.
   Measured through the real CLI under a load average of about 68: median 155 ms a call against 50 ms for a bare
   `python3 -S`, 1006 ms at most over 20 calls ([raw](docs/reports/2026-11-05-faa-206-retro/raw/hook-timing.log)).
 - creating-fabric-agents and adapting-projects-to-fabric: an agent built or adapted with the kit closes each piece of
   work with the same retro (practices, *Reliability*).
+
+### Fixed
+
+- A dispatched run's exit contract (step 7) and `references/on-demand-session.md` no longer say `fabric_whoami` asks
+  the retro: no released Fabric carries `retro-after-work` (0.63.0 shipped that wording).
+- The session hooks read their input as UTF-8 bytes, so a hook payload in Cyrillic (a release's note) is no longer
+  dropped on Windows before Python 3.15, where the text stream decodes with the locale's code page.
 
 ### Upgrading
 

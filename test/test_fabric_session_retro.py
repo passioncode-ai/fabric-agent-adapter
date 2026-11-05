@@ -16,6 +16,12 @@ HOOKS = ROOT / "plugins/fabric-agent-adapter/hooks/hooks.json"
 cli = fs
 
 
+def _nested(value, depth):
+    for _ in range(depth):
+        value = {"structuredContent": value}
+    return value
+
+
 def release(name="mcp__fabric__fabric_work_release", response=None, **given):
     payload = {"hook_event_name": "PostToolUse", "tool_name": name, "tool_input": given}
     if response is not None:
@@ -61,6 +67,9 @@ class Released(unittest.TestCase):
                         release(how="done", response={"structuredContent": {"ok": True}}),
                         release(how="done", response={"released": 1}),
                         release(how="done", response={"released": 0}),
+                        release("mcp__fabric__fabric_task_release", outcome="succeeded",
+                                response={"released": True, "at": "2026-11-05T10:00:00Z"}),
+                        release(how="done", response=_nested({"released": False}, 8)),
                         release(how="done", response={"released": ["c1"]}),
                         release(how="done", response="[" * 100000 + "]" * 100000),
                         release(how="done", response=[{"type": "image", "text": '{"released": false}'}]),
@@ -157,6 +166,17 @@ class Hook(Base):
             with self.subTest(payload=payload):
                 quiet, _ = self.run_hook("post-tool-use", payload)
                 self.assertEqual((quiet.returncode, quiet.stdout), (0, ""))
+
+    def test_a_note_in_cyrillic_reaches_the_hook_whatever_the_locale(self):
+        # 0.64.0 seam reading 5: the host writes UTF-8; Windows before 3.15 decodes a text stream with its code page
+        import subprocess, sys
+        payload = json.dumps(release(how="done", note="Сделано, тесты зелёные"), ensure_ascii=False).encode("utf-8")
+        script = ROOT / "plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py"
+        for encoding in ("cp1252", "cp1251", "utf-8"):
+            done = subprocess.run([sys.executable, "-S", str(script), "hook", "post-tool-use"], input=payload,
+                                  capture_output=True, env=dict(self.env, PYTHONIOENCODING=encoding), timeout=10)
+            self.assertEqual(done.returncode, 0, encoding)
+            self.assertIn(b"PostToolUse", done.stdout, encoding)
 
     def test_other_hosts_get_no_post_tool_hook(self):
         for host in ("codex", "kimi", "hermes"):

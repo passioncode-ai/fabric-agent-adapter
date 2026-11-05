@@ -472,8 +472,12 @@ def released_done(payload: Any) -> bool:
     # a refusal is said in so many words, and so is a release of nothing (claims: "session" with no live claim) or a
     # repeat (Fabric answers a repeat with the first release's `at`, a first release with its `seq`; 0.64.0 seam reading
     # 2); any other answer keeps the line, an unreadable one included
-    return said is None or not (said.get("released") is False or said.get("code") == "already-released"
-                                or said.get("claims") == [] or ("at" in said and "seq" not in said))
+    if said is None:
+        return True
+    # only fabric_work_release answers a repeat with the first release's `at` and no `seq` (0.64.0 unit reading 5)
+    repeat = rule is RETRO_DONE["fabric_work_release"] and "at" in said and "seq" not in said
+    return not (said.get("released") is False or said.get("code") == "already-released" or said.get("claims") == []
+                or repeat)
 
 
 def hook_post_tool_use(payload: Dict[str, Any]) -> Optional[str]:
@@ -489,7 +493,13 @@ def _host_output(host: str, event: str, context: str) -> str:
 
 def read_hook_input() -> Dict[str, Any]:
     try:
-        text = "" if sys.stdin is None or sys.stdin.isatty() else sys.stdin.read(1024 * 1024)
+        if sys.stdin is None or sys.stdin.isatty():
+            return {}
+        # the bytes, decoded as UTF-8: a host writes its JSON in UTF-8, and on Windows before Python 3.15 the text
+        # stream decodes with the locale's code page, which drops a release whose note is in Cyrillic (0.64.0 seam
+        # reading 5)
+        raw = sys.stdin.buffer.read(1024 * 1024) if hasattr(sys.stdin, "buffer") else sys.stdin.read(1024 * 1024)
+        text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
         payload = json.loads(text) if text.strip() else {}
         return payload if isinstance(payload, dict) else {}
     except Exception:  # noqa: BLE001
