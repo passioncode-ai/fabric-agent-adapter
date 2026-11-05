@@ -242,6 +242,16 @@
         "sends only metadata off its side (an opaque ticket id, times, outcome, category, at most an 80-character paraphrase that passed a personal-data check)",
         "declares under the channel-agent extension key with no null in a required member except a channel's decision when nothing is decided ({\"none\": \"not_yet\", \"until\": ...} or {\"none\": \"not_used\"} where the standard takes it)"
       ]
+    },
+    {
+      "id": "a-built-agent-closes-its-work-with-a-retro",
+      "request": "Create a fabric-compatible agent that triages incoming support tickets for a named team; it runs as a resident service. What does it do when a job ends?",
+      "expected": [
+        "closes each job with a retro: observatory_lesson for what went wrong, insight/1 lines for what it learned, or one line that there is nothing",
+        "puts no values in the retro",
+        "writes the same lines to its own retrospective file where Project Observatory is not installed",
+        "lists the retro in the resilience-and-autonomy checklist it reports"
+      ]
     }
   ]
 }

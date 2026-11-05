@@ -32,6 +32,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   external APIs the service's author configures, such as OpenRouter, with keys the service
   reads by name at run time; the kit itself calls no outside host on its own. A board
   responder talks only to Fabric's hub on loopback.
+- The working-with-fabric PostToolUse hook (FAA-206) reads only the release call Claude Code gives it on stdin (the
+  tool's name, its input, which can carry the agent's note, and Fabric's answer), in memory: it writes, logs and sends
+  nothing and prints one fixed line or nothing.
 - The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
   in the session's folder (counts only, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
   session Fabric launched. Stop also, only once the running Fabric's `fabric_session_observe` takes

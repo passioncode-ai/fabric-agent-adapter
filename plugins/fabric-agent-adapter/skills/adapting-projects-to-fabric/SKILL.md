@@ -250,7 +250,8 @@ creating-fabric-agents carries a `LICENSE` naming its holder; an existing one ke
 
 **An adapted agent closes each piece of work with a retro**, as Fabric's `retro-after-work` asks every session:
 `observatory_lesson` for what went wrong (one class key per lesson), insight/1 lines for what it learned about the
-product, or one line that there is nothing (creating-fabric-agents practices, *Reliability*).
+product, or one line that there is nothing; a resident service does it when a job ends, and without Project
+Observatory it writes the lines to its own retrospective file (creating-fabric-agents practices, *Reliability*).
 
 ## Completion format
 

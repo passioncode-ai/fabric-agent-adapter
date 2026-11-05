@@ -410,9 +410,31 @@ RETRO_LINE = ("[fabric-agent-adapter] You released this work as done: write its 
               "asks (retro-after-work). What went wrong and what would have prevented it go to `observatory_lesson`, "
               "one class key per lesson; what you learned about the product goes in insight/1 lines; with nothing "
               "worth saying, one line that says so. No values in either.")
-#: The release tools and the field that says done: Fabric's `fabric_work_release` (how, or its alias outcome) and the
-#: older `fabric_task_release` (outcome succeeded).
+#: The release tools and the field that says done: Fabric's `fabric_work_release` (how, or its alias outcome when how is
+#: absent, as Fabric reads `how ?? outcome`) and the older `fabric_task_release` (outcome succeeded).
 RETRO_DONE = {"fabric_work_release": (("how", "outcome"), "done"), "fabric_task_release": (("outcome",), "succeeded")}
+
+
+def _release_answer(answer: Any) -> Optional[Dict[str, Any]]:
+    """Fabric's answer to a release as the object it wrote, when the hook can read it: Fabric refuses a release with an
+    ordinary answer `{released: false, code, reason}` and never with isError (0.64.0 product reading 1), so the text
+    of the answer is what tells a refusal from a release."""
+    if isinstance(answer, dict):
+        if "released" in answer:
+            return answer
+        if isinstance(answer.get("structuredContent"), dict):
+            return answer["structuredContent"]
+        answer = answer.get("content")
+    if isinstance(answer, list):
+        answer = "".join(block.get("text", "") for block in answer
+                         if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str))
+    if isinstance(answer, str):
+        try:
+            value = json.loads(answer)
+        except ValueError:
+            return None
+        return value if isinstance(value, dict) else None
+    return None
 
 
 def released_done(payload: Any) -> bool:
@@ -426,10 +448,15 @@ def released_done(payload: Any) -> bool:
     if rule is None or not name.startswith("mcp__"):
         return False
     fields, done = rule
-    if not any(given.get(field) == done for field in fields):
+    ending = next((given[field] for field in fields if given.get(field) is not None), None)
+    if ending != done:
         return False
     answer = payload.get("tool_response")
-    return not (isinstance(answer, dict) and answer.get("isError") is True)
+    if isinstance(answer, dict) and answer.get("isError") is True:
+        return False
+    said = _release_answer(answer)
+    # an answer the hook cannot read keeps the reminder: the obligation is Fabric's, and a missed one costs more
+    return said is None or said.get("released", True) is True
 
 
 def hook_post_tool_use(payload: Dict[str, Any]) -> Optional[str]:

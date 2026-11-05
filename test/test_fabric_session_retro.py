@@ -44,7 +44,13 @@ class Released(unittest.TestCase):
                         release("mcp__plugin_x_fabric__fabric_work_release", how="done"),
                         release("mcp__fabric__fabric_task_release", outcome="succeeded"),
                         release(how="done", response={"released": True}),
-                        release(how="done", response=[{"type": "text", "text": "ok"}])):
+                        release(how="done", response=[{"type": "text", "text": "ok"}]),
+                        release(how="done", response=[{"type": "text", "text": '{"released": true, "claims": []}'}]),
+                        release(how="done", response={"content": [{"type": "text", "text": '{"released": true}'}]}),
+                        release(how="done", response={"structuredContent": {"released": True}}),
+                        release(how="done", response='{"released": true}'),
+                        release(how="done", outcome="let-go"),
+                        release(outcome="done", how=None)):
             with self.subTest(payload=payload):
                 self.assertTrue(cli.released_done(payload))
 
@@ -56,10 +62,29 @@ class Released(unittest.TestCase):
                         release("fabric_work_release", how="done"),
                         release("mcp__fabric__fabric_work_release_all", how="done"),
                         release(how="done", response={"isError": True, "content": []}),
+                        release(how="let-go", outcome="done"),
+                        release("mcp__fabric__fabric_task_release", how="succeeded"),
+                        release(how="done", response=[{"type": "text", "text":
+                                                       '{"released": false, "code": "not-held", "reason": "x"}'}]),
+                        release(how="done", response='{"released": false, "code": "bad-input"}'),
+                        release(how="done", response={"released": False, "code": "not-yours"}),
+                        release(how="done", response={"content": [{"type": "text", "text": '{"released": false}'}]}),
+                        release("mcp__fabric__fabric_task_release", outcome="succeeded",
+                                response=[{"type": "text", "text": '{"released": false, "reason": "you do not hold that task"}'}]),
+                        release(how="done", response={"released": "true"}),
+                        release(how="done", response={"structuredContent": {"released": False, "code": "partial"}}),
                         {"tool_name": "mcp__fabric__fabric_work_release", "tool_input": "done"},
                         {"tool_name": None, "tool_input": {"how": "done"}}, [], None, "x"):
             with self.subTest(payload=payload):
                 self.assertFalse(cli.released_done(payload))
+
+
+class Facade(unittest.TestCase):
+    def test_the_facade_exports_the_hook(self):
+        said = json.loads(fs.hook_post_tool_use(release(how="done")))
+        self.assertEqual(said["hookSpecificOutput"]["additionalContext"], fs.RETRO_LINE)
+        self.assertIsNone(fs.hook_post_tool_use(release(how="let-go")))
+        self.assertEqual(set(fs.RETRO_DONE), {"fabric_work_release", "fabric_task_release"})
 
 
 class Registration(unittest.TestCase):
@@ -85,8 +110,10 @@ class Hook(Base):
         self.assertEqual(done.returncode, 0)
         said = json.loads(done.stdout)["hookSpecificOutput"]
         self.assertEqual(said, {"hookEventName": "PostToolUse", "additionalContext": cli.RETRO_LINE})
+        refused = [{"type": "text", "text": '{"released": false, "code": "not-held"}'}]
         for payload in (release(how="let-go"), release("mcp__fabric__fabric_work_claim", how="done"),
-                        release(how="done", response={"isError": True}), "not json", ""):
+                        release(how="done", response={"isError": True}), release(how="done", response=refused),
+                        "not json", ""):
             with self.subTest(payload=payload):
                 quiet, _ = self.run_hook("post-tool-use", payload)
                 self.assertEqual((quiet.returncode, quiet.stdout), (0, ""))

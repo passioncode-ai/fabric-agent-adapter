@@ -34,7 +34,7 @@ next action:
 python3 plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py status
 ```
 
-In Claude Code the plugin adds four session hooks: SessionStart (at startup and `/clear`, never on compact or
+In Claude Code the plugin adds five session hooks: SessionStart (at startup and `/clear`, never on compact or
 resume) puts that preamble into the session when the MCP server `fabric` is registered, Fabric runs and the project
 uses Fabric (one line pointing at `fabric_whoami` in a folder with no sign of it); when Fabric
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
@@ -46,7 +46,7 @@ reads the last 512 KB of the session transcript (message text and tool output in
 local path or text); UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the
 session left claimed. After a call to Fabric's release tools that releases a claim as done, PostToolUse adds one
 line naming the retro Fabric's `retro-after-work` asks for (FAA-206). Stop, UserPromptSubmit and SessionEnd spool and call Fabric only when the running Fabric
-advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched (except the exit contract in one started on a board request, where the prompt hook prints no unread line or reminder), never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
+advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched (except the retro line after a release of finished work, and the exit contract in one started on a board request, where the prompt hook prints no unread line or reminder), never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
 kept or sent) and always
 exit 0 once `python3` starts (on Windows, Claude Code runs hooks in Git Bash, or PowerShell without it, where `python3`
 must name Python 3.9 or later; FAA-183). `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks
