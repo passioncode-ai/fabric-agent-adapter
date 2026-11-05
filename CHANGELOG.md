@@ -9,17 +9,17 @@
   board thread `1add3c03`). Before, the exit contract and `references/on-demand-session.md` step 4 left such a request
   for the next run, but after `com.effect_begin` it is `in_progress`, which a next run could only settle as
   `outcome_unknown` with `com.reconcile`. A request still accepted, with no effect begun, is still left for the next
-  run. The contract leaves "no run starts that close to it" to the reference to stay under Hermes' 4000 characters
-  (3991 at its longest).
+  run. The contract says "if it called `com.effect_begin`" and leaves "no run starts that close to it" to the reference to stay under Hermes' 4000 characters
+  (3998 at its longest).
 - The session hooks read their input as UTF-8 with a byte order mark dropped, and read up to 4 MiB of bytes: since
   0.64.0 they counted 1 MiB of bytes, so a prompt of about 600,000 Cyrillic characters was read as nothing where 0.63.0
   read it, and a payload starting with a BOM was read as nothing on every hook (FAA-210). More than 4 MiB is still
   read as nothing.
-- The dashboard-kit notice reads its input as UTF-8 bytes too, so a repository under a folder named in Cyrillic gets
+- The dashboard-kit notice reads its input as UTF-8 bytes too, and more than 64 KiB as nothing, so a repository under a folder named in Cyrillic gets
   its line on Windows before Python 3.15 (FAA-210).
-- The retro line after a release of finished work and the session-start preamble say where insight/1 lines go: the
-  project's `insights/` folder, as Observatory named it for its reader (OBS-331, board thread `f7758225`);
-  outside the repository when that is public (a public product keeps them in its local data folder, `<name>-data/`);
+- The retro line after a release of finished work and the session-start preamble say where insight/1 lines go: `insights/`,
+  as Observatory named it for its reader (OBS-331, board thread `f7758225`), in the project's data folder when it has
+  one (`<name>-data/insights/` beside its checkout), else in its repository, never inside a public repository;
   `references/session-hooks.md`, `references/on-demand-session.md` step 7 and the service guidance
   (creating-fabric-agents practices, adapting-projects-to-fabric) say the same; without Project Observatory only the
   lessons go to an agent's own retrospective file.

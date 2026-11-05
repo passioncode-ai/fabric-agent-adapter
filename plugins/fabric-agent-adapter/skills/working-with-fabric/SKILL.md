@@ -302,7 +302,7 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 2. `fabric_task_handoff` when a task follows this one: a NAMED result, not a summary of the chat.
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
    the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. After `done` or at session end, the retro:
-   `observatory_lesson`, insight/1 lines, or one line that there is nothing.
+   `observatory_lesson`, insight/1 lines in `insights/`, or one line that there is nothing.
 
 Release anyway: a lapsed claim reads as stuck work.
 

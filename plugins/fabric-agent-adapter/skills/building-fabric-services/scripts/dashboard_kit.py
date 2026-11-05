@@ -392,8 +392,11 @@ def hook_cwd(stdin_text: str) -> Path:
 
 def read_stdin_text(stream, limit: int = 65536) -> str:
     """The hook's input as UTF-8 bytes (a byte order mark dropped, a stray byte read as U+FFFD): a host writes its JSON
-    in UTF-8, and a Windows text stream before Python 3.15 decodes it with the locale's code page (FAA-210)."""
-    raw = stream.buffer.read(limit) if hasattr(stream, "buffer") else stream.read(limit)
+    in UTF-8, and a Windows text stream before Python 3.15 decodes it with the locale's code page (FAA-210). More than
+    `limit` is read as nothing, as the session hooks read theirs."""
+    raw = stream.buffer.read(limit + 1) if hasattr(stream, "buffer") else stream.read(limit + 1)
+    if len(raw) > limit:
+        return ""
     return raw.decode("utf-8-sig", errors="replace") if isinstance(raw, bytes) else raw.lstrip("\ufeff")
 
 

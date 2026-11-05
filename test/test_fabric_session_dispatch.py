@@ -442,7 +442,7 @@ class Hooks(Base):
                       "no run comes after the deadline (0.63.0 product reading 12)")
         # FAA-210: after com.effect_begin the request is in_progress, which a next run could only reconcile as
         # outcome_unknown, so the run completes it failed_known with what it observed
-        self.assertIn("then: after `com.effect_begin`, or when the request's deadline", text)
+        self.assertIn("then: if it called `com.effect_begin`, or when the request's deadline", text)
 
     def test_the_prompt_hooks_confirmation_names_the_session_id(self):
         # 0.63.0 unit reading 9: the confirmation carries the id when it is a lowercase UUID

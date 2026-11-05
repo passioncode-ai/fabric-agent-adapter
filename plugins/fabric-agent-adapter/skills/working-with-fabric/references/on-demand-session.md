@@ -127,7 +127,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
 7. **End the run.** The one write left is the retro after work
-   (`observatory_lesson` and insight/1 lines in the project's `insights/` folder, outside a public repository, or one line that there is nothing; no values; ADR-0188's
+   (`observatory_lesson` and insight/1 lines in `insights/` (the project's data folder when it has one, else its repository; never a public repository), or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
    `watch-mail`, no question to the operator.
 

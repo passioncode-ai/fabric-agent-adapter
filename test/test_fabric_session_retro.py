@@ -32,7 +32,7 @@ def release(name="mcp__fabric__fabric_work_release", response=None, **given):
 class Words(unittest.TestCase):
     def test_the_line_says_what_fabric_asks(self):
         for word in ("released this work as done", "in this turn", "`observatory_lesson`", "one class key per lesson",
-                     "insight/1", "the project's `insights/` folder (outside the repository when that is public)", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
+                     "insight/1", "insight/1 lines in `insights/` (the project's data folder when it has one, else its repository; never a public repository)", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
                      "No values"):
             self.assertIn(word, cli.RETRO_LINE)
         # 0.64.0 product reading 2: the line names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
@@ -44,7 +44,7 @@ class Words(unittest.TestCase):
         # self-contained: Fabric 0.3.15 and earlier do not carry retro-after-work (0.64.0 seam reading 1)
         self.assertIn("When a piece of work ends (released as done, or the session about to end), write its retro in "
                       "the same turn: `observatory_lesson` for what went wrong (or your answer without it), insight/1 "
-                      "lines in the project's `insights/` (outside the repository when that is public) for what you learned, or one line that there is nothing.", text)
+                      "lines in `insights/` (the project's data folder when it has one, else its repository; never a public repository) for what you learned, or one line that there is nothing.", text)
         self.assertNotIn("—", text)
 
 

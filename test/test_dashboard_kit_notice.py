@@ -91,7 +91,8 @@ class Notice(unittest.TestCase):
 
         self.assertEqual(dk.read_stdin_text(Bytes("\ufeff{\"cwd\": \"/папка\"}".encode("utf-8"))), '{"cwd": "/папка"}')
         self.assertEqual(dk.read_stdin_text(io.StringIO("\ufeff{}")), "{}")
-        self.assertEqual(dk.read_stdin_text(Bytes(b"x" * 10), limit=4), "xxxx")
+        self.assertEqual(dk.read_stdin_text(Bytes(b"x" * 4), limit=4), "xxxx")
+        self.assertEqual(dk.read_stdin_text(Bytes(b"x" * 5), limit=4), "", "more than the limit is read as nothing")
 
     def test_a_repository_under_a_cyrillic_folder_hears_the_line_whatever_the_locale(self):
         # FAA-210: the host writes its JSON in UTF-8; a Windows text stream before Python 3.15 decodes it with the
