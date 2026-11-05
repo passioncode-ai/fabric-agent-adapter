@@ -429,6 +429,9 @@ class Hooks(Base):
                       "workflow only once the request is settled (`com.get`: answered, terminal or outcome_unknown), "
                       "else leave it open.", text)
         self.assertLess(text.index("7. Write the retro"), text.index("On an error you cannot get past"))
+        # D3: one meaning of settled in the contract; outcome_unknown waits on a reconcile, resolved
+        self.assertIn("resolve `outcome_unknown` only with `com.reconcile`", text)
+        self.assertEqual(text.count("settle"), 1)
 
     def test_work_that_outlasts_the_run_is_left_accepted(self):
         text = cli.dispatch_contract(FULL)

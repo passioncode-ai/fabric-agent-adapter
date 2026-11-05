@@ -524,7 +524,7 @@
       "expected": [
         "reads com.status once for the epoch and the slot's generation, com.get on the request for its state, and the latest checkpoint for what the earlier run recorded",
         "takes the accepted request over with com.responder_replace (expectedGeneration) and its transfer, never com.claim (an accepted request is never claimed)",
-        "settles outcome_unknown only with com.reconcile and an observed result, and never completes what it did not observe",
+        "resolves outcome_unknown only with com.reconcile and an observed result, and never completes what it did not observe",
         "answers no other request, and renews the board lease with com.renew or com.progress about every 20 s in a long step, finishing before run-ends-at"
       ]
     },
@@ -568,7 +568,7 @@
       "expected": [
         "does not complete the request, since it holds no fence for it",
         "reads the request with com.get and closes the workflow only if it reads answered, terminal or outcome_unknown",
-        "otherwise leaves the workflow open: a checkpoint without close naming the refused claim, no close: true",
+        "otherwise leaves the workflow open: an in_progress checkpoint without close naming the refused claim, no close: true",
         "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing) and ends the run"
       ]
     },
