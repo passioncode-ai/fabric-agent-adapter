@@ -759,7 +759,9 @@ class CredentialUrlTests(unittest.TestCase):
     KIT = "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_example.py"
     AT = "@"
     SHAPES = ("https" + "://u:pw" + AT + "h", "https" + ":u:pw" + AT + "h", "https" + ":\\\\u:p" + AT + "h",
-              "https" + ":///h\\u:pw" + AT + "x/r", "ht\ttps" + "://h\\u:pw" + AT + "x/r", "ws" + "://bot:tok" + AT + "h")
+              "https" + ":///h\\u:pw" + AT + "x/r", "ht\ttps" + "://h\\u:pw" + AT + "x/r", "ws" + "://bot:tok" + AT + "h", "https" + ":/\t/u:pw" + AT + "h",
+              # the products' own pattern takes quotes and backticks in the password, the wider one does not
+              '"https' + '://u:"+pw+"' + AT + 'h"', "https" + "://u:p'w" + AT + "h", "https" + "://u:p`w" + AT + "h")
 
     def test_every_shape_fails_in_every_shipped_place(self):
         for rel in (self.KIT, "plugins/fabric-agent-adapter/skills/working-with-fabric/references/x.md",
@@ -780,6 +782,18 @@ class CredentialUrlTests(unittest.TestCase):
         tmp, root = _tree(files)
         with tmp:
             self.assertEqual(validate.credential_url_problems(root), [])
+
+    def test_the_scope_is_what_the_package_ships(self):
+        """package.json `files` decides: a second plugin folder and package.json itself are read, the CHANGELOG is not."""
+        files = {"package.json": '{"files": ["bin", "plugins", "CHANGELOG.md", "!**/*.pyc"]}\n',
+                 "plugins/another/x.md": "`%s`\n" % self.SHAPES[0], "CHANGELOG.md": "`%s`\n" % self.SHAPES[0],
+                 "README.md": "`%s`\n" % self.SHAPES[0]}
+        tmp, root = _tree(files)
+        with tmp:
+            self.assertEqual(validate.credential_url_scope(root), ["bin", "plugins", "package.json"])
+            problems = validate.credential_url_problems(root)
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("plugins/another/x.md:1", problems[0])
 
     def test_a_binary_file_is_skipped(self):
         tmp, root = _tree({})

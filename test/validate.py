@@ -693,17 +693,31 @@ def dollar_anchor_problems(root: Path = ROOT, allow: Optional[Dict[Tuple[str, st
 
 
 # FAA-211: the kit vendors into public products whose release checks refuse a URL with credentials, and a product that
-# vendors kit modules by their byte digests cannot edit them. No shipped file but the CHANGELOG (a record) writes one:
-# an example names its scheme in angle brackets (`<https>://u:pw@h`), and a test builds the real URL from parts. The
-# pattern is wider than the products' (`https?://user:password@`): any scheme, no slashes, backslashes, `///`.
-CREDENTIAL_URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:[/\\]*[^\s/@:`'\"]*:[^\s/@`'\"]+@")
-CREDENTIAL_URL_SCOPE = ("bin", "plugins/fabric-agent-adapter", "README.md", "SECURITY.md")
+# vendors kit modules by their byte digests cannot edit them. No file the npm package ships but the CHANGELOG (a record
+# of released notes, no kit module) writes one: an example names its scheme in angle brackets (`<https>://u:pw@h`).
+# Both patterns are searched: the products' own (project-observatory's `credential-url`) and a wider one in scheme and
+# slashes (any scheme, no slashes, backslashes, `///`, a tab among the slashes), so a line either refuses fails here first.
+CREDENTIAL_URLS = (re.compile(r"https?://[^\s/@:]+:[^\s/@]+@"),
+                   re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:[/\\\t]*[^\s/@:`'\"]*:[^\s/@`'\"]+@"))
+CREDENTIAL_URL_RECORDS = ("CHANGELOG.md",)
+CREDENTIAL_URL_SCOPE = ("bin", "plugins", "README.md", "SECURITY.md")  # a tree without package.json
+
+
+def credential_url_scope(root: Path = ROOT) -> List[str]:
+    """What the npm package ships (package.json `files`, its exclusions aside) but the records."""
+    manifest = root / "package.json"
+    if not manifest.is_file():
+        return list(CREDENTIAL_URL_SCOPE)
+    files = json.loads(manifest.read_text(encoding="utf-8")).get("files") or []
+    return [name for name in files if not name.startswith("!") and name not in CREDENTIAL_URL_RECORDS] + ["package.json"]
 
 
 def credential_url_problems(root: Path = ROOT) -> List[str]:
     problems: List[str] = []
-    for name in CREDENTIAL_URL_SCOPE:
+    for name in credential_url_scope(root):
         top = root / name
+        if not top.exists():
+            continue
         files = [top] if top.is_file() else sorted(p for p in top.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
         for path in files:
             try:
@@ -711,7 +725,7 @@ def credential_url_problems(root: Path = ROOT) -> List[str]:
             except (UnicodeDecodeError, OSError):
                 continue
             for lineno, line in enumerate(text.splitlines(), 1):
-                found = CREDENTIAL_URL.search(line)
+                found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
                 if found:
                     problems.append("%s:%d writes a URL with credentials (%r): name the scheme in angle brackets, "
                                     "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"

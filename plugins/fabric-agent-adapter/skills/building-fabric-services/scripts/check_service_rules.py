@@ -34,7 +34,7 @@ def shown_repository(value: str) -> str:
     whatever they hold, up to the last `@` that a host and `:` follow; anything else by its name. Then a query and a
     fragment. A value with a piece shaped like a credential that is no name (fabric_secrets.repository_name) is not
     printed (0.62.0 readings 2 to 11). Read first as redact_url reads it: C0 controls and space off its ends, every tab,
-    CR and LF out, so `<https>:/<tab>/u:pw@h` is the URL it is (unit reading 11)."""
+    CR and LF out, so `<https>:/\\t/u:pw@h` is the URL it is (unit reading 11)."""
     value = re.sub(r"[\t\n\r]", "", value.strip("".join(map(chr, range(0x21)))))
     if _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
         shown = redact_url(value)  # which drops the user information as written first (seam readings 10 and 11)

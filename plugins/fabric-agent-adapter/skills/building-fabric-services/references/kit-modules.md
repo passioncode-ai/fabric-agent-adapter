@@ -6,6 +6,11 @@ the digests of every release since 0.8.0, so a copy in a service can be told apa
 module with exactly what it needs and reports a copy's state. Tests: `test/test_fabric_kit.py`,
 `test/test_kit_api.py`, `test/kit-api.test.mjs`.
 
+A module's comments write an example URL with credentials with its scheme in angle brackets: read `<https>` as
+`https`. No module holds a literal one (since 0.65.0, FAA-211), so a product whose release check refuses such a URL
+can copy modules unchanged; the package's CHANGELOG, a record of released notes and no module, keeps its old
+examples as written.
+
 ## Contents
 
 - [Install, status, build](#install-status-build)
