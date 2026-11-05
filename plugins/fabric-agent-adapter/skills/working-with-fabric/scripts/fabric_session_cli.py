@@ -387,13 +387,14 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
 
 def dispatch_held_elsewhere(dispatch: Dict[str, str], session_id: Any, env: Optional[Dict[str, str]] = None) -> bool:
     """Whether a record for the dispatch exists and does not name this session: dispatch_holder then answers no for
-    it at every prompt (a record that cannot be read counts as another session's). A session id that is not one is
-    the holder at its prompt (dispatch_holder), so it is never told it is nested."""
+    it at every prompt (a record that cannot be read counts as another session's). A session id that is not one counts
+    as the holder in dispatch_holder and its prompt hook says nothing to it, so it is never told it is nested."""
     env = os.environ if env is None else env
     if not isinstance(session_id, str) or not SESSION_ID.fullmatch(session_id):
         return False
     folder, key = _dispatch_record(dispatch, env)
-    if not (folder / (key + ".json")).exists():
+    # lexists: a dangling link is a record dispatch_holder's O_EXCL refuses, and it never raises (0.63.0 unit reading 24)
+    if not os.path.lexists(str(folder / (key + ".json"))):
         return False
     try:
         return json.loads(read_small(folder / (key + ".json")) or "null").get("session") != session_id

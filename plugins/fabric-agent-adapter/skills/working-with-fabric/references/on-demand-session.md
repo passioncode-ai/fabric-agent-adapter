@@ -147,7 +147,8 @@ and ends `timed-out`.
 A coding agent the run starts itself (a `claude -p` or `codex exec` from its shell, a reviewer) inherits the
 environment, and its prompt does not start with the line, so it is a helper; an Agent tool subagent runs in the same
 process and gets no hook output at all. Every session under the environment gets the conditional contract at its
-start, except a `/clear` while another session holds the dispatch, which is told it is nested; the prompt hook prints one line only to a second session whose own first line names the dispatch, telling it
+start, except a `/clear`: the holder's own keeps the run's contract, and one while another session holds the
+dispatch is told it is nested; the prompt hook prints one line only to a second session whose own first line names the dispatch, telling it
 the run holds it. A helper launched outside the run is best started with `env -u
 FABRIC_DISPATCH_WORKFLOW -u FABRIC_DISPATCH_HANDOFF -u FABRIC_DISPATCH_REQUEST`. The first session whose own line names
 the dispatch holds it: the prompt hook records that session id for the dispatch, by its `FABRIC_DISPATCH_ID` (Fabric gives each dispatch one, a UUID v4 by Fabric's word on board thread `b3e60686`; Switchboard sets it since

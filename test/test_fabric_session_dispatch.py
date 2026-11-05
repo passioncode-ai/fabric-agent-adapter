@@ -708,6 +708,18 @@ class Hooks(Base):
             self.assertEqual((folder / (key + ".json")).read_text(), body, "the record stays")
             self.assertFalse(cli.dispatch_holder(FULL, cleared, env), "its prompt is answered nested too")
         self.assertFalse(cli.dispatch_held_elsewhere(FULL, "a b", env), "a bad id is the holder at its prompt")
+        (folder / (key + ".json")).write_text("not json")
+        for payload in ({"cwd": str(self.repo), "source": "clear"},
+                        {"session_id": "a b", "cwd": str(self.repo), "source": "clear"}):
+            done, _ = self.run_hook("session-start", payload, extra_env=ENV)
+            self.assertEqual(self.context(done), cli.dispatch_contract(FULL, conditional=True), "a bad id")
+            self.assertEqual((folder / (key + ".json")).read_text(), "not json")
+        (folder / (key + ".json")).unlink()
+        (folder / (key + ".json")).symlink_to(folder / "gone.json")
+        done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
+                                extra_env=ENV)
+        self.assertEqual(self.context(done), cli.DISPATCH_NESTED.format(**FULL), "a dangling link is a record")
+        self.assertFalse(cli.dispatch_holder(FULL, cleared, env))
 
     def test_a_clear_with_no_record_is_told_the_condition(self):
         from unittest import mock

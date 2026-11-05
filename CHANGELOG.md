@@ -37,7 +37,8 @@
   Codex run gets the hook only where its `CODEX_HOME` trusts it (Switchboard's isolated homes carry the person's trust since 0.7.8); a host whose hook gets no session id (the native bridges) is always told
   the conditional contract and writes no record; on Windows, where each hook runs under a new Git Bash, a `/clear` holds
   nothing (it cannot tell the holder from a helper), so the cleared session is told it runs inside a run that holds it,
-  stays a helper and Fabric takes the workflow over after the run.
+  stays a helper and Fabric takes the workflow over after the run. On any system, a `/clear` while another session
+  holds the dispatch (a nested session's clear) is told the same.
   `watch-mail` refuses to start in a dispatched session, and the dashboard-kit notice says nothing there. `references/on-demand-session.md` holds the steps and every argument; the
   hooks tell a dispatched session from this version on.
 - working-with-fabric: whatever waits on the Project is answered in the same turn (FAA-205, the operator's rule of
