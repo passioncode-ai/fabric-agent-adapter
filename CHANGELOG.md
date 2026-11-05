@@ -27,7 +27,7 @@
 - The plugin's `hooks.json` gains a `PostToolUse` entry whose matcher names Fabric's two release tools on the `fabric`
   server (or a plugin's `plugin_<name>_fabric`) only; nothing to configure. Codex and Kimi get no post-tool hook from `install-host-hooks` in this release.
 - working-with-fabric SKILL.md, to stay within its word budget, no longer repeats five things its
-  `references/session-hooks.md` keeps (README, SKILL-CARD and SECURITY.md keep the first three too): that the
+  `references/session-hooks.md` keeps (README keeps the first three too, SKILL-CARD and SECURITY.md the first two): that the
   transcript's tail can hold a secret the session displayed, the off switch `FABRIC_SESSION_NO_REPOSITORIES=1`, that
   session start ignores compact and resume, how a reminder Fabric gave is tagged, and where a turn `watch-mail`
   delivered prints it.

@@ -301,8 +301,8 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 1. `fabric_stage_report` and `fabric_task_note` with what was done, what remains, and the exact next step.
 2. `fabric_task_handoff` when a task follows this one: a NAMED result, not a summary of the chat.
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
-   the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. After `done`, and before any session ends, the retro (FAA-206):
-   `observatory_lesson`, insight/1 lines, or a line saying nothing.
+   the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. After `done` or at session end, the retro:
+   `observatory_lesson`, insight/1 lines, or one line that there is nothing.
 
 Release anyway: a lapsed claim reads as stuck work.
 
@@ -340,7 +340,7 @@ Hermes also needs `hermes plugins enable fabric-agent-adapter`; removal uses `he
 Read [native host hooks](references/native-host-hooks.md) for exact paths, permission behavior and verification.
 Registration and a loaded hook do not prove admission. Never edit those files by hand. Without the hook, put the preamble into the first prompt
 yourself: "Call `fabric_whoami` first; `com.status` and `com.list`, answering what waits this turn; `fabric_work_list`,
-then `fabric_work_claim`; `fabric_work_release` when you stop, then the retro." Without an MCP client there is no way in: say so,
+then `fabric_work_claim`; `fabric_work_release` when you stop, then the retro." Without an MCP client there is no way in: say so
 and work without claiming Fabric saw it.
 
 ## The session hooks
