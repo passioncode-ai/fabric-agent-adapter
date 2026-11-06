@@ -25,6 +25,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     _write_private,
     claude_registration,
     codex_registered,
+    a_file,
     administrators_copy,
     another_users_copy,
     fabric_bin_candidates,
@@ -734,12 +735,12 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     # a launcher's folder that already holds another user's Fabric.app is no place for this user's (0.70.0 seam reading
     # 3): as the launcher says then, unset PASSIONCODE_APPLICATIONS and use ~/Applications
     candidates = fabric_bin_candidates(platform, env)
-    occupied = bool(chosen) and candidates[0].is_file() and another_users_copy(candidates[0], platform, env)
+    occupied = bool(chosen) and a_file(candidates[0]) and another_users_copy(candidates[0], platform, env)
     place = str(chosen) if chosen and not occupied else "~/Applications"
     if occupied:
         unset = {k: v for k, v in (os.environ if env is None else env).items() if k != APPLICATIONS_ENV}
         candidates = fabric_bin_candidates(platform, unset)
-        place = "~/Applications (%s holds another user's Fabric.app: unset %s)" % (chosen, APPLICATIONS_ENV)
+        place = "~/Applications, with %s unset: %s holds another user's Fabric.app" % (APPLICATIONS_ENV, chosen)
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
             " (your own copy, in %s)" % place if platform == "darwin" else "", "of yours " if platform == "darwin" else "",

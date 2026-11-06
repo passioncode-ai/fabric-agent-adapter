@@ -2331,12 +2331,37 @@ class Status(Base):
         theirs = os.path.realpath(str(binary))
         self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
         occupied = fs.status(self.repo, env, "darwin")["next"]
-        self.assertIn("put your own Fabric.app in ~/Applications (%s holds another user's Fabric.app: unset "
-                      "PASSIONCODE_APPLICATIONS), then" % apps, occupied)
+        self.assertIn("put your own Fabric.app in ~/Applications, with PASSIONCODE_APPLICATIONS unset: %s holds another "
+                      "user's Fabric.app, then" % apps, occupied)
         self.assertNotIn('"%s"' % binary, occupied)
         self.assertIn('"%s"' % (self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"), occupied)
+        # 0.70.0 unit reading 4: the D7 branch with nothing registered, and its fabric-mcp line
+        (self.home / ".claude.json").unlink()
+        report = fs.status(self.repo, env, "darwin")
+        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in ~/Applications, with PASSIONCODE_APPLICATIONS "
+                      "unset: %s holds another user's Fabric.app); no fabric-mcp of yours is at %s" % (apps, binary),
+                      report["next"])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("fabric-mcp: none of yours in %s (PASSIONCODE_APPLICATIONS)" % apps, printed.getvalue())
         crashed = dict(self.env, PASSIONCODE_APPLICATIONS="~nosuchuser-faa237/Apps")
         self.assertIsNone(fs.status(self.repo, crashed, "darwin")["launcherFolder"], "a literal ~ is no folder")
+
+    @unittest.skipUnless(hasattr(os, "getuid") and os.getuid() != 0, "POSIX modes, not root")
+    def test_status_survives_a_launchers_folder_it_cannot_enter(self):
+        # 0.70.0 unit reading 4: a folder under one this user cannot enter raised PermissionError before Python 3.14
+        self.env_module.fabric_bin_candidates = self.saved
+        locked = self.base / "locked"
+        locked.mkdir()
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(locked / "Apps"))
+        locked.chmod(0)
+        try:
+            self.assertIsNone(fs.find_fabric_bin("darwin", env))
+            report = fs.status(self.repo, env, "darwin")
+        finally:
+            locked.chmod(0o700)
+        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in %s)" % (locked / "Apps"), report["next"])
 
     def test_the_cli_prints_and_reads_no_token(self):
         # a path in the test's home: the subprocess does not see setUp's owner stub, and a host's /Applications copy may

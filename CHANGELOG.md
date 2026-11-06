@@ -10,9 +10,11 @@
   `cb1df3d5`). `status` names root's copy outside the home "the administrator's copy, which the launcher does not
   update" (`administratorsCopy` and `launcherFolder` in `--json`); a launcher's folder that already holds another
   user's `Fabric.app` is not proposed: `status` says to unset the variable and use `~/Applications`, as the launcher
-  does; the label is about the copy `status` found, not the registered command, and running it stays allowed. With the
-  folder set, `status` names it in its install advice and its `fabric-mcp:` line, never `~/Applications`. The SKILL.md
-  Step 0 row and the `a-second-user-of-a-mac-registers-fabric` eval name the folder.
+  advises for a bundle the user cannot write; the label is about the copy `status` found, not the registered command,
+  and running it stays allowed. A folder this user cannot enter reads as holding no copy: `status` names it in its
+  install advice instead of stopping on Python's `PermissionError` (before Python 3.14). With the folder set, `status`
+  names it in its install advice and its `fabric-mcp:` line, never `~/Applications` unless that folder holds another
+  user's copy (above). The SKILL.md Step 0 row and the `a-second-user-of-a-mac-registers-fabric` eval name the folder.
 - `references/project-board.md` and `references/on-demand-session.md` name Fabric's `board.read-at-start` rule for the
   slot condition of a gate decline: Fabric's board rule took it from the adapter (FAA-231, main `dbfbfce4`, from its
   next release). `com.enroll`'s own tool description on Fabric's main (`b8c0a38c`) still answers whatever the slot

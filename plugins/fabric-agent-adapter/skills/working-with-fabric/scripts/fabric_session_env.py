@@ -202,6 +202,15 @@ def _owner_uid(path: Path) -> Optional[int]:
         return None
 
 
+def a_file(path: Path) -> bool:
+    """`path.is_file()`, False where it cannot be read: the launcher's folder is the person's choice and may sit under a
+    folder this user cannot enter, where Python before 3.14 raises PermissionError (0.70.0 unit reading 4)."""
+    try:
+        return path.is_file()
+    except (OSError, ValueError):
+        return False
+
+
 def _real(path: Path) -> Path:
     try:
         return Path(os.path.realpath(str(path)))
@@ -250,7 +259,7 @@ def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] 
     macOS a copy outside the user's home is taken only when it is this user's or root's (an install every user
     shares): another user's copy is skipped (FAA-229, FAA-237)."""
     for candidate in fabric_bin_candidates(platform, env):
-        if candidate.is_file() and not another_users_copy(candidate, platform, env):
+        if a_file(candidate) and not another_users_copy(candidate, platform, env):
             return candidate
     return None
 
