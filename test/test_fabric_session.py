@@ -4,6 +4,8 @@ watch-mail and install-host-hooks. Hooks are driven with fixtures: a temporary H
 dead pid, and a fake fabric-mcp that speaks MCP on stdio and records what it was asked."""
 
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -231,10 +233,10 @@ class Paths(unittest.TestCase):
             try:
                 self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "a copy of this user's own")
                 env_module._owner_uid = lambda path: 0
-                self.assertIsNone(fs.find_fabric_bin("darwin", {"HOME": str(home)}), "root's: the launcher's rule")
-                self.assertEqual(fs.find_fabric_bin("linux", {"HOME": str(home)}), shared, "the owner rule is macOS'")
+                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "root's copy is everyone's")
                 env_module._owner_uid = lambda path: os.getuid() + 1
                 self.assertIsNone(fs.find_fabric_bin("darwin", {"HOME": str(home)}), "another user's copy")
+                self.assertEqual(fs.find_fabric_bin("linux", {"HOME": str(home)}), shared, "the owner rule is macOS'")
                 mine.parent.mkdir(parents=True)
                 mine.write_text("#!/bin/sh\n")
                 self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), mine, "the user's own copy first")
@@ -2128,12 +2130,26 @@ class Status(Base):
         self.hub()
         saved = self.env_module._owner_uid
         try:
-            self.env_module._owner_uid = lambda path: os.getuid() + 1
+            foreign_file = os.path.realpath(str(shared))
+            self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == foreign_file else 0)
             report = fs.status(self.repo, self.env, "darwin")
             self.assertEqual(report["registeredCopy"], "another user's")
-            self.assertTrue(report["next"].startswith("The registered fabric-mcp is another user's copy: claude mcp "
-                                                      "remove --scope user fabric, then claude mcp add --scope user"),
-                            report["next"])
+            own = self.base / "no-fabric" / "fabric-mcp"
+            # 0.69.0 product reading 2: with no copy of the user's own, install one first; never a placeholder path
+            self.assertEqual(report["next"], "The registered fabric-mcp is another user's copy: install your own Fabric "
+                             "(into ~/Applications, as the launcher does), then claude mcp remove --scope user fabric, "
+                             'then claude mcp add --scope user fabric -- "%s" --runner claude-code'
+                             % (self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"))
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                fs.print_status(report)
+            self.assertIn("fabric-mcp: none of yours at the default install locations", printed.getvalue())
+            self.assertIn("(another user's copy)", printed.getvalue())
+            own.parent.mkdir()
+            own.write_text("")
+            self.assertEqual(fs.status(self.repo, self.env, "darwin")["next"], "The registered fabric-mcp is another "
+                             "user's copy: claude mcp remove --scope user fabric, then claude mcp add --scope user fabric "
+                             '-- "%s" --runner claude-code' % own)
             for platform in ("linux", "win32"):
                 other = fs.status(self.repo, self.env, platform)
                 self.assertEqual(other["registeredCopy"], "ok", platform)
@@ -2143,8 +2159,39 @@ class Status(Base):
         finally:
             self.env_module._owner_uid = saved
         (self.home / ".claude.json").unlink()
+        own.unlink()
         self.assertIn("no fabric-mcp of yours is at", fs.status(self.repo, self.env, "darwin")["next"])
         self.assertIn("no fabric-mcp is at", fs.status(self.repo, self.env, "linux")["next"], "the owner rule is macOS'")
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_the_registered_copy_is_judged_by_the_file_it_runs(self):
+        # 0.69.0 seam reading 2: a bare command runs what PATH finds, a link in the home runs what it points at, and a
+        # project's .mcp.json is every collaborator's
+        shared = self.base / "Applications" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        shared.chmod(0o755)  # shutil.which finds executables only
+        foreign_file = os.path.realpath(str(shared))
+        saved = self.env_module._owner_uid
+        self.hub()
+        try:
+            self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == foreign_file else 0)
+            env = dict(self.env, PATH=str(shared.parent))
+            self.register(command="fabric-mcp")
+            self.assertEqual(fs.status(self.repo, env, "darwin")["registeredCopy"], "another user's", "found on PATH")
+            link = self.home / "bin" / "fabric-mcp"
+            link.parent.mkdir()
+            link.symlink_to(shared)
+            self.register(command=str(link))
+            self.assertEqual(fs.status(self.repo, self.env, "darwin")["registeredCopy"], "another user's", "a link")
+            self.assertFalse(fs.another_users_copy(Path("/x\x00y"), "darwin", self.env), "a NUL is unreadable, not a crash")
+            (self.home / ".claude.json").unlink()
+            (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
+            report = fs.status(self.repo, self.env, "darwin")
+            self.assertIn("claude mcp add --scope local fabric", report["next"])
+            self.assertNotIn("remove", report["next"], "never rewrite a .mcp.json the team shares")
+        finally:
+            self.env_module._owner_uid = saved
 
     def test_the_cli_prints_and_reads_no_token(self):
         self.register()

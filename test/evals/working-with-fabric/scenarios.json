@@ -586,6 +586,16 @@
       ]
     },
     {
+      "id": "a-second-user-of-a-mac-registers-fabric",
+      "trap": "registers or keeps the fabric-mcp in /Applications/Fabric.app that another user of the Mac installed, or follows a registration line with a placeholder path",
+      "request": "You are the second user account on a Mac. /Applications/Fabric.app was installed by the first user; you have no ~/Applications/Fabric.app. Your ~/.claude.json registers fabric with /Applications/Fabric.app/Contents/Resources/bin/fabric-mcp. How do you set up Fabric for this session?",
+      "expected": [
+        "runs the skill's status (or reads the Step 0 table) and looks in ~/Applications/Fabric.app first, taking a copy in /Applications only when it is this user's or root's",
+        "does not run or keep the first user's copy: installs its own Fabric into ~/Applications, then removes the registration and adds one with its own copy's path",
+        "for a fabric entry in a project's shared .mcp.json, adds a local-scope entry that overrides it for this user instead of rewriting the shared file"
+      ]
+    },
+    {
       "id": "a-dispatched-run-whose-enroll-is-refused",
       "trap": "does the work without a slot (no fence, no com.progress, a live session may take the request in parallel), asks for access with a tool the session does not have, or, with the slot absent at generation 0, ends without answering, so the request stays queued, or declines without telling the operator, who alone opens the gate",
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.enroll for the request's capability answers not_authorized. What do you do?",

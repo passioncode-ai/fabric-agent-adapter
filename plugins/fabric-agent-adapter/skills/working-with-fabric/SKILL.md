@@ -50,7 +50,7 @@ By hand, when Python is absent: Fabric publishes `hub.json` in its folder while 
 
 | OS | Fabric's folder (`hub.json`) | `<Fabric>/bin` |
 |---|---|---|
-| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `~/Applications/Fabric.app/Contents/Resources/bin`, then `/Applications` if yours |
+| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `~/Applications/Fabric.app/Contents/Resources/bin`, then `/Applications` if yours or root's |
 | Windows | `%LOCALAPPDATA%\passioncode-fabric\` | the install folder's `resources\bin` (`fabric-mcp.cmd`); per-user default `%LOCALAPPDATA%\Programs\Fabric` |
 | Linux | `$XDG_DATA_HOME/passioncode-fabric/` (default `~/.local/share/`) | the install folder's `resources/bin`; the `.deb` puts it in `/opt/Fabric` |
 

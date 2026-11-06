@@ -12,21 +12,25 @@
   question's `commandId`, UUID v5 of the name `board.gate` in the request id's namespace (`gate_question_id`), so every
   run on that request gets the same question back; an operator decision recorded under the same `about` settles the
   gate's later questions. Fabric proposed the step and confirmed the tool needs no slot on 0.3.16 (board thread
-  `1add3c03`, `5fb4226d`, `a58b4280`); Fabric adds the same step to its `board.read-at-start` rule (its CO-517). A
-  question that fails is noted in the closing write. `references/on-demand-session.md` and `references/project-board.md`
-  say the same. The contract stays under Hermes' 4000 characters (3996 at its longest) with several clauses shorter
-  ("never complete what you did not observe" is left to steps 4 and 5's `observed: true` and the reconcile rule).
+  `1add3c03`, `5fb4226d`, `a58b4280`); Fabric adds the same step to its `board.read-at-start` rule (its CO-517).
+  `references/on-demand-session.md` (which also has a failed question noted in the closing write) and
+  `references/project-board.md` say the same. The contract stays under Hermes' 4000 characters (3996 at its longest)
+  with several clauses shorter; "never complete what you did not observe" now lives in the reference only (the
+  contract keeps `observed: true` and the reconcile rule's observed result).
 
 ### Fixed
 
 - working-with-fabric: on macOS `status`, and the `claude mcp add` line it proposes, look for `fabric-mcp` in
   `~/Applications/Fabric.app` first, then `/Applications/Fabric.app`, and take the copy outside the user's home only
-  when it is this user's (FAA-229, spec G6 of `docs/evidence/specs/2026-11-06-machine-move-gaps.md`; the launcher's
-  rule, its `lib/catalog.js` `appPath`, which also wants that bundle writable). Before, `/Applications` came first, so
-  a second user of a Mac was pointed at another user's Fabric. The hooks run the command registered in
-  `~/.claude.json`, so `status` now names a registered `fabric-mcp` outside the home that is another user's (root's,
-  an install every user shares, is not flagged) and gives the `claude mcp remove` and `claude mcp add` lines that
-  register the user's own. The SKILL.md table says the same for a reader without Python.
+  when it is this user's or root's (an install every user shares) (FAA-229, spec G6 of
+  `docs/evidence/specs/2026-11-06-machine-move-gaps.md`). Before, `/Applications` came first, so a second user of a
+  Mac was pointed at another user's Fabric. The launcher installs the user's own copy in `~/Applications` unless the
+  user owns and can write `/Applications` (its `lib/catalog.js` `appPath`): it updates the bundle, while this only
+  runs it. The hooks run the command registered in `~/.claude.json`, so `status` now names a registered `fabric-mcp`
+  that is another user's copy outside the home (a bare command judged by what `PATH` finds, a link by what it points
+  at): it says to install the user's own Fabric into `~/Applications` first when there is none, then gives the
+  `claude mcp remove` and `claude mcp add` lines with that copy's path; a project's shared `.mcp.json` is overridden
+  with a `--scope local` entry, never rewritten. The SKILL.md table says the same for a reader without Python.
 
 ## 0.68.0 (2026-11-06)
 

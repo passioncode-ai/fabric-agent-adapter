@@ -716,15 +716,25 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
                                                                     else "on" if repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
     # FAA-229: before 0.69.0 status proposed /Applications first, so a second user of a Mac may run another user's copy
-    foreign = bool(claude) and another_users_copy(Path(claude["command"]), platform, env)
+    foreign = bool(claude) and claude["fabricMcp"] and another_users_copy(Path(claude["command"]), platform, env)
     report["registeredCopy"] = "another user's" if foreign else "ok"
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later; no fabric-mcp %sis at %s." % (
             "of yours " if platform == "darwin" else "",
             ", ".join(str(p) for p in fabric_bin_candidates(platform, env)))
     elif foreign:
-        report["next"] = ("The registered fabric-mcp is another user's copy: claude mcp remove --scope %s fabric, then "
-                          "claude mcp add --scope user fabric -- %s --runner claude-code" % (claude["scope"], shown))
+        own = '"%s"' % (binary or fabric_bin_candidates(platform, env)[0])
+        first = "" if binary else "install your own Fabric (into ~/Applications, as the launcher does), then "
+        if claude["scope"] == "project":
+            # the project's .mcp.json is shared with every collaborator: a local entry overrides it for this user alone
+            report["next"] = ("The registered fabric-mcp (the project's .mcp.json) is another user's copy: %sclaude mcp "
+                              "add --scope local fabric -- %s --runner claude-code in that project, which overrides it "
+                              "for you alone" % (first, own))
+        else:
+            report["next"] = ("The registered fabric-mcp is another user's copy: %sclaude mcp remove --scope %s fabric%s, "
+                              "then claude mcp add --scope user fabric -- %s --runner claude-code" % (
+                                  first, claude["scope"], " (in the folder it was added in)" if claude["scope"] == "local"
+                                  else "", own))
     elif hub["state"] == "not-a-hub":
         report["next"] = "Fabric's hub could not be verified (%s): open Fabric; send it nothing until it can." % hub["reason"]
     elif hub["state"] != "running":
@@ -743,7 +753,9 @@ def print_status(report: Dict[str, Any]) -> None:
             "not-a-hub": "not verified: %s" % hub.get("reason")}[hub["state"]]
     claude = report["claudeCode"]
     print("Fabric: %s" % line)
-    print("fabric-mcp: %s" % (report["fabricMcp"] or "not found at the default install locations"))
+    print("fabric-mcp: %s" % (report["fabricMcp"] or (
+        "none of yours at the default install locations" if report.get("registeredCopy") == "another user's"
+        else "not found at the default install locations")))
     print("Claude Code: %s" % ("fabric registered (%s scope) -> %s%s" % (
         claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") + (
         " (another user's copy)" if report.get("registeredCopy") == "another user's" else "") if claude else "not registered"))
