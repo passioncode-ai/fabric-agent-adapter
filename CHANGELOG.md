@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.72.0 (unreleased)
+
+### Changed
+
+- working-with-fabric: a run Fabric started on a board request whose `com.enroll` is refused `not_authorized` asks the
+  operator with `fabric_question_ask` (`about: board.gate.<capability>`, the same `commandId`) at every slot state, not
+  only when the slot reads `absent` at generation 0; `com.reply` stays only for that state, since at any other a
+  service of the Project takes the request when it rejoins. After CO-506 a refusal comes only from an organization's
+  machine, a missing live credential or a standing denial, and a run that stayed silent then left the request to
+  «На проверке» with no reason (FAA-241; Fabric main `4f3c742a`, which says the same in `board.read-at-start` and
+  `com.enroll`'s description). The exit contract's step 3, `references/on-demand-session.md`,
+  `references/project-board.md` (a live session too) and the scenario eval say so; the exit contract stays under
+  Hermes' 4000 characters (3996 at its longest).
+
 ## 0.71.0 (2026-11-06)
 
 The contract pin moves to `eac1a594` (`v0.1.0+2026-11-06.1`) from `3830a33` (`v0.1.0+2026-10-27.6`); between them

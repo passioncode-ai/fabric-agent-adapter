@@ -191,16 +191,15 @@ generation of 1 or more: a holder enrolled on it), do
 not reply on the request: tell the person and leave it queued. A session whose own `com.enroll` is refused
 `not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
 it answers the request once that it cannot be taken now and why, does no work on it without the slot, then asks the
-operator once with `fabric_question_ask` (`kind: access`, `about: board.gate.<capability>`, the `commandId` that
+operator once (at any other slot state it sends no reply and still asks, FAA-241) with `fabric_question_ask` (`kind: access`, `about: board.gate.<capability>`, the `commandId` that
 `python3 <skill-dir>/scripts/fabric_session.py gate-id <request>` prints, the same a run uses, and a `text` naming the request, the gate and what
 opens it; without Python, no `commandId` can be made: tell the person only), tells the person (the question stays
 filed even when that is the operator: Fabric keeps its `about` and settles nothing by it yet, CO-519), and stops handling
-that request without waiting (Fabric's `board.read-at-start` rule and `com.enroll`'s own tool description said the
-same, slot condition included, at main `603da12f`, `dbfbfce4` and `12d57bdd`; since main `4f3c742a` they also ask the
-operator at the other slot states, which the adapter takes in 0.72.0, FAA-241; in no Fabric release yet: on Fabric
-0.3.16 this rule wins). Never write "it stays queued" in a reply: the reply itself ends the queue. A
+that request without waiting (Fabric's `board.read-at-start` rule and `com.enroll`'s own tool description say the
+same since main `4f3c742a`, slot condition included: `603da12f`, `dbfbfce4`, `12d57bdd`; in no Fabric release yet, and
+on Fabric 0.3.16 this rule wins). Never write "it stays queued" in a reply: the reply itself ends the queue. A
 run Fabric started on a board request has no person in its chat to tell: with the slot `absent` at generation 0 it declines,
-asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
+asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued and still asks ([on-demand session](on-demand-session.md), step 3).
 
 ## Replying
 

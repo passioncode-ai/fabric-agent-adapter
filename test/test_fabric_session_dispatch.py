@@ -433,7 +433,7 @@ class Hooks(Base):
         # 0.68.0 readings 5 and 6: com.status always lists the request's capability; a slot a service ever held
         # (stale, active, or absent at a generation of 1 or more) takes the request back, so decline only at generation 0
         self.assertIn("a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at "
-                      "generation 0, one `com.reply` (replyTo it) declining until Fabric's CO-506 (resend then), next "
+                      "generation 0, one `com.reply` (replyTo it) declining until CO-506 (resend then); either way "
                       "`fabric_question_ask` {kind: access, about: board.gate.<capability>, commandId: %s, text: the "
                       "request, its gate, what opens it}, then step 6 (done) once `com.get` reads answered, and 7;"
                       % cli.gate_question_id(FULL["request"]), text)
@@ -470,6 +470,8 @@ class Hooks(Base):
         self.assertIn("about: board.gate.<capability>", step3, "one `about` names the gate for every question on it")
         self.assertLess(step3.index("`com.reply` (replyTo it)"), step3.index("`fabric_question_ask`"))
         self.assertLess(step3.index("`fabric_question_ask`"), step3.index("then step 6 (done)"))
+        # FAA-241 (Fabric main 4f3c742a): the question is asked at every slot state, the reply only at absent generation 0
+        self.assertIn("(resend then); either way `fabric_question_ask`", step3)
         # 0.69.0 unit reading 1: each of open, done and notes is optional, as in 0.68.0
         self.assertIn("(add `open`, `done` or `notes`; no value)", text)
 
