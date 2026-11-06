@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.70.0 (2026-11-06)
+
+### Fixed
+
+- working-with-fabric: on macOS, with `PASSIONCODE_APPLICATIONS` set to a folder starting with `/`, `status` looks for
+  `Fabric.app` only there, as the launcher installs every app in that one folder (its `lib/catalog.js` `appsDir`); an
+  empty or relative value keeps the default order (FAA-237, the launcher's reading of its PR #277, board thread
+  `cb1df3d5`). `status` names root's copy outside the home "the administrator's copy, which the launcher does not
+  update" (`administratorsCopy` and `launcherFolder` in `--json`); a launcher's folder that already holds another
+  user's `Fabric.app` is not proposed: `status` says to unset the variable and use `~/Applications`, as the launcher's
+  PR #277 advises for a bundle the user cannot write (`bd22566`, open: launcher 0.2.75 with the variable unset
+  installs into `/Applications`, so the person puts the copy in `~/Applications`); the label is about the copy
+  `status` found, not the registered command, and running it stays allowed. A folder this user cannot enter reads as
+  holding no copy: `status` names it in its install advice instead of stopping on Python's `PermissionError` (before
+  Python 3.14). With the folder set, `status` names it in its install advice and its `fabric-mcp:` line, never
+  `~/Applications` unless that folder holds another user's copy (above). The SKILL.md Step 0 row and the
+  `a-second-user-of-a-mac-registers-fabric` eval name the folder.
+- `references/project-board.md` and `references/on-demand-session.md` name Fabric's `board.read-at-start` rule for the
+  slot condition of a gate decline: Fabric took it from the adapter into its board rule (main `dbfbfce4`) and into
+  `com.enroll`'s own tool description (main `12d57bdd`), from its next release, so a live session gets one instruction
+  (FAA-231).
+
 ## 0.69.1 (2026-11-06)
 
 The tag `v0.69.0` was never published: its release run

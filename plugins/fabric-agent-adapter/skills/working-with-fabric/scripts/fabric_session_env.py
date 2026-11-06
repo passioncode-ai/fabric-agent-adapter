@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.69.1"
+VERSION = "0.70.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -162,11 +162,29 @@ def state_root(platform: str = sys.platform, env: Optional[Dict[str, str]] = Non
     return Path(env.get("XDG_CACHE_HOME") or str(home / ".cache")) / "fabric-agent-adapter"
 
 
+#: The launcher's folder for every app it installs, when the person sets one (FAA-237).
+APPLICATIONS_ENV = "PASSIONCODE_APPLICATIONS"
+
+
+def launcher_folder(env: Optional[Dict[str, str]] = None) -> Optional[Path]:
+    """The folder `PASSIONCODE_APPLICATIONS` names, when it starts with `/` (FAA-237). The launcher's `appsDir` takes
+    any non-empty value as it is, so a relative value or a literal `~` would be a folder under the launcher's working
+    folder, which no other process can find: none here, and the default order holds. A macOS path is POSIX on
+    whatever host reads it."""
+    value = (os.environ if env is None else env).get(APPLICATIONS_ENV) or ""
+    return Path(value) if value.startswith("/") else None
+
+
 def fabric_bin_candidates(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> List[Path]:
     """Where `<Fabric>/bin/fabric-mcp` is on a default install (ADR-0134 amendment 2; electron-builder targets)."""
     env = os.environ if env is None else env
     home = _home(env)
     if platform == "darwin":
+        # The launcher's one folder for every app, when the person set it (its lib/catalog.js appsDir; FAA-237): only
+        # there. An empty or relative value is not a place, and the default order holds.
+        chosen = launcher_folder(env)
+        if chosen:
+            return [chosen / "Fabric.app/Contents/Resources/bin/fabric-mcp"]
         # The user's own copy first: on a Mac with several users a copy in /Applications may be another user's
         # (FAA-229; the launcher's order from its PR #277, lib/catalog.js appPath, planned for launcher 0.2.76).
         return [home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp",
@@ -182,6 +200,15 @@ def _owner_uid(path: Path) -> Optional[int]:
         return os.stat(str(path)).st_uid
     except (OSError, ValueError):  # ValueError: a NUL in a path read from a config file
         return None
+
+
+def a_file(path: Path) -> bool:
+    """`path.is_file()`, False where it cannot be read: the launcher's folder is the person's choice and may sit under a
+    folder this user cannot enter, where Python before 3.14 raises PermissionError (0.70.0 unit reading 4)."""
+    try:
+        return path.is_file()
+    except (OSError, ValueError):
+        return False
 
 
 def _real(path: Path) -> Path:
@@ -215,13 +242,24 @@ def another_users_copy(path: Path, platform: str = sys.platform, env: Optional[D
     return owner is not None and owner not in (os.getuid(), 0)
 
 
+def administrators_copy(path: Path, platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> bool:
+    """On macOS, a file outside the user's home that root owns: an install the administrator made (a pkg or MDM). This
+    user may run it, and the launcher does not update it (its doctor calls it the administrator's from its PR #277,
+    planned for 0.2.76; FAA-237)."""
+    if platform != "darwin" or not hasattr(os, "getuid") or os.getuid() == 0 or not path.is_absolute():
+        return False
+    path = _real(path)
+    if _real(_home(os.environ if env is None else env)) in path.parents:
+        return False
+    return _owner_uid(path) == 0
+
+
 def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> Optional[Path]:
-    """The first candidate that is a file. On macOS a copy outside the user's home is taken only when it is this
-    user's or root's (an install every user shares): another user's copy is skipped (FAA-229). The launcher installs
-    the user's own copy in `~/Applications` unless the user owns and can write `/Applications` (its lib/catalog.js
-    appPath, from its PR #277, planned for 0.2.76): it updates the bundle, while this only runs it."""
+    """The first candidate that is a file (only the launcher's folder when `PASSIONCODE_APPLICATIONS` names one). On
+    macOS a copy outside the user's home is taken only when it is this user's or root's (an install every user
+    shares): another user's copy is skipped (FAA-229, FAA-237)."""
     for candidate in fabric_bin_candidates(platform, env):
-        if candidate.is_file() and not another_users_copy(candidate, platform, env):
+        if a_file(candidate) and not another_users_copy(candidate, platform, env):
             return candidate
     return None
 

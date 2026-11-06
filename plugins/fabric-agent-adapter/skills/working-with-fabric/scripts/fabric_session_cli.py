@@ -25,11 +25,15 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     _write_private,
     claude_registration,
     codex_registered,
+    a_file,
+    administrators_copy,
     another_users_copy,
     fabric_bin_candidates,
     fabric_launched,
     fabric_root,
+    APPLICATIONS_ENV,
     find_fabric_bin,
+    launcher_folder,
     host_registered,
     launched_by_ancestor,
     locate_hub,
@@ -722,14 +726,29 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     foreign = bool(claude) and claude["fabricMcp"] and not command.startswith(("./", ".\\")) and another_users_copy(
         Path(command), platform, env)
     report["ownCopyRule"] = platform == "darwin"
+    chosen = launcher_folder(env) if platform == "darwin" else None
+    report["launcherFolder"] = str(chosen) if chosen else None
+    # FAA-237: root's copy runs, and the launcher calls it the administrator's and does not update it
+    report["administratorsCopy"] = bool(binary) and administrators_copy(binary, platform, env)
     report["registeredCopy"] = "another user's" if foreign else "ok"
+    # where the user's own copy goes: the launcher's folder when the person named one, else ~/Applications (FAA-237);
+    # a launcher's folder that already holds another user's Fabric.app is no place for this user's (0.70.0 seam reading
+    # 3): unset PASSIONCODE_APPLICATIONS and use ~/Applications, as the launcher's PR #277 says then (its 0.2.75 would
+    # install into /Applications with the variable unset, so the person puts the copy there)
+    candidates = fabric_bin_candidates(platform, env)
+    occupied = bool(chosen) and a_file(candidates[0]) and another_users_copy(candidates[0], platform, env)
+    place = str(chosen) if chosen and not occupied else "~/Applications"
+    if occupied:
+        unset = {k: v for k, v in (os.environ if env is None else env).items() if k != APPLICATIONS_ENV}
+        candidates = fabric_bin_candidates(platform, unset)
+        place = "~/Applications, with %s unset: %s holds another user's Fabric.app" % (APPLICATIONS_ENV, chosen)
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
-            " (your own copy, in ~/Applications)" if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
+            " (your own copy, in %s)" % place if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
             ", ".join(str(p) for p in fabric_bin_candidates(platform, env)))
     elif foreign:
-        own = '"%s"' % (binary or fabric_bin_candidates(platform, env)[0])
-        first = "" if binary else "put your own Fabric.app in ~/Applications, then "
+        own = '"%s"' % (binary or candidates[0])
+        first = "" if binary else "put your own Fabric.app in %s, then " % place
         where = claude.get("folder", "")
         if claude["scope"] == "project":
             # the project's .mcp.json is shared with every collaborator: a local entry overrides it for this user alone
@@ -760,8 +779,10 @@ def print_status(report: Dict[str, Any]) -> None:
             "not-a-hub": "not verified: %s" % hub.get("reason")}[hub["state"]]
     claude = report["claudeCode"]
     print("Fabric: %s" % line)
-    print("fabric-mcp: %s" % (report["fabricMcp"] or (
-        "none of yours at the default install locations" if report.get("ownCopyRule")
+    print("fabric-mcp: %s" % ((report["fabricMcp"] + (" (the administrator's copy, which the launcher does not update)"
+                                                    if report.get("administratorsCopy") else "")) if report["fabricMcp"] else (
+        "none of yours in %s (PASSIONCODE_APPLICATIONS)" % report["launcherFolder"] if report.get("launcherFolder")
+        else "none of yours at the default install locations" if report.get("ownCopyRule")
         else "not found at the default install locations")))
     print("Claude Code: %s" % ("fabric registered (%s scope) -> %s%s" % (
         claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") + (
