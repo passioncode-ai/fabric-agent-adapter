@@ -2160,7 +2160,10 @@ class Status(Base):
                 self.assertEqual(other["registeredCopy"], "ok", platform)
                 self.assertNotIn("another user's", other["next"], platform)
             self.env_module._owner_uid = lambda path: 0
-            self.assertEqual(fs.status(self.repo, self.env, "darwin")["next"], "Call fabric_whoami.", "root's is shared")
+            # not the next action: the hub is written where this host's Fabric keeps it, not macOS' place (0.69.1)
+            shared_copy = fs.status(self.repo, self.env, "darwin")
+            self.assertEqual(shared_copy["registeredCopy"], "ok", "root's is shared")
+            self.assertNotIn("another user's", shared_copy["next"])
         finally:
             self.env_module._owner_uid = saved
         (self.home / ".claude.json").unlink()

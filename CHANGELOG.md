@@ -1,6 +1,19 @@
 # Changelog
 
-## 0.69.0 (2026-11-06)
+## 0.69.1 (2026-11-06)
+
+The tag `v0.69.0` was never published: its release run
+([42159022439](https://github.com/passioncode-ai/fabric-agent-adapter/actions/runs/42159022439)) stopped at one test
+on the Linux jobs (`python`, `floors`), so 0.69.1 is the first npm release carrying everything listed under 0.69.0 below.
+
+### Fixed
+
+- `test_a_registered_copy_of_another_user_is_named` asked `status` for the next action on platform `darwin` with the
+  test hub written where this host's Fabric keeps it; on Linux that is not macOS' place, so the answer was "Fabric is
+  not running". The root's-copy case now checks that the registration is not flagged, whatever the next action.
+  Verified in `python:3.11-slim` and `python:3.9-slim` containers.
+
+## 0.69.0 (2026-11-06, tagged, not published)
 
 ### Added
 
