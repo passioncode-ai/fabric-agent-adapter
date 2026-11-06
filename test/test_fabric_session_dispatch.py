@@ -429,12 +429,13 @@ class Hooks(Base):
         # 0.68.0 product reading 2: the reply answers the request, so it declines and asks for a resend, never "waits"
         # 0.68.0 readings 5 and 6: com.status always lists the request's capability; a slot a service ever held
         # (stale, active, or absent at a generation of 1 or more) takes the request back, so decline only at generation 0
-        self.assertIn("a not_authorized enroll: no slot, no work and, if queued, its `com.status` slot `absent` at "
+        self.assertIn("a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at "
                       "generation 0, one `com.reply` (replyTo it) declining until Fabric's CO-506 (resend then), then step "
                       "6 (done) once `com.get` reads answered, and 7;", text)
         branch = text[text.index("a not_authorized enroll"):text.index("CO-506")]
         self.assertNotIn(";", branch, "0.68.0 unit reading 2: a queued request is the refused enroll's case, not its own")
         self.assertEqual(text.count(" 7. "), 1, "' 7. ' is step 7 alone, so the step slices hold")
+        self.assertEqual(text.count(" 6. "), 1, "' 6. ' is step 6 alone")
         self.assertIn("Details: working-with-fabric references/on-demand-session.md.", text, "a native host has no other pointer")
         self.assertNotIn("access.request", text)
         # FAA-215: Fabric refuses a complete after an effect began without observed: true (observation_required)

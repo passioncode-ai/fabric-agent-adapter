@@ -221,7 +221,7 @@
     {
       "id": "a-request-a-dispatched-run-declined",
       "trap": "waits for the owner as if the request were still queued, resends at once under a new key while it is open, or resends again and again after a second decline",
-      "request": "You sent a request to another Project whose owner is not working now. Within a minute a run Fabric started on that Project replied: it cannot take the request until Fabric ships CO-506, and asks you to send it again then. What do you do?",
+      "request": "You sent a request to another Project whose owner is not working now. A few minutes later a run Fabric started on that Project replied: it cannot take the request until Fabric ships CO-506, and asks you to send it again then. What do you do?",
       "expected": [
         "knows the reply answered the request: it no longer waits for its owner",
         "reads the decline and marks it read with com.read_ack (unread, it shows on its own Project in «На проверке»), and records the wait on CO-506 (what it waits on, which watcher acts)",

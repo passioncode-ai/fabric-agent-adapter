@@ -149,7 +149,8 @@ longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
 small change may still be adapted under step 3. Record the wait on CO-506 (what it waits on, which watcher acts); once
 it ships and the ask still stands, cancel the answered request (`com.cancel`) and, once the cancel's receipt reads it
 `cancelled`, submit it again with a new key, once: a second decline after CO-506 shipped (a machine CO-506 grants
-nothing on) goes to the person.
+nothing on) goes to the person. A live session's answer that the request cannot be taken now (its own refused `com.enroll`,
+below) is read the same way: `com.read_ack`, record the wait on the reason it names, one resend once that clears.
 
 The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it.
 
@@ -185,11 +186,11 @@ deadline no longer expires it; only the requester can still cancel it. So reply 
 is the answer: you did the work, you say why it will not be done, or you are doing it and give its state with the
 nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If your Project's
 service responder should still do the work (`com.status`'s slot for the capability is `active` or `stale`, or `absent` at a
-generation of 1 or more: a service held it), do
+generation of 1 or more: a holder enrolled on it), do
 not reply on the request: tell the person and leave it queued. A session whose own `com.enroll` is refused
 `not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
 it answers the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's
-board rule on its `main` at `b8c0a38c`). Never write "it stays queued" in a reply: the reply itself ends the queue. A
+board rule on its `main` at `b8c0a38c` answers once; the slot condition is this adapter's). Never write "it stays queued" in a reply: the reply itself ends the queue. A
 run Fabric started on a board request has no person to tell: with the slot `absent` at generation 0 it declines and
 asks for a resend; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
 
