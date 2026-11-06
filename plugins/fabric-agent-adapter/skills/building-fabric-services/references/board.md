@@ -243,7 +243,7 @@ whose responder was gone. Read it as the owner's attestation, not the responder'
 
 ## When the operator moves a slot to another session (FAA-155)
 
-The contract's DEC-0140 PR-2 (accepted 2026-10-30, after this kit's pin) lets the operator move a
+The contract's DEC-0140 PR-2 (accepted 2026-10-30; in the pin since 0.71.0) lets the operator move a
 (Project, capability) slot to another live session of the Project: one transition, as `com.responder_replace` would make
 it for the receiving session (generation up, `claimed` back to `queued`, `in_progress` to `outcome_unknown`, `accepted`
 held and not transferred). The responder keeps that move instead of undoing it:

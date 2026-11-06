@@ -61,6 +61,11 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none`: a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
 | `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed`, `personal` or `processor-hosted` (an organization's cloud a processor runs under a processing agreement, DEC-0099); `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
 
+A local descriptor MAY say where a collector on the same machine reads its daily operations digests, under
+`https://fabric.passioncode.ai/agent-contract/extensions/ops-digest/0.1` (`fabric-ops-digest/0.1`, DEC-0153, OD-9,
+FAC-SEM-168): 1 to 8 `{dir, source}`, `dir` a folder inside `paths.data`. A remote descriptor carries none, and the key
+is read nowhere else. The kits know the revision and neither write nor check the declaration yet (FAA-206).
+
 ## Identifier equality (DEC-0076)
 
 Two identifiers are the same when their normal forms are equal. `normal_identifier` / `normalIdentifier` and
@@ -139,12 +144,11 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
        {"id": "notify", "kind": "service", "target": "communicator.default", "capability": "communicator.notify"}],
       degraded=degraded, states={"router": "ok" if model_answered else "down"}))
   ```
-- `extensions` MAY carry two more declarations since the pin `v0.1.0+2026-11-06.1`: a channel agent's under
+- `extensions` MAY carry a channel agent's declaration under
   `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (`channel-agent-standard/1`, DEC-0150,
-  FAC-SEM-162 to 165) and a service's operations digests under
-  `https://fabric.passioncode.ai/agent-contract/extensions/ops-digest/0.1` (`fabric-ops-digest/0.1`, DEC-0153,
-  FAC-SEM-166 to 168). The kits know both protocol revisions (`PROTOCOL_REVISIONS`); they do not build or check
-  either declaration yet (FAA-197, FAA-206).
+  FAC-SEM-162 to 165) only for a service with no manifest; one with a manifest declares it under its manifest's
+  `provider.extensions` alone (CA-1). The kits know the revision (`PROTOCOL_REVISIONS`) and do not build or check the
+  declaration yet (FAA-197).
 - `surfaces.mcp.auth`: `descriptor` (default), `own` (DEC-0024) or `delegation` (DEC-0039, DL-16):
   the MCP surface takes only the estate's delegation tokens, and the top-level
   `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's

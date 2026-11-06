@@ -235,7 +235,7 @@ chat of any of his agents binds all his agents (OA-1).
 - His word is done the first time, by you (CT-220): no command for him to run; on a risk, one short question, then do
   it.
 - Human gates stay (OA-5): sign-in, one-time code, consent, payment, top-up, secret typed in or handed out (DEC-0147),
-  spend above a limit (handed over with link and amount, not in chat), a passkey, a comparison of codes with another person
+  spend above a limit (link and amount handed over, never a chat question), a passkey, a comparison of codes with another person
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than

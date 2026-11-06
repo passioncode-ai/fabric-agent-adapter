@@ -115,8 +115,9 @@ where nothing is decided (a channel's `decision`); a final text never `not_used`
 on (FAC-SEM-164); `recommendation` only with `answered_signal: "none"`, the id of the
 board thread where the queue's owner was told; a channel's `items_seen_unit` one of `mails`, `updates`, `messages`,
 `reviews`; durations in ISO 8601; the knowledge file as a source with its
-maximum age. `test/test_channel_agent_example.py` holds the example to that form; `check_service.py` reads the
-declaration once the contract publishes its schema.
+maximum age. `test/test_channel_agent_example.py` holds the example to that form; the contract publishes its schema
+at the pin (`service-channel-agent-extension.schema.json`); `check_service.py` does not read the declaration yet
+(FAA-197).
 
 ## Configure
 

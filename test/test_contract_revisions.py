@@ -13,7 +13,7 @@ from test_adapt_project import ADAPTER, ROOT, scaffold_args
 
 OLD = '2ce392291c6668598d12cd38327e24696b5ca15c'
 NEW = 'eac1a594aa131851f079da8bb7b2149e1951f35f'
-DEC145 = '3830a3353923e20f826d466610e1c479f120bec0'  # DEC-0142, the release v0.1.0+2026-10-27.6 (0.57.0…0.70.0); stays supported (0.71.0)
+DEC145 = '3830a3353923e20f826d466610e1c479f120bec0'  # DEC-0142…0145, the release v0.1.0+2026-10-27.6 (0.57.0…0.70.0); stays supported (0.71.0)
 DEC141 = '00e050ba7429c0c60261cec871779e0fd6aeeb28'  # DEC-0138…0141, the release v0.1.0+2026-10-27.1 (0.54.0…0.56.0); stays supported (0.57.0, FAA-176)
 DEC137 = '1197a90dc4b57152cabcc71ad17db7559f35a27f'  # DEC-0126…0137, the release v0.1.0+2026-10-26.12 (0.52.0…0.53.0); stays supported (0.54.0, FAA-159)
 DEC125 = 'e6c4fc16b415eec3190dd34d924d269405359dc9'  # DEC-0125, the release v0.1.0+2026-10-26.2 (0.51.0…0.51.2); stays supported (0.52.0 brief REQ-1)
