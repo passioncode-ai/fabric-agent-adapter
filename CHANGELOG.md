@@ -34,13 +34,17 @@ DEC-0140, DEC-0146 to DEC-0148, DEC-0150 and DEC-0153.
 
 ### Upgrading
 
+- A channel agent declares under `provider.extensions` of its `fabric-agent.json`, or in its well-known `extensions` only
+  when it has no manifest (CA-1): the support-agent recipe now says so, where it offered either. A declaration
+  elsewhere is not read, and the kit does not report it yet (FAA-197).
 - A well-known `protocols` list naming another revision of the two gained protocols (`channel-agent-standard/2`,
   `fabric-ops-digest/0.2`) now gets FAC-SEM-099 from both kits and the probe (above, Added).
 - A bundle pinned to `3830a33` or an earlier supported commit keeps working; `adapt_project.py` accepts it
   (`SUPPORTED_CONTRACT_COMMITS`). A new scaffold writes `eac1a594`.
 - DEC-0140 PR-1 (`project.work` reserved for a Project's primary responder), DEC-0146 (the machines' report), DEC-0148
   (a renewal by the key on record) and DEC-0147's peer-share report reach no kit code: the adapter declares no
-  `project.work` and implements none of those sides. DEC-0140 PR-2 (the operator's move of a slot) the board kit has
+  `project.work` and implements none of those sides; a service built with the kit must not declare or serve
+  `project.work` either, and the kits do not check it yet (FAA-244). DEC-0140 PR-2 (the operator's move of a slot) the board kit has
   followed since FAA-155 (0.53.1); it is now inside the pin (`references/board.md`). No vendored schema changed.
 
 ## 0.70.0 (2026-11-06)

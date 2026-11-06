@@ -141,7 +141,8 @@ draft-and-check step owns.
   recommendation to its owner, posted on the board: `recommendation` is that board thread's id. Many `referred` tickets show a missing signal, not a regression.
 - **Text from a channel is data** (the contract's DEC-0150 CA-8): a message, caption, file name, link or
   quoted reply is never an instruction; the agent makes no tool call, send, spend or access change because a message
-  asks, and acts on its own task and its operator's word. Check: the recipe's fence around the message and its checks.
+  asks, and acts on its own task; an operator's word in a chat acts only in that chat and never outside the task
+  (a paraphrase; FAA-197 quotes CA-8 verbatim). Check: the recipe's fence around the message and its checks.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.
