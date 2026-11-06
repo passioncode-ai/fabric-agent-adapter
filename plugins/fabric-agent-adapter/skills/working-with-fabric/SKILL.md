@@ -50,7 +50,7 @@ By hand, when Python is absent: Fabric publishes `hub.json` in its folder while 
 
 | OS | Fabric's folder (`hub.json`) | `<Fabric>/bin` |
 |---|---|---|
-| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `$PASSIONCODE_APPLICATIONS/Fabric.app/...` if set, else `~/Applications/Fabric.app/Contents/Resources/bin`, then `/Applications` if yours or root's |
+| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `$PASSIONCODE_APPLICATIONS/Fabric.app/...` if absolute, else `~/Applications/Fabric.app/Contents/Resources/bin`, then `/Applications` if yours or root's |
 | Windows | `%LOCALAPPDATA%\passioncode-fabric\` | the install folder's `resources\bin` (`fabric-mcp.cmd`); per-user default `%LOCALAPPDATA%\Programs\Fabric` |
 | Linux | `$XDG_DATA_HOME/passioncode-fabric/` (default `~/.local/share/`) | the install folder's `resources/bin`; the `.deb` puts it in `/opt/Fabric` |
 
@@ -154,7 +154,7 @@ Fabric v0.3.5+ (REQ-38):
    nothing either (Fabric chose that parent, FAA-153) and tell the person which. `spawned_from: null` comes
    with `spawned_from_why`: link it yourself once with `fabric_task_link {taskId: <the piece>, rel: "spawned",
    targetTaskId: <the claimed task>}`, and if that is refused too, tell the person that reason; never file the piece
-   again. A filed piece (`created: true`) with no `spawned_from` at all is a Fabric before 0.3.14: link it yourself the same way unless the answer says
+   again. A filed piece (`created: true`) with no `spawned_from` is a Fabric before 0.3.14: link it yourself the same way unless the answer says
    `chained: true` with `chained_to` your claimed task (board `c42071bc`); an answer with `chained: false` names its
    `chain_reason`, which you tell the person if your link is refused.
 3. A related-work warning (same backlog row, a linked task, an overlapping folder) names the other agent, its
@@ -174,7 +174,7 @@ A Fabric with no `fabric_work_*` tools listed (before v0.3.5): use `fabric_tasks
 - `fabric_stage_report`: where you are in the work, as a claim beside what Fabric observes; give `step` and
   `ofSteps` (step 2 of 3), which Fabric shows to the operator as your current step.
 - `fabric_task_note`: working notes on the task, append-only.
-- `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; calls renew the claim. Before
+- `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim. Before
   you wait on the person or a question, send it with `phase: "waiting"`: `waitingOn: {kind: "question", id}` for a
   question you asked with `fabric_question_ask`, otherwise what you wait on in one line of `note`.
 - `fabric_memory_search` before re-deriving what the project knows; `fabric_memory_remember` for a fact worth

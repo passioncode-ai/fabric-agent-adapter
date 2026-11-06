@@ -166,6 +166,26 @@ def state_root(platform: str = sys.platform, env: Optional[Dict[str, str]] = Non
 APPLICATIONS_ENV = "PASSIONCODE_APPLICATIONS"
 
 
+def launcher_folder(env: Optional[Dict[str, str]] = None) -> Optional[Path]:
+    """The folder `PASSIONCODE_APPLICATIONS` names, when it is one: `~` is this env's home, `~user` the system's, and a
+    value that is empty, relative or names an unknown user is none (FAA-237)."""
+    env = os.environ if env is None else env
+    value = (env.get(APPLICATIONS_ENV) or "").strip()
+    if not value:
+        return None
+    if value == "~" or value.startswith("~/"):
+        return _home(env) / value[2:]
+    if value.startswith("~"):
+        if os.name != "posix":  # ~user is a macOS form; another system would read another place
+            return None
+        try:
+            value = os.path.expanduser(value)
+        except (RuntimeError, KeyError, OSError, ValueError):  # ~user with no such user
+            return None
+    # a macOS path is POSIX on whatever host reads it (on Windows `/Volumes/Apps` has no drive yet is absolute here)
+    return Path(value) if value.startswith("/") else None
+
+
 def fabric_bin_candidates(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> List[Path]:
     """Where `<Fabric>/bin/fabric-mcp` is on a default install (ADR-0134 amendment 2; electron-builder targets)."""
     env = os.environ if env is None else env
@@ -173,9 +193,9 @@ def fabric_bin_candidates(platform: str = sys.platform, env: Optional[Dict[str, 
     if platform == "darwin":
         # The launcher's one folder for every app, when the person set it (its lib/catalog.js appsDir; FAA-237): only
         # there. An empty or relative value is not a place, and the default order holds.
-        chosen = (env.get(APPLICATIONS_ENV) or "").strip()
-        if chosen and Path(chosen).expanduser().is_absolute():
-            return [Path(chosen).expanduser() / "Fabric.app/Contents/Resources/bin/fabric-mcp"]
+        chosen = launcher_folder(env)
+        if chosen:
+            return [chosen / "Fabric.app/Contents/Resources/bin/fabric-mcp"]
         # The user's own copy first: on a Mac with several users a copy in /Applications may be another user's
         # (FAA-229; the launcher's order from its PR #277, lib/catalog.js appPath, planned for launcher 0.2.76).
         return [home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp",

@@ -52,6 +52,7 @@ from fabric_session_env import (  # noqa: F401
     another_users_copy,
     fabric_bin_candidates,
     find_fabric_bin,
+    launcher_folder,
     read_small,
     pid_alive,
     locate_hub,

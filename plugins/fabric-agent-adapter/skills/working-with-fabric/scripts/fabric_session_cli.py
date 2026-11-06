@@ -31,6 +31,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     fabric_launched,
     fabric_root,
     find_fabric_bin,
+    launcher_folder,
     host_registered,
     launched_by_ancestor,
     locate_hub,
@@ -723,16 +724,21 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     foreign = bool(claude) and claude["fabricMcp"] and not command.startswith(("./", ".\\")) and another_users_copy(
         Path(command), platform, env)
     report["ownCopyRule"] = platform == "darwin"
+    chosen = launcher_folder(env) if platform == "darwin" else None
+    report["launcherFolder"] = str(chosen) if chosen else None
     # FAA-237: root's copy runs, and the launcher calls it the administrator's and does not update it
     report["administratorsCopy"] = bool(binary) and administrators_copy(binary, platform, env)
     report["registeredCopy"] = "another user's" if foreign else "ok"
+    # where the user's own copy goes: the launcher's folder when the person named one, else ~/Applications (FAA-237)
+    folder = launcher_folder(env) if platform == "darwin" else None
+    place = str(folder) if folder else "~/Applications"
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
-            " (your own copy, in ~/Applications)" if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
+            " (your own copy, in %s)" % place if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
             ", ".join(str(p) for p in fabric_bin_candidates(platform, env)))
     elif foreign:
         own = '"%s"' % (binary or fabric_bin_candidates(platform, env)[0])
-        first = "" if binary else "put your own Fabric.app in ~/Applications, then "
+        first = "" if binary else "put your own Fabric.app in %s, then " % place
         where = claude.get("folder", "")
         if claude["scope"] == "project":
             # the project's .mcp.json is shared with every collaborator: a local entry overrides it for this user alone
@@ -765,7 +771,8 @@ def print_status(report: Dict[str, Any]) -> None:
     print("Fabric: %s" % line)
     print("fabric-mcp: %s" % ((report["fabricMcp"] + (" (the administrator's copy, which the launcher does not update)"
                                                     if report.get("administratorsCopy") else "")) if report["fabricMcp"] else (
-        "none of yours at the default install locations" if report.get("ownCopyRule")
+        "none of yours in %s (PASSIONCODE_APPLICATIONS)" % report["launcherFolder"] if report.get("launcherFolder")
+        else "none of yours at the default install locations" if report.get("ownCopyRule")
         else "not found at the default install locations")))
     print("Claude Code: %s" % ("fabric registered (%s scope) -> %s%s" % (
         claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") + (

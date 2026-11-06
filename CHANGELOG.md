@@ -8,8 +8,9 @@
   `Fabric.app` only there, as the launcher installs every app in that one folder (its `lib/catalog.js` `appsDir`); an
   empty or relative value keeps the default order (FAA-237, the launcher's reading of its PR #277, board thread
   `cb1df3d5`). `status` names root's copy outside the home "the administrator's copy, which the launcher does not
-  update" (`administratorsCopy` in `--json`); running it stays allowed. The SKILL.md Step 0 row and the
-  `a-second-user-of-a-mac-registers-fabric` eval say the same.
+  update" (`administratorsCopy` in `--json`); running it stays allowed. With the folder set, `status` names it
+  in its install advice and its `fabric-mcp:` line, never `~/Applications`. The SKILL.md Step 0 row and the
+  `a-second-user-of-a-mac-registers-fabric` eval name the folder.
 - `references/project-board.md` and `references/on-demand-session.md` name Fabric's `board.read-at-start` rule for
   the slot condition of a gate decline: Fabric took it from the adapter (FAA-231, main `dbfbfce4`, from its next
   release), so a live session and a run get one instruction.

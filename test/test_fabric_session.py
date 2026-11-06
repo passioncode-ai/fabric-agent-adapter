@@ -135,7 +135,7 @@ class Base(unittest.TestCase):
                                  "FABRIC_SERVICES_DIR", "FABRIC_LAUNCHED_SESSION", "FABRIC_ACP_SESSION",
                                  "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT", "FABRIC_DISPATCH_WORKFLOW",
                                  "FABRIC_DISPATCH_HANDOFF", "FABRIC_DISPATCH_REQUEST",
-                                 "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID")}
+                                 "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID", "PASSIONCODE_APPLICATIONS")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"
@@ -225,10 +225,12 @@ class Paths(unittest.TestCase):
         self.assertEqual(fs.fabric_bin_candidates("darwin", env),
                          [Path("/Volumes/Apps/Fabric.app/Contents/Resources/bin/fabric-mcp")])
         self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS="~/Apps")),
-                         [Path(os.path.expanduser("~/Apps")) / "Fabric.app/Contents/Resources/bin/fabric-mcp"])
+                         [Path("/Users/a/Apps/Fabric.app/Contents/Resources/bin/fabric-mcp")], "this env's home")
+        self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS=" /Volumes/Apps/ ")),
+                         [Path("/Volumes/Apps/Fabric.app/Contents/Resources/bin/fabric-mcp")])
         default = [Path("/Users/a/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
                    Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")]
-        for value in ("", "  ", "relative/Apps"):
+        for value in ("", "  ", "relative/Apps", "~nosuchuser-faa237/Apps"):
             self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS=value)), default, value)
         self.assertEqual(fs.fabric_bin_candidates("linux", env), [Path("/opt/Fabric/resources/bin/fabric-mcp")],
                          "the launcher's folder is macOS'")
@@ -2291,6 +2293,39 @@ class Status(Base):
         self.env_module._owner_uid = lambda path: os.getuid()
         self.assertFalse(fs.status(self.repo, self.env, "darwin")["administratorsCopy"], "the user's own copy")
         self.assertFalse(fs.status(self.repo, self.env, "linux")["administratorsCopy"])
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_status_follows_the_launchers_one_folder(self):
+        # FAA-237 (0.70.0 unit reading 1): the folder the person named is where status looks and where it says to install
+        self.env_module.fabric_bin_candidates = self.saved
+        apps = self.base / "Apps"
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(apps))
+        report = fs.status(self.repo, env, "darwin")
+        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in %s); no fabric-mcp of yours is at %s"
+                      % (apps, apps / "Fabric.app/Contents/Resources/bin/fabric-mcp"), report["next"])
+        self.assertNotIn("~/Applications", report["next"])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("fabric-mcp: none of yours in %s (PASSIONCODE_APPLICATIONS)" % apps, printed.getvalue())
+        binary = apps / "Fabric.app/Contents/Resources/bin/fabric-mcp"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("")
+        self.assertEqual(fs.status(self.repo, env, "darwin")["fabricMcp"], str(binary))
+        self.env_module._owner_uid = lambda path: 0
+        self.assertTrue(fs.status(self.repo, env, "darwin")["administratorsCopy"], "root's copy in the launcher's folder")
+        binary.unlink()
+        shared = self.base / "Shared" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        self.register(command=str(shared))
+        self.env_module._owner_uid = lambda path: os.getuid() + 1
+        foreign = fs.status(self.repo, env, "darwin")["next"]
+        self.assertIn("put your own Fabric.app in %s, then" % apps, foreign)
+        self.assertIn('"%s"' % binary, foreign)
+        self.assertNotIn("~/Applications", foreign)
+        crashed = dict(self.env, PASSIONCODE_APPLICATIONS="~nosuchuser-faa237/Apps")
+        self.assertIn("~/Applications", fs.status(self.repo, crashed, "darwin")["next"], "an unknown user is no folder")
 
     def test_the_cli_prints_and_reads_no_token(self):
         # a path in the test's home: the subprocess does not see setUp's owner stub, and a host's /Applications copy may
