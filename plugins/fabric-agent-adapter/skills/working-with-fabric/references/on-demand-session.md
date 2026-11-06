@@ -95,9 +95,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    release with CO-506, which grants it at `com.enroll`; on Fabric 0.3.16 nothing else does, since Agent access only
    decides a request a service filed; once CO-506 shipped, the reason Fabric's `board.own-respond` log line names and
    what lifts it: a machine marked as an organization's (the mark in Fabric's settings), no live credential (the agent
-   enrolls again) or a standing denial ("Снять отказ" in Agent access); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot, and an
-   operator decision recorded under that `about` settles later questions on the gate: Fabric, thread `1add3c03`,
-   `a58b4280`). A question that fails is left (the decline already answered the request), and the closing write's
+   enrolls again) or a standing denial ("Снять отказ" in Agent access); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot; Fabric keeps the
+   `about` with the question and settles no later question by it, so each gate question reaches the operator and a
+   repeat with the same `commandId` returns the same question: Fabric, thread `1add3c03`, `5b216035`). A question that fails is left (the decline already answered the request), and the closing write's
    `notes` say so, since then nothing about the gate reached the operator. Then it closes the workflow `done` once
    `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with the slot `stale`, `active`, or `absent` at a generation of 1 or more (a holder enrolled on it: a
    service of this Project, or after CO-506 a session; one that stopped cleanly reads `absent`, and a service takes the

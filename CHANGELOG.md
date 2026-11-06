@@ -25,6 +25,9 @@ DEC-0140, DEC-0146 to DEC-0148, DEC-0150 and DEC-0153.
   started on a board request, `references/on-demand-session.md` and the scenario evals.
 - creating-fabric-agents `references/practices.md` and the support-agent recipe name DEC-0150 as the contract's,
   released in `v0.1.0+2026-11-05.2`, where they called it proposed.
+- working-with-fabric `references/on-demand-session.md` no longer says that an operator decision recorded under a
+  gate question's `about` settles later questions: Fabric keeps the `about` and settles nothing by it (thread
+  `1add3c03`, `5b216035`), so each gate question reaches the operator.
 
 ### Upgrading
 
