@@ -208,12 +208,37 @@ class Paths(unittest.TestCase):
                          Path("C:/L") / "passioncode-fabric")
 
     def test_fabric_bin_per_os(self):
-        self.assertIn(Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
-                      fs.fabric_bin_candidates("darwin", {"HOME": "/Users/a"}))
+        # FAA-229: the user's own ~/Applications copy comes first, as the launcher installs one per macOS user
+        self.assertEqual(fs.fabric_bin_candidates("darwin", {"HOME": "/Users/a"}),
+                         [Path("/Users/a/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
+                          Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")])
         self.assertEqual(fs.fabric_bin_candidates("linux", {"HOME": "/h"}), [Path("/opt/Fabric/resources/bin/fabric-mcp")])
         (win,) = fs.fabric_bin_candidates("win32", {"HOME": "C:/U", "LOCALAPPDATA": "C:/L"})
         self.assertEqual(win.name, "fabric-mcp.cmd")
         self.assertIn("Programs", win.parts)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_another_users_copy_outside_home_is_skipped(self):
+        # FAA-229: on a Mac with several users, /Applications may hold another user's Fabric.app
+        env_module = sys.modules["fabric_session_env"]
+        with tempfile.TemporaryDirectory() as tmp:
+            home, shared = Path(tmp) / "home", Path(tmp) / "Applications" / "fabric-mcp"
+            shared.parent.mkdir(parents=True)
+            shared.write_text("#!/bin/sh\n")
+            mine = home / "Applications" / "fabric-mcp"
+            saved_c, saved_o = env_module.fabric_bin_candidates, env_module._owner_uid
+            env_module.fabric_bin_candidates = lambda platform=None, env=None: [mine, shared]
+            try:
+                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "a copy of this user's own")
+                env_module._owner_uid = lambda path: 0
+                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "root's copy is everyone's")
+                env_module._owner_uid = lambda path: os.getuid() + 1
+                self.assertIsNone(fs.find_fabric_bin("darwin", {"HOME": str(home)}), "another user's copy")
+                mine.parent.mkdir(parents=True)
+                mine.write_text("#!/bin/sh\n")
+                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), mine, "the user's own copy first")
+            finally:
+                env_module.fabric_bin_candidates, env_module._owner_uid = saved_c, saved_o
 
     def test_state_root_is_never_fabric_root(self):
         for platform in ("darwin", "linux", "win32"):

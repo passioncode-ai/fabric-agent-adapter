@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.68.0"
+  version: "0.69.0"
 ---
 
 # Working with Fabric
@@ -50,7 +50,7 @@ By hand, when Python is absent: Fabric publishes `hub.json` in its folder while 
 
 | OS | Fabric's folder (`hub.json`) | `<Fabric>/bin` |
 |---|---|---|
-| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `/Applications/Fabric.app/Contents/Resources/bin` |
+| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `~/Applications/Fabric.app/Contents/Resources/bin`, then `/Applications` |
 | Windows | `%LOCALAPPDATA%\passioncode-fabric\` | the install folder's `resources\bin` (`fabric-mcp.cmd`); per-user default `%LOCALAPPDATA%\Programs\Fabric` |
 | Linux | `$XDG_DATA_HOME/passioncode-fabric/` (default `~/.local/share/`) | the install folder's `resources/bin`; the `.deb` puts it in `/opt/Fabric` |
 
@@ -118,7 +118,7 @@ session; the tool list changes. Follow those rules: they outrank this skill wher
 A dispatched session skips the `com.list` sweep, Step 4 and Step 7: [on-demand session](references/on-demand-session.md).
 
 `com.status` (can the board be read, how many unread), then `com.list` (`unread: true` where listed); `com.read_ack`
-only what you actually read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when
+only what you read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when
 every participant needs it (DEC-0135); an older board refuses it: post a new thread message. Answer what waits on your Project this turn (state now, result later; leave a responder's request queued); a request is your next task. Ask another Project
 only through `com.submit`, addressed to its Project id (never a session or a folder), the same idempotency key on a
 retry. When nobody answers (no `active` responder, live claim, agent-sync lease or
@@ -271,7 +271,7 @@ chat of any of his agents binds all his agents (OA-1).
 ### A lane stopped on a limit: restart it at once
 
 A workflow lane, subagent or session can stop on *You've hit your session / usage limit · resets <time>* or a
-rate-limit error. It can also go silent: no transcript write for 15–20 minutes, its task unfinished, and no command
+rate-limit error. It can go silent: no transcript write for 15–20 minutes, its task unfinished, and no command
 of its own still running. In each case, do not wait for the reset ([principle 10, item 6](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/principles.md#10-a-free-agent-takes-the-next-task)).
 Restart it from where it stopped:
 

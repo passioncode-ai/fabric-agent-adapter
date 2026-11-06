@@ -7,6 +7,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -128,36 +129,36 @@ DISPATCH_HEAD = "[fabric-agent-adapter] Fabric started this session on one board
 #: Before the prompt is seen (session start; Codex and Kimi have no prompt hook) the contract is conditional.
 DISPATCH_IF = (
     "[fabric-agent-adapter] This session is the run on a board request only when its own prompt's first line is "
-    "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; do your task only, touching none of the three."
-    " That line with other values: no run; say so in the request's thread and stop. The run:")
+    "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; touch none of the three."
+    " With other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3996 in 0.68.0: almost none left, so a new rule takes its characters back from the text around it).
+#: (3996 in 0.68.0, 3994 in 0.69.0: a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
-    "request and end; nobody watches, never wait for a person. 1. `fabric_whoami`, then the packet "
+    "request and end; never wait for a person. 1. `fabric_whoami`, then the packet "
     "(`observatory_checkpoint_latest` {{workflowId: {workflow}}}): obey its constraints first; its goal describes "
-    "the request; artifacts: capability, deadline, run-ends-at. Read the request with `com.get` "
-    "{{message: <request>}} and its thread with `com.list` {{thread: <the `thread` com.get answered>}}. 2. "
+    "the request; artifacts: capability, deadline, run-ends-at. Read the request (`com.get` "
+    "{{message: <request>}}) and its thread (`com.list` {{thread: <the `thread` com.get answered>}}). 2. "
     "`observatory_handoff_accept` with {handoff}, the `owner`, `idempotencyKey` and `executor` the launcher's prompt names "
     "(when it names none: your `owner` `agent:<name>`, the key `accept-<handoff>`, no executor) and this session's own "
-    "`sessionId` (the same on a retry) takes the lease; keep its `leaseId`. A lapsed or refused handoff holds "
+    "`sessionId` (the same on a retry); keep its `leaseId`. A lapsed or refused handoff holds "
     "no lease: end the run without touching the request. 3. `com.status` once ("
-    "epoch, slot generation); `com.enroll` for the capability, then `com.claim` for the request, "
+    "epoch, generation); `com.enroll` (the capability), `com.claim` (the request), "
     "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at generation 0, one `com.reply` (replyTo it) "
-    "declining until Fabric's CO-506 (resend then), then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
-    "`com.reconcile` and an observed result; never complete what you did not observe. After the lease, the claim and the reply: an in_progress checkpoint (`workflowId`, "
+    "declining until Fabric's CO-506 (resend then) and `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "`com.reconcile` and an observed result; never complete what you did not observe. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
-    "`pack`) unchanged, adding `open`, `done` or `notes`, no value. 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s, "
-    "finish before run-ends-at; work that cannot end by then posts its state (`com.progress`); "
+    "`pack`) unchanged (add `open`, `done`, `notes`; no value). 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s; "
+    "work that cannot end by run-ends-at posts its state (`com.progress`); "
     "if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known (observed: true) saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion, publication: `fabric_effect_request`; a sign-in, a one-time code, a typed "
     "secret or a payment is a person's (none is in this chat), and so is a production step unless the operator's "
     "words, relayed verbatim, dated and sourced, from his trusted projects with a scope naming it, approve it: name it in "
     "the answer. 5. `com.reply` in the thread, then "
-    "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. Once the board took it, "
+    "`com.complete` (observed: true): completed, or failed_known with the reason. 6. Once the board took it, "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, a `stepId`, "
     "the `leaseId`, `close: true`, a status and the packet's body with `done` and `notes` added: done for completed; for "
     "failed_known blocked with the reason in notes (failed once Observatory takes it, OBS-323). 7. Write the retro "
@@ -295,7 +296,15 @@ def dispatch_contract(dispatch: Dict[str, str], session_id: Any = None, conditio
     the prompt is seen, or as the run's once it is known to be (a cleared holder)."""
     told = DISPATCH_SESSION.format(session=session_id) if isinstance(session_id, str) and _SESSION_UUID.fullmatch(
         session_id) else ""
-    return ((DISPATCH_IF if conditional else DISPATCH_HEAD) + DISPATCH_CONTRACT).format(**dispatch) + told
+    return ((DISPATCH_IF if conditional else DISPATCH_HEAD) + DISPATCH_CONTRACT).format(
+        gate=gate_question_id(dispatch["request"]), **dispatch) + told
+
+
+def gate_question_id(request: str) -> str:
+    """The `commandId` of the run's one question to the operator about a request it declined at the gate: UUID v5 of the
+    name `board.gate` in the request id's namespace, so every run on that request asks the same question (Fabric,
+    thread 1add3c03, a58b4280; FAA-224)."""
+    return str(uuid.uuid5(uuid.UUID(request), "board.gate"))
 
 
 def _dispatch_record(dispatch: Dict[str, str], env: Dict[str, str]) -> Tuple[Path, str]:
@@ -706,7 +715,7 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
                                                                     else "on" if repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
     if binary is None and claude is None:
-        report["next"] = "Install Fabric v0.3.5 or later; fabric-mcp is not at %s." % ", ".join(
+        report["next"] = "Install Fabric v0.3.5 or later; no fabric-mcp of yours (or root's) is at %s." % ", ".join(
             str(p) for p in fabric_bin_candidates(platform, env))
     elif hub["state"] == "not-a-hub":
         report["next"] = "Fabric's hub could not be verified (%s): open Fabric; send it nothing until it can." % hub["reason"]

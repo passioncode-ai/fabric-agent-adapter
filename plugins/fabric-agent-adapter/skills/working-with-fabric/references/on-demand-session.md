@@ -85,15 +85,23 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    whenever the board can be read: a missing entry or an unavailable board is the error rule),
    the run answers it once with `com.reply` (`replyTo` the request, from the target Project, which answers
    it: DEC-0098, DEC-0102) declining it: this Project cannot take it until Fabric ships CO-506, and the requester sends
-   it again then (the reply ends the queue, so nothing takes it later; never say it waits). Then it closes the workflow `done` once
+   it again then (the reply ends the queue, so nothing takes it later; never say it waits). Since only the operator
+   opens that gate and an answered request reaches no operator screen, it then asks the operator once:
+   `fabric_question_ask` with `kind: access`, `about: board.gate.<capability>`, the `commandId` the contract names (UUID
+   v5 of the name `board.gate` in the request id's namespace, `gate_question_id` in `fabric_session_cli.py`, so every run
+   on that request gets the same question back) and a `text` naming the request (its id, the requesting Project, the
+   capability), the gate (this Project's `board.respond` grant for that capability) and what opens it (Fabric's CO-506,
+   or the grant in Fabric's Settings, Agent access); it waits for no answer (FAA-224; the tool needs no slot, and an
+   operator decision recorded under that `about` settles later questions on the gate: Fabric, thread `1add3c03`,
+   `a58b4280`). A question that fails is left: the decline already answered the request. Then it closes the workflow `done` once
    `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with the slot `stale`, `active`, or `absent` at a generation of 1 or more (a holder enrolled on it: a
    service of this Project, or after CO-506 a session; one that stopped cleanly reads `absent`, and a service takes the
    request when it rejoins, so a decline would take it from it; Fabric serves a session no `held` flag yet), the error
    rule below holds and the request stays as it is (queued, it goes to the operator after two runs with no answer). A
    capability listed only by a service's live grant, with no enroll yet, also reads `absent` at generation 0: a run
    declines it, which a service asking and enrolling at once (ADR-0186) seldom leaves time for.
-   The target's request no longer waits for the operator (an answered request is settled: no second run, no unmoved or
-   to-operator finding); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
+   The target's request no longer waits for the operator on the board (an answered request is settled: no second run,
+   no unmoved or to-operator finding; the question above is what reaches the operator); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
    shows it on the requester's Project in «На проверке» as an answer nobody read,
    and the closing write's `notes` say the request was declined until CO-506.
    Fabric's dispatcher counts an answered request as settled and starts no second run for it. Once CO-506 ships

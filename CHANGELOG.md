@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.69.0 (unreleased)
+
+### Added
+
+- working-with-fabric: a run Fabric started on a board request that declines it at the gate (its `com.enroll` refused
+  `not_authorized`, the slot `absent` at generation 0) now also asks the operator once, with `fabric_question_ask`
+  (`kind: access`, `about: board.gate.<capability>`): which request, which gate (the Project's `board.respond` grant)
+  and what opens it (Fabric's CO-506, or the grant in Agent access), and ends without waiting (FAA-224). An answered
+  request reaches no operator screen, and only the operator opens the gate. The contract names the question's
+  `commandId`, UUID v5 of the name `board.gate` in the request id's namespace (`gate_question_id`), so every run on
+  that request gets the same question back; an operator decision recorded under the same `about` settles the gate's
+  later questions. Fabric proposed the step and confirmed the tool needs no slot on 0.3.16 (board thread `1add3c03`,
+  `5fb4226d`, `a58b4280`); Fabric adds the same step to its `board.read-at-start` rule (its CO-517).
+  `references/on-demand-session.md` and `references/project-board.md` say the same. The contract stays under Hermes'
+  4000 characters (3994 at its longest) with several clauses shorter.
+
+### Fixed
+
+- working-with-fabric: on macOS the session hooks and `status` look for `fabric-mcp` in `~/Applications/Fabric.app`
+  first, then `/Applications/Fabric.app`, and take the copy outside the user's home only when it is this user's or
+  root's (FAA-229, spec G6 of `docs/evidence/specs/2026-11-06-machine-move-gaps.md`). Before, `/Applications` came
+  first, so a second user of a Mac was pointed at another user's Fabric. The launcher's rule is the same (its
+  `lib/catalog.js` `appPath`). `status` says no `fabric-mcp` of the user's (or root's) was found when it skipped
+  another user's copy.
+
 ## 0.68.0 (2026-11-06)
 
 ### Fixed

@@ -9,6 +9,7 @@ import importlib
 import json
 import os
 import unittest
+import uuid as uuid_module
 from pathlib import Path
 
 from test_fabric_session import Base, SID, fs
@@ -430,8 +431,9 @@ class Hooks(Base):
         # 0.68.0 readings 5 and 6: com.status always lists the request's capability; a slot a service ever held
         # (stale, active, or absent at a generation of 1 or more) takes the request back, so decline only at generation 0
         self.assertIn("a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at "
-                      "generation 0, one `com.reply` (replyTo it) declining until Fabric's CO-506 (resend then), then step "
-                      "6 (done) once `com.get` reads answered, and 7;", text)
+                      "generation 0, one `com.reply` (replyTo it) declining until Fabric's CO-506 (resend then) and "
+                      "`fabric_question_ask` {kind: access, about: board.gate.<capability>, commandId: %s}, then step 6 "
+                      "(done) once `com.get` reads answered, and 7;" % cli.gate_question_id(FULL["request"]), text)
         branch = text[text.index("a not_authorized enroll"):text.index("CO-506")]
         self.assertNotIn(";", branch, "0.68.0 unit reading 2: a queued request is the refused enroll's case, not its own")
         self.assertEqual(text.count(" 7. "), 1, "' 7. ' is step 7 alone, so the step slices hold")
@@ -444,6 +446,26 @@ class Hooks(Base):
         self.assertIn("6. Once the board took it, `observatory_checkpoint_write`", text)
         self.assertLess(text.index("3. "), text.index(" 6. "))
         self.assertLess(text.index(" 6. "), text.index(" 7. "), "no ' 7. ' before step 6 (the closing-write test slices on it)")
+
+    def test_a_declined_request_asks_the_operator_once_per_request(self):
+        # FAA-224: an answered request reaches no operator screen, and only the operator opens the gate; Fabric's
+        # fabric_question_ask needs no slot (thread 1add3c03, a58b4280), and a commandId derived from the request id
+        # makes every run on that request ask the same question
+        other = dict(FULL, request="1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab")
+        first, again = cli.gate_question_id(FULL["request"]), cli.gate_question_id(FULL["request"].upper())
+        self.assertEqual(first, again, "the id's spelling does not change the question")
+        self.assertEqual(first, str(uuid_module.uuid5(uuid_module.UUID(FULL["request"]), "board.gate")))
+        self.assertEqual(uuid_module.UUID(first).version, 5)
+        self.assertNotEqual(first, cli.gate_question_id(other["request"]))
+        self.assertNotEqual(first, FULL["request"], "never the request id itself, which other asks may reuse")
+        for conditional in (False, True):
+            text = cli.dispatch_contract(other, conditional=conditional)
+            self.assertIn("commandId: %s}" % cli.gate_question_id(other["request"]), text)
+            self.assertNotIn(first, text)
+        step3 = text[text.index(" 3. "):text.index(" 4. ")]
+        self.assertIn("about: board.gate.<capability>", step3, "one operator decision on the gate settles them all")
+        self.assertLess(step3.index("`com.reply` (replyTo it)"), step3.index("`fabric_question_ask`"))
+        self.assertLess(step3.index("`fabric_question_ask`"), step3.index("then step 6 (done)"))
 
     def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
         # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made

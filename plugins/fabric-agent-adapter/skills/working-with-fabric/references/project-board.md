@@ -138,10 +138,11 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
    ask still stands, submit it again.
 
-**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project with no live
+**A decline from a run Fabric started** (adapter 0.68.0; the question to the operator since 0.69.0): where Fabric's dispatcher runs, a request to a Project with no live
 session and whose capability slot no service ever held (`absent` at generation 0), whose session holds no
 `board.respond` grant (every coding-session Project before Fabric ships CO-506), is answered within minutes (after a
-two-minute grace) by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
+two-minute grace) by a run that declines it until CO-506, asks for a resend and asks the operator about the gate
+(`fabric_question_ask`, `about: board.gate.<capability>`) (where the run carries this adapter's exit
 contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
 queued) ([on-demand session](on-demand-session.md), step 3).
 The request is then `answered`: read the decline and `com.read_ack` it (unread, it shows in «На проверке»); it no
@@ -191,8 +192,8 @@ not reply on the request: tell the person and leave it queued. A session whose o
 `not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
 it answers the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's
 board rule on its `main` at `b8c0a38c` answers once; the slot condition is this adapter's). Never write "it stays queued" in a reply: the reply itself ends the queue. A
-run Fabric started on a board request has no person to tell: with the slot `absent` at generation 0 it declines and
-asks for a resend; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
+run Fabric started on a board request has no person to tell: with the slot `absent` at generation 0 it declines,
+asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
 
 ## Replying
 

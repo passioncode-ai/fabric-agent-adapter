@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.68.0"
+VERSION = "0.69.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -167,18 +167,34 @@ def fabric_bin_candidates(platform: str = sys.platform, env: Optional[Dict[str, 
     env = os.environ if env is None else env
     home = _home(env)
     if platform == "darwin":
-        return [Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
-                home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"]
+        # The user's own copy first: on a Mac with several users each installs into ~/Applications, and a copy in
+        # /Applications may be another user's (the launcher's rule, its lib/catalog.js appPath; FAA-229).
+        return [home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp",
+                Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")]
     if platform == "win32":
         local = Path(env.get("LOCALAPPDATA") or str(home / "AppData" / "Local"))
         return [local / "Programs" / "Fabric" / "resources" / "bin" / "fabric-mcp.cmd"]
     return [Path("/opt/Fabric/resources/bin/fabric-mcp")]
 
 
+def _owner_uid(path: Path) -> Optional[int]:
+    try:
+        return os.stat(str(path)).st_uid
+    except OSError:
+        return None
+
+
 def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> Optional[Path]:
+    """The first candidate that is a file. On macOS a copy outside the user's home is taken only when it is this
+    user's or root's (an install every user shares): another user's copy is skipped (FAA-229)."""
+    home = _home(os.environ if env is None else env)
     for candidate in fabric_bin_candidates(platform, env):
-        if candidate.is_file():
-            return candidate
+        if not candidate.is_file():
+            continue
+        if platform == "darwin" and home not in candidate.parents and hasattr(os, "getuid"):
+            if _owner_uid(candidate) not in (os.getuid(), 0):
+                continue
+        return candidate
     return None
 
 
