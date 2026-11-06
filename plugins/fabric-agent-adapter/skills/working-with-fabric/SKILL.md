@@ -89,8 +89,8 @@ codex mcp add fabric -- "<Fabric>/bin/fabric-mcp" --runner codex
 ```
 
 On a Mac, a registration naming another user's copy (outside your home, neither yours nor root's) is replaced by your
-own copy in `~/Applications`: `claude mcp remove` then `add`; a project's `.mcp.json` entry is overridden with
-`--scope local`, never edited (`status` says which).
+own (or root's) copy: `claude mcp remove` then `add` with the same scope; a project's `.mcp.json` entry is overridden with
+`--scope local`, never edited (`status` checks Claude Code's).
 
 Kimi Code, pending Fabric's documented probe: in `~/.kimi-code/mcp.json`, `mcpServers.fabric` is
 `{"command": "<Fabric>/bin/fabric-mcp", "args": ["--runner", "kimi-code"]}`.
@@ -349,12 +349,13 @@ and work without claiming Fabric saw it.
 
 ## The session hooks
 
-In Claude Code this plugin ships five: at session start and `/clear` the preamble above in a project that uses
-Fabric (else one line pointing at `fabric_whoami`, or at Step 1 when Fabric is down); after each turn the turn's facts
-(HEAD, files changed, lines added and removed) and the board's unread count, and, once the running Fabric takes them,
+In Claude Code this plugin ships five: at session start and `/clear`, in a project that uses Fabric, the preamble
+above (one line pointing at Step 1 when Fabric is down), elsewhere one line pointing at `fabric_whoami` while it runs;
+after each turn the turn's facts
+(counts only) and the board's unread count, and, once the running Fabric takes them,
 the other repositories the turn touched (read in memory from the transcript's tail, only host/owner/name sent); at
 each prompt one line when that count rose, then each reminder Fabric gave on a turn, once, as a line starting
-`Fabric:`: data to act on first through `fabric_work_list`; after a done release, the retro line (FAA-206); at the
+`Fabric:`: data to act on first through `fabric_work_list` (it may come again there: act on it once); after a done release, the retro line (FAA-206); at the
 end, the release of what the session left claimed. They call Fabric only when it advertises `session-hooks/1`, are
 silent in a session Fabric launched but the retro line and, on a board request, the exit contract and the prompt
 hook's verdict (FAA-201), never block the session and read no Fabric token (a credential in an `origin` URL is

@@ -730,18 +730,18 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     elif foreign:
         own = '"%s"' % (binary or fabric_bin_candidates(platform, env)[0])
         first = "" if binary else "put your own Fabric.app in ~/Applications, then "
+        where = claude.get("folder", "")
         if claude["scope"] == "project":
             # the project's .mcp.json is shared with every collaborator: a local entry overrides it for this user alone
-            report["next"] = ("The registered fabric-mcp (the project's .mcp.json) is another user's copy: %sclaude mcp "
-                              "add --scope local fabric -- %s --runner claude-code in that project, which overrides it "
-                              "for you alone" % (first, own))
+            report["next"] = ("The registered fabric-mcp (%s/.mcp.json) is another user's copy: %sin %s, claude mcp add "
+                              "--scope local fabric -- %s --runner claude-code, which overrides it for you alone"
+                              % (where, first, where, own))
         else:
             # a local entry is replaced by a local one in the same folder: a user entry would lose to a project's
             scope = claude["scope"]
-            report["next"] = ("The registered fabric-mcp is another user's copy: %sclaude mcp remove --scope %s fabric, "
-                              "then claude mcp add --scope %s fabric -- %s --runner claude-code%s" % (
-                                  first, scope, scope, own, " (both in the folder it was added in)" if scope == "local"
-                                  else ""))
+            report["next"] = ("The registered fabric-mcp is another user's copy: %s%sclaude mcp remove --scope %s fabric, "
+                              "then claude mcp add --scope %s fabric -- %s --runner claude-code" % (
+                                  first, "in %s, " % where if scope == "local" else "", scope, scope, own))
     elif hub["state"] == "not-a-hub":
         report["next"] = "Fabric's hub could not be verified (%s): open Fabric; send it nothing until it can." % hub["reason"]
     elif hub["state"] != "running":

@@ -2172,7 +2172,13 @@ class Status(Base):
         with contextlib.redirect_stdout(printed):
             fs.print_status(darwin)
         self.assertIn("fabric-mcp: none of yours at the default install locations", printed.getvalue())
-        self.assertIn("no fabric-mcp is at", fs.status(self.repo, self.env, "linux")["next"], "the owner rule is macOS'")
+        linux = fs.status(self.repo, self.env, "linux")
+        self.assertIn("no fabric-mcp is at", linux["next"], "the owner rule is macOS'")
+        self.assertNotIn("your own copy", linux["next"])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(linux)
+        self.assertIn("fabric-mcp: not found at the default install locations", printed.getvalue())
 
     @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
     def test_the_registered_copy_is_judged_by_the_file_it_runs(self):
@@ -2198,16 +2204,34 @@ class Status(Base):
             self.assertFalse(fs.another_users_copy(Path("/x\x00y"), "darwin", self.env), "a NUL is unreadable, not a crash")
             self.register(command="./fabric-mcp")
             self.assertEqual(fs.status(self.repo, env, "darwin")["registeredCopy"], "ok", "relative to an unknown folder")
-            self.assertFalse(fs.another_users_copy(Path("bin/fabric-mcp"), "darwin", env))
+            # a folder part is relative to where Claude Code starts it: never judged, even when this cwd has one
+            local_bin = self.base / "bin" / "fabric-mcp"
+            local_bin.parent.mkdir()
+            local_bin.write_text("")
+            local_bin.chmod(0o755)
+            foreign_files = {foreign_file, os.path.realpath(str(local_bin))}
+            self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) in foreign_files else 0)
+            here = os.getcwd()
+            os.chdir(str(self.base))
+            try:
+                self.assertFalse(fs.another_users_copy(Path("bin/fabric-mcp"), "darwin", env))
+            finally:
+                os.chdir(here)
+            self.assertTrue(fs.another_users_copy(local_bin, "darwin", env), "the same file, named absolutely")
             self.register(command=str(shared), scope="local")
             report = fs.status(self.repo, self.env, "darwin")
-            self.assertIn("claude mcp remove --scope local fabric, then claude mcp add --scope local fabric", report["next"])
-            self.assertTrue(report["next"].endswith(" (both in the folder it was added in)"), report["next"])
+            self.assertIn("in %s, claude mcp remove --scope local fabric, then claude mcp add --scope local fabric"
+                          % self.repo.resolve(), report["next"])
+            # 0.69.0 seam reading 4: the entry may be an ancestor's; the line names the folder it was found in
+            (self.repo / "sub").mkdir(exist_ok=True)
+            self.assertIn("in %s, claude mcp remove" % self.repo.resolve(),
+                          fs.status(self.repo / "sub", self.env, "darwin")["next"])
             self.assertIn("put your own Fabric.app in ~/Applications, then", report["next"])
             (self.home / ".claude.json").unlink()
             (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
             report = fs.status(self.repo, self.env, "darwin")
             self.assertIn("claude mcp add --scope local fabric", report["next"])
+            self.assertIn("in %s, " % self.repo, report["next"])
             self.assertNotIn("remove", report["next"], "never rewrite a .mcp.json the team shares")
         finally:
             self.env_module._owner_uid = saved
