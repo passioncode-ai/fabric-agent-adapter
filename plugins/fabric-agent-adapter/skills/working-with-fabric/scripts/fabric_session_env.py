@@ -234,7 +234,8 @@ def another_users_copy(path: Path, platform: str = sys.platform, env: Optional[D
 
 def administrators_copy(path: Path, platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> bool:
     """On macOS, a file outside the user's home that root owns: an install the administrator made (a pkg or MDM). This
-    user may run it, and the launcher does not update it (its doctor calls it the administrator's; FAA-237)."""
+    user may run it, and the launcher does not update it (its doctor calls it the administrator's from its PR #277,
+    planned for 0.2.76; FAA-237)."""
     if platform != "darwin" or not hasattr(os, "getuid") or os.getuid() == 0 or not path.is_absolute():
         return False
     path = _real(path)
