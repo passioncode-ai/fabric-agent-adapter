@@ -733,7 +733,8 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     report["registeredCopy"] = "another user's" if foreign else "ok"
     # where the user's own copy goes: the launcher's folder when the person named one, else ~/Applications (FAA-237);
     # a launcher's folder that already holds another user's Fabric.app is no place for this user's (0.70.0 seam reading
-    # 3): as the launcher says then, unset PASSIONCODE_APPLICATIONS and use ~/Applications
+    # 3): unset PASSIONCODE_APPLICATIONS and use ~/Applications, as the launcher's PR #277 says then (its 0.2.75 would
+    # install into /Applications with the variable unset, so the person puts the copy there)
     candidates = fabric_bin_candidates(platform, env)
     occupied = bool(chosen) and a_file(candidates[0]) and another_users_copy(candidates[0], platform, env)
     place = str(chosen) if chosen and not occupied else "~/Applications"

@@ -2362,6 +2362,16 @@ class Status(Base):
         finally:
             locked.chmod(0o700)
         self.assertIn("Install Fabric v0.3.5 or later (your own copy, in %s)" % (locked / "Apps"), report["next"])
+        # Python 3.14 answers False itself: raise as 3.9 to 3.13 do, so the check holds on any Python (0.70.0 unit reading 5)
+        original = Path.is_file
+
+        def refused(path, *args, **kwargs):
+            if str(path).startswith(str(locked)):
+                raise PermissionError(13, "Permission denied", str(path))
+            return original(path, *args, **kwargs)
+        with mock.patch.object(Path, "is_file", refused):
+            self.assertIsNone(fs.find_fabric_bin("darwin", env))
+            self.assertIn("(your own copy, in %s)" % (locked / "Apps"), fs.status(self.repo, env, "darwin")["next"])
 
     def test_the_cli_prints_and_reads_no_token(self):
         # a path in the test's home: the subprocess does not see setUp's owner stub, and a host's /Applications copy may
