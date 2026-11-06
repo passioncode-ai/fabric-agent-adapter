@@ -201,7 +201,9 @@ def another_users_copy(path: Path, platform: str = sys.platform, env: Optional[D
         return False
     environ = os.environ if env is None else env
     if not path.is_absolute():
-        found = shutil.which(str(path), path=environ.get("PATH"))
+        if len(path.parts) != 1:  # relative to a folder Claude Code starts it in, which this does not know
+            return False
+        found = shutil.which(str(path), path=environ.get("PATH", os.defpath))
         if not found:
             return False
         path = Path(found)

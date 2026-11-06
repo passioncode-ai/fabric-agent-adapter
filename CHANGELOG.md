@@ -13,7 +13,8 @@
   run on that request gets the same question back; an operator decision recorded under the same `about` settles the
   gate's later questions. Fabric proposed the step and confirmed the tool needs no slot on 0.3.16 (board thread
   `1add3c03`, `5fb4226d`, `a58b4280`); Fabric adds the same step to its `board.read-at-start` rule (its CO-517).
-  `references/on-demand-session.md` (which also has a failed question noted in the closing write) and
+  `references/on-demand-session.md` (which also has a failed question noted in the closing write, and what lifts the
+  gate once CO-506 shipped: the reason Fabric's `board.own-respond` log line names, `315c5b54`) and
   `references/project-board.md` say the same. The contract stays under Hermes' 4000 characters (3996 at its longest)
   with several clauses shorter; "never complete what you did not observe" now lives in the reference only (the
   contract keeps `observed: true` and the reconcile rule's observed result).
@@ -24,13 +25,17 @@
   `~/Applications/Fabric.app` first, then `/Applications/Fabric.app`, and take the copy outside the user's home only
   when it is this user's or root's (an install every user shares) (FAA-229, spec G6 of
   `docs/evidence/specs/2026-11-06-machine-move-gaps.md`). Before, `/Applications` came first, so a second user of a
-  Mac was pointed at another user's Fabric. The launcher installs the user's own copy in `~/Applications` unless the
-  user owns and can write `/Applications` (its `lib/catalog.js` `appPath`): it updates the bundle, while this only
-  runs it. The hooks run the command registered in `~/.claude.json`, so `status` now names a registered `fabric-mcp`
+  Mac was pointed at another user's Fabric. The launcher takes the same order after its PR #277 (`lib/catalog.js`
+  `appPath`; open on 2026-11-06: launcher 0.2.75 still installs into and registers `/Applications`), and it installs
+  the user's own copy unless the user owns and can write `/Applications`, since it updates the bundle; this only runs
+  it. The hooks run the command registered in `~/.claude.json`, so `status` now names a registered `fabric-mcp`
   that is another user's copy outside the home (a bare command judged by what `PATH` finds, a link by what it points
-  at): it says to install the user's own Fabric into `~/Applications` first when there is none, then gives the
+  at): it says to put the user's own Fabric.app in `~/Applications` first when there is none, then gives the
   `claude mcp remove` and `claude mcp add` lines with that copy's path; a project's shared `.mcp.json` is overridden
-  with a `--scope local` entry, never rewritten. The SKILL.md table says the same for a reader without Python.
+  with a `--scope local` entry, never rewritten. With no registration, `status` prints "none of yours" and says to
+  install the user's own copy in `~/Applications`. SKILL.md says the same (the Step 0 table for the order and owner,
+  Step 2 for a registration of another user's copy). The session hooks paragraph of SKILL.md is shorter; its details
+  stay in `references/session-hooks.md`.
 
 ## 0.68.0 (2026-11-06)
 

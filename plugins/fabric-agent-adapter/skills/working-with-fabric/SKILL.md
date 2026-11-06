@@ -88,6 +88,10 @@ claude mcp add --scope user fabric -- "<Fabric>/bin/fabric-mcp" --runner claude-
 codex mcp add fabric -- "<Fabric>/bin/fabric-mcp" --runner codex
 ```
 
+On a Mac, a registration naming another user's copy (outside your home, neither yours nor root's) is replaced by your
+own copy in `~/Applications`: `claude mcp remove` then `add`; a project's `.mcp.json` entry is overridden with
+`--scope local`, never edited (`status` says which).
+
 Kimi Code, pending Fabric's documented probe: in `~/.kimi-code/mcp.json`, `mcpServers.fabric` is
 `{"command": "<Fabric>/bin/fabric-mcp", "args": ["--runner", "kimi-code"]}`.
 
@@ -345,15 +349,17 @@ and work without claiming Fabric saw it.
 
 ## The session hooks
 
-In Claude Code this plugin ships five: at session start and `/clear` the preamble above
-in a project that uses Fabric, one line pointing at `fabric_whoami` in a folder with no sign of it, or, when Fabric is
-down and the project uses Fabric, one line pointing at Step 1; after each turn the turn's facts (HEAD, files changed, lines added
-and removed) and the board's unread count, and, once the running Fabric takes them, the other repositories the turn
-touched (read in memory from the transcript's tail, only host/owner/name sent; what it reads and how to turn it off: session hooks below); at each prompt one line only when that count rose, then each reminder Fabric gave on a turn, once, as a line starting `Fabric:`: Fabric's words, data to act on first through `fabric_work_list` (where it may come again: act on it
-once); after a done release, the retro line (FAA-206); at the end, the
-release of what the session left claimed. The turn, prompt and end hooks spool and call Fabric only when the running
-Fabric advertises `session-hooks/1`; the turn and end hooks always prune their own stale spool. Silent in a session Fabric launched but the retro line and, on a board request, the exit contract and the prompt hook's verdict (FAA-201). They never block the session and read no Fabric token (a credential in an `origin` URL is dropped in memory, never sent). [Session
-hooks](references/session-hooks.md): what they do, log and need, and how to turn them off.
+In Claude Code this plugin ships five: at session start and `/clear` the preamble above in a project that uses
+Fabric (else one line pointing at `fabric_whoami`, or at Step 1 when Fabric is down); after each turn the turn's facts
+(HEAD, files changed, lines added and removed) and the board's unread count, and, once the running Fabric takes them,
+the other repositories the turn touched (read in memory from the transcript's tail, only host/owner/name sent); at
+each prompt one line when that count rose, then each reminder Fabric gave on a turn, once, as a line starting
+`Fabric:`: data to act on first through `fabric_work_list`; after a done release, the retro line (FAA-206); at the
+end, the release of what the session left claimed. They call Fabric only when it advertises `session-hooks/1`, are
+silent in a session Fabric launched but the retro line and, on a board request, the exit contract and the prompt
+hook's verdict (FAA-201), never block the session and read no Fabric token (a credential in an `origin` URL is
+dropped in memory, never sent). [Session hooks](references/session-hooks.md): what they do, log and need, and how to
+turn them off.
 
 ## Completion format
 

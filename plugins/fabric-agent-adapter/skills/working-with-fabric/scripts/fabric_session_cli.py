@@ -716,15 +716,19 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
                                                                     else "on" if repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
     # FAA-229: before 0.69.0 status proposed /Applications first, so a second user of a Mac may run another user's copy
-    foreign = bool(claude) and claude["fabricMcp"] and another_users_copy(Path(claude["command"]), platform, env)
+    command = claude["command"] if claude else ""
+    # Path() drops a leading ./, which would turn a command relative to a folder into a PATH lookup
+    foreign = bool(claude) and claude["fabricMcp"] and not command.startswith(("./", ".\\")) and another_users_copy(
+        Path(command), platform, env)
+    report["ownCopyRule"] = platform == "darwin"
     report["registeredCopy"] = "another user's" if foreign else "ok"
     if binary is None and claude is None:
-        report["next"] = "Install Fabric v0.3.5 or later; no fabric-mcp %sis at %s." % (
-            "of yours " if platform == "darwin" else "",
+        report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
+            " (your own copy, in ~/Applications)" if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
             ", ".join(str(p) for p in fabric_bin_candidates(platform, env)))
     elif foreign:
         own = '"%s"' % (binary or fabric_bin_candidates(platform, env)[0])
-        first = "" if binary else "install your own Fabric (into ~/Applications, as the launcher does), then "
+        first = "" if binary else "put your own Fabric.app in ~/Applications, then "
         if claude["scope"] == "project":
             # the project's .mcp.json is shared with every collaborator: a local entry overrides it for this user alone
             report["next"] = ("The registered fabric-mcp (the project's .mcp.json) is another user's copy: %sclaude mcp "
@@ -754,7 +758,7 @@ def print_status(report: Dict[str, Any]) -> None:
     claude = report["claudeCode"]
     print("Fabric: %s" % line)
     print("fabric-mcp: %s" % (report["fabricMcp"] or (
-        "none of yours at the default install locations" if report.get("registeredCopy") == "another user's"
+        "none of yours at the default install locations" if report.get("ownCopyRule")
         else "not found at the default install locations")))
     print("Claude Code: %s" % ("fabric registered (%s scope) -> %s%s" % (
         claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") + (

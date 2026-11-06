@@ -92,7 +92,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    on that request gets the same question back) and a `text` naming the request (its id, the requesting Project, the
    capability), the gate (this Project's `board.respond` grant for that capability) and what opens it (a Fabric
    release with CO-506, which grants it at `com.enroll`; on Fabric 0.3.16 nothing else does, since Agent access only
-   decides a request a service filed; once CO-506 shipped, what holds that grant back on this machine); it waits for no answer (FAA-224; the tool needs no slot, and an
+   decides a request a service filed; once CO-506 shipped, the reason Fabric's `board.own-respond` log line names and
+   what lifts it: a machine marked as an organization's (the mark in Fabric's settings), no live credential (the agent
+   enrolls again) or a standing denial ("Снять отказ" in Agent access); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot, and an
    operator decision recorded under that `about` settles later questions on the gate: Fabric, thread `1add3c03`,
    `a58b4280`). A question that fails is left (the decline already answered the request), and the closing write's
    `notes` say so, since then nothing reached the operator. Then it closes the workflow `done` once
