@@ -352,7 +352,7 @@ and work without claiming Fabric saw it.
 In Claude Code this plugin ships five: at session start and `/clear`, in a project that uses Fabric, the preamble
 above (one line pointing at Step 1 when Fabric is down), elsewhere one line pointing at `fabric_whoami` while it runs;
 after each turn the turn's facts
-(counts only) and the board's unread count, and, once the running Fabric takes them,
+(HEAD and counts) and the board's unread count, and, once the running Fabric takes them,
 the other repositories the turn touched (read in memory from the transcript's tail, only host/owner/name sent); at
 each prompt one line when that count rose, then each reminder Fabric gave on a turn, once, as a line starting
 `Fabric:`: data to act on first through `fabric_work_list` (it may come again there: act on it once); after a done release, the retro line (FAA-206); at the

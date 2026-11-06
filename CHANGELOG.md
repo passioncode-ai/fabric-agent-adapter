@@ -26,17 +26,18 @@
   when it is this user's or root's (an install every user shares) (FAA-229, spec G6 of
   `docs/evidence/specs/2026-11-06-machine-move-gaps.md`). Before, `/Applications` came first, so a second user of a
   Mac was pointed at another user's Fabric. The launcher takes the same order after its PR #277 (`lib/catalog.js`
-  `appPath`; open on 2026-11-06: launcher 0.2.75 still installs into and registers `/Applications`), and it installs
-  the user's own copy unless the user owns and can write `/Applications`, since it updates the bundle; this only runs
-  it. The hooks run the command registered in `~/.claude.json`, so `status` now names a registered `fabric-mcp`
-  that is another user's copy outside the home (a bare command judged by what `PATH` finds, a link by what it points
-  at): it says to put the user's own Fabric.app in `~/Applications` first when there is none, then gives the
-  `claude mcp remove` and `claude mcp add` lines with that copy's path; a project's shared `.mcp.json` is overridden
-  with a `--scope local` entry, never rewritten, and a local entry is replaced by a local one; both name the folder
-  the entry was found in (`claude_registration` now returns it). With no registration, `status` prints "none of yours" and says to
-  install the user's own copy in `~/Applications`. SKILL.md says the same (the Step 0 table for the order and owner,
-  Step 2 for a registration of another user's copy; `status` checks Claude Code's registration only). The session hooks paragraph of SKILL.md is shorter; its details
-  stay in `references/session-hooks.md`.
+  `appPath`, planned for 0.2.76; open on 2026-11-06, and launcher 0.2.75 still installs into and registers
+  `/Applications`); it never takes root's copy and installs the user's own unless the user owns and can write
+  `/Applications`, since it updates the bundle, while this only runs it.
+- `status` names a registered `fabric-mcp` that is another user's copy outside the home (a bare command judged by
+  what `PATH` finds, a link by what it points at), since the hooks run the command Claude Code has registered: it says
+  to put the user's own Fabric.app in `~/Applications` first when there is none, then gives the `claude mcp remove` and
+  `claude mcp add` lines with that copy's path. A project's shared `.mcp.json` is overridden with a `--scope local`
+  entry, never rewritten, and a local entry is replaced by a local one; both name the folder the entry was found in
+  (`claude_registration` now returns it). When no copy of the user's is found, `status` prints "none of yours"; with
+  neither a copy nor a registration it says to install one in `~/Applications`. `status` checks Claude Code's
+  registration only. SKILL.md says the same (the Step 0 table for the order and owner, Step 2 for a registration of
+  another user's copy); its session-hooks paragraph is shorter, the details staying in `references/session-hooks.md`.
 
 ## 0.68.0 (2026-11-06)
 

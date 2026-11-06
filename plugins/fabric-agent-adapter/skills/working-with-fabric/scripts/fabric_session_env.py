@@ -168,7 +168,7 @@ def fabric_bin_candidates(platform: str = sys.platform, env: Optional[Dict[str, 
     home = _home(env)
     if platform == "darwin":
         # The user's own copy first: on a Mac with several users a copy in /Applications may be another user's
-        # (FAA-229; the launcher's order from its PR #277, lib/catalog.js appPath, launcher 0.2.76 and later).
+        # (FAA-229; the launcher's order from its PR #277, lib/catalog.js appPath, planned for launcher 0.2.76).
         return [home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp",
                 Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")]
     if platform == "win32":
@@ -219,7 +219,7 @@ def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] 
     """The first candidate that is a file. On macOS a copy outside the user's home is taken only when it is this
     user's or root's (an install every user shares): another user's copy is skipped (FAA-229). The launcher installs
     the user's own copy in `~/Applications` unless the user owns and can write `/Applications` (its lib/catalog.js
-    appPath, from its PR #277, launcher 0.2.76): it updates the bundle, while this only runs it."""
+    appPath, from its PR #277, planned for 0.2.76): it updates the bundle, while this only runs it."""
     for candidate in fabric_bin_candidates(platform, env):
         if candidate.is_file() and not another_users_copy(candidate, platform, env):
             return candidate

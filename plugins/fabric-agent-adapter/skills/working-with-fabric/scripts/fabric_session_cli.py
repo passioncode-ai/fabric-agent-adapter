@@ -733,9 +733,9 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
         where = claude.get("folder", "")
         if claude["scope"] == "project":
             # the project's .mcp.json is shared with every collaborator: a local entry overrides it for this user alone
-            report["next"] = ("The registered fabric-mcp (%s/.mcp.json) is another user's copy: %sin %s, claude mcp add "
+            report["next"] = ("The registered fabric-mcp (%s) is another user's copy: %sin %s, claude mcp add "
                               "--scope local fabric -- %s --runner claude-code, which overrides it for you alone"
-                              % (where, first, where, own))
+                              % (Path(where) / ".mcp.json", first, where, own))
         else:
             # a local entry is replaced by a local one in the same folder: a user entry would lose to a project's
             scope = claude["scope"]

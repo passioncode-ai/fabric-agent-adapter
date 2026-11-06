@@ -2231,7 +2231,7 @@ class Status(Base):
             (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
             report = fs.status(self.repo, self.env, "darwin")
             self.assertIn("claude mcp add --scope local fabric", report["next"])
-            self.assertIn("in %s, " % self.repo, report["next"])
+            self.assertIn("in %s, " % self.repo.resolve(), report["next"])
             self.assertNotIn("remove", report["next"], "never rewrite a .mcp.json the team shares")
         finally:
             self.env_module._owner_uid = saved
