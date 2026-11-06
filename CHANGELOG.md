@@ -16,9 +16,9 @@
   names it in its install advice and its `fabric-mcp:` line, never `~/Applications` unless that folder holds another
   user's copy (above). The SKILL.md Step 0 row and the `a-second-user-of-a-mac-registers-fabric` eval name the folder.
 - `references/project-board.md` and `references/on-demand-session.md` name Fabric's `board.read-at-start` rule for the
-  slot condition of a gate decline: Fabric's board rule took it from the adapter (FAA-231, main `dbfbfce4`, from its
-  next release). `com.enroll`'s own tool description on Fabric's main (`b8c0a38c`) still answers whatever the slot
-  reads; the run's step 3 wins over it, and FAA-231 stays open until Fabric aligns it.
+  slot condition of a gate decline: Fabric took it from the adapter into its board rule (main `dbfbfce4`) and into
+  `com.enroll`'s own tool description (main `12d57bdd`), from its next release, so a live session gets one instruction
+  (FAA-231).
 
 ## 0.69.1 (2026-11-06)
 
