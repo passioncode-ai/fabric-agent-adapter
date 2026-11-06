@@ -138,10 +138,11 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
    ask still stands, submit it again.
 
-**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project with no live
+**A decline from a run Fabric started** (adapter 0.68.0; the question to the operator since 0.69.0): where Fabric's dispatcher runs, a request to a Project with no live
 session and whose capability slot no service ever held (`absent` at generation 0), whose session holds no
 `board.respond` grant (every coding-session Project before Fabric ships CO-506), is answered within minutes (after a
-two-minute grace) by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
+two-minute grace) by a run that declines it until CO-506, asks for a resend and asks the operator about the gate
+(`fabric_question_ask`, `about: board.gate.<capability>`) (where the run carries this adapter's exit
 contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
 queued) ([on-demand session](on-demand-session.md), step 3).
 The request is then `answered`: read the decline and `com.read_ack` it (unread, it shows in «На проверке»); it no
@@ -189,10 +190,15 @@ service responder should still do the work (`com.status`'s slot for the capabili
 generation of 1 or more: a holder enrolled on it), do
 not reply on the request: tell the person and leave it queued. A session whose own `com.enroll` is refused
 `not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
-it answers the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's
-board rule on its `main` at `b8c0a38c` answers once; the slot condition is this adapter's). Never write "it stays queued" in a reply: the reply itself ends the queue. A
-run Fabric started on a board request has no person to tell: with the slot `absent` at generation 0 it declines and
-asks for a resend; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
+it answers the request once that it cannot be taken now and why, does no work on it without the slot, then asks the
+operator once with `fabric_question_ask` (`kind: access`, `about: board.gate.<capability>`, the `commandId` that
+`python3 <skill-dir>/scripts/fabric_session.py gate-id <request>` prints, the same a run uses, and a `text` naming the request, the gate and what
+opens it; without Python, no `commandId` can be made: tell the person only), tells the person (the question stays
+filed even when that is the operator: his decision is recorded under that `about` in Fabric), and stops handling that
+request without waiting (Fabric's `board.read-at-start` rule asks every session the same from its CO-517, main
+`603da12f`, in no release yet; the slot condition is this adapter's). Never write "it stays queued" in a reply: the reply itself ends the queue. A
+run Fabric started on a board request has no person in its chat to tell: with the slot `absent` at generation 0 it declines,
+asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
 
 ## Replying
 

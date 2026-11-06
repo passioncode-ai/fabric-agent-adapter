@@ -48,6 +48,7 @@ from fabric_session_env import (  # noqa: F401
     _home,
     fabric_root,
     state_root,
+    another_users_copy,
     fabric_bin_candidates,
     find_fabric_bin,
     read_small,

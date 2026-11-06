@@ -25,6 +25,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     _write_private,
     claude_registration,
     codex_registered,
+    another_users_copy,
     fabric_bin_candidates,
     fabric_launched,
     fabric_root,
@@ -128,36 +129,36 @@ DISPATCH_HEAD = "[fabric-agent-adapter] Fabric started this session on one board
 #: Before the prompt is seen (session start; Codex and Kimi have no prompt hook) the contract is conditional.
 DISPATCH_IF = (
     "[fabric-agent-adapter] This session is the run on a board request only when its own prompt's first line is "
-    "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; do your task only, touching none of the three."
-    " That line with other values: no run; say so in the request's thread and stop. The run:")
+    "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; touch none of the three."
+    " Other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3996 in 0.68.0: almost none left, so a new rule takes its characters back from the text around it).
+#: (3996 in 0.68.0 and in 0.69.0: a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
-    "request and end; nobody watches, never wait for a person. 1. `fabric_whoami`, then the packet "
+    "request and end; never wait for a person. 1. `fabric_whoami`, then the packet "
     "(`observatory_checkpoint_latest` {{workflowId: {workflow}}}): obey its constraints first; its goal describes "
-    "the request; artifacts: capability, deadline, run-ends-at. Read the request with `com.get` "
-    "{{message: <request>}} and its thread with `com.list` {{thread: <the `thread` com.get answered>}}. 2. "
+    "the request; artifacts: capability, deadline, run-ends-at. Read the request (`com.get` "
+    "{{message: <request>}}) and its thread (`com.list` {{thread: <the `thread` com.get answered>}}). 2. "
     "`observatory_handoff_accept` with {handoff}, the `owner`, `idempotencyKey` and `executor` the launcher's prompt names "
     "(when it names none: your `owner` `agent:<name>`, the key `accept-<handoff>`, no executor) and this session's own "
-    "`sessionId` (the same on a retry) takes the lease; keep its `leaseId`. A lapsed or refused handoff holds "
+    "`sessionId` (the same on a retry); keep its `leaseId`. A lapsed or refused handoff holds "
     "no lease: end the run without touching the request. 3. `com.status` once ("
-    "epoch, slot generation); `com.enroll` for the capability, then `com.claim` for the request, "
+    "epoch, generation); `com.enroll` (the capability), `com.claim` (the request), "
     "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at generation 0, one `com.reply` (replyTo it) "
-    "declining until Fabric's CO-506 (resend then), then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
-    "`com.reconcile` and an observed result; never complete what you did not observe. After the lease, the claim and the reply: an in_progress checkpoint (`workflowId`, "
+    "declining until Fabric's CO-506 (resend then), next `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "`com.reconcile` and an observed result. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
-    "`pack`) unchanged, adding `open`, `done` or `notes`, no value. 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s, "
-    "finish before run-ends-at; work that cannot end by then posts its state (`com.progress`); "
+    "`pack`) unchanged (add `open`, `done` or `notes`; no value). 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s; "
+    "work that cannot end by run-ends-at posts its state (`com.progress`); "
     "if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known (observed: true) saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
     "skipped. Money, deletion, publication: `fabric_effect_request`; a sign-in, a one-time code, a typed "
     "secret or a payment is a person's (none is in this chat), and so is a production step unless the operator's "
     "words, relayed verbatim, dated and sourced, from his trusted projects with a scope naming it, approve it: name it in "
     "the answer. 5. `com.reply` in the thread, then "
-    "`com.complete` with an observed outcome: completed, or failed_known with the reason. 6. Once the board took it, "
+    "`com.complete` (observed: true): completed, or failed_known with the reason. 6. Once the board took it, "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, a `stepId`, "
     "the `leaseId`, `close: true`, a status and the packet's body with `done` and `notes` added: done for completed; for "
     "failed_known blocked with the reason in notes (failed once Observatory takes it, OBS-323). 7. Write the retro "
@@ -295,7 +296,17 @@ def dispatch_contract(dispatch: Dict[str, str], session_id: Any = None, conditio
     the prompt is seen, or as the run's once it is known to be (a cleared holder)."""
     told = DISPATCH_SESSION.format(session=session_id) if isinstance(session_id, str) and _SESSION_UUID.fullmatch(
         session_id) else ""
-    return ((DISPATCH_IF if conditional else DISPATCH_HEAD) + DISPATCH_CONTRACT).format(**dispatch) + told
+    return ((DISPATCH_IF if conditional else DISPATCH_HEAD) + DISPATCH_CONTRACT).format(
+        gate=gate_question_id(dispatch["request"]), **dispatch) + told
+
+
+def gate_question_id(request: str) -> str:
+    """The `commandId` of the run's one question to the operator about a request it declined at the gate: UUID v5 of the
+    name `board.gate` in the request id's namespace, so every run on that request asks the same question (Fabric,
+    thread 1add3c03, a58b4280; FAA-224)."""
+    import uuid  # only the exit contract needs it; the other hooks never pay for the import
+
+    return str(uuid.uuid5(uuid.UUID(request), "board.gate"))
 
 
 def _dispatch_record(dispatch: Dict[str, str], env: Dict[str, str]) -> Tuple[Path, str]:
@@ -705,9 +716,32 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
               "transcriptRead": "off" if repositories_off(env) else ("waiting" if not active else "unregistered" if claude is None
                                                                     else "on" if repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
+    # FAA-229: before 0.69.0 status proposed /Applications first, so a second user of a Mac may run another user's copy
+    command = claude["command"] if claude else ""
+    # Path() drops a leading ./, which would turn a command relative to a folder into a PATH lookup
+    foreign = bool(claude) and claude["fabricMcp"] and not command.startswith(("./", ".\\")) and another_users_copy(
+        Path(command), platform, env)
+    report["ownCopyRule"] = platform == "darwin"
+    report["registeredCopy"] = "another user's" if foreign else "ok"
     if binary is None and claude is None:
-        report["next"] = "Install Fabric v0.3.5 or later; fabric-mcp is not at %s." % ", ".join(
-            str(p) for p in fabric_bin_candidates(platform, env))
+        report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
+            " (your own copy, in ~/Applications)" if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
+            ", ".join(str(p) for p in fabric_bin_candidates(platform, env)))
+    elif foreign:
+        own = '"%s"' % (binary or fabric_bin_candidates(platform, env)[0])
+        first = "" if binary else "put your own Fabric.app in ~/Applications, then "
+        where = claude.get("folder", "")
+        if claude["scope"] == "project":
+            # the project's .mcp.json is shared with every collaborator: a local entry overrides it for this user alone
+            report["next"] = ("The registered fabric-mcp (%s) is another user's copy: %sin %s, claude mcp add "
+                              "--scope local fabric -- %s --runner claude-code, which overrides it for you alone"
+                              % (Path(where) / ".mcp.json", first, where, own))
+        else:
+            # a local entry is replaced by a local one in the same folder: a user entry would lose to a project's
+            scope = claude["scope"]
+            report["next"] = ("The registered fabric-mcp is another user's copy: %s%sclaude mcp remove --scope %s fabric, "
+                              "then claude mcp add --scope %s fabric -- %s --runner claude-code" % (
+                                  first, "in %s, " % where if scope == "local" else "", scope, scope, own))
     elif hub["state"] == "not-a-hub":
         report["next"] = "Fabric's hub could not be verified (%s): open Fabric; send it nothing until it can." % hub["reason"]
     elif hub["state"] != "running":
@@ -726,9 +760,12 @@ def print_status(report: Dict[str, Any]) -> None:
             "not-a-hub": "not verified: %s" % hub.get("reason")}[hub["state"]]
     claude = report["claudeCode"]
     print("Fabric: %s" % line)
-    print("fabric-mcp: %s" % (report["fabricMcp"] or "not found at the default install locations"))
+    print("fabric-mcp: %s" % (report["fabricMcp"] or (
+        "none of yours at the default install locations" if report.get("ownCopyRule")
+        else "not found at the default install locations")))
     print("Claude Code: %s" % ("fabric registered (%s scope) -> %s%s" % (
-        claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") if claude else "not registered"))
+        claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") + (
+        " (another user's copy)" if report.get("registeredCopy") == "another user's" else "") if claude else "not registered"))
     print("Codex: %s" % ("fabric registered" if report["codex"] else "not registered"))
     print("Session hooks: %s" % ("active" if report["sessionHooks"] == "active"
                                  else "inert (this Fabric does not advertise %s)" % HOOK_FEATURE))
@@ -767,6 +804,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return watch_mail_cli(argv[1:])
     if argv[:1] == ["install-host-hooks"]:
         return install_host_hooks_cli(argv[1:])
+    if argv[:1] == ["gate-id"]:
+        # the commandId of the one operator question about a request declined at the gate, for a session that is not
+        # a run (Fabric's board.read-at-start from its CO-517 asks every session; FAA-224)
+        if len(argv) != 2 or not re.fullmatch(_DISPATCH_VALUE["request"], argv[1]):
+            print("usage: fabric_session.py gate-id <board request id, a UUID>", file=sys.stderr)
+            return 2
+        print(gate_question_id(argv[1]))
+        return 0
     import argparse
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command")

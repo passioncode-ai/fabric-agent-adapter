@@ -76,7 +76,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
 3. **Take the request.** `com.status` once, for the epoch every idempotency key names and the slot's generation.
    `com.enroll` for the request's capability, then `com.claim {idempotency, capability, request}`, `com.accept`, and
    `com.effect_begin` before the work has an effect. A `com.enroll` refused `not_authorized` (the run's Project holds
-   no `board.respond` grant for the capability) takes no slot, asks for no access and does no work: on Fabric 0.3.16 a
+   no `board.respond` grant for the capability) takes no slot, asks for no grant itself (no `fabric.access.request`) and does no work: on Fabric 0.3.16 a
    session has no route to that grant (`fabric.access.request` is the door's and a binding's, never exposed by
    `fabric-mcp`, and Fabric's Agent access only decides a request already waiting), and work without a slot has no
    fence, no `com.progress` and a live session may take the request in parallel. When `com.get` reads the request
@@ -85,15 +85,28 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    whenever the board can be read: a missing entry or an unavailable board is the error rule),
    the run answers it once with `com.reply` (`replyTo` the request, from the target Project, which answers
    it: DEC-0098, DEC-0102) declining it: this Project cannot take it until Fabric ships CO-506, and the requester sends
-   it again then (the reply ends the queue, so nothing takes it later; never say it waits). Then it closes the workflow `done` once
+   it again then (the reply ends the queue, so nothing takes it later; never say it waits). Since only the operator
+   opens that gate and the decline shows the operator no gate (at most an unread answer on the requester's Project
+   until it is read), it then asks the operator once:
+   `fabric_question_ask` with `kind: access`, `about: board.gate.<capability>`, the `commandId` the contract names (UUID
+   v5 of the name `board.gate` in the request id's namespace, `gate_question_id` in `fabric_session_cli.py`, so every run
+   on that request gets the same question back) and a `text` naming the request (its id, the requesting Project, the
+   capability), the gate (this Project's `board.respond` grant for that capability) and what opens it (a Fabric
+   release with CO-506, which grants it at `com.enroll`; on Fabric 0.3.16 nothing else does, since Agent access only
+   decides a request a service filed; once CO-506 shipped, the reason Fabric's `board.own-respond` log line names and
+   what lifts it: a machine marked as an organization's (the mark in Fabric's settings), no live credential (the agent
+   enrolls again) or a standing denial ("Снять отказ" in Agent access); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot, and an
+   operator decision recorded under that `about` settles later questions on the gate: Fabric, thread `1add3c03`,
+   `a58b4280`). A question that fails is left (the decline already answered the request), and the closing write's
+   `notes` say so, since then nothing about the gate reached the operator. Then it closes the workflow `done` once
    `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with the slot `stale`, `active`, or `absent` at a generation of 1 or more (a holder enrolled on it: a
    service of this Project, or after CO-506 a session; one that stopped cleanly reads `absent`, and a service takes the
    request when it rejoins, so a decline would take it from it; Fabric serves a session no `held` flag yet), the error
    rule below holds and the request stays as it is (queued, it goes to the operator after two runs with no answer). A
    capability listed only by a service's live grant, with no enroll yet, also reads `absent` at generation 0: a run
    declines it, which a service asking and enrolling at once (ADR-0186) seldom leaves time for.
-   The target's request no longer waits for the operator (an answered request is settled: no second run, no unmoved or
-   to-operator finding); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
+   The target's request no longer waits for the operator on the board (an answered request is settled: no second run,
+   no unmoved or to-operator finding; the question above is what reaches the operator, when Fabric took it); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
    shows it on the requester's Project in «На проверке» as an answer nobody read,
    and the closing write's `notes` say the request was declined until CO-506.
    Fabric's dispatcher counts an answered request as settled and starts no second run for it. Once CO-506 ships
@@ -163,7 +176,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
 7. **End the run.** The one write left is the retro after work
    (`observatory_lesson` and insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout), or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
-   `watch-mail`, no question to the operator.
+   `watch-mail`, no further `fabric_question_ask` (step 3's gate question is the only one).
 
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
 request `failed_known` with the reason (and `observed: true` after `com.effect_begin`) when it holds a fence for it,

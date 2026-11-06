@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.68.0"
+VERSION = "0.69.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -167,17 +167,61 @@ def fabric_bin_candidates(platform: str = sys.platform, env: Optional[Dict[str, 
     env = os.environ if env is None else env
     home = _home(env)
     if platform == "darwin":
-        return [Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
-                home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"]
+        # The user's own copy first: on a Mac with several users a copy in /Applications may be another user's
+        # (FAA-229; the launcher's order from its PR #277, lib/catalog.js appPath, planned for launcher 0.2.76).
+        return [home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp",
+                Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")]
     if platform == "win32":
         local = Path(env.get("LOCALAPPDATA") or str(home / "AppData" / "Local"))
         return [local / "Programs" / "Fabric" / "resources" / "bin" / "fabric-mcp.cmd"]
     return [Path("/opt/Fabric/resources/bin/fabric-mcp")]
 
 
+def _owner_uid(path: Path) -> Optional[int]:
+    try:
+        return os.stat(str(path)).st_uid
+    except (OSError, ValueError):  # ValueError: a NUL in a path read from a config file
+        return None
+
+
+def _real(path: Path) -> Path:
+    try:
+        return Path(os.path.realpath(str(path)))
+    except (OSError, ValueError):
+        return path
+
+
+def another_users_copy(path: Path, platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> bool:
+    """On macOS, a file outside the user's home that is neither this user's nor root's: another user's copy, which this
+    user must not run (FAA-229). Root's is an install every user shares, not another user's. False elsewhere, and for a
+    path it cannot read. A bare command is the one PATH resolves to, and a link is judged by what it points at, so a
+    link in the home to another user's copy is that copy."""
+    if platform != "darwin" or not hasattr(os, "getuid"):
+        return False
+    environ = os.environ if env is None else env
+    if not path.is_absolute():
+        if len(path.parts) != 1:  # relative to a folder Claude Code starts it in, which this does not know
+            return False
+        import shutil  # only status reaches this; the hooks never pay for the import
+
+        found = shutil.which(str(path), path=environ.get("PATH", os.defpath))
+        if not found:
+            return False
+        path = Path(found)
+    path = _real(path)
+    if _real(_home(environ)) in path.parents:
+        return False
+    owner = _owner_uid(path)
+    return owner is not None and owner not in (os.getuid(), 0)
+
+
 def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> Optional[Path]:
+    """The first candidate that is a file. On macOS a copy outside the user's home is taken only when it is this
+    user's or root's (an install every user shares): another user's copy is skipped (FAA-229). The launcher installs
+    the user's own copy in `~/Applications` unless the user owns and can write `/Applications` (its lib/catalog.js
+    appPath, from its PR #277, planned for 0.2.76): it updates the bundle, while this only runs it."""
     for candidate in fabric_bin_candidates(platform, env):
-        if candidate.is_file():
+        if candidate.is_file() and not another_users_copy(candidate, platform, env):
             return candidate
     return None
 
@@ -271,7 +315,8 @@ def _stdio_entry(entry: Any) -> Optional[Dict[str, Any]]:
 
 def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
     """Claude Code's MCP server `fabric` for this folder: local, then project (.mcp.json), then user scope.
-    Only command and args are returned; an entry's env is never read out."""
+    Only command and args are returned, with the folder a local or project entry was found in; an entry's env is never
+    read out."""
     home = _home(env)
     config: Dict[str, Any] = {}
     text = read_small(home / ".claude.json", CONFIG_CAP)
@@ -286,7 +331,7 @@ def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Opti
         servers = (projects.get(str(folder)) or {}).get("mcpServers") if isinstance(projects.get(str(folder)), dict) else None
         found = _stdio_entry((servers or {}).get("fabric")) if isinstance(servers, dict) else None
         if found:
-            return dict(found, scope="local")
+            return dict(found, scope="local", folder=str(folder))
     for folder in _ancestors(cwd):
         text = read_small(folder / ".mcp.json")
         if text:
@@ -296,7 +341,7 @@ def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Opti
                 servers = None
             found = _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
             if found:
-                return dict(found, scope="project")
+                return dict(found, scope="project", folder=str(folder))
     servers = config.get("mcpServers")
     found = _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
     return dict(found, scope="user") if found else None

@@ -4,6 +4,8 @@ watch-mail and install-host-hooks. Hooks are driven with fixtures: a temporary H
 dead pid, and a fake fabric-mcp that speaks MCP on stdio and records what it was asked."""
 
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -208,12 +210,38 @@ class Paths(unittest.TestCase):
                          Path("C:/L") / "passioncode-fabric")
 
     def test_fabric_bin_per_os(self):
-        self.assertIn(Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
-                      fs.fabric_bin_candidates("darwin", {"HOME": "/Users/a"}))
+        # FAA-229: the user's own ~/Applications copy comes first, as the launcher installs one per macOS user
+        self.assertEqual(fs.fabric_bin_candidates("darwin", {"HOME": "/Users/a"}),
+                         [Path("/Users/a/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
+                          Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")])
         self.assertEqual(fs.fabric_bin_candidates("linux", {"HOME": "/h"}), [Path("/opt/Fabric/resources/bin/fabric-mcp")])
         (win,) = fs.fabric_bin_candidates("win32", {"HOME": "C:/U", "LOCALAPPDATA": "C:/L"})
         self.assertEqual(win.name, "fabric-mcp.cmd")
         self.assertIn("Programs", win.parts)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_another_users_copy_outside_home_is_skipped(self):
+        # FAA-229: on a Mac with several users, /Applications may hold another user's Fabric.app
+        env_module = sys.modules["fabric_session_env"]
+        with tempfile.TemporaryDirectory() as tmp:
+            home, shared = Path(tmp) / "home", Path(tmp) / "Applications" / "fabric-mcp"
+            shared.parent.mkdir(parents=True)
+            shared.write_text("#!/bin/sh\n")
+            mine = home / "Applications" / "fabric-mcp"
+            saved_c, saved_o = env_module.fabric_bin_candidates, env_module._owner_uid
+            env_module.fabric_bin_candidates = lambda platform=None, env=None: [mine, shared]
+            try:
+                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "a copy of this user's own")
+                env_module._owner_uid = lambda path: 0
+                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "root's copy is everyone's")
+                env_module._owner_uid = lambda path: os.getuid() + 1
+                self.assertIsNone(fs.find_fabric_bin("darwin", {"HOME": str(home)}), "another user's copy")
+                self.assertEqual(fs.find_fabric_bin("linux", {"HOME": str(home)}), shared, "the owner rule is macOS'")
+                mine.parent.mkdir(parents=True)
+                mine.write_text("#!/bin/sh\n")
+                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), mine, "the user's own copy first")
+            finally:
+                env_module.fabric_bin_candidates, env_module._owner_uid = saved_c, saved_o
 
     def test_state_root_is_never_fabric_root(self):
         for platform in ("darwin", "linux", "win32"):
@@ -2068,9 +2096,14 @@ class Status(Base):
         self.env_module = sys.modules["fabric_session_env"]  # find_fabric_bin reads it there (FAA-65)
         self.saved = self.env_module.fabric_bin_candidates
         self.env_module.fabric_bin_candidates = lambda platform=None, env=None: [self.base / "no-fabric" / "fabric-mcp"]
+        # 0.69.0 unit reading 3: every file is this user's, so a host's /Applications/Fabric.app of another user
+        # (FAA-229's machine) cannot change a test that registers its default path
+        self.saved_owner = self.env_module._owner_uid
+        self.env_module._owner_uid = lambda path: getattr(os, "getuid", lambda: 0)()
 
     def tearDown(self):
         self.env_module.fabric_bin_candidates = self.saved
+        self.env_module._owner_uid = self.saved_owner
         super().tearDown()
 
     def test_one_next_action_per_state(self):
@@ -2091,8 +2124,123 @@ class Status(Base):
         self.assertEqual(fs.status(self.repo, self.env)["next"],
                          'Register it once: claude mcp add --scope user fabric -- "%s" --runner claude-code' % binary)
 
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_a_registered_copy_of_another_user_is_named(self):
+        # FAA-229 (0.69.0 product reading 1): status before 0.69.0 proposed /Applications first, and the hooks run the
+        # registered command, so a second user of a Mac who followed it is told to register their own copy
+        shared = self.base / "Applications" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        self.register(command=str(shared))
+        self.hub()
+        saved = self.env_module._owner_uid
+        try:
+            foreign_file = os.path.realpath(str(shared))
+            self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == foreign_file else 0)
+            report = fs.status(self.repo, self.env, "darwin")
+            self.assertEqual(report["registeredCopy"], "another user's")
+            own = self.base / "no-fabric" / "fabric-mcp"
+            # 0.69.0 product reading 2: with no copy of the user's own, install one first; never a placeholder path
+            self.assertEqual(report["next"], "The registered fabric-mcp is another user's copy: put your own "
+                             "Fabric.app in ~/Applications, then claude mcp remove --scope user fabric, "
+                             'then claude mcp add --scope user fabric -- "%s" --runner claude-code'
+                             % (self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"))
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                fs.print_status(report)
+            self.assertIn("fabric-mcp: none of yours at the default install locations", printed.getvalue())
+            self.assertIn("(another user's copy)", printed.getvalue())
+            own.parent.mkdir()
+            own.write_text("")
+            self.assertEqual(fs.status(self.repo, self.env, "darwin")["next"], "The registered fabric-mcp is another "
+                             "user's copy: claude mcp remove --scope user fabric, then claude mcp add --scope user fabric "
+                             '-- "%s" --runner claude-code' % own)
+            for platform in ("linux", "win32"):
+                other = fs.status(self.repo, self.env, platform)
+                self.assertEqual(other["registeredCopy"], "ok", platform)
+                self.assertNotIn("another user's", other["next"], platform)
+            self.env_module._owner_uid = lambda path: 0
+            self.assertEqual(fs.status(self.repo, self.env, "darwin")["next"], "Call fabric_whoami.", "root's is shared")
+        finally:
+            self.env_module._owner_uid = saved
+        (self.home / ".claude.json").unlink()
+        own.unlink()
+        darwin = fs.status(self.repo, self.env, "darwin")
+        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in ~/Applications); no fabric-mcp of yours is at",
+                      darwin["next"])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(darwin)
+        self.assertIn("fabric-mcp: none of yours at the default install locations", printed.getvalue())
+        linux = fs.status(self.repo, self.env, "linux")
+        self.assertIn("no fabric-mcp is at", linux["next"], "the owner rule is macOS'")
+        self.assertNotIn("your own copy", linux["next"])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(linux)
+        self.assertIn("fabric-mcp: not found at the default install locations", printed.getvalue())
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_the_registered_copy_is_judged_by_the_file_it_runs(self):
+        # 0.69.0 seam reading 2: a bare command runs what PATH finds, a link in the home runs what it points at, and a
+        # project's .mcp.json is every collaborator's
+        shared = self.base / "Applications" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        shared.chmod(0o755)  # shutil.which finds executables only
+        foreign_file = os.path.realpath(str(shared))
+        saved = self.env_module._owner_uid
+        self.hub()
+        try:
+            self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == foreign_file else 0)
+            env = dict(self.env, PATH=str(shared.parent))
+            self.register(command="fabric-mcp")
+            self.assertEqual(fs.status(self.repo, env, "darwin")["registeredCopy"], "another user's", "found on PATH")
+            link = self.home / "bin" / "fabric-mcp"
+            link.parent.mkdir()
+            link.symlink_to(shared)
+            self.register(command=str(link))
+            self.assertEqual(fs.status(self.repo, self.env, "darwin")["registeredCopy"], "another user's", "a link")
+            self.assertFalse(fs.another_users_copy(Path("/x\x00y"), "darwin", self.env), "a NUL is unreadable, not a crash")
+            self.register(command="./fabric-mcp")
+            self.assertEqual(fs.status(self.repo, env, "darwin")["registeredCopy"], "ok", "relative to an unknown folder")
+            # a folder part is relative to where Claude Code starts it: never judged, even when this cwd has one
+            local_bin = self.base / "bin" / "fabric-mcp"
+            local_bin.parent.mkdir()
+            local_bin.write_text("")
+            local_bin.chmod(0o755)
+            foreign_files = {foreign_file, os.path.realpath(str(local_bin))}
+            self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) in foreign_files else 0)
+            here = os.getcwd()
+            os.chdir(str(self.base))
+            try:
+                self.assertFalse(fs.another_users_copy(Path("bin/fabric-mcp"), "darwin", env))
+            finally:
+                os.chdir(here)
+            self.assertTrue(fs.another_users_copy(local_bin, "darwin", env), "the same file, named absolutely")
+            self.register(command=str(shared), scope="local")
+            report = fs.status(self.repo, self.env, "darwin")
+            self.assertIn("in %s, claude mcp remove --scope local fabric, then claude mcp add --scope local fabric"
+                          % self.repo.resolve(), report["next"])
+            # 0.69.0 seam reading 4: the entry may be an ancestor's; the line names the folder it was found in
+            (self.repo / "sub").mkdir(exist_ok=True)
+            self.assertIn("in %s, claude mcp remove" % self.repo.resolve(),
+                          fs.status(self.repo / "sub", self.env, "darwin")["next"])
+            self.assertIn("put your own Fabric.app in ~/Applications, then", report["next"])
+            (self.home / ".claude.json").unlink()
+            (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
+            report = fs.status(self.repo, self.env, "darwin")
+            self.assertIn("claude mcp add --scope local fabric", report["next"])
+            self.assertIn("in %s, " % self.repo.resolve(), report["next"])
+            self.assertIn("(%s) is another user's copy" % (self.repo.resolve() / ".mcp.json"), report["next"])
+            self.assertNotIn("remove", report["next"], "never rewrite a .mcp.json the team shares")
+        finally:
+            self.env_module._owner_uid = saved
+
     def test_the_cli_prints_and_reads_no_token(self):
-        self.register()
+        # a path in the test's home: the subprocess does not see setUp's owner stub, and a host's /Applications copy may
+        # be another user's (0.69.0 seam reading 6)
+        self.register(command=str(self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"))
         self.hub()
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)

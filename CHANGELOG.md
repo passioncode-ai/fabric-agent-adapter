@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.69.0 (2026-11-06)
+
+### Added
+
+- working-with-fabric: a run Fabric started on a board request that declines it at the gate (its `com.enroll` refused
+  `not_authorized`, the slot `absent` at generation 0) now also asks the operator once, with `fabric_question_ask`
+  (`kind: access`, `about: board.gate.<capability>`, a `text` naming the request, the gate and what opens it), and
+  ends without waiting (FAA-224). The decline shows the operator no gate (at most an unread answer on the requester's
+  Project), and only the operator opens it: on Fabric 0.3.16 nothing but a Fabric release with CO-506 (which grants it
+  at `com.enroll`) does. The contract names the question's `commandId`, UUID v5 of the name `board.gate` in the
+  request id's namespace (`gate_question_id`), so every run on that request gets the same question back; an operator
+  decision recorded under the same `about` settles the gate's later questions. Fabric proposed the step and confirmed
+  the tool needs no slot on 0.3.16 (board thread `1add3c03`, `5fb4226d`, `a58b4280`); Fabric's `board.read-at-start`
+  rule asks every session the same since its CO-517 (main `603da12f`), from its next release, so a live session whose
+  own `com.enroll` is refused asks too, with the id the new `fabric_session.py gate-id <request>` prints
+  (`references/project-board.md`). `references/on-demand-session.md` (which also has a failed question noted in the
+  closing write, and what lifts the gate once CO-506 shipped: the reason Fabric's `board.own-respond` log line names,
+  `315c5b54`) and `references/project-board.md` say the same. The contract stays under Hermes' 4000 characters (3996
+  at its longest) with several clauses shorter; "never complete what you did not observe" now lives in the reference
+  only (the contract keeps `observed: true` and the reconcile rule's observed result).
+
+### Fixed
+
+- working-with-fabric: on macOS `status`, and the `claude mcp add` line it proposes, look for `fabric-mcp` in
+  `~/Applications/Fabric.app` first, then `/Applications/Fabric.app`, and take the copy outside the user's home only
+  when it is this user's or root's (an install every user shares) (FAA-229, spec G6 of
+  `docs/evidence/specs/2026-11-06-machine-move-gaps.md`). Before, `/Applications` came first, so a second user of a
+  Mac was pointed at another user's Fabric. The launcher takes the same order after its PR #277 (`lib/catalog.js`
+  `appPath`, planned for 0.2.76; open on 2026-11-06, and launcher 0.2.75 still installs into and registers
+  `/Applications`); it never takes root's copy and installs the user's own unless the user owns and can write
+  `/Applications`, since it updates the bundle, while this only runs it.
+- On macOS, `status` names a registered `fabric-mcp` that is another user's copy outside the home (a bare command
+  judged by what `PATH` finds, a link by what it points at), since the hooks run the command Claude Code has
+  registered: it says to put the user's own Fabric.app in `~/Applications` first when there is neither the user's nor
+  root's copy, then gives the `claude mcp remove` and `claude mcp add` lines with that copy's path. A project's shared
+  `.mcp.json` is overridden with a `--scope local` entry, never rewritten, and a local entry is replaced by a local
+  one; both name the folder the entry was found in (`claude_registration` now returns it). When neither the user's nor
+  root's copy is found, `status` prints "none of yours"; with neither a copy nor a registration it says to install one
+  in `~/Applications`. `status` checks Claude Code's registration only. SKILL.md says the same (the Step 0 table for
+  the order and owner, Step 2 for a registration of another user's copy); its session-hooks paragraph is shorter, the
+  details staying in `references/session-hooks.md`.
+
 ## 0.68.0 (2026-11-06)
 
 ### Fixed

@@ -141,7 +141,7 @@ this repository both obeys it and ships its service layer
   (`dispatch/`, 0600, pruned after 7 days) (FAA-201), on the condition that the session's own prompt starts with the
   dispatch line naming the same three; the prompt hook, which sees that line, confirms the run or says it is none. Stop and SessionEnd first remove
   their own session folders untouched for 7 days, then read `hub.json` and return, writing nothing else, unless the
-  running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (counts only, at most 1.5 s);
+  running Fabric advertises `session-hooks/1`; then they measure the turn's git facts (HEAD and counts, at most 1.5 s);
   only once a worker has seen the running Fabric's `fabric_session_observe` take `repositories` (a mark in the hooks'
   folder), and unless the person turned it off (`FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file,
   FAA-160), Stop also reads the tail of the session's transcript (at most 512 KB from its end; message text and tool output, which can
