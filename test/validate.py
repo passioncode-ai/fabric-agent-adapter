@@ -62,6 +62,7 @@ STDLIB_IMPORTS = {
     "copy", "ctypes", "msvcrt",  # ctypes and msvcrt: the Windows paths of the service kit (DEC-0032)
     "email",  # email.utils: the probe reads a cookie's Expires date (DEC-0039)
     "xml",  # the supervisor tests read the Task Scheduler XML back (FAA-21)
+    "uuid",  # the run's gate question id, UUID v5 of the board request id (FAA-224)
     "ntpath", "posixpath",  # the lock name the Node kit holds, computed for either system (FAA-21)
     "ipaddress", "math", "struct",  # the delegation verifier: a loopback key-set URL, Ed25519 and claim checks (DEC-0039)
     "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
