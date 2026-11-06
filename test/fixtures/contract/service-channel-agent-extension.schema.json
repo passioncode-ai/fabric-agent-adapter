@@ -1,0 +1,700 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fabric.passioncode.ai/agent-contract/0.1.0/schemas/service-channel-agent-extension.schema.json",
+  "title": "extensions/channel-agent/0.1: what an agent that answers people on a channel declares, one entry per project it serves (channel-agent-standard/1, DEC-0150)",
+  "description": "The value of the channel-agent extension key https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1, under provider.extensions of a service's fabric-agent.json, or, for a service with no manifest, under extensions of its /.well-known/fabric-service answer: the standard's version and, for each project the agent serves, its side, taxonomy, tiers, question route, gap registry, channels, sources, hand-off queues, evals and budgets, ticket outbox, token slot and recorded decisions. Ids, names and ages only: no secret value, no person's address, no private path. A checker reports a misplaced or invalid value as FAC-SEM-162, a repeated id or a missing decision as FAC-SEM-163, a channel, queue or budget obligation as FAC-SEM-164 and a credential-shaped name or value as FAC-SEM-165. docs/specification/channel-agent.md.",
+  "type": "object",
+  "required": [
+    "standard",
+    "projects"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "standard": {
+      "const": "channel-agent-standard/1",
+      "description": "The version of the standard the agent follows."
+    },
+    "projects": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/project"
+      },
+      "description": "One entry per project the agent serves; a project once (FAC-SEM-163)."
+    }
+  },
+  "$defs": {
+    "ref": {
+      "type": "string",
+      "pattern": "^(?![A-Za-z0-9._:-]*[0-9]{7})[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "description": "An opaque id or name: a letter or digit, then up to 127 of letters, digits and . _ : -, with no run of 7 or more digits (a phone or account number, as support-ticket/1's id_looks_personal refuses). No @, slash, backslash or space, so no person's address and no path fits."
+    },
+    "relativeRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^(?![/~])(?![A-Za-z][A-Za-z0-9+.-]*:)(?!(?:[^/]*/)*\\.\\.(?:/|$))[A-Za-z0-9._:/-]+$",
+      "description": "A table name or a path relative to the agent's repository: letters, digits and . _ : / -, never starting with / or ~ or a scheme (a drive letter is one), and no .. segment, so no private path fits."
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^P(?=[0-9T])(?!(0+D)?(T(0+H)?(0+M)?(0+S)?)?$)([0-9]{1,5}D)?(T(?=[0-9])([0-9]{1,5}H)?([0-9]{1,5}M)?([0-9]{1,5}S)?)?$",
+      "description": "An ISO 8601 duration in days, hours, minutes and seconds (P7D, PT1H, PT10M, P1DT12H), above zero: no years, months or weeks, whose length depends on the calendar, and no all-zero duration (P0D, PT0S). A wall-clock duration: a working-time limit's calendar is not declared."
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+      "description": "A calendar date, YYYY-MM-DD."
+    },
+    "none": {
+      "type": "object",
+      "required": [
+        "none"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "none": {
+          "enum": [
+            "not_yet",
+            "not_used"
+          ],
+          "description": "not_yet: the project does not have it yet and names the date by which it will; not_used: the project does not use it."
+        },
+        "until": {
+          "$ref": "#/$defs/date",
+          "description": "With not_yet only: the date by which the member is declared."
+        }
+      },
+      "if": {
+        "properties": {
+          "none": {
+            "const": "not_yet"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "until"
+        ],
+        "properties": {
+          "until": true
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "until"
+          ],
+          "properties": {
+            "until": true
+          }
+        }
+      },
+      "description": "The standard's form for a required member a project does not have (channel-agent-standard/1, section 13.6 as its owner's round 4 gives it): {\"none\": \"not_yet\", \"until\": \"YYYY-MM-DD\"} or {\"none\": \"not_used\"}. Closed; until is a full date and only with not_yet. Taken at four members only: question_route, gap_registry, tickets.pd_check and a channel's texts.final."
+    },
+    "usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "An amount in US dollars, a number like the usage report's limits (service-usage.schema.json limitUsd, DEC-0027), except that 0 is allowed here and means no budget; a budget above 0 is spent under the usage-report limit spend_record names."
+    },
+    "texts": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 64,
+      "propertyNames": {
+        "maxLength": 35,
+        "pattern": "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$",
+        "not": {
+          "const": "none"
+        }
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "description": "One text per language, keyed by a BCP 47 tag; each at most 4096 characters counted in Unicode code points (as JSON Schema's maxLength counts them), one Telegram message. Not blank and no em dash (FAC-SEM-164); an empty text is refused here (FAC-SEM-162). A language is never named none, so the none form cannot pass for a text where the schema does not take it."
+    },
+    "project": {
+      "type": "object",
+      "required": [
+        "project",
+        "side",
+        "lead_agent",
+        "adopted_at",
+        "taxonomy",
+        "question_route",
+        "gap_registry",
+        "channels",
+        "sources",
+        "handoff_queues",
+        "evals",
+        "tickets"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "project": {
+          "type": "string",
+          "pattern": "^project:[a-z0-9][a-z0-9._-]{0,127}$",
+          "description": "The project's id in the project registry, project:<slug>, the registry alias pattern unchanged (the registry's name, not an id the agent invents): an alias of the Fabric Project, compared as written (docs/specification/identifiers.md); question_route.target is the canonical Fabric Project id."
+        },
+        "side": {
+          "type": "string",
+          "pattern": "^(?![a-z0-9-]*[0-9]{7})[a-z0-9-]{1,32}$",
+          "description": "The side the agent expects the project to be on, the standard's ^[a-z0-9-]{1,32}$ with no run of 7 or more digits; the signal server refuses a write whose side differs (side_mismatch). Side codes live in the server's data, so the contract checks the pattern only."
+        },
+        "lead_agent": {
+          "$ref": "#/$defs/ref",
+          "description": "The project's lead agent."
+        },
+        "adopted_at": {
+          "$ref": "#/$defs/date",
+          "description": "The day the agent adopted the standard for this project; the observed checks report without failing for 30 days from it."
+        },
+        "taxonomy": {
+          "type": "object",
+          "required": [
+            "version",
+            "codes"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "version": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+              "description": "The taxonomy's version."
+            },
+            "codes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 512,
+              "items": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "label"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^(?![a-z0-9_.]*[0-9]{7})[a-z0-9_.]{1,64}$",
+                    "description": "A ticket's category code, as support-ticket/1's category (^[a-z0-9_.]{1,64}$) with no run of 7 or more digits; once in the list (FAC-SEM-163)."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120,
+                    "description": "What the category means, for a person."
+                  }
+                }
+              }
+            }
+          },
+          "description": "The ticket taxonomy: its version and its category codes."
+        },
+        "tiers": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "required": [
+              "code",
+              "label",
+              "rule",
+              "escalate"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^(?![a-z0-9_]*[0-9]{7})[a-z0-9_]{1,32}$",
+                "description": "The tier's code, which travels to the signal server; once in the list (FAC-SEM-163)."
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "description": "The badge a person sees, and the status the agent may tell the customer."
+              },
+              "rule": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63} >=? (0|[1-9][0-9]{0,14})$",
+                "description": "<fact> > <integer> or <fact> >= <integer>, the fact a customer fact the project declares (open_orders, paid_total_usd), one space on each side of the operator, the integer at most 15 digits."
+              },
+              "escalate": {
+                "enum": [
+                  "at_once",
+                  "ladder"
+                ],
+                "description": "at_once: a question the agent cannot resolve goes to a person at once and ahead of the queue; ladder: it climbs the question ladder."
+              }
+            }
+          },
+          "description": "The customer tiers the project declares, if any."
+        },
+        "question_route": {
+          "if": {
+            "type": "object",
+            "required": [
+              "none"
+            ],
+            "properties": {
+              "none": true
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/none"
+          },
+          "else": {
+            "$ref": "#/$defs/questionRoute"
+          },
+          "description": "How a question the knowledge cannot answer reaches a person. Or the none form ($defs/none)."
+        },
+        "gap_registry": {
+          "if": {
+            "type": "object",
+            "required": [
+              "none"
+            ],
+            "properties": {
+              "none": true
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/none"
+          },
+          "else": {
+            "$ref": "#/$defs/gapRegistry"
+          },
+          "description": "The project's one gap registry. Or the none form ($defs/none)."
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "$ref": "#/$defs/channel"
+          },
+          "description": "Each channel the agent answers on for this project."
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "owner",
+              "read",
+              "cadence",
+              "max_age"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ref",
+                "description": "The source's id, once among the sources and the declined sources (FAC-SEM-163)."
+              },
+              "owner": {
+                "$ref": "#/$defs/ref",
+                "description": "Who owns the source."
+              },
+              "read": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]{0,31}$",
+                "description": "How the source is read (url, api, capability, export, file), a word, not its address."
+              },
+              "cadence": {
+                "$ref": "#/$defs/durationOrZero",
+                "description": "How often it is read or rebuilt; zero means on every question."
+              },
+              "max_age": {
+                "$ref": "#/$defs/duration",
+                "description": "The age past which the source opens an alert episode, above zero: the signal server reports a source's age against it, so zero would read as always stale. The age runs from the source's last successful read (a sync that finished), not from the last change of its content (the standard's section 7.1)."
+              }
+            }
+          },
+          "description": "Every source the agent reads, with its owner and maximum age."
+        },
+        "declined_sources": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "decision"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ref",
+                "description": "The source that was declined."
+              },
+              "decision": {
+                "$ref": "#/$defs/ref",
+                "description": "The decision that declined it."
+              }
+            }
+          },
+          "description": "Sources recommended and declined, each with its decision."
+        },
+        "handoff_queues": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "owner",
+              "limit",
+              "answered_signal"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ref",
+                "description": "The queue's id, once in the list (FAC-SEM-163)."
+              },
+              "owner": {
+                "$ref": "#/$defs/ref",
+                "description": "Who owns the queue."
+              },
+              "limit": {
+                "$ref": "#/$defs/duration",
+                "description": "How long a hand-off may wait in the queue."
+              },
+              "answered_signal": {
+                "$ref": "#/$defs/ref",
+                "description": "The signal that a hand-off was answered, or none."
+              },
+              "recommendation": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{8,128}$",
+                "description": "The board thread of the recommendation to the queue's owner, an opaque id as the board writes it (comms-common opaqueId); present when answered_signal is none (FAC-SEM-164)."
+              }
+            }
+          },
+          "description": "Each queue a hand-off to a person goes to."
+        },
+        "evals": {
+          "type": "object",
+          "required": [
+            "suite",
+            "judge_budget_usd",
+            "replay_budget_usd"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "suite": {
+              "$ref": "#/$defs/relativeRef",
+              "description": "The eval suite, by its path in the agent's repository or its name."
+            },
+            "judge_budget_usd": {
+              "$ref": "#/$defs/usd",
+              "description": "The daily judge's budget in USD; 0 means none."
+            },
+            "replay_budget_usd": {
+              "$ref": "#/$defs/usd",
+              "description": "The replays' budget per month in USD; 0 means none."
+            },
+            "spend_record": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The id of the limit in the agent's usage report (service-usage limit id) the budgets are spent under; a budget above 0 names one (FAC-SEM-164), and a budget without one reads 0."
+            }
+          },
+          "description": "The eval suite and the budgets of the judge and the replays."
+        },
+        "tickets": {
+          "type": "object",
+          "required": [
+            "outbox",
+            "token_slot",
+            "pd_check"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "outbox": {
+              "$ref": "#/$defs/relativeRef",
+              "description": "Where unsent ticket writes wait: a table name or a path in the agent's repository."
+            },
+            "token_slot": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,127}/[a-z][a-z0-9-]{0,31}/[A-Z][A-Z0-9_]{0,63}$",
+              "description": "The vault slot of the (agent, project) token, by name: <project>/<env>/<NAME>, where <project> is the vault project's name (^[a-z0-9][a-z0-9._-]{0,127}$, not the declaration's project:<slug>), <env> ^[a-z][a-z0-9-]{0,31}$ and NAME ^[A-Z][A-Z0-9_]{0,63}$. Never its value."
+            },
+            "pd_check": {
+              "if": {
+                "type": "object",
+                "required": [
+                  "none"
+                ],
+                "properties": {
+                  "none": true
+                }
+              },
+              "then": {
+                "$ref": "#/$defs/none"
+              },
+              "else": {
+                "$ref": "#/$defs/pdCheck"
+              },
+              "description": "The personal-data check run inside the side, as <name>@<version>. Or the none form ($defs/none)."
+            }
+          },
+          "description": "The ticket outbox, the token's slot and the personal-data check."
+        },
+        "recorded_decisions": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "date",
+              "effect"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/ref",
+                "description": "The decision's id, once in the list (FAC-SEM-163)."
+              },
+              "date": {
+                "$ref": "#/$defs/date",
+                "description": "The day it was recorded."
+              },
+              "effect": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "description": "What it does, as a word (replies_off)."
+              }
+            }
+          },
+          "description": "The recorded decisions the agent follows; every channel held by one names it (FAC-SEM-163)."
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "replies_enabled",
+        "decision",
+        "final_limit",
+        "first_reply_limit",
+        "holding_reply",
+        "clarifying_question",
+        "items_seen_unit",
+        "texts"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(?![a-z0-9_-]*[0-9]{7})[a-z0-9][a-z0-9_-]{0,63}$",
+          "description": "The channel's id, as support-ticket/1's channel: this contract's grammar (the standard gives none), lower case, with no run of 7 or more digits; once in the project (FAC-SEM-163)."
+        },
+        "kind": {
+          "enum": [
+            "telegram_dm",
+            "telegram_group",
+            "mail",
+            "store_review",
+            "public_comment",
+            "team_chat",
+            "account"
+          ],
+          "description": "The kind of channel."
+        },
+        "replies_enabled": {
+          "type": "boolean",
+          "description": "Whether the agent replies; false only by a recorded decision (FAC-SEM-163)."
+        },
+        "decision": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ref"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The recorded decision that holds the channel, or null."
+        },
+        "final_limit": {
+          "$ref": "#/$defs/duration",
+          "description": "The age at which a ticket gets its final reply and ends."
+        },
+        "first_reply_limit": {
+          "$ref": "#/$defs/duration",
+          "description": "The age by which the first reply is due."
+        },
+        "holding_reply": {
+          "type": "boolean",
+          "description": "Whether a held question gets a holding reply; true needs a holding text (FAC-SEM-164)."
+        },
+        "clarifying_question": {
+          "type": "boolean",
+          "description": "Whether the agent may ask one clarifying question; never on a store review (FAC-SEM-164)."
+        },
+        "quiet_window": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/duration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How long the agent waits while staff is answering in a group, or null."
+        },
+        "late_answer_window": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/duration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How late an answer may still come, or null."
+        },
+        "items_seen_unit": {
+          "enum": [
+            "mails",
+            "updates",
+            "messages",
+            "reviews"
+          ],
+          "description": "What the channel's own API counts as arrived, the unit of the daily note's items_seen."
+        },
+        "texts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "holding": {
+              "$ref": "#/$defs/texts",
+              "description": "The holding reply, per language."
+            },
+            "final": {
+              "if": {
+                "type": "object",
+                "required": [
+                  "none"
+                ],
+                "properties": {
+                  "none": true
+                }
+              },
+              "then": {
+                "$ref": "#/$defs/none"
+              },
+              "else": {
+                "$ref": "#/$defs/texts"
+              },
+              "description": "The final reply, per language; present when replies are on (FAC-SEM-164). Or the none form ($defs/none): a replying channel with {\"none\": ...} owes no finding."
+            }
+          },
+          "description": "The holding and final texts the channel sends."
+        }
+      }
+    },
+    "durationOrZero": {
+      "type": "string",
+      "pattern": "^P(?=[0-9T])([0-9]{1,5}D)?(T(?=[0-9])([0-9]{1,5}H)?([0-9]{1,5}M)?([0-9]{1,5}S)?)?$",
+      "description": "An ISO 8601 duration in days, hours, minutes and seconds, as duration, where zero (P0D, PT0S) is allowed: a source's cadence, read on every question."
+    },
+    "questionRoute": {
+      "type": "object",
+      "required": [
+        "capability",
+        "target",
+        "daily_cap",
+        "days",
+        "tz",
+        "send_at",
+        "expires"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "enum": [
+            "team.ask",
+            "operator.ask"
+          ],
+          "description": "team.ask for a product team's side, operator.ask for the operator's; which side is which is the signal server's data."
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,191}$",
+          "description": "The desk's Fabric project id, as com.submit addresses it (comms-common projectId)."
+        },
+        "daily_cap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "The agent's cap for this project's questions a day; the desk's side-wide cap of section 6.4 still binds. This reading is to be confirmed with the standard's owner on thread b6820b97."
+        },
+        "days": {
+          "type": "string",
+          "pattern": "^(mon|tue|wed|thu|fri|sat|sun)(-(mon|tue|wed|thu|fri|sat|sun))?(,(mon|tue|wed|thu|fri|sat|sun)(-(mon|tue|wed|thu|fri|sat|sun))?)*$",
+          "description": "The desk's working days: days and ranges, comma separated (mon-fri, mon,wed,fri)."
+        },
+        "tz": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_+-]{0,30}(/[A-Za-z0-9_+-]{1,30}){0,2}$",
+          "description": "The time zone of days and send_at: an IANA name, one segment (UTC, GMT, CET) or Area/Location (Europe/Warsaw, Etc/UTC, America/Argentina/Buenos_Aires)."
+        },
+        "send_at": {
+          "type": "string",
+          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+          "description": "The desk's send time, HH:MM in tz."
+        },
+        "expires": {
+          "$ref": "#/$defs/duration",
+          "description": "How long a question waits for its answer (its deadline)."
+        }
+      },
+      "description": "How a question the knowledge cannot answer reaches a person."
+    },
+    "gapRegistry": {
+      "type": "object",
+      "required": [
+        "owner",
+        "capability"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/ref",
+          "description": "The agent that keeps the project's gap registry."
+        },
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{1,127}$",
+          "description": "The capability the registry is reached by (common capabilityName)."
+        }
+      },
+      "description": "The project's one gap registry."
+    },
+    "pdCheck": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}@[0-9A-Za-z][0-9A-Za-z.+-]{0,31}$",
+      "description": "The personal-data check run inside the side, as <name>@<version>."
+    }
+  }
+}
