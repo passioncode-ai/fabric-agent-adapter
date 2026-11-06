@@ -305,7 +305,7 @@ def dispatch_contract(dispatch: Dict[str, str], session_id: Any = None, conditio
 
 
 def gate_question_id(request: str) -> str:
-    """The `commandId` of the run's one question to the operator about a request it declined at the gate: UUID v5 of the
+    """The `commandId` of the run's one question to the operator about a request whose `com.enroll` was refused at the gate: UUID v5 of the
     name `board.gate` in the request id's namespace, so every run on that request asks the same question (Fabric,
     thread 1add3c03, a58b4280; FAA-224)."""
     import uuid  # only the exit contract needs it; the other hooks never pay for the import
@@ -826,7 +826,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if argv[:1] == ["install-host-hooks"]:
         return install_host_hooks_cli(argv[1:])
     if argv[:1] == ["gate-id"]:
-        # the commandId of the one operator question about a request declined at the gate, for a session that is not
+        # the commandId of the one operator question about a request whose enroll was refused, for a session that is not
         # a run (Fabric's board.read-at-start from its CO-517 asks every session; FAA-224)
         if len(argv) != 2 or not re.fullmatch(_DISPATCH_VALUE["request"], argv[1]):
             print("usage: fabric_session.py gate-id <board request id, a UUID>", file=sys.stderr)

@@ -196,7 +196,8 @@ operator once (at any other slot state it sends no reply and still asks, FAA-241
 opens it; without Python, no `commandId` can be made: tell the person only), tells the person (the question stays
 filed even when that is the operator: Fabric keeps its `about` and settles nothing by it yet, CO-519), and stops handling
 that request without waiting (Fabric's `board.read-at-start` rule and `com.enroll`'s own tool description say the
-same since main `4f3c742a`: the question since `603da12f` (CO-517), the slot condition since `dbfbfce4` and `12d57bdd`; in no Fabric release yet, and
+same since main `4f3c742a`: the question since `603da12f` (CO-517) in the rule and `12d57bdd` in the description, the slot condition since
+`dbfbfce4` and `12d57bdd`; in no Fabric release yet, and
 on Fabric 0.3.16 this rule wins). Never write "it stays queued" in a reply: the reply itself ends the queue. A
 run Fabric started on a board request has no person in its chat to tell: with the slot `absent` at generation 0 it declines,
 asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued and still asks ([on-demand session](on-demand-session.md), step 3).
@@ -267,7 +268,8 @@ answer for a merge, a release or the end of the task; the finished result goes l
 thread. A state with its nearest date is an answer (the operator's rule of 2026-11-04, board thread `11646774`): to a
 request it moves the request to `answered` as any participant reply does (above), so where your Project's service
 responder should still do the work, tell the person and leave the request queued instead (a session's own refused
-`com.enroll` with its slot `absent` at generation 0 answers once that it cannot be taken now, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
+`com.enroll` with its slot `absent` at generation 0 answers once that it cannot be taken now, and at any slot state asks
+the operator, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
 it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
 `com.complete` (DEC-0152 SA-6, proposed). Fabric's `fabric_whoami` gives a state as a `com.reply` and a slot holder's as a
 `com.progress` since Fabric 0.3.16 (`fff4b6d9`); the responder's exception above is this page's.

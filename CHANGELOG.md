@@ -13,8 +13,9 @@
   `4f3c742a`, which says the same in `board.read-at-start` and `com.enroll`'s description). The exit contract's step
   3, `references/on-demand-session.md`, `references/project-board.md` (a live session too) and both scenario evals
   (`a-dispatched-run-whose-enroll-is-refused`, `answer-as-responder-or-reply`) say so; the gate question names what
-  opens the gate at a held slot (the service enrolling again); the exit contract stays under Hermes' 4000 characters
-  (3996 at its longest).
+  opens the gate: before CO-506, a Fabric release with it, and at a held slot the service enrolling again; once CO-506
+  shipped, the reason Fabric's `board.own-respond` names and what lifts it; the exit contract stays under Hermes' 4000
+  characters (3996 at its longest).
 
 ## 0.71.0 (2026-11-06)
 
