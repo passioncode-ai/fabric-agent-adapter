@@ -23,7 +23,8 @@ DEC-0140, DEC-0146 to DEC-0148, DEC-0150 and DEC-0153.
 
 - working-with-fabric: a human gate is "a secret typed in or handed out" (DEC-0147 reads AP-4's `secret` so, a peer
   share's export included) where it said "a typed secret": SKILL.md's human gates, the exit contract of a run Fabric
-  started on a board request, `references/on-demand-session.md` and the scenario evals.
+  started on a board request, `references/on-demand-session.md` and the scenario evals; creating-fabric-agents
+  `references/resilience-and-autonomy.md` too.
 - creating-fabric-agents `references/practices.md` and the support-agent recipe name DEC-0150 as the contract's,
   released in `v0.1.0+2026-11-05.2`, where they called it proposed, and say `check_service.py` does not read the
   declaration yet (FAA-197), where they said it would once the schema was published.

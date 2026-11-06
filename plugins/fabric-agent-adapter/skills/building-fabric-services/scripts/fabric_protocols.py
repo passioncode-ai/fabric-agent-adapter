@@ -10,8 +10,8 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 
-#: Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`, DEC-0067); a test
-#: holds it equal to the contract's register at the pin.
+#: Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`, DEC-0067); the
+#: adapter's own test holds it equal to the contract's register at the adapter's pin, not in a vendored copy.
 PROTOCOL_REVISIONS: Dict[str, Tuple[str, ...]] = {
     "access-log": ("1",), "approval": ("1",), "activity-summary": ("1",), "agent-directory": ("1",), "call-record": ("1",), "channel-agent-standard": ("1",), "coding-agents": ("1",), "credential-decision": ("1",), "credential-request": ("1",), "credential-revocation": ("1",), "enroll-token": ("1",), "entitlement": ("1",),
     "entitlement-key-set": ("1",), "estate-record": ("1",), "execution-packet": ("1",),

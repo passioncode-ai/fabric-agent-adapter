@@ -116,8 +116,8 @@ mechanism that held after the fix. Every rule is cheaper to build in than to ret
 
 1. **An open question is a decision to make.** Decide from the recorded decisions, then the
    goal, then the safest reversible option; write the decision and its source where the work
-   lives; batch the questions only a person can answer (sign-in, consent, payment, a typed
-   secret) and keep working around them.
+   lives; batch the questions only a person can answer (sign-in, consent, payment, a secret
+   typed in or handed out) and keep working around them.
 2. **Nothing in a user's path waits for a human approval.** Send now or not at all; when unsure,
    say so, open a recorded question, and answer again automatically when the knowledge changes.
    Drafts awaiting approval waited for days.

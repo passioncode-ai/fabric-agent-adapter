@@ -174,7 +174,7 @@
    "imports": [
     "fabric_secrets"
    ],
-   "sha256": "f2e401ca2873a1aaa9b628decf3232a737c992bbb2aa44110e95ae7357edb33f"
+   "sha256": "077c6f03f3b887a2e22d9ce6b5bd3750199d71a29d4c82b1d5af8a615b509d93"
   },
   {
    "module": "fabric_actions",
@@ -666,7 +666,7 @@
    "imports": [
     "fabric-secrets"
    ],
-   "sha256": "02e8870f7c6f24f84a055613a9c29023612ad8b450a9ea00d4c3b2cc0d1bcd1e"
+   "sha256": "a560b7d6eb0d26204c5536711c3dda9daae90cc91e07cdc75412e75c86272767"
   },
   {
    "module": "fabric-actions",
@@ -5604,7 +5604,7 @@
    "fabric_ceremonies.py": "a59e83cf4adb2669a9b98008e3d3a0cba991a35cbff97bc604fc82fe81cfd49f",
    "fabric_package_schema.py": "e623f0408d38e3343ed66222fb812907c6c52e1a286eb1c1176ab2e64640c9ad",
    "fabric_package.py": "1f2b9e73b2b32a7e1e887d4b69f87c6e21b4d1227ad924a235334223e6dd51ca",
-   "fabric_protocols.py": "f2e401ca2873a1aaa9b628decf3232a737c992bbb2aa44110e95ae7357edb33f",
+   "fabric_protocols.py": "077c6f03f3b887a2e22d9ce6b5bd3750199d71a29d4c82b1d5af8a615b509d93",
    "fabric_actions.py": "ae21d1199614c4f74d1dcd1e0a87107a9d52434cd9e2d64aa24a7b1e196fb723",
    "fabric_connections.py": "7de55cb7d808f756d650effabfaa12027d40a5bd5d2f6d448c32969d47529ecb",
    "fabric_a2a.py": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919",
@@ -5647,7 +5647,7 @@
    "fabric-ceremonies.mjs": "117d4374c9e95c930a38de7adbd4323774798f4fe6ec6f24afcd6f2c7298ca44",
    "fabric-package-schema.mjs": "cd28092375db0fc21ffab1f0bb7794f7f8979ee08c64d3b9faf4b3845357caa6",
    "fabric-package.mjs": "8cfb32eebbd4e1bcf28a6e4437344ae2dd54479b0e7c820f002e9f94ab9ecaad",
-   "fabric-protocols.mjs": "02e8870f7c6f24f84a055613a9c29023612ad8b450a9ea00d4c3b2cc0d1bcd1e",
+   "fabric-protocols.mjs": "a560b7d6eb0d26204c5536711c3dda9daae90cc91e07cdc75412e75c86272767",
    "fabric-actions.mjs": "06e42f5e24c96311d5417d0d1effa93479ef7128a7ab139903b2bcf59253f6be",
    "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",
    "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
