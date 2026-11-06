@@ -26,6 +26,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     _write_private,
     claude_registration,
     codex_registered,
+    another_users_copy,
     fabric_bin_candidates,
     fabric_launched,
     fabric_root,
@@ -130,10 +131,10 @@ DISPATCH_HEAD = "[fabric-agent-adapter] Fabric started this session on one board
 DISPATCH_IF = (
     "[fabric-agent-adapter] This session is the run on a board request only when its own prompt's first line is "
     "exactly `fabric-dispatch/1 workflow={workflow} handoff={handoff} request={request}`. No such line: it is a helper; touch none of the three."
-    " With other values: no run; say so in the request's thread and stop. The run:")
+    " Other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3996 in 0.68.0, 3994 in 0.69.0: a new rule takes its characters back from the text around it).
+#: (3996 in 0.68.0 and in 0.69.0: a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
     "request and end; never wait for a person. 1. `fabric_whoami`, then the packet "
@@ -146,11 +147,11 @@ DISPATCH_CONTRACT = (
     "no lease: end the run without touching the request. 3. `com.status` once ("
     "epoch, generation); `com.enroll` (the capability), `com.claim` (the request), "
     "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at generation 0, one `com.reply` (replyTo it) "
-    "declining until Fabric's CO-506 (resend then) and `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
-    "`com.reconcile` and an observed result; never complete what you did not observe. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
+    "declining until Fabric's CO-506 (resend then), next `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "`com.reconcile` and an observed result. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
-    "`pack`) unchanged (add `open`, `done`, `notes`; no value). 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s; "
+    "`pack`) unchanged (add `open`, `done` or `notes`; no value). 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s; "
     "work that cannot end by run-ends-at posts its state (`com.progress`); "
     "if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known (observed: true) saying so and steps 6 and 7; "
     "otherwise it is left accepted for the next run, an in_progress checkpoint without `close`, steps 5 and 6 "
@@ -714,9 +715,16 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
               "transcriptRead": "off" if repositories_off(env) else ("waiting" if not active else "unregistered" if claude is None
                                                                     else "on" if repositories_wanted(env) else "waiting")}
     shown = '"%s"' % (binary or "<Fabric>/bin/" + ("fabric-mcp.cmd" if platform == "win32" else "fabric-mcp"))
+    # FAA-229: before 0.69.0 status proposed /Applications first, so a second user of a Mac may run another user's copy
+    foreign = bool(claude) and another_users_copy(Path(claude["command"]), platform, env)
+    report["registeredCopy"] = "another user's" if foreign else "ok"
     if binary is None and claude is None:
-        report["next"] = "Install Fabric v0.3.5 or later; no fabric-mcp of yours (or root's) is at %s." % ", ".join(
-            str(p) for p in fabric_bin_candidates(platform, env))
+        report["next"] = "Install Fabric v0.3.5 or later; no fabric-mcp %sis at %s." % (
+            "of yours " if platform == "darwin" else "",
+            ", ".join(str(p) for p in fabric_bin_candidates(platform, env)))
+    elif foreign:
+        report["next"] = ("The registered fabric-mcp is another user's copy: claude mcp remove --scope %s fabric, then "
+                          "claude mcp add --scope user fabric -- %s --runner claude-code" % (claude["scope"], shown))
     elif hub["state"] == "not-a-hub":
         report["next"] = "Fabric's hub could not be verified (%s): open Fabric; send it nothing until it can." % hub["reason"]
     elif hub["state"] != "running":
@@ -737,7 +745,8 @@ def print_status(report: Dict[str, Any]) -> None:
     print("Fabric: %s" % line)
     print("fabric-mcp: %s" % (report["fabricMcp"] or "not found at the default install locations"))
     print("Claude Code: %s" % ("fabric registered (%s scope) -> %s%s" % (
-        claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") if claude else "not registered"))
+        claude["scope"], claude["command"], "" if claude["fabricMcp"] else " (not fabric-mcp)") + (
+        " (another user's copy)" if report.get("registeredCopy") == "another user's" else "") if claude else "not registered"))
     print("Codex: %s" % ("fabric registered" if report["codex"] else "not registered"))
     print("Session hooks: %s" % ("active" if report["sessionHooks"] == "active"
                                  else "inert (this Fabric does not advertise %s)" % HOOK_FEATURE))

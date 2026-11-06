@@ -231,7 +231,8 @@ class Paths(unittest.TestCase):
             try:
                 self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "a copy of this user's own")
                 env_module._owner_uid = lambda path: 0
-                self.assertEqual(fs.find_fabric_bin("darwin", {"HOME": str(home)}), shared, "root's copy is everyone's")
+                self.assertIsNone(fs.find_fabric_bin("darwin", {"HOME": str(home)}), "root's: the launcher's rule")
+                self.assertEqual(fs.find_fabric_bin("linux", {"HOME": str(home)}), shared, "the owner rule is macOS'")
                 env_module._owner_uid = lambda path: os.getuid() + 1
                 self.assertIsNone(fs.find_fabric_bin("darwin", {"HOME": str(home)}), "another user's copy")
                 mine.parent.mkdir(parents=True)
@@ -2115,6 +2116,35 @@ class Status(Base):
         binary.write_text("")
         self.assertEqual(fs.status(self.repo, self.env)["next"],
                          'Register it once: claude mcp add --scope user fabric -- "%s" --runner claude-code' % binary)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_a_registered_copy_of_another_user_is_named(self):
+        # FAA-229 (0.69.0 product reading 1): status before 0.69.0 proposed /Applications first, and the hooks run the
+        # registered command, so a second user of a Mac who followed it is told to register their own copy
+        shared = self.base / "Applications" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        self.register(command=str(shared))
+        self.hub()
+        saved = self.env_module._owner_uid
+        try:
+            self.env_module._owner_uid = lambda path: os.getuid() + 1
+            report = fs.status(self.repo, self.env, "darwin")
+            self.assertEqual(report["registeredCopy"], "another user's")
+            self.assertTrue(report["next"].startswith("The registered fabric-mcp is another user's copy: claude mcp "
+                                                      "remove --scope user fabric, then claude mcp add --scope user"),
+                            report["next"])
+            for platform in ("linux", "win32"):
+                other = fs.status(self.repo, self.env, platform)
+                self.assertEqual(other["registeredCopy"], "ok", platform)
+                self.assertNotIn("another user's", other["next"], platform)
+            self.env_module._owner_uid = lambda path: 0
+            self.assertEqual(fs.status(self.repo, self.env, "darwin")["next"], "Call fabric_whoami.", "root's is shared")
+        finally:
+            self.env_module._owner_uid = saved
+        (self.home / ".claude.json").unlink()
+        self.assertIn("no fabric-mcp of yours is at", fs.status(self.repo, self.env, "darwin")["next"])
+        self.assertIn("no fabric-mcp is at", fs.status(self.repo, self.env, "linux")["next"], "the owner rule is macOS'")
 
     def test_the_cli_prints_and_reads_no_token(self):
         self.register()

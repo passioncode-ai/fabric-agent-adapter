@@ -184,17 +184,33 @@ def _owner_uid(path: Path) -> Optional[int]:
         return None
 
 
+def another_users_copy(path: Path, platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> bool:
+    """On macOS, a file outside the user's home that is neither this user's nor root's: another user's copy, which this
+    user must not run (FAA-229). Root's is an install every user shares, not another user's. False elsewhere, and for a
+    path it cannot read."""
+    if platform != "darwin" or not hasattr(os, "getuid") or not path.is_absolute():
+        return False
+    if _home(os.environ if env is None else env) in path.parents:
+        return False
+    owner = _owner_uid(path)
+    return owner is not None and owner not in (os.getuid(), 0)
+
+
+def _own_copy(path: Path, platform: str, env: Optional[Dict[str, str]]) -> bool:
+    if platform != "darwin" or not hasattr(os, "getuid"):
+        return True
+    if _home(os.environ if env is None else env) in path.parents:
+        return True
+    return _owner_uid(path) == os.getuid()
+
+
 def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> Optional[Path]:
     """The first candidate that is a file. On macOS a copy outside the user's home is taken only when it is this
-    user's or root's (an install every user shares): another user's copy is skipped (FAA-229)."""
-    home = _home(os.environ if env is None else env)
+    user's, as the launcher installs it (its lib/catalog.js appPath): another user's copy, or root's, is skipped and
+    `~/Applications` is the user's own place (FAA-229)."""
     for candidate in fabric_bin_candidates(platform, env):
-        if not candidate.is_file():
-            continue
-        if platform == "darwin" and home not in candidate.parents and hasattr(os, "getuid"):
-            if _owner_uid(candidate) not in (os.getuid(), 0):
-                continue
-        return candidate
+        if candidate.is_file() and _own_copy(candidate, platform, env):
+            return candidate
     return None
 
 
