@@ -96,7 +96,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    which takes the request itself without opening this gate; on Fabric 0.3.16 nothing else does, since Agent access only
    decides a request a service filed; once CO-506 shipped, at every slot state, the reason Fabric's `board.own-respond`
    log line names and what lifts it: a machine marked as an organization's (the mark in Fabric's settings), no live credential (the agent
-   enrolls again) a standing denial ("Снять отказ" in Agent access) or a full ask queue (the
+   enrolls again), a standing denial ("Снять отказ" in Agent access) or a full ask queue (the
    operator answers the asks that wait, or they expire); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot; Fabric keeps the
    `about` with the question and settles no later question by it yet (CO-519), so each gate question reaches the operator and a
    repeat with the same `commandId` returns the same question: Fabric, thread `1add3c03`, `5b216035`). A question that fails is left (the decline already answered the request), and the closing write's
@@ -106,7 +106,7 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    service of this Project, or after CO-506 a session; one that stopped cleanly reads `absent`, and a service takes the
    request when it rejoins, so a decline would take it from it; Fabric serves a session no `held` flag yet), it sends no
    `com.reply` but still asks the operator with the same `fabric_question_ask` (a question answers no request and takes
-   nothing from the service; after CO-506 such a refusal comes from the reason `board.own-respond` names (an organization's machine, no live
+   nothing from the service; after CO-506 such a refusal comes from the reason `board.own-respond` names (such as an organization's machine, no live
    credential, a standing denial, a full ask queue), so it is never silent: FAA-241, Fabric main `4f3c742a`; a question that fails is named in the
    `notes` of one more in_progress checkpoint), then the error rule below holds and the request stays as it is (a queued request goes to
    the operator after two runs with no answer). A
