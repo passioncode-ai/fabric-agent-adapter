@@ -92,8 +92,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    v5 of the name `board.gate` in the request id's namespace, `gate_question_id` in `fabric_session_cli.py`, so every run
    on that request gets the same question back) and a `text` naming the request (its id, the requesting Project, the
    capability), the gate (this Project's `board.respond` grant for that capability) and what opens it (on Fabric before CO-506: a Fabric
-   release with CO-506, which grants it at `com.enroll`, and at a slot a holder held, the Project's service, which takes
-   the request when it enrolls again; on Fabric 0.3.16 nothing else does, since Agent access only
+   release with CO-506, which grants it at `com.enroll`, and at a slot a holder held, the Project's service enrolling again,
+   which takes the request itself without opening this gate; on Fabric 0.3.16 nothing else does, since Agent access only
    decides a request a service filed; once CO-506 shipped, at every slot state, the reason Fabric's `board.own-respond`
    log line names and what lifts it: a machine marked as an organization's (the mark in Fabric's settings), no live credential (the agent
    enrolls again) or a standing denial ("Снять отказ" in Agent access); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot; Fabric keeps the
@@ -105,8 +105,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    service of this Project, or after CO-506 a session; one that stopped cleanly reads `absent`, and a service takes the
    request when it rejoins, so a decline would take it from it; Fabric serves a session no `held` flag yet), it sends no
    `com.reply` but still asks the operator with the same `fabric_question_ask` (a question answers no request and takes
-   nothing from the service; after CO-506 such a refusal comes only from an organization's machine, no live credential
-   or a standing denial, so it is never silent: FAA-241, Fabric main `4f3c742a`; a question that fails is named in the
+   nothing from the service; after CO-506 such a refusal comes from the reason `board.own-respond` names (an organization's machine, no live
+   credential, a standing denial, a full ask queue), so it is never silent: FAA-241, Fabric main `4f3c742a`; a question that fails is named in the
    `notes` of one more in_progress checkpoint), then the error rule below holds and the request stays as it is (queued, it goes to
    the operator after two runs with no answer). A
    capability listed only by a service's live grant, with no enroll yet, also reads `absent` at generation 0: a run
