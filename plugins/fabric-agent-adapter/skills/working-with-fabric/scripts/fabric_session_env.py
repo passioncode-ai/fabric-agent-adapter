@@ -167,22 +167,10 @@ APPLICATIONS_ENV = "PASSIONCODE_APPLICATIONS"
 
 
 def launcher_folder(env: Optional[Dict[str, str]] = None) -> Optional[Path]:
-    """The folder `PASSIONCODE_APPLICATIONS` names, when it is one: `~` is this env's home, `~user` the system's, and a
-    value that is empty, relative or names an unknown user is none (FAA-237)."""
-    env = os.environ if env is None else env
-    value = (env.get(APPLICATIONS_ENV) or "").strip()
-    if not value:
-        return None
-    if value == "~" or value.startswith("~/"):
-        return _home(env) / value[2:]
-    if value.startswith("~"):
-        if os.name != "posix":  # ~user is a macOS form; another system would read another place
-            return None
-        try:
-            value = os.path.expanduser(value)
-        except (RuntimeError, KeyError, OSError, ValueError):  # ~user with no such user
-            return None
-    # a macOS path is POSIX on whatever host reads it (on Windows `/Volumes/Apps` has no drive yet is absolute here)
+    """The folder `PASSIONCODE_APPLICATIONS` names, read as the launcher reads it (its lib/catalog.js `appsDir` takes the
+    value as it is): a value starting with `/` is the folder; anything else, `~` included (a shell expands it before it
+    is set), is none, and the default order holds (FAA-237). A macOS path is POSIX on whatever host reads it."""
+    value = (os.environ if env is None else env).get(APPLICATIONS_ENV) or ""
     return Path(value) if value.startswith("/") else None
 
 

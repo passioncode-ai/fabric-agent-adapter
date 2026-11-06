@@ -118,7 +118,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    yet);
    Fabric's `com.enroll` description in 0.3.16 tells a session to ask the grant, which it cannot, and 0.3.16's own
    `not_authorized` refusal says to reply with the answer; step 3 wins over both, and over the corrected description on Fabric's
-   `main` before `dbfbfce4` (which answered whatever the slot read); the refusal text waits for its CO-507. An earlier run may have left the request taken: `com.get` on the
+   `main` in `com.enroll`'s tool description (`b8c0a38c`, which still answers whatever the slot reads; only the board
+   rule took the condition at `dbfbfce4`, and FAA-231 asks Fabric to align the description); the refusal text waits
+   for its CO-507. An earlier run may have left the request taken: `com.get` on the
    request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
    attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result; so is an `in_progress` one an

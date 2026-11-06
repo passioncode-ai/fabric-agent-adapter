@@ -224,13 +224,12 @@ class Paths(unittest.TestCase):
         env = {"HOME": "/Users/a", "PASSIONCODE_APPLICATIONS": "/Volumes/Apps"}
         self.assertEqual(fs.fabric_bin_candidates("darwin", env),
                          [Path("/Volumes/Apps/Fabric.app/Contents/Resources/bin/fabric-mcp")])
-        self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS="~/Apps")),
-                         [Path("/Users/a/Apps/Fabric.app/Contents/Resources/bin/fabric-mcp")], "this env's home")
-        self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS=" /Volumes/Apps/ ")),
+        self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS="/Volumes/Apps/")),
                          [Path("/Volumes/Apps/Fabric.app/Contents/Resources/bin/fabric-mcp")])
         default = [Path("/Users/a/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
                    Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")]
-        for value in ("", "  ", "relative/Apps", "~nosuchuser-faa237/Apps"):
+        # as the launcher reads it: a literal ~ is no folder (0.70.0 product reading 2)
+        for value in ("", "  ", "relative/Apps", "~/Apps", "~nosuchuser-faa237/Apps", " /Volumes/Apps"):
             self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS=value)), default, value)
         self.assertEqual(fs.fabric_bin_candidates("linux", env), [Path("/opt/Fabric/resources/bin/fabric-mcp")],
                          "the launcher's folder is macOS'")
@@ -2313,7 +2312,8 @@ class Status(Base):
         binary.write_text("")
         self.assertEqual(fs.status(self.repo, env, "darwin")["fabricMcp"], str(binary))
         self.env_module._owner_uid = lambda path: 0
-        self.assertTrue(fs.status(self.repo, env, "darwin")["administratorsCopy"], "root's copy in the launcher's folder")
+        if os.getuid() != 0:  # root's own copy is not an administrator's (the container runs as root)
+            self.assertTrue(fs.status(self.repo, env, "darwin")["administratorsCopy"], "root's copy in the launcher's folder")
         binary.unlink()
         shared = self.base / "Shared" / "fabric-mcp"
         shared.parent.mkdir()

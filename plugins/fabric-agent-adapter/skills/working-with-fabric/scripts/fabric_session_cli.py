@@ -730,8 +730,7 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     report["administratorsCopy"] = bool(binary) and administrators_copy(binary, platform, env)
     report["registeredCopy"] = "another user's" if foreign else "ok"
     # where the user's own copy goes: the launcher's folder when the person named one, else ~/Applications (FAA-237)
-    folder = launcher_folder(env) if platform == "darwin" else None
-    place = str(folder) if folder else "~/Applications"
+    place = str(chosen) if chosen else "~/Applications"
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
             " (your own copy, in %s)" % place if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
