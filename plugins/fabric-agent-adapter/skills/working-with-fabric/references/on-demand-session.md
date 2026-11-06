@@ -91,28 +91,35 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `fabric_question_ask` with `kind: access`, `about: board.gate.<capability>`, the `commandId` the contract names (UUID
    v5 of the name `board.gate` in the request id's namespace, `gate_question_id` in `fabric_session_cli.py`, so every run
    on that request gets the same question back) and a `text` naming the request (its id, the requesting Project, the
-   capability), the gate (this Project's `board.respond` grant for that capability) and what opens it (a Fabric
-   release with CO-506, which grants it at `com.enroll`; on Fabric 0.3.16 nothing else does, since Agent access only
-   decides a request a service filed; once CO-506 shipped, the reason Fabric's `board.own-respond` log line names and
-   what lifts it: a machine marked as an organization's (the mark in Fabric's settings), no live credential (the agent
-   enrolls again) or a standing denial ("Снять отказ" in Agent access); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot; Fabric keeps the
+   capability), the gate (this Project's `board.respond` grant for that capability) and what opens it (on Fabric before CO-506: a Fabric
+   release with CO-506, which grants it at `com.enroll`, and at a slot a holder held, the Project's service enrolling again,
+   which takes the request itself without opening this gate; on Fabric 0.3.16 nothing else does, since Agent access only
+   decides a request a service filed; once CO-506 shipped, at every slot state, the reason Fabric's `board.own-respond`
+   log line names and what lifts it: a machine marked as an organization's (the mark in Fabric's settings), no live credential (the agent
+   enrolls again), a standing denial ("Снять отказ" in Agent access) or a full ask queue (the
+   operator answers the asks that wait, or they expire); Fabric, thread `1add3c03`, `315c5b54`); it waits for no answer (FAA-224; the tool needs no slot; Fabric keeps the
    `about` with the question and settles no later question by it yet (CO-519), so each gate question reaches the operator and a
    repeat with the same `commandId` returns the same question: Fabric, thread `1add3c03`, `5b216035`). A question that fails is left (the decline already answered the request), and the closing write's
    `notes` say so, since then nothing about the gate reached the operator. Then it closes the workflow `done` once
-   `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with the slot `stale`, `active`, or `absent` at a generation of 1 or more (a holder enrolled on it: a
+   `com.get` reads it answered (step 6), and writes the retro (step 7). When the request is not queued, or the slot
+   reads `stale`, `active`, or `absent` at a generation of 1 or more (a holder enrolled on it: a
    service of this Project, or after CO-506 a session; one that stopped cleanly reads `absent`, and a service takes the
-   request when it rejoins, so a decline would take it from it; Fabric serves a session no `held` flag yet), the error
-   rule below holds and the request stays as it is (queued, it goes to the operator after two runs with no answer). A
+   request when it rejoins, so a decline would take it from it; Fabric serves a session no `held` flag yet), it sends no
+   `com.reply` but still asks the operator with the same `fabric_question_ask` (a question answers no request and takes
+   nothing from the service; after CO-506 such a refusal comes from the reason `board.own-respond` names (such as an organization's machine, no live
+   credential, a standing denial, a full ask queue), so it is never silent: FAA-241, Fabric main `4f3c742a`; a question that fails is named in the
+   `notes` of one more in_progress checkpoint), then the error rule below holds and the request stays as it is (a queued request goes to
+   the operator after two runs with no answer). A
    capability listed only by a service's live grant, with no enroll yet, also reads `absent` at generation 0: a run
    declines it, which a service asking and enrolling at once (ADR-0186) seldom leaves time for.
-   The target's request no longer waits for the operator on the board (an answered request is settled: no second run,
+   After the decline, the target's request no longer waits for the operator on the board (an answered request is settled: no second run,
    no unmoved or to-operator finding; the question above is what reaches the operator, when Fabric took it); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
    shows it on the requester's Project in «На проверке» as an answer nobody read,
    and the closing write's `notes` say the request was declined until CO-506.
    Fabric's dispatcher counts an answered request as settled and starts no second run for it. Once CO-506 ships
    (Fabric's `main` `027cb809`) a session's own Project grants it at `com.enroll` itself, and this branch is taken only
    where CO-506 grants nothing (a machine marked as an organization's, no live credential for the session or its runner,
-   or a standing denial of that ask); the reply then names CO-506 though it shipped, and the real gate is that grant (left open in FAA-215).
+   a standing denial of that ask, or a full ask queue); the reply then names CO-506 though it shipped, and the real gate is that grant (left open in FAA-215).
    FAA-219; Fabric's answer in board thread `1add3c03` (option (b), 2026-11-05), the responder's run's rule plus the
    slot condition, which Fabric's `board.read-at-start` took from the adapter (FAA-231, main `dbfbfce4`, in no release
    yet);

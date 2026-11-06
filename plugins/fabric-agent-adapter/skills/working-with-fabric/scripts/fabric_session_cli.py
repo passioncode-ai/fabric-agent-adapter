@@ -137,7 +137,7 @@ DISPATCH_IF = (
     " Other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3996 in 0.68.0 and in 0.69.0, 3999 in 0.71.0: a new rule takes its characters back from the text around it).
+#: (3996 in 0.68.0 and in 0.69.0, 3999 in 0.71.0, 3996 in 0.72.0: a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
     "request and end; never wait for a person. 1. `fabric_whoami`, then the packet "
@@ -150,7 +150,7 @@ DISPATCH_CONTRACT = (
     "no lease: end the run without touching the request. 3. `com.status` once ("
     "epoch, generation); `com.enroll` (the capability), `com.claim` (the request), "
     "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at generation 0, one `com.reply` (replyTo it) "
-    "declining until Fabric's CO-506 (resend then), next `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "declining until CO-506 (resend then), either way `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
     "`com.reconcile` and an observed result. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
@@ -305,7 +305,7 @@ def dispatch_contract(dispatch: Dict[str, str], session_id: Any = None, conditio
 
 
 def gate_question_id(request: str) -> str:
-    """The `commandId` of the run's one question to the operator about a request it declined at the gate: UUID v5 of the
+    """The `commandId` of the run's one question to the operator about a request whose `com.enroll` was refused at the gate: UUID v5 of the
     name `board.gate` in the request id's namespace, so every run on that request asks the same question (Fabric,
     thread 1add3c03, a58b4280; FAA-224)."""
     import uuid  # only the exit contract needs it; the other hooks never pay for the import
@@ -826,7 +826,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if argv[:1] == ["install-host-hooks"]:
         return install_host_hooks_cli(argv[1:])
     if argv[:1] == ["gate-id"]:
-        # the commandId of the one operator question about a request declined at the gate, for a session that is not
+        # the commandId of the one operator question about a request whose enroll was refused, for a session that is not
         # a run (Fabric's board.read-at-start from its CO-517 asks every session; FAA-224)
         if len(argv) != 2 or not re.fullmatch(_DISPATCH_VALUE["request"], argv[1]):
             print("usage: fabric_session.py gate-id <board request id, a UUID>", file=sys.stderr)
