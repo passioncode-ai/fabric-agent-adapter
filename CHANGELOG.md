@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.71.0 (unreleased)
+## 0.71.0 (2026-11-06)
 
 The contract pin moves to `eac1a594` (`v0.1.0+2026-11-06.1`) from `3830a33` (`v0.1.0+2026-10-27.6`); between them
 DEC-0140, DEC-0146 to DEC-0148, DEC-0150 and DEC-0153.
