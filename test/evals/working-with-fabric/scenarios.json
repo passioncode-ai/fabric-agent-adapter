@@ -592,7 +592,7 @@
       "expected": [
         "runs the skill's status (or reads the Step 0 table) and looks in ~/Applications/Fabric.app first, taking a copy in /Applications only when it is this user's or root's",
         "does not run or keep the first user's copy: installs its own Fabric into ~/Applications, then removes the registration and adds one with its own copy's path",
-        "for a fabric entry in a project's shared .mcp.json, adds a local-scope entry that overrides it for this user instead of rewriting the shared file"
+        "if a project's shared .mcp.json registers fabric, adds a local-scope entry that overrides it for this user instead of rewriting the shared file"
       ]
     },
     {

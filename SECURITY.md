@@ -36,7 +36,7 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   tool's name, its input, which can carry the agent's note, and Fabric's answer), in memory: it writes, logs and sends
   nothing and prints one fixed line or nothing.
 - The working-with-fabric session hooks run as the person: Stop and SessionEnd run `git`
-  in the session's folder (counts only, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
+  in the session's folder (HEAD and counts, at most 1.5 s; with the mark below, also that folder's own `origin`, only to leave its repository out), read the process table to tell a
   session Fabric launched. Stop also, only once the running Fabric's `fabric_session_observe` takes
   `repositories` (FAA-140; a worker sees it in the tool's schema and leaves a mark) and unless the person turned it off
   (`FABRIC_SESSION_NO_REPOSITORIES=1` or a `no-repositories` file in the hooks' folder, FAA-160), reads the

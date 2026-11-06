@@ -2232,12 +2232,15 @@ class Status(Base):
             report = fs.status(self.repo, self.env, "darwin")
             self.assertIn("claude mcp add --scope local fabric", report["next"])
             self.assertIn("in %s, " % self.repo.resolve(), report["next"])
+            self.assertIn("(%s) is another user's copy" % (self.repo.resolve() / ".mcp.json"), report["next"])
             self.assertNotIn("remove", report["next"], "never rewrite a .mcp.json the team shares")
         finally:
             self.env_module._owner_uid = saved
 
     def test_the_cli_prints_and_reads_no_token(self):
-        self.register()
+        # a path in the test's home: the subprocess does not see setUp's owner stub, and a host's /Applications copy may
+        # be another user's (0.69.0 seam reading 6)
+        self.register(command=str(self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"))
         self.hub()
         done = subprocess.run([sys.executable, str(SCRIPT), "status", "--cwd", str(self.repo)],
                               capture_output=True, text=True, env=self.env, timeout=10)
