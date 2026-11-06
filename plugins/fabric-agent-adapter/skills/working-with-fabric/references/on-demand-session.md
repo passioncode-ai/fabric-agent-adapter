@@ -1,6 +1,6 @@
 # A session started on a board request (FAA-201)
 
-When a board request reaches a project that has no responder and no live session, Fabric starts a session in the
+When a board request reaches a project that has no live responder and no live session, Fabric starts a session in the
 project's folder to do it (Fabric's on-demand spec, sections 3.4 to 3.6, at Fabric commit `1329b60f`). That session
 does the one request, reports, completes it and ends. Nobody watches it, so it never waits for a person. The
 dispatcher ships in Fabric 0.3.16 (released 2026-11-05, tag `v0.3.16` at `bcead0ef`), on by default since
@@ -75,7 +75,36 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    never passes a lease any other way.
 3. **Take the request.** `com.status` once, for the epoch every idempotency key names and the slot's generation.
    `com.enroll` for the request's capability, then `com.claim {idempotency, capability, request}`, `com.accept`, and
-   `com.effect_begin` before the work has an effect. An earlier run may have left the request taken: `com.get` on the
+   `com.effect_begin` before the work has an effect. A `com.enroll` refused `not_authorized` (the run's Project holds
+   no `board.respond` grant for the capability) takes no slot, asks for no access and does no work: on Fabric 0.3.16 a
+   session has no route to that grant (`fabric.access.request` is the door's and a binding's, never exposed by
+   `fabric-mcp`, and Fabric's Agent access only decides a request already waiting), and work without a slot has no
+   fence, no `com.progress` and a live session may take the request in parallel. When `com.get` reads the request
+   `queued` and `com.status`'s entry for the request's capability reads `absent` at generation 0 (no holder of this
+   Project ever enrolled on that slot; `com.status` lists the capability of every open request, so the entry is there
+   whenever the board can be read: a missing entry or an unavailable board is the error rule),
+   the run answers it once with `com.reply` (`replyTo` the request, from the target Project, which answers
+   it: DEC-0098, DEC-0102) declining it: this Project cannot take it until Fabric ships CO-506, and the requester sends
+   it again then (the reply ends the queue, so nothing takes it later; never say it waits). Then it closes the workflow `done` once
+   `com.get` reads it answered (step 6), and writes the retro (step 7); in any other state, or with the slot `stale`, `active`, or `absent` at a generation of 1 or more (a holder enrolled on it: a
+   service of this Project, or after CO-506 a session; one that stopped cleanly reads `absent`, and a service takes the
+   request when it rejoins, so a decline would take it from it; Fabric serves a session no `held` flag yet), the error
+   rule below holds and the request stays as it is (queued, it goes to the operator after two runs with no answer). A
+   capability listed only by a service's live grant, with no enroll yet, also reads `absent` at generation 0: a run
+   declines it, which a service asking and enrolling at once (ADR-0186) seldom leaves time for.
+   The target's request no longer waits for the operator (an answered request is settled: no second run, no unmoved or
+   to-operator finding); the requester reads the decline, and until it reads and acknowledges it (`com.read_ack`) Fabric
+   shows it on the requester's Project in «На проверке» as an answer nobody read,
+   and the closing write's `notes` say the request was declined until CO-506.
+   Fabric's dispatcher counts an answered request as settled and starts no second run for it. Once CO-506 ships
+   (Fabric's `main` `027cb809`) a session's own Project grants it at `com.enroll` itself, and this branch is taken only
+   where CO-506 grants nothing (a machine marked as an organization's, no live credential for the session or its runner,
+   or a standing denial of that ask); the reply then names CO-506 though it shipped, and the real gate is that grant (left open in FAA-215).
+   FAA-219; Fabric's answer in board thread `1add3c03` (option (b), 2026-11-05), the responder's run's rule plus the
+   slot condition, which is the adapter's (Fabric's corrected description has none);
+   Fabric's `com.enroll` description in 0.3.16 tells a session to ask the grant, which it cannot, and 0.3.16's own
+   `not_authorized` refusal says to reply with the answer; step 3 wins over both, and over the corrected description on Fabric's
+   `main` (which answers whatever the slot reads); the refusal text waits for its CO-507. An earlier run may have left the request taken: `com.get` on the
    request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
    attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result; so is an `in_progress` one an
@@ -93,7 +122,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `run-ends-at`, as the note of a `com.progress` on the request's thread (the slot holder's state, DEC-0152 SA-6,
    proposed). Then:
    - after `com.effect_begin` the request is `in_progress`, which a next run could only settle as `outcome_unknown`
-     with `com.reconcile`: `com.complete` `failed_known` with the state it observed, and steps 6 and 7 (FAA-210; the
+     with `com.reconcile`: `com.complete` `failed_known` with `observed: true` and the state it observed (Fabric refuses
+     a complete after an effect began without `observed: true`, `observation_required`; FAA-215), and steps 6 and 7 (FAA-210; the
      same choice as a responder's run, board thread `1add3c03`);
    - when the request's `deadline` (the packet's `deadline:` artifact) is not after `run-ends-at` plus 10 minutes, no
      run comes before the deadline and an accepted request does not expire by itself: `com.complete` `failed_known`
@@ -120,10 +150,14 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    his own words do when relayed verbatim, with their date and source, from one of his own projects (provenance
    `trusted`) and with a scope naming the step (`project-board.md`, *No person in the chat*).
 5. **Answer and complete.** `com.reply` in the thread with the answer, then `com.complete` with an observed outcome:
-   `completed`, or `failed_known` with the reason.
-6. **Close the workflow.** `observatory_checkpoint_write {workflowId, owner, idempotencyKey, stepId, status, body,
+   `completed`, or `failed_known` with the reason; after `com.effect_begin` every complete carries `observed: true`.
+6. **Close the workflow**, once the board took the complete (or, in step 3's branch, `com.get` reads the request
+   answered); a refused complete (a
+   lost fence, a lapsed lease) leaves the request unsettled, and the error rule below holds, not this step (FAA-215).
+   `observatory_checkpoint_write {workflowId, owner, idempotencyKey, stepId, status, body,
    leaseId, close: true}`, with the packet's body and `done[]` and `notes` added, no values in it. Without `workflowId` Observatory
-   reads the write as the start of a new workflow and refuses it. The status is `done` for `completed`; for
+   reads the write as the start of a new workflow and refuses it; the `owner` is the one the accept named. The status is
+   `done` for `completed` and for a request step 3's reply answered; for
    `failed_known` it is `failed` once Observatory takes it (OBS-323; Observatory takes `in_progress`, `done` and
    `blocked` today), and until then `blocked` with the reason in `notes`.
 7. **End the run.** The one write left is the retro after work
@@ -132,8 +166,10 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    `watch-mail`, no question to the operator.
 
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
-request `failed_known` with the reason when it holds a fence for it. It closes the workflow only once the request is
-settled: the board accepted the complete or a reconcile, or `com.get` reads the request answered, terminal or
+request `failed_known` with the reason (and `observed: true` after `com.effect_begin`) when it holds a fence for it,
+first saying the reason in a `com.progress` note on the request's thread, where the requester and the operator read it.
+A run that leaves the workflow open names its reason in the open checkpoint, which Fabric's take-back does not carry to
+the next run (it starts from a fresh body; open in FAA-215). It closes the workflow only once the request is settled: the board accepted the complete or a reconcile, or `com.get` reads the request answered, terminal or
 `outcome_unknown` (no Fabric starts a run for an `outcome_unknown` request, so its workflow is closed safely; Fabric's
 main counts such a run finished, not empty, since `babb2dc1`). Otherwise (the request still `queued`, `claimed`, `accepted` or
 `in_progress`, and not this run's to settle) it leaves the workflow open, with an `in_progress` checkpoint without

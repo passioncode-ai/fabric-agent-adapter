@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.68.0 (2026-11-06)
+
+### Fixed
+
+- working-with-fabric: a run Fabric started on a board request whose first `com.enroll` is refused `not_authorized`
+  takes no slot, asks for no access and does no work: when `com.get` reads the request queued and `com.status` shows its
+  capability's slot `absent` at generation 0 (a slot a service ever held takes the request when it rejoins), it answers it once with
+  `com.reply` (`replyTo` the request) declining it until Fabric ships CO-506 and asking for a resend then, closes the workflow `done` once
+  `com.get` reads it answered, and writes the retro; in any other state the error rule holds (FAA-219). On Fabric 0.3.16
+  a session has no route to that grant, and work without a slot has no fence. Fabric chose this in board thread
+  `1add3c03` (option (b), 2026-11-05), the responder's run says the same, and after Fabric's CO-506 the grant comes at
+  `com.enroll` itself. Fabric keeps its dispatcher switch off on the operator's machine until this ships or CO-506 does. A declined
+  request is settled: it no longer waits for the operator (no second run), an unread decline shows on the requester's
+  Project in «На проверке» as an answer nobody read, and its workflow closes `done` with the decline in its notes;
+  `references/project-board.md` tells the requester what to do with it (record the wait on CO-506, resend once then).
+  A declined request also leaves Fabric's home list of requests no agent answers, and its workflow counts among the
+  `done` ones; only its notes say it was declined.
+- The exit contract's other open steps (FAA-215): after `com.effect_begin` a run at its limit completes `failed_known`
+  with `observed: true` (Fabric refuses a complete after an effect began without it, `observation_required`); the
+  workflow closes only once the board took the complete, or `com.get` reads a replied request answered (a refused
+  complete is the error rule); the error
+  rule ends with the retro; the retro names `insights/`. `references/on-demand-session.md` says the same, names
+  `observed: true` for every complete after `com.effect_begin`, and has a run on an error say its reason in a
+  `com.progress` note before it completes the request.
+- The contract keeps its rules within Hermes' own 4000-character cap on a plugin's prompt section
+  (`MAX_SYSTEM_PROMPT_SECTION_CHARS`, Hermes v0.22.2), 3996 at its longest: the arguments a tool's schema already names
+  (`com.claim`'s, the closing write's `owner` and `idempotencyKey`) are left to the tool and the reference, and several
+  sentences are shorter.
+
 ## 0.67.0 (2026-11-05)
 
 ### Fixed

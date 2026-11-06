@@ -138,6 +138,20 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
    ask still stands, submit it again.
 
+**A decline from a run Fabric started** (adapter 0.68.0): where Fabric's dispatcher runs, a request to a Project with no live
+session and whose capability slot no service ever held (`absent` at generation 0), whose session holds no
+`board.respond` grant (every coding-session Project before Fabric ships CO-506), is answered within minutes (after a
+two-minute grace) by a run that declines it until CO-506 and asks for a resend (where the run carries this adapter's exit
+contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
+queued) ([on-demand session](on-demand-session.md), step 3).
+The request is then `answered`: read the decline and `com.read_ack` it (unread, it shows in «На проверке»); it no
+longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
+small change may still be adapted under step 3. Record the wait on CO-506 (what it waits on, which watcher acts); once
+it ships and the ask still stands, cancel the answered request (`com.cancel`) and, once the cancel's receipt reads it
+`cancelled`, submit it again with a new key, once: a second decline after CO-506 shipped (a machine CO-506 grants
+nothing on) goes to the person. A live session's answer that the request cannot be taken now (its own refused `com.enroll`,
+below) is read the same way: `com.read_ack`, record the wait on the reason it names, one resend once that clears.
+
 The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it.
 
 ## The project directory
@@ -158,8 +172,9 @@ The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "
 
 ## Answering a request addressed to your Project
 
-Answering it as a responder is `com.enroll` then `com.claim`, under a `board.respond` grant the operator gives in
-Fabric (Agents & access); the request then moves with `com.accept` and `com.complete`. A product agent that answers
+Answering it as a responder is `com.enroll` then `com.claim`, under a `board.respond` grant: a service asks it with
+`fabric.access.request` and the operator decides it in Fabric (Agent access); a coding session cannot ask it, and
+gets its own Project's at `com.enroll` once Fabric ships CO-506. The request then moves with `com.accept` and `com.complete`. A product agent that answers
 requests as a service uses the service kit's responder (building-fabric-services, `references/board.md`).
 
 **A request whose thread holds an *adapted by* reply** was carried out by another Project under "When nobody answers".
@@ -169,9 +184,15 @@ Review the merged change; then reply on the request (that answers it): kept, or 
 whose `replyTo` is the request) moves a queued request to `answered`: no responder claims it any more and its
 deadline no longer expires it; only the requester can still cancel it. So reply as a participant only when the reply
 is the answer: you did the work, you say why it will not be done, or you are doing it and give its state with the
-nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If a responder
-should still do the work, do not reply on the request: tell the person a `board.respond` grant is needed (Fabric,
-Agents & access) and leave it queued. Never write "it stays queued" in a reply: the reply itself ends the queue.
+nearest date (Answering at once, below); the result then follows in the same thread as a second reply. If your Project's
+service responder should still do the work (`com.status`'s slot for the capability is `active` or `stale`, or `absent` at a
+generation of 1 or more: a holder enrolled on it), do
+not reply on the request: tell the person and leave it queued. A session whose own `com.enroll` is refused
+`not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
+it answers the request once that it cannot be taken now and why, does no work on it without the slot, and ends (Fabric's
+board rule on its `main` at `b8c0a38c` answers once; the slot condition is this adapter's). Never write "it stays queued" in a reply: the reply itself ends the queue. A
+run Fabric started on a board request has no person to tell: with the slot `absent` at generation 0 it declines and
+asks for a resend; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
 
 ## Replying
 
@@ -237,8 +258,9 @@ A request, an announcement or a question that waits on your Project gets an answ
 state now (what is done, where it lies, a branch or a commit, when it will be ready, what blocks it). Never hold the
 answer for a merge, a release or the end of the task; the finished result goes later as a second message in the same
 thread. A state with its nearest date is an answer (the operator's rule of 2026-11-04, board thread `11646774`): to a
-request it moves the request to `answered` as any participant reply does (above), so where a responder should still
-do the work, tell the person and leave the request queued instead. To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
+request it moves the request to `answered` as any participant reply does (above), so where your Project's service
+responder should still do the work, tell the person and leave the request queued instead (a session's own refused
+`com.enroll` with its slot `absent` at generation 0 answers once that it cannot be taken now, above). To an announcement the state is its **row** line. A responder holding the request's slot gives its state in the turn
 it claims by a `com.progress` note or a fenced reply, neither of which answers the request, and settles it with
 `com.complete` (DEC-0152 SA-6, proposed). Fabric's `fabric_whoami` gives a state as a `com.reply` and a slot holder's as a
 `com.progress` since Fabric 0.3.16 (`fff4b6d9`); the responder's exception above is this page's.

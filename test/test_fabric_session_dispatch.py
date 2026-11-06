@@ -120,7 +120,7 @@ class Parsing(unittest.TestCase):
         # Observatory's checkpoint_write takes in_progress, done and blocked today; failed arrives with OBS-323
         text = cli.dispatch_contract(FULL)
         self.assertIn("done for completed", text)
-        self.assertIn("until then blocked", text)
+        self.assertIn("failed_known blocked with the reason in notes (failed once Observatory takes it, OBS-323)", text)
 
 
 class Hooks(Base):
@@ -419,8 +419,31 @@ class Hooks(Base):
 
     def test_step_7_names_the_retro_itself(self):
         # 0.64.0 product reading 2: the contract names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
-        self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines, or one line that there is nothing; "
-                      "no values), then end the run", cli.dispatch_contract(FULL))
+        self.assertIn("7. Write the retro (`observatory_lesson` and insight/1 lines in `insights/`, or one line that there "
+                      "is nothing; no values), then end:", cli.dispatch_contract(FULL))
+
+    def test_a_refused_enroll_answers_with_a_reply_and_the_close_waits_for_the_board(self):
+        # FAA-219: on Fabric 0.3.16 a session has no tool to ask board.respond (Fabric, thread 1add3c03, 9d23b27c);
+        # a reply from the target Project answers the request (DEC-0098, DEC-0102), and an answered request is settled
+        text = cli.dispatch_contract(FULL)
+        # 0.68.0 product reading 2: the reply answers the request, so it declines and asks for a resend, never "waits"
+        # 0.68.0 readings 5 and 6: com.status always lists the request's capability; a slot a service ever held
+        # (stale, active, or absent at a generation of 1 or more) takes the request back, so decline only at generation 0
+        self.assertIn("a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at "
+                      "generation 0, one `com.reply` (replyTo it) declining until Fabric's CO-506 (resend then), then step "
+                      "6 (done) once `com.get` reads answered, and 7;", text)
+        branch = text[text.index("a not_authorized enroll"):text.index("CO-506")]
+        self.assertNotIn(";", branch, "0.68.0 unit reading 2: a queued request is the refused enroll's case, not its own")
+        self.assertEqual(text.count(" 7. "), 1, "' 7. ' is step 7 alone, so the step slices hold")
+        self.assertEqual(text.count(" 6. "), 1, "' 6. ' is step 6 alone")
+        self.assertIn("Details: working-with-fabric references/on-demand-session.md.", text, "a native host has no other pointer")
+        self.assertNotIn("access.request", text)
+        # FAA-215: Fabric refuses a complete after an effect began without observed: true (observation_required)
+        self.assertIn("`com.complete` failed_known (observed: true) saying so", text)
+        # FAA-215: step 6 only once the board took the complete or the reply; a refused one is the error rule
+        self.assertIn("6. Once the board took it, `observatory_checkpoint_write`", text)
+        self.assertLess(text.index("3. "), text.index(" 6. "))
+        self.assertLess(text.index(" 6. "), text.index(" 7. "), "no ' 7. ' before step 6 (the closing-write test slices on it)")
 
     def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
         # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made
@@ -428,7 +451,7 @@ class Hooks(Base):
         text = cli.dispatch_contract(FULL)
         self.assertIn("On an error you cannot get past: complete the request failed_known if you hold its fence; close the "
                       "workflow only once the request is settled (`com.get`: answered, terminal or outcome_unknown), "
-                      "else leave it open.", text)
+                      "else leave it open; then the retro.", text)
         self.assertLess(text.index("7. Write the retro"), text.index("On an error you cannot get past"))
         # D3: one meaning of settled in the contract; outcome_unknown waits on a reconcile, resolved
         self.assertIn("resolve `outcome_unknown` only with `com.reconcile`", text)
@@ -442,7 +465,7 @@ class Hooks(Base):
                       "no run comes after the deadline (0.63.0 product reading 12)")
         # FAA-210: after com.effect_begin the request is in_progress, which a next run could only reconcile as
         # outcome_unknown, so the run completes it failed_known with what it observed
-        self.assertIn("then: if it called `com.effect_begin`, or when the request's deadline", text)
+        self.assertIn("posts its state (`com.progress`); if it called `com.effect_begin`, or when the request's deadline", text)
 
     def test_the_prompt_hooks_confirmation_names_the_session_id(self):
         # 0.63.0 unit reading 9: the confirmation carries the id when it is a lowercase UUID
