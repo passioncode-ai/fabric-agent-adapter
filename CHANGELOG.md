@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.71.0 (unreleased)
+
+The contract pin moves to `eac1a594` (`v0.1.0+2026-11-06.1`) from `3830a33` (`v0.1.0+2026-10-27.6`); between them
+DEC-0140, DEC-0146 to DEC-0148, DEC-0150 and DEC-0153.
+
+### Added
+
+- **The protocol register** gains `channel-agent-standard/1` (DEC-0150) and `fabric-ops-digest/0.1` (DEC-0153) in both
+  twins (`fabric_protocols.py`, `fabric-protocols.mjs`; `feed-protocols-vectors.json` regenerated), so a service's
+  well-known that names one is read as a known revision. A well-known naming another revision of either, such as
+  `channel-agent-standard/2`, is now refused as an unknown revision of a known protocol (FAC-SEM-099), where before
+  the name was unknown and passed.
+- The contract's `service-descriptor-ops-digest` fixture is vendored (`descriptor-fixtures.json`, 12 valid
+  descriptors); both kits' descriptor checks accept it.
+- `references/protocol.md` names the two new extension keys, `extensions/channel-agent/0.1` and
+  `extensions/ops-digest/0.1`. The kits know their revisions and do not build or check either declaration yet: the
+  channel agent's check is FAA-197, the operations digest FAA-206 part 2.
+
+### Changed
+
+- working-with-fabric: a human gate is "a secret typed in or handed out" (DEC-0147 reads AP-4's `secret` so, a peer
+  share's export included) where it said "a typed secret": SKILL.md's human gates, the exit contract of a run Fabric
+  started on a board request, `references/on-demand-session.md` and the scenario evals.
+- creating-fabric-agents `references/practices.md` and the support-agent recipe name DEC-0150 as the contract's,
+  released in `v0.1.0+2026-11-05.2`, where they called it proposed.
+
+### Upgrading
+
+- A bundle pinned to `3830a33` or an earlier supported commit keeps working; `adapt_project.py` accepts it
+  (`SUPPORTED_CONTRACT_COMMITS`). A new scaffold writes `eac1a594`.
+- DEC-0140 (`project.work` reserved for a Project's primary responder), DEC-0146 (the machines' report), DEC-0148 (a
+  renewal by the key on record) and DEC-0147's peer-share report reach no kit code: the adapter declares no
+  `project.work` and implements none of those sides. No vendored schema changed.
+
 ## 0.70.0 (2026-11-06)
 
 ### Fixed

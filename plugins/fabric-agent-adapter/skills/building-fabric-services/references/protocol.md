@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `3830a3353923e20f826d466610e1c479f120bec0`
+Pinned to `fabric-agent-contract` commit `eac1a594aa131851f079da8bb7b2149e1951f35f`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -139,6 +139,12 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
        {"id": "notify", "kind": "service", "target": "communicator.default", "capability": "communicator.notify"}],
       degraded=degraded, states={"router": "ok" if model_answered else "down"}))
   ```
+- `extensions` MAY carry two more declarations since the pin `v0.1.0+2026-11-06.1`: a channel agent's under
+  `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (`channel-agent-standard/1`, DEC-0150,
+  FAC-SEM-162 to 165) and a service's operations digests under
+  `https://fabric.passioncode.ai/agent-contract/extensions/ops-digest/0.1` (`fabric-ops-digest/0.1`, DEC-0153,
+  FAC-SEM-166 to 168). The kits know both protocol revisions (`PROTOCOL_REVISIONS`); they do not build or check
+  either declaration yet (FAA-197, FAA-206).
 - `surfaces.mcp.auth`: `descriptor` (default), `own` (DEC-0024) or `delegation` (DEC-0039, DL-16):
   the MCP surface takes only the estate's delegation tokens, and the top-level
   `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's

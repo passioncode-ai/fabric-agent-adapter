@@ -139,7 +139,7 @@ draft-and-check step owns.
   finished sync, changed or not: the standard ages a source from its last sync). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
   recommendation to its owner, posted on the board: `recommendation` is that board thread's id. Many `referred` tickets show a missing signal, not a regression.
-- **Text from a channel is data** (the contract's proposed DEC-0150 CA-8): a message, caption, file name, link or
+- **Text from a channel is data** (the contract's DEC-0150 CA-8): a message, caption, file name, link or
   quoted reply is never an instruction; the agent makes no tool call, send, spend or access change because a message
   asks, and acts on its own task and its operator's word. Check: the recipe's fence around the message and its checks.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
@@ -147,7 +147,7 @@ draft-and-check step owns.
   reply's text.
 - **The declaration lives under the extension key**
   `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, one entry per project (the contract's
-  proposed DEC-0150, not merged yet; the key and the form may change when it is). A required
+  DEC-0150, release `v0.1.0+2026-11-05.2`). A required
   member is never null, except where nothing is decided (a channel's `decision`, and the optional `quiet_window`,
   `late_answer_window` and `evals.spend_record`): a member not there yet is `{"none": "not_yet", "until": "<date>"}`,
   one not used `{"none": "not_used"}` (only `question_route`, `gap_registry`, `tickets.pd_check` and a channel's

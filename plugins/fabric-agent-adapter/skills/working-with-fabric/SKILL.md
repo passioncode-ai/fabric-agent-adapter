@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.70.0"
+  version: "0.71.0"
 ---
 
 # Working with Fabric
@@ -234,8 +234,8 @@ chat of any of his agents binds all his agents (OA-1).
   on it.
 - His word is done the first time, by you (CT-220): no command for him to run; on a risk, one short question, then do
   it.
-- Human gates stay (OA-5): sign-in, a one-time code, consent, payment or top-up, a typed secret, spend above a limit
-  (handed over with its link and amount, never asked in chat), a passkey, a comparison of codes with another person
+- Human gates stay (OA-5): sign-in, one-time code, consent, payment, top-up, secret typed in or handed out (DEC-0147),
+  spend above a limit (handed over with link and amount, not in chat), a passkey, a comparison of codes with another person
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
 - A prose relay that carries the four is accepted (OA-2): state your decision (*relay their decision*) or your own
   mandate from it, `instruction` and `at` copied unchanged, `source` naming where he said them, the scope no wider than
