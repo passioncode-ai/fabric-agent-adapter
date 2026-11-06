@@ -8,6 +8,8 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import subprocess
+import sys
 import unittest
 import uuid as uuid_module
 from pathlib import Path
@@ -470,6 +472,18 @@ class Hooks(Base):
         self.assertLess(step3.index("`fabric_question_ask`"), step3.index("then step 6 (done)"))
         # 0.69.0 unit reading 1: each of open, done and notes is optional, as in 0.68.0
         self.assertIn("(add `open`, `done` or `notes`; no value)", text)
+
+    def test_gate_id_prints_the_contracts_command_id(self):
+        # 0.69.0 product reading 7: a live session follows Fabric's CO-517 too, and must ask with the same id a run does
+        script = Path(cli.__file__).with_name("fabric_session.py")
+        done = subprocess.run([sys.executable, "-S", str(script), "gate-id", FULL["request"]], capture_output=True,
+                              text=True, timeout=10)
+        self.assertEqual((done.returncode, done.stdout.strip()), (0, cli.gate_question_id(FULL["request"])))
+        self.assertIn("commandId: %s" % done.stdout.strip(), cli.dispatch_contract(FULL))
+        for bad in ([], ["not-a-uuid"], [FULL["request"], "extra"]):
+            refused = subprocess.run([sys.executable, "-S", str(script), "gate-id"] + bad, capture_output=True,
+                                     text=True, timeout=10)
+            self.assertEqual((refused.returncode, refused.stdout), (2, ""), bad)
 
     def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
         # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made

@@ -804,6 +804,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return watch_mail_cli(argv[1:])
     if argv[:1] == ["install-host-hooks"]:
         return install_host_hooks_cli(argv[1:])
+    if argv[:1] == ["gate-id"]:
+        # the commandId of the one operator question about a request declined at the gate, for a session that is not
+        # a run (Fabric's board.read-at-start from its CO-517 asks every session; FAA-224)
+        if len(argv) != 2 or not re.fullmatch(_DISPATCH_VALUE["request"], argv[1]):
+            print("usage: fabric_session.py gate-id <board request id, a UUID>", file=sys.stderr)
+            return 2
+        print(gate_question_id(argv[1]))
+        return 0
     import argparse
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command")

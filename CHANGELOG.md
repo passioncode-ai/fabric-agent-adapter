@@ -12,12 +12,14 @@
   at `com.enroll`) does. The contract names the question's `commandId`, UUID v5 of the name `board.gate` in the
   request id's namespace (`gate_question_id`), so every run on that request gets the same question back; an operator
   decision recorded under the same `about` settles the gate's later questions. Fabric proposed the step and confirmed
-  the tool needs no slot on 0.3.16 (board thread `1add3c03`, `5fb4226d`, `a58b4280`); Fabric's `board.read-at-start` rule
-  says the same since its CO-517 (main `603da12f`), from its next release. `references/on-demand-session.md` (which also has a failed question noted
-  in the closing write, and what lifts the gate once CO-506 shipped: the reason Fabric's `board.own-respond` log line
-  names, `315c5b54`) and `references/project-board.md` say the same. The contract stays under Hermes' 4000 characters
-  (3996 at its longest) with several clauses shorter; "never complete what you did not observe" now lives in the
-  reference only (the contract keeps `observed: true` and the reconcile rule's observed result).
+  the tool needs no slot on 0.3.16 (board thread `1add3c03`, `5fb4226d`, `a58b4280`); Fabric's `board.read-at-start`
+  rule asks every session the same since its CO-517 (main `603da12f`), from its next release, so a live session whose
+  own `com.enroll` is refused asks too, with the id the new `fabric_session.py gate-id <request>` prints
+  (`references/project-board.md`). `references/on-demand-session.md` (which also has a failed question noted in the
+  closing write, and what lifts the gate once CO-506 shipped: the reason Fabric's `board.own-respond` log line names,
+  `315c5b54`) and `references/project-board.md` say the same. The contract stays under Hermes' 4000 characters (3996
+  at its longest) with several clauses shorter; "never complete what you did not observe" now lives in the reference
+  only (the contract keeps `observed: true` and the reconcile rule's observed result).
 
 ### Fixed
 
