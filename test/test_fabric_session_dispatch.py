@@ -467,7 +467,7 @@ class Hooks(Base):
                           "Fabric refuses an empty text (0.69.0 readings 1)")
             self.assertNotIn(first, text)
         step3 = text[text.index(" 3. "):text.index(" 4. ")]
-        self.assertIn("about: board.gate.<capability>", step3, "one operator decision on the gate settles them all")
+        self.assertIn("about: board.gate.<capability>", step3, "one `about` names the gate for every question on it")
         self.assertLess(step3.index("`com.reply` (replyTo it)"), step3.index("`fabric_question_ask`"))
         self.assertLess(step3.index("`fabric_question_ask`"), step3.index("then step 6 (done)"))
         # 0.69.0 unit reading 1: each of open, done and notes is optional, as in 0.68.0

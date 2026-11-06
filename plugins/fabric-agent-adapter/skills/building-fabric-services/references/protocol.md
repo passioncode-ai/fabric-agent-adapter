@@ -25,8 +25,8 @@ record pins DEC-0127 and DEC-0128; the family and the agent network named DEC-01
 the sender it answers, or to whom it names DEC-0135; a hand-over adds no naming list the scope in force leaves out
 DEC-0136; a job's step under the mandate read under the job's own capability DEC-0141; a person's comparison of codes as a human
 step DEC-0142. The organization's member list, draft exchange, relay and the machines' report, DEC-0129, DEC-0131 to
-DEC-0134 and DEC-0139, an organization's adaptation DEC-0138 and the peer share DEC-0142, reach the kit only as
-protocol register entries). The contract's schemas are normative;
+DEC-0134 and DEC-0139, an organization's adaptation DEC-0138, the peer share DEC-0142, the channel-agent standard DEC-0150
+and the operations digest DEC-0153, reach the kit only as protocol register entries). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
@@ -147,7 +147,8 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
 - `extensions` MAY carry a channel agent's declaration under
   `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (`channel-agent-standard/1`, DEC-0150,
   FAC-SEM-162 to 165) only for a service with no manifest; one with a manifest declares it under its manifest's
-  `provider.extensions` alone (CA-1). The kits know the revision (`PROTOCOL_REVISIONS`) and do not build or check the
+  `provider.extensions` alone (CA-1). A well-known answer lists `channel-agent-standard/1` in its `protocols` only once
+  its readers have re-pinned to this revision of the contract (channel-agent.md). The kits know the revision (`PROTOCOL_REVISIONS`) and do not build or check the
   declaration yet (FAA-197).
 - `surfaces.mcp.auth`: `descriptor` (default), `own` (DEC-0024) or `delegation` (DEC-0039, DL-16):
   the MCP surface takes only the estate's delegation tokens, and the top-level

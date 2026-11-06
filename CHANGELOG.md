@@ -34,6 +34,8 @@ DEC-0140, DEC-0146 to DEC-0148, DEC-0150 and DEC-0153.
 
 ### Upgrading
 
+- A well-known `protocols` list naming another revision of the two gained protocols (`channel-agent-standard/2`,
+  `fabric-ops-digest/0.2`) now gets FAC-SEM-099 from both kits and the probe (above, Added).
 - A bundle pinned to `3830a33` or an earlier supported commit keeps working; `adapt_project.py` accepts it
   (`SUPPORTED_CONTRACT_COMMITS`). A new scaffold writes `eac1a594`.
 - DEC-0140 PR-1 (`project.work` reserved for a Project's primary responder), DEC-0146 (the machines' report), DEC-0148
