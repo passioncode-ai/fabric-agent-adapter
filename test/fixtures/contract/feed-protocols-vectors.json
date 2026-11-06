@@ -17,6 +17,9 @@
     "call-record": [
       "1"
     ],
+    "channel-agent-standard": [
+      "1"
+    ],
     "coding-agents": [
       "1"
     ],
@@ -60,6 +63,9 @@
       "1"
     ],
     "fabric-load": [
+      "0.1"
+    ],
+    "fabric-ops-digest": [
       "0.1"
     ],
     "fabric-dashboard": [

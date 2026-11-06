@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `3830a3353923e20f826d466610e1c479f120bec0`
+Pinned to `fabric-agent-contract` commit `eac1a594aa131851f079da8bb7b2149e1951f35f`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -25,8 +25,8 @@ record pins DEC-0127 and DEC-0128; the family and the agent network named DEC-01
 the sender it answers, or to whom it names DEC-0135; a hand-over adds no naming list the scope in force leaves out
 DEC-0136; a job's step under the mandate read under the job's own capability DEC-0141; a person's comparison of codes as a human
 step DEC-0142. The organization's member list, draft exchange, relay and the machines' report, DEC-0129, DEC-0131 to
-DEC-0134 and DEC-0139, an organization's adaptation DEC-0138 and the peer share DEC-0142, reach the kit only as
-protocol register entries). The contract's schemas are normative;
+DEC-0134 and DEC-0139, an organization's adaptation DEC-0138, the peer share DEC-0142, the channel-agent standard DEC-0150
+and the operations digest DEC-0153, reach the kit only as protocol register entries). The contract's schemas are normative;
 this page is the working summary. Extension key:
 `https://fabric.passioncode.ai/agent-contract/extensions/service/0.1`.
 
@@ -60,6 +60,11 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `installedAt`, `installedBy` | when, and who installed it: the installer and its version as a string, or `{by, role?, tool}` (DEC-0061): `by` `person` (with `role` `operator` or `administrator`), `node` or `organization`; `role` for a person only; `tool` the installer and its version. It names a role, never a person. An app's descriptor uses the object form with `by: "person"`. `register_remote` / `registerRemote` and the sample write the object form |
 | `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none`: a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
 | `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed`, `personal` or `processor-hosted` (an organization's cloud a processor runs under a processing agreement, DEC-0099); `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
+
+A local descriptor MAY say where a collector on the same machine reads its daily operations digests, under
+`https://fabric.passioncode.ai/agent-contract/extensions/ops-digest/0.1` (`fabric-ops-digest/0.1`, DEC-0153, OD-9,
+FAC-SEM-168): 1 to 8 `{dir, source}`, `dir` a folder inside `paths.data`. A remote descriptor carries none, and the key
+is read nowhere else. The kits know the revision and neither write nor check the declaration yet (FAA-206).
 
 ## Identifier equality (DEC-0076)
 
@@ -139,6 +144,12 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
        {"id": "notify", "kind": "service", "target": "communicator.default", "capability": "communicator.notify"}],
       degraded=degraded, states={"router": "ok" if model_answered else "down"}))
   ```
+- `extensions` MAY carry a channel agent's declaration under
+  `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (`channel-agent-standard/1`, DEC-0150,
+  FAC-SEM-162 to 165) only for a service with no manifest; one with a manifest declares it under its manifest's
+  `provider.extensions` alone (CA-1). A well-known answer lists `channel-agent-standard/1` in its `protocols` only once
+  its readers have re-pinned to this revision of the contract (channel-agent.md). The kits know the revision (`PROTOCOL_REVISIONS`) and do not build or check the
+  declaration yet (FAA-197).
 - `surfaces.mcp.auth`: `descriptor` (default), `own` (DEC-0024) or `delegation` (DEC-0039, DL-16):
   the MCP surface takes only the estate's delegation tokens, and the top-level
   `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's

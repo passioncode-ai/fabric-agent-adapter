@@ -89,7 +89,7 @@ class Parsing(unittest.TestCase):
             self.assertIn(word, text)
         self.assertNotIn("—", text)
         # 0.63.0 unit reading 21: the operator's relayed words lift the production stop only
-        self.assertIn("a sign-in, a one-time code, a typed secret or a payment is a person's (none is in this chat), "
+        self.assertIn("a sign-in, one-time code, secret typed in or handed out, or payment is a person's (none is in this chat), "
                       "and so is a production step unless the operator's words, relayed verbatim, dated and sourced, "
                       "from his trusted projects with a scope naming it, approve it",
                       " ".join(text.split()))
@@ -104,7 +104,7 @@ class Parsing(unittest.TestCase):
             self.assertIn(word, text)
         self.assertNotIn("earlier checkpoints", text, "Observatory has no tool that reads them")
         for word in ("repeats `goal`, `constraints`, `artifacts` and `credentials` of `checkpoint.body`",
-                     "its goal describes the request", "the packet's body with `done` and `notes` added"):
+                     "its goal describes the request", "the packet's body plus `done` and `notes`"):
             self.assertIn(word, text, "Observatory keeps only the latest body (0.63.0 readings 3)")
         # 0.63.0 seam reading 4: Observatory's write redacts board-request:, board-thread: and fabric-project: refs,
         # and refuses the decorated credentials of the top-level answer or the accept's pack
@@ -467,7 +467,7 @@ class Hooks(Base):
                           "Fabric refuses an empty text (0.69.0 readings 1)")
             self.assertNotIn(first, text)
         step3 = text[text.index(" 3. "):text.index(" 4. ")]
-        self.assertIn("about: board.gate.<capability>", step3, "one operator decision on the gate settles them all")
+        self.assertIn("about: board.gate.<capability>", step3, "one `about` names the gate for every question on it")
         self.assertLess(step3.index("`com.reply` (replyTo it)"), step3.index("`fabric_question_ask`"))
         self.assertLess(step3.index("`fabric_question_ask`"), step3.index("then step 6 (done)"))
         # 0.69.0 unit reading 1: each of open, done and notes is optional, as in 0.68.0

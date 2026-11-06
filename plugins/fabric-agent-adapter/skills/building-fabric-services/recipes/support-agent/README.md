@@ -105,9 +105,9 @@ on its page and opens one alert when `stale` turns true: the recipe has no page 
 ## Declaring the channel-agent standard
 
 An agent that answers people on a channel declares what it follows under
-`https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (the contract's proposed DEC-0150, not
-merged yet, so the key and the form may change), in its `fabric-agent.json` or its
-well-known `extensions` (the standard's 11 and 13.6; the doctrine: creating-fabric-agents
+`https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (the contract's DEC-0150, release
+`v0.1.0+2026-11-05.2`), under `provider.extensions` of its `fabric-agent.json`, or, for a service with no manifest,
+under its well-known `extensions` (CA-1; the standard's 11 and 13.6; the doctrine: creating-fabric-agents
 [practices](../../../creating-fabric-agents/references/practices.md#agents-on-a-channel-people-write-to)).
 `channel-agent.example.json` is one project's declaration in the standard's round 4 form: a required member that is
 not there yet reads `{"none": "not_yet", "until": "<date>"}`, one not used `{"none": "not_used"}`, never null except
@@ -115,8 +115,9 @@ where nothing is decided (a channel's `decision`); a final text never `not_used`
 on (FAC-SEM-164); `recommendation` only with `answered_signal: "none"`, the id of the
 board thread where the queue's owner was told; a channel's `items_seen_unit` one of `mails`, `updates`, `messages`,
 `reviews`; durations in ISO 8601; the knowledge file as a source with its
-maximum age. `test/test_channel_agent_example.py` holds the example to that form; `check_service.py` reads the
-declaration once the contract publishes its schema.
+maximum age. `test/test_channel_agent_example.py` holds the example to that form; the contract publishes its schema
+at the pin (`service-channel-agent-extension.schema.json`); `check_service.py` does not read the declaration yet
+(FAA-197).
 
 ## Configure
 

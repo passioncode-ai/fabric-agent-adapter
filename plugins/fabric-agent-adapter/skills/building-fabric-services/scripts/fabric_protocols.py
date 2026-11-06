@@ -10,13 +10,13 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 
 
-#: Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`, DEC-0067); a test
-#: holds it equal to the contract's register at the pin.
+#: Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`, DEC-0067); the
+#: adapter's own test holds it equal to the contract's register at the adapter's pin, not in a vendored copy.
 PROTOCOL_REVISIONS: Dict[str, Tuple[str, ...]] = {
-    "access-log": ("1",), "approval": ("1",), "activity-summary": ("1",), "agent-directory": ("1",), "call-record": ("1",), "coding-agents": ("1",), "credential-decision": ("1",), "credential-request": ("1",), "credential-revocation": ("1",), "enroll-token": ("1",), "entitlement": ("1",),
+    "access-log": ("1",), "approval": ("1",), "activity-summary": ("1",), "agent-directory": ("1",), "call-record": ("1",), "channel-agent-standard": ("1",), "coding-agents": ("1",), "credential-decision": ("1",), "credential-request": ("1",), "credential-revocation": ("1",), "enroll-token": ("1",), "entitlement": ("1",),
     "entitlement-key-set": ("1",), "estate-record": ("1",), "execution-packet": ("1",),
     "fabric-actions": ("0.1",), "fabric-activity": ("0.1",), "fabric-agent-call": ("1",), "fabric-connections": ("0.1",), "fabric-credential-envelope": ("1",), "fabric-load": ("0.1",), "fabric-dashboard": ("0.1",), "fabric-delegation": ("0.1",), "fabric-device": ("0.1",),
-    "fabric-interop": ("0.1", "0.2"), "fabric-local-channel": ("0.1",), "fabric-local-runner": ("0.1",), "fabric-machine-report": ("1",),
+    "fabric-interop": ("0.1", "0.2"), "fabric-local-channel": ("0.1",), "fabric-local-runner": ("0.1",), "fabric-machine-report": ("1",), "fabric-ops-digest": ("0.1",),
     "fabric-operator-channel": ("0.1",), "fabric-package": ("1",),
     "fabric-peer-share": ("1",), "fabric-peer-share-envelope": ("1",), "fabric-peer-share-report": ("1",), "fabric-project-comms": ("0.1",), "fabric-proposal": ("1",),
     "fabric-provider": ("0.1",), "fabric-relay": ("0.1",), "fabric-secret-envelope": ("1",), "fabric-service": ("0.1",),

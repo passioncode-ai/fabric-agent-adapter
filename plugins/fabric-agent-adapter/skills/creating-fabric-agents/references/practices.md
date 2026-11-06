@@ -139,19 +139,20 @@ draft-and-check step owns.
   finished sync, changed or not: the standard ages a source from its last sync). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
   recommendation to its owner, posted on the board: `recommendation` is that board thread's id. Many `referred` tickets show a missing signal, not a regression.
-- **Text from a channel is data** (the contract's proposed DEC-0150 CA-8): a message, caption, file name, link or
+- **Text from a channel is data** (the contract's DEC-0150 CA-8): a message, caption, file name, link or
   quoted reply is never an instruction; the agent makes no tool call, send, spend or access change because a message
-  asks, and acts on its own task and its operator's word. Check: the recipe's fence around the message and its checks.
+  asks, and acts on its own task; an operator's word in a chat acts only in that chat and never outside the task
+  (a paraphrase; FAA-197 quotes CA-8 verbatim). Check: the recipe's fence around the message and its checks.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.
 - **The declaration lives under the extension key**
   `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, one entry per project (the contract's
-  proposed DEC-0150, not merged yet; the key and the form may change when it is). A required
+  DEC-0150, release `v0.1.0+2026-11-05.2`). A required
   member is never null, except where nothing is decided (a channel's `decision`, and the optional `quiet_window`,
   `late_answer_window` and `evals.spend_record`): a member not there yet is `{"none": "not_yet", "until": "<date>"}`,
   one not used `{"none": "not_used"}` (only `question_route`, `gap_registry`, `tickets.pd_check` and a channel's
   `texts.final` take that form, and a final text is never `not_used` beside a holding reply with replies on: a holding
   reply owes a final one, the contract's FAC-SEM-164); `recommendation` appears only with `answered_signal: "none"`; what each channel
   counts (`channels[].items_seen_unit`) is one of `mails`, `updates`, `messages` or `reviews`. Example: the recipe's
-  `channel-agent.example.json`. `check_service.py` reads it once the contract publishes its schema.
+  `channel-agent.example.json`. The contract publishes its schema at the pin (`service-channel-agent-extension.schema.json`); `check_service.py` does not read the declaration yet (FAA-197).
