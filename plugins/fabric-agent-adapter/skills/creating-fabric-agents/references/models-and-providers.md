@@ -35,16 +35,22 @@ model, FAC-SEM-112) and `openrouter-attribution.md` (FAC-SEM-098). The kit that 
 
 ## A starting choice
 
-As of 2026-10, all on OpenRouter, ordered from strongest to lightest. Prices and modalities change: read the catalog
-(`GET https://openrouter.ai/api/v1/models`, `architecture.input_modalities`, `pricing`) before you rely on them.
+As of 2026-11, all on OpenRouter. Prices and modalities change: read the catalog
+(`GET https://openrouter.ai/api/v1/models`, `architecture.input_modalities`, `pricing`) before you rely on them. Prices
+below are dollars per million tokens, input / output, read 2026-11-06; reasoning tokens bill as output.
 
-| Model | Input | Good for |
+| Lane | Primary | Fallback (another vendor) |
 |---|---|---|
-| `xiaomi/mimo-v2.6-pro` | text, image, video, audio | an agent that plans and calls tools; replies to people; video and audio input |
-| `anthropic/claude-haiku-5.5` | text, image, file | code generated inside a product, internal tasks; test it on your users' topics before a reply lane |
-| `google/gemini-3.8-flash` | text, image, video, file, audio | audio and video input; costs more per token |
-| `qwen/qwen3.8-flash` | text, image, video | a fallback of another vendor for short answers |
-| `deepseek/deepseek-v4.1-flash` | text, image | classification, extraction, triage, periodic jobs, reading screenshots; always the newest `-flash`, never `-pro` |
+| Decisions: plan, orchestrate, call tools, converse, transform, hard classification, images and video, generated code | `moonshotai/kimi-k3.1-pro` (2 / 10; text, image, video) | internal lanes `anthropic/claude-sonnet-5.5`; lanes reading user content `xiaomi/mimo-v2.6-pro` or `z-ai/glm-5.3` |
+| Verification of another model's output on internal lanes (a plan, code, a synthesis, an extraction, a step before it acts) | `anthropic/claude-sonnet-5.5` (2 / 10; text, image, file) | `z-ai/glm-5.3` or `deepseek/deepseek-v4.1-flash` |
+| Plan and strategy validation | a panel of three vendors, e.g. `kimi-k3.1-pro`, `google/gemini-4-argon` and `anthropic/claude-opus-5.5` (4 / 20); the author never judges | the two left |
+| Data, documents, audio and video input | `google/gemini-3.1-pro-preview` or `google/gemini-4-argon` (2 / 10; every input) | `xiaomi/mimo-v2.6-pro` (0.435 / 0.87; audio and video) |
+| User requests and user content | an open-vendor model: `kimi-k3.1-pro` where a decision or a reply needs intelligence, `z-ai/glm-5.3` or `deepseek/deepseek-v4.1-flash` at volume | another open vendor; a closed vendor is never the only route, never drafts a reply to a person and never checks such a lane |
+| Strong, cheap reasoning over text at volume | `z-ai/glm-5.3` (0.07 / 1.40; text only) | `deepseek/deepseek-v4.1-flash` |
+| Volume: classification, extraction, triage, screenshots, periodic jobs | `deepseek/deepseek-v4.1-flash` (0.051 / 0.567; text, image); always the newest `-flash`, never `-pro` | `qwen/qwen3.8-flash`; `z-ai/glm-5.3-flash` only with a generous budget, its reasoning cannot be turned off |
+
+A frontier-class model costs several times a light one per turn: put it where decisions are made and volume is
+moderate, and keep volume on the light models.
 
 Embeddings, speech to text and text to speech are separate choices: keep the one measured on your data, and never
 change an embedding model without re-indexing every stored vector (search silently turns into noise).
