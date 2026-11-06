@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -203,6 +202,8 @@ def another_users_copy(path: Path, platform: str = sys.platform, env: Optional[D
     if not path.is_absolute():
         if len(path.parts) != 1:  # relative to a folder Claude Code starts it in, which this does not know
             return False
+        import shutil  # only status reaches this; the hooks never pay for the import
+
         found = shutil.which(str(path), path=environ.get("PATH", os.defpath))
         if not found:
             return False

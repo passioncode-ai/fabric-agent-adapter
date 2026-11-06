@@ -2201,8 +2201,8 @@ class Status(Base):
             self.assertFalse(fs.another_users_copy(Path("bin/fabric-mcp"), "darwin", env))
             self.register(command=str(shared), scope="local")
             report = fs.status(self.repo, self.env, "darwin")
-            self.assertIn("claude mcp remove --scope local fabric (in the folder it was added in), then claude mcp add "
-                          "--scope user fabric", report["next"])
+            self.assertIn("claude mcp remove --scope local fabric, then claude mcp add --scope local fabric", report["next"])
+            self.assertTrue(report["next"].endswith(" (both in the folder it was added in)"), report["next"])
             self.assertIn("put your own Fabric.app in ~/Applications, then", report["next"])
             (self.home / ".claude.json").unlink()
             (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))

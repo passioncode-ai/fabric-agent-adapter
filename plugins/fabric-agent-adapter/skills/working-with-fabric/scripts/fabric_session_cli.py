@@ -7,7 +7,6 @@ import os
 import re
 import sys
 import time
-import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -305,6 +304,8 @@ def gate_question_id(request: str) -> str:
     """The `commandId` of the run's one question to the operator about a request it declined at the gate: UUID v5 of the
     name `board.gate` in the request id's namespace, so every run on that request asks the same question (Fabric,
     thread 1add3c03, a58b4280; FAA-224)."""
+    import uuid  # only the exit contract needs it; the other hooks never pay for the import
+
     return str(uuid.uuid5(uuid.UUID(request), "board.gate"))
 
 
@@ -735,10 +736,12 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
                               "add --scope local fabric -- %s --runner claude-code in that project, which overrides it "
                               "for you alone" % (first, own))
         else:
-            report["next"] = ("The registered fabric-mcp is another user's copy: %sclaude mcp remove --scope %s fabric%s, "
-                              "then claude mcp add --scope user fabric -- %s --runner claude-code" % (
-                                  first, claude["scope"], " (in the folder it was added in)" if claude["scope"] == "local"
-                                  else "", own))
+            # a local entry is replaced by a local one in the same folder: a user entry would lose to a project's
+            scope = claude["scope"]
+            report["next"] = ("The registered fabric-mcp is another user's copy: %sclaude mcp remove --scope %s fabric, "
+                              "then claude mcp add --scope %s fabric -- %s --runner claude-code%s" % (
+                                  first, scope, scope, own, " (both in the folder it was added in)" if scope == "local"
+                                  else ""))
     elif hub["state"] == "not-a-hub":
         report["next"] = "Fabric's hub could not be verified (%s): open Fabric; send it nothing until it can." % hub["reason"]
     elif hub["state"] != "running":

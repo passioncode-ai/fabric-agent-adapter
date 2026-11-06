@@ -32,7 +32,7 @@
   that is another user's copy outside the home (a bare command judged by what `PATH` finds, a link by what it points
   at): it says to put the user's own Fabric.app in `~/Applications` first when there is none, then gives the
   `claude mcp remove` and `claude mcp add` lines with that copy's path; a project's shared `.mcp.json` is overridden
-  with a `--scope local` entry, never rewritten. With no registration, `status` prints "none of yours" and says to
+  with a `--scope local` entry, never rewritten, and a local entry is replaced by a local one. With no registration, `status` prints "none of yours" and says to
   install the user's own copy in `~/Applications`. SKILL.md says the same (the Step 0 table for the order and owner,
   Step 2 for a registration of another user's copy). The session hooks paragraph of SKILL.md is shorter; its details
   stay in `references/session-hooks.md`.
