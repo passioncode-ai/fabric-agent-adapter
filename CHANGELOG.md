@@ -5,14 +5,16 @@
 ### Changed
 
 - working-with-fabric: a run Fabric started on a board request whose `com.enroll` is refused `not_authorized` asks the
-  operator with `fabric_question_ask` (`about: board.gate.<capability>`, the same `commandId`) at every slot state, not
-  only when the slot reads `absent` at generation 0; `com.reply` stays only for that state, since at any other a
-  service of the Project takes the request when it rejoins. After CO-506 a refusal comes only from an organization's
-  machine, a missing live credential or a standing denial, and a run that stayed silent then left the request to
-  «На проверке» with no reason (FAA-241; Fabric main `4f3c742a`, which says the same in `board.read-at-start` and
-  `com.enroll`'s description). The exit contract's step 3, `references/on-demand-session.md`,
-  `references/project-board.md` (a live session too) and the scenario eval say so; the exit contract stays under
-  Hermes' 4000 characters (3996 at its longest).
+  operator with `fabric_question_ask` (`about: board.gate.<capability>`, the same `commandId`) at every slot state,
+  not only when the slot reads `absent` at generation 0; `com.reply` stays only for that state, since at any other a
+  holder enrolled on the slot (a service of the Project, or after CO-506 a session) may take the request back. After
+  CO-506 a refusal comes only from an organization's machine, a missing live credential or a standing denial, and a
+  run that stayed silent then left the request to «На проверке» without the gate's reason (FAA-241; Fabric main
+  `4f3c742a`, which says the same in `board.read-at-start` and `com.enroll`'s description). The exit contract's step
+  3, `references/on-demand-session.md`, `references/project-board.md` (a live session too) and both scenario evals
+  (`a-dispatched-run-whose-enroll-is-refused`, `answer-as-responder-or-reply`) say so; the gate question names what
+  opens the gate at a held slot (the service enrolling again); the exit contract stays under Hermes' 4000 characters
+  (3996 at its longest).
 
 ## 0.71.0 (2026-11-06)
 

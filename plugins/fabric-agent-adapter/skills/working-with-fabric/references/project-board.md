@@ -196,7 +196,7 @@ operator once (at any other slot state it sends no reply and still asks, FAA-241
 opens it; without Python, no `commandId` can be made: tell the person only), tells the person (the question stays
 filed even when that is the operator: Fabric keeps its `about` and settles nothing by it yet, CO-519), and stops handling
 that request without waiting (Fabric's `board.read-at-start` rule and `com.enroll`'s own tool description say the
-same since main `4f3c742a`, slot condition included: `603da12f`, `dbfbfce4`, `12d57bdd`; in no Fabric release yet, and
+same since main `4f3c742a`: the question since `603da12f` (CO-517), the slot condition since `dbfbfce4` and `12d57bdd`; in no Fabric release yet, and
 on Fabric 0.3.16 this rule wins). Never write "it stays queued" in a reply: the reply itself ends the queue. A
 run Fabric started on a board request has no person in its chat to tell: with the slot `absent` at generation 0 it declines,
 asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued and still asks ([on-demand session](on-demand-session.md), step 3).

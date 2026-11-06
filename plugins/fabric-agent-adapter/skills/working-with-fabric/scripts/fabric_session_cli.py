@@ -150,7 +150,7 @@ DISPATCH_CONTRACT = (
     "no lease: end the run without touching the request. 3. `com.status` once ("
     "epoch, generation); `com.enroll` (the capability), `com.claim` (the request), "
     "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at generation 0, one `com.reply` (replyTo it) "
-    "declining until CO-506 (resend then); either way `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "declining until CO-506 (resend then), either way `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
     "`com.reconcile` and an observed result. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
