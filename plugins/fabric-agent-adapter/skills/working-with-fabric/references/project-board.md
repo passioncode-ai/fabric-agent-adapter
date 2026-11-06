@@ -192,9 +192,11 @@ not reply on the request: tell the person and leave it queued. A session whose o
 `not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
 it answers the request once that it cannot be taken now and why, does no work on it without the slot, then asks the
 operator once with `fabric_question_ask` (`kind: access`, `about: board.gate.<capability>`, the `commandId` that
-`fabric_session.py gate-id <request>` prints, the same a run uses, and a `text` naming the request, the gate and what
-opens it), tells the person, and ends without waiting (Fabric's `board.read-at-start` rule asks every session the same
-since its CO-517, main `603da12f`; the slot condition is this adapter's). Never write "it stays queued" in a reply: the reply itself ends the queue. A
+`python3 <skill-dir>/scripts/fabric_session.py gate-id <request>` prints, the same a run uses, and a `text` naming the request, the gate and what
+opens it; without Python, no `commandId` can be made: tell the person only), tells the person (the question stays
+filed even when that is the operator: his decision is recorded under that `about` in Fabric), and stops handling that
+request without waiting (Fabric's `board.read-at-start` rule asks every session the same from its CO-517, main
+`603da12f`, in no release yet; the slot condition is this adapter's). Never write "it stays queued" in a reply: the reply itself ends the queue. A
 run Fabric started on a board request has no person in its chat to tell: with the slot `absent` at generation 0 it declines,
 asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued ([on-demand session](on-demand-session.md), step 3).
 

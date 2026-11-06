@@ -484,6 +484,7 @@ class Hooks(Base):
             refused = subprocess.run([sys.executable, "-S", str(script), "gate-id"] + bad, capture_output=True,
                                      text=True, timeout=10)
             self.assertEqual((refused.returncode, refused.stdout), (2, ""), bad)
+            self.assertIn("usage: fabric_session.py gate-id", refused.stderr, bad)
 
     def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
         # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made
