@@ -167,9 +167,10 @@ APPLICATIONS_ENV = "PASSIONCODE_APPLICATIONS"
 
 
 def launcher_folder(env: Optional[Dict[str, str]] = None) -> Optional[Path]:
-    """The folder `PASSIONCODE_APPLICATIONS` names, read as the launcher reads it (its lib/catalog.js `appsDir` takes the
-    value as it is): a value starting with `/` is the folder; anything else, `~` included (a shell expands it before it
-    is set), is none, and the default order holds (FAA-237). A macOS path is POSIX on whatever host reads it."""
+    """The folder `PASSIONCODE_APPLICATIONS` names, when it starts with `/` (FAA-237). The launcher's `appsDir` takes
+    any non-empty value as it is, so a relative value or a literal `~` would be a folder under the launcher's working
+    folder, which no other process can find: none here, and the default order holds. A macOS path is POSIX on
+    whatever host reads it."""
     value = (os.environ if env is None else env).get(APPLICATIONS_ENV) or ""
     return Path(value) if value.startswith("/") else None
 
@@ -245,10 +246,9 @@ def administrators_copy(path: Path, platform: str = sys.platform, env: Optional[
 
 
 def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> Optional[Path]:
-    """The first candidate that is a file. On macOS a copy outside the user's home is taken only when it is this
-    user's or root's (an install every user shares): another user's copy is skipped (FAA-229). The launcher installs
-    the user's own copy in `~/Applications` unless the user owns and can write `/Applications` (its lib/catalog.js
-    appPath, from its PR #277, planned for 0.2.76): it updates the bundle, while this only runs it."""
+    """The first candidate that is a file (only the launcher's folder when `PASSIONCODE_APPLICATIONS` names one). On
+    macOS a copy outside the user's home is taken only when it is this user's or root's (an install every user
+    shares): another user's copy is skipped (FAA-229, FAA-237)."""
     for candidate in fabric_bin_candidates(platform, env):
         if candidate.is_file() and not another_users_copy(candidate, platform, env):
             return candidate

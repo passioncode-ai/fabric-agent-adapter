@@ -30,6 +30,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     fabric_bin_candidates,
     fabric_launched,
     fabric_root,
+    APPLICATIONS_ENV,
     find_fabric_bin,
     launcher_folder,
     host_registered,
@@ -729,14 +730,22 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     # FAA-237: root's copy runs, and the launcher calls it the administrator's and does not update it
     report["administratorsCopy"] = bool(binary) and administrators_copy(binary, platform, env)
     report["registeredCopy"] = "another user's" if foreign else "ok"
-    # where the user's own copy goes: the launcher's folder when the person named one, else ~/Applications (FAA-237)
-    place = str(chosen) if chosen else "~/Applications"
+    # where the user's own copy goes: the launcher's folder when the person named one, else ~/Applications (FAA-237);
+    # a launcher's folder that already holds another user's Fabric.app is no place for this user's (0.70.0 seam reading
+    # 3): as the launcher says then, unset PASSIONCODE_APPLICATIONS and use ~/Applications
+    candidates = fabric_bin_candidates(platform, env)
+    occupied = bool(chosen) and candidates[0].is_file() and another_users_copy(candidates[0], platform, env)
+    place = str(chosen) if chosen and not occupied else "~/Applications"
+    if occupied:
+        unset = {k: v for k, v in (os.environ if env is None else env).items() if k != APPLICATIONS_ENV}
+        candidates = fabric_bin_candidates(platform, unset)
+        place = "~/Applications (%s holds another user's Fabric.app: unset %s)" % (chosen, APPLICATIONS_ENV)
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
             " (your own copy, in %s)" % place if platform == "darwin" else "", "of yours " if platform == "darwin" else "",
             ", ".join(str(p) for p in fabric_bin_candidates(platform, env)))
     elif foreign:
-        own = '"%s"' % (binary or fabric_bin_candidates(platform, env)[0])
+        own = '"%s"' % (binary or candidates[0])
         first = "" if binary else "put your own Fabric.app in %s, then " % place
         where = claude.get("folder", "")
         if claude["scope"] == "project":

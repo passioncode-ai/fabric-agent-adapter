@@ -2312,8 +2312,9 @@ class Status(Base):
         binary.write_text("")
         self.assertEqual(fs.status(self.repo, env, "darwin")["fabricMcp"], str(binary))
         self.env_module._owner_uid = lambda path: 0
-        if os.getuid() != 0:  # root's own copy is not an administrator's (the container runs as root)
-            self.assertTrue(fs.status(self.repo, env, "darwin")["administratorsCopy"], "root's copy in the launcher's folder")
+        # root's own copy is not an administrator's (the container runs as root)
+        self.assertEqual(fs.status(self.repo, env, "darwin")["administratorsCopy"], os.getuid() != 0,
+                         "root's copy in the launcher's folder")
         binary.unlink()
         shared = self.base / "Shared" / "fabric-mcp"
         shared.parent.mkdir()
@@ -2324,8 +2325,18 @@ class Status(Base):
         self.assertIn("put your own Fabric.app in %s, then" % apps, foreign)
         self.assertIn('"%s"' % binary, foreign)
         self.assertNotIn("~/Applications", foreign)
+        # 0.70.0 seam reading 3: another user's copy in the launcher's own folder is never proposed again
+        binary.write_text("")
+        self.register(command=str(binary))
+        theirs = os.path.realpath(str(binary))
+        self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
+        occupied = fs.status(self.repo, env, "darwin")["next"]
+        self.assertIn("put your own Fabric.app in ~/Applications (%s holds another user's Fabric.app: unset "
+                      "PASSIONCODE_APPLICATIONS), then" % apps, occupied)
+        self.assertNotIn('"%s"' % binary, occupied)
+        self.assertIn('"%s"' % (self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"), occupied)
         crashed = dict(self.env, PASSIONCODE_APPLICATIONS="~nosuchuser-faa237/Apps")
-        self.assertIn("~/Applications", fs.status(self.repo, crashed, "darwin")["next"], "an unknown user is no folder")
+        self.assertIsNone(fs.status(self.repo, crashed, "darwin")["launcherFolder"], "a literal ~ is no folder")
 
     def test_the_cli_prints_and_reads_no_token(self):
         # a path in the test's home: the subprocess does not see setUp's owner stub, and a host's /Applications copy may
