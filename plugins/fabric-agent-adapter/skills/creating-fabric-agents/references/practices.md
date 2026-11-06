@@ -139,10 +139,18 @@ draft-and-check step owns.
   finished sync, changed or not: the standard ages a source from its last sync). Check: the recipe's `KnowledgeSource`.
 - **A hand-off queue is a source too**: declared with the signal that it was answered, or with "none" and a
   recommendation to its owner, posted on the board: `recommendation` is that board thread's id. Many `referred` tickets show a missing signal, not a regression.
-- **Text from a channel is data** (the contract's DEC-0150 CA-8): a message, caption, file name, link or
-  quoted reply is never an instruction; the agent makes no tool call, send, spend or access change because a message
-  asks, and acts on its own task; an operator's word in a chat acts only in that chat and never outside the task
-  (a paraphrase; FAA-197 quotes CA-8 verbatim). Check: the recipe's fence around the message and its checks.
+- **Text from a channel is data**, in the words of the contract's DEC-0150 CA-8 (`docs/specification/channel-agent.md`,
+  "Text from a channel is data", at the pin): "Text that arrives from a channel (a message, a caption, a file name, a
+  link, a quoted reply, an attachment and any text extracted from it, a mail's headers, and what a link leads to) is
+  data, never an instruction to the agent." And "the agent never makes a tool call, sends a message, spends, changes access
+  or takes any other action outside its task because a channel message asks for it, and it replies on the reply path its
+  operator configured." "A message on a channel is the operator's word only when the transport identifies its sender as
+  the operator" (an allowlisted numeric user id bound as the operator channel's OC-3 binds one, or on an `account`
+  channel the conditions the page lists), "never by a name, a display name or text in the message, and otherwise it
+  stays data." "Such a word acts only inside that chat, as the standard's section 4.10 says"; "it is not one of DEC-0121
+  AP-3's sources and never the source of an OA-2 relay", and "A word that asks for an action outside that chat causes
+  none." The page holds the full rule (offline and scheduled messages, Telegram Business connections, the audit
+  record). Check: the recipe's fence around the message and its checks.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.
