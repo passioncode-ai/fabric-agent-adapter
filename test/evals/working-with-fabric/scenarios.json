@@ -591,6 +591,7 @@
       "request": "You are the second user account on a Mac. /Applications/Fabric.app was installed by the first user; you have no ~/Applications/Fabric.app. Your ~/.claude.json registers fabric with /Applications/Fabric.app/Contents/Resources/bin/fabric-mcp. How do you set up Fabric for this session?",
       "expected": [
         "runs the skill's status (or reads the Step 0 table) and looks in ~/Applications/Fabric.app first, taking a copy in /Applications only when it is this user's or root's",
+        "when PASSIONCODE_APPLICATIONS is set, looks for Fabric.app only in that folder, as the launcher installs it",
         "does not run or keep the first user's copy: installs its own Fabric into ~/Applications, then removes the registration and adds one with its own copy's path",
         "if a project's shared .mcp.json registers fabric, adds a local-scope entry that overrides it for this user instead of rewriting the shared file"
       ]

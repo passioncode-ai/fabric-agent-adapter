@@ -219,6 +219,40 @@ class Paths(unittest.TestCase):
         self.assertEqual(win.name, "fabric-mcp.cmd")
         self.assertIn("Programs", win.parts)
 
+    def test_the_launchers_one_folder_is_the_only_place(self):
+        # FAA-237: with PASSIONCODE_APPLICATIONS set the launcher installs every app there, and only there
+        env = {"HOME": "/Users/a", "PASSIONCODE_APPLICATIONS": "/Volumes/Apps"}
+        self.assertEqual(fs.fabric_bin_candidates("darwin", env),
+                         [Path("/Volumes/Apps/Fabric.app/Contents/Resources/bin/fabric-mcp")])
+        self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS="~/Apps")),
+                         [Path(os.path.expanduser("~/Apps")) / "Fabric.app/Contents/Resources/bin/fabric-mcp"])
+        default = [Path("/Users/a/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"),
+                   Path("/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")]
+        for value in ("", "  ", "relative/Apps"):
+            self.assertEqual(fs.fabric_bin_candidates("darwin", dict(env, PASSIONCODE_APPLICATIONS=value)), default, value)
+        self.assertEqual(fs.fabric_bin_candidates("linux", env), [Path("/opt/Fabric/resources/bin/fabric-mcp")],
+                         "the launcher's folder is macOS'")
+
+    @unittest.skipUnless(hasattr(os, "getuid") and os.getuid() != 0, "POSIX owners, not root")
+    def test_roots_copy_is_named_the_administrators(self):
+        # FAA-237: the launcher's doctor calls root's /Applications copy the administrator's and does not update it
+        env_module = sys.modules["fabric_session_env"]
+        with tempfile.TemporaryDirectory() as tmp:
+            home, shared = Path(tmp) / "home", Path(tmp) / "Applications" / "fabric-mcp"
+            shared.parent.mkdir(parents=True)
+            shared.write_text("")
+            saved = env_module._owner_uid
+            try:
+                env_module._owner_uid = lambda path: 0
+                self.assertTrue(fs.administrators_copy(shared, "darwin", {"HOME": str(home)}))
+                self.assertFalse(fs.administrators_copy(shared, "linux", {"HOME": str(home)}))
+                env_module._owner_uid = lambda path: os.getuid()
+                self.assertFalse(fs.administrators_copy(shared, "darwin", {"HOME": str(home)}), "the user's own")
+                env_module._owner_uid = lambda path: 0
+                self.assertFalse(fs.administrators_copy(home / "x", "darwin", {"HOME": str(home)}), "inside the home")
+            finally:
+                env_module._owner_uid = saved
+
     @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
     def test_another_users_copy_outside_home_is_skipped(self):
         # FAA-229: on a Mac with several users, /Applications may hold another user's Fabric.app
@@ -2239,6 +2273,24 @@ class Status(Base):
             self.assertNotIn("remove", report["next"], "never rewrite a .mcp.json the team shares")
         finally:
             self.env_module._owner_uid = saved
+
+    @unittest.skipUnless(hasattr(os, "getuid") and os.getuid() != 0, "POSIX owners, not root")
+    def test_status_names_the_administrators_copy(self):
+        # FAA-237: root's copy outside the home runs, and status says the launcher does not update it
+        binary = self.base / "no-fabric" / "fabric-mcp"
+        binary.parent.mkdir()
+        binary.write_text("")
+        self.env_module._owner_uid = lambda path: 0
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual((report["fabricMcp"], report["administratorsCopy"]), (str(binary), True))
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("fabric-mcp: %s (the administrator's copy, which the launcher does not update)" % binary,
+                      printed.getvalue())
+        self.env_module._owner_uid = lambda path: os.getuid()
+        self.assertFalse(fs.status(self.repo, self.env, "darwin")["administratorsCopy"], "the user's own copy")
+        self.assertFalse(fs.status(self.repo, self.env, "linux")["administratorsCopy"])
 
     def test_the_cli_prints_and_reads_no_token(self):
         # a path in the test's home: the subprocess does not see setUp's owner stub, and a host's /Applications copy may

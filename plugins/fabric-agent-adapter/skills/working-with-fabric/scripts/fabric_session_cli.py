@@ -25,6 +25,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     _write_private,
     claude_registration,
     codex_registered,
+    administrators_copy,
     another_users_copy,
     fabric_bin_candidates,
     fabric_launched,
@@ -722,6 +723,8 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     foreign = bool(claude) and claude["fabricMcp"] and not command.startswith(("./", ".\\")) and another_users_copy(
         Path(command), platform, env)
     report["ownCopyRule"] = platform == "darwin"
+    # FAA-237: root's copy runs, and the launcher calls it the administrator's and does not update it
+    report["administratorsCopy"] = bool(binary) and administrators_copy(binary, platform, env)
     report["registeredCopy"] = "another user's" if foreign else "ok"
     if binary is None and claude is None:
         report["next"] = "Install Fabric v0.3.5 or later%s; no fabric-mcp %sis at %s." % (
@@ -760,7 +763,8 @@ def print_status(report: Dict[str, Any]) -> None:
             "not-a-hub": "not verified: %s" % hub.get("reason")}[hub["state"]]
     claude = report["claudeCode"]
     print("Fabric: %s" % line)
-    print("fabric-mcp: %s" % (report["fabricMcp"] or (
+    print("fabric-mcp: %s" % ((report["fabricMcp"] + (" (the administrator's copy, which the launcher does not update)"
+                                                    if report.get("administratorsCopy") else "")) if report["fabricMcp"] else (
         "none of yours at the default install locations" if report.get("ownCopyRule")
         else "not found at the default install locations")))
     print("Claude Code: %s" % ("fabric registered (%s scope) -> %s%s" % (

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.70.0 (unreleased)
+
+### Fixed
+
+- working-with-fabric: on macOS, with `PASSIONCODE_APPLICATIONS` set to an absolute folder, `status` looks for
+  `Fabric.app` only there, as the launcher installs every app in that one folder (its `lib/catalog.js` `appsDir`); an
+  empty or relative value keeps the default order (FAA-237, the launcher's reading of its PR #277, board thread
+  `cb1df3d5`). `status` names root's copy outside the home "the administrator's copy, which the launcher does not
+  update" (`administratorsCopy` in `--json`); running it stays allowed. The SKILL.md Step 0 row and the
+  `a-second-user-of-a-mac-registers-fabric` eval say the same.
+- `references/project-board.md` and `references/on-demand-session.md` name Fabric's `board.read-at-start` rule for
+  the slot condition of a gate decline: Fabric took it from the adapter (FAA-231, main `dbfbfce4`, from its next
+  release), so a live session and a run get one instruction.
+
 ## 0.69.1 (2026-11-06)
 
 The tag `v0.69.0` was never published: its release run

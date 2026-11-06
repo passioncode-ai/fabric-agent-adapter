@@ -18,7 +18,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.69.1"
+  version: "0.70.0"
 ---
 
 # Working with Fabric
@@ -50,7 +50,7 @@ By hand, when Python is absent: Fabric publishes `hub.json` in its folder while 
 
 | OS | Fabric's folder (`hub.json`) | `<Fabric>/bin` |
 |---|---|---|
-| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `~/Applications/Fabric.app/Contents/Resources/bin`, then `/Applications` if yours or root's |
+| macOS | `~/Library/Application Support/ai.passioncode.fabric/` | `$PASSIONCODE_APPLICATIONS/Fabric.app/...` if set, else `~/Applications/Fabric.app/Contents/Resources/bin`, then `/Applications` if yours or root's |
 | Windows | `%LOCALAPPDATA%\passioncode-fabric\` | the install folder's `resources\bin` (`fabric-mcp.cmd`); per-user default `%LOCALAPPDATA%\Programs\Fabric` |
 | Linux | `$XDG_DATA_HOME/passioncode-fabric/` (default `~/.local/share/`) | the install folder's `resources/bin`; the `.deb` puts it in `/opt/Fabric` |
 
@@ -88,7 +88,7 @@ claude mcp add --scope user fabric -- "<Fabric>/bin/fabric-mcp" --runner claude-
 codex mcp add fabric -- "<Fabric>/bin/fabric-mcp" --runner codex
 ```
 
-On a Mac, a registration naming another user's copy (outside your home, neither yours nor root's) is replaced by your
+On a Mac, a registration naming another user's copy (outside your home, not yours or root's) is replaced by your
 own (or root's) copy: `claude mcp remove` then `add` with the same scope; a project's `.mcp.json` entry is overridden with
 `--scope local`, never edited (`status` checks Claude Code's).
 
@@ -174,7 +174,7 @@ A Fabric with no `fabric_work_*` tools listed (before v0.3.5): use `fabric_tasks
 - `fabric_stage_report`: where you are in the work, as a claim beside what Fabric observes; give `step` and
   `ofSteps` (step 2 of 3), which Fabric shows to the operator as your current step.
 - `fabric_task_note`: working notes on the task, append-only.
-- `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim. Before
+- `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; calls renew the claim. Before
   you wait on the person or a question, send it with `phase: "waiting"`: `waitingOn: {kind: "question", id}` for a
   question you asked with `fabric_question_ask`, otherwise what you wait on in one line of `note`.
 - `fabric_memory_search` before re-deriving what the project knows; `fabric_memory_remember` for a fact worth
@@ -340,7 +340,7 @@ python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host codex --
 It edits `~/.codex/hooks.json` (`hooks.SessionStart`) or appends one `[[hooks]]` table to `~/.kimi-code/config.toml`,
 backs the file up first, refuses a file of another shape or one that changed since the dry run, and `--remove` takes
 it out again. Hermes/OpenCode/OpenClaw/Pi use their native plugin loaders, not Claude hook JSON.
-Hermes also needs `hermes plugins enable fabric-agent-adapter`; removal uses `hermes plugins disable fabric-agent-adapter`.
+Hermes needs `hermes plugins enable fabric-agent-adapter`; removal uses `hermes plugins disable fabric-agent-adapter`.
 Read [native host hooks](references/native-host-hooks.md) for exact paths, permission behavior and verification.
 Registration and a loaded hook do not prove admission. Never edit those files by hand. Without the hook, put the preamble into the first prompt
 yourself: "Call `fabric_whoami` first; `com.status` and `com.list`, answering what waits this turn; `fabric_work_list`,

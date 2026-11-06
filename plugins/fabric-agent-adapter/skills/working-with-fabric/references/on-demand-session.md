@@ -114,10 +114,11 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    where CO-506 grants nothing (a machine marked as an organization's, no live credential for the session or its runner,
    or a standing denial of that ask); the reply then names CO-506 though it shipped, and the real gate is that grant (left open in FAA-215).
    FAA-219; Fabric's answer in board thread `1add3c03` (option (b), 2026-11-05), the responder's run's rule plus the
-   slot condition, which is the adapter's (Fabric's corrected description has none);
+   slot condition, which Fabric's `board.read-at-start` took from the adapter (FAA-231, main `dbfbfce4`, in no release
+   yet);
    Fabric's `com.enroll` description in 0.3.16 tells a session to ask the grant, which it cannot, and 0.3.16's own
    `not_authorized` refusal says to reply with the answer; step 3 wins over both, and over the corrected description on Fabric's
-   `main` (which answers whatever the slot reads); the refusal text waits for its CO-507. An earlier run may have left the request taken: `com.get` on the
+   `main` before `dbfbfce4` (which answered whatever the slot read); the refusal text waits for its CO-507. An earlier run may have left the request taken: `com.get` on the
    request shows its state, and the latest checkpoint (step 1) what that run recorded. An accepted request is never
    claimed again: take it over with `com.responder_replace {expectedGeneration, transfer}` (its receipt carries the new
    attempt). An `outcome_unknown` one is resolved only by `com.reconcile` with an observed result; so is an `in_progress` one an

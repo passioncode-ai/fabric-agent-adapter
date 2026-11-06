@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.69.1"
+VERSION = "0.70.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -162,11 +162,20 @@ def state_root(platform: str = sys.platform, env: Optional[Dict[str, str]] = Non
     return Path(env.get("XDG_CACHE_HOME") or str(home / ".cache")) / "fabric-agent-adapter"
 
 
+#: The launcher's folder for every app it installs, when the person sets one (FAA-237).
+APPLICATIONS_ENV = "PASSIONCODE_APPLICATIONS"
+
+
 def fabric_bin_candidates(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> List[Path]:
     """Where `<Fabric>/bin/fabric-mcp` is on a default install (ADR-0134 amendment 2; electron-builder targets)."""
     env = os.environ if env is None else env
     home = _home(env)
     if platform == "darwin":
+        # The launcher's one folder for every app, when the person set it (its lib/catalog.js appsDir; FAA-237): only
+        # there. An empty or relative value is not a place, and the default order holds.
+        chosen = (env.get(APPLICATIONS_ENV) or "").strip()
+        if chosen and Path(chosen).expanduser().is_absolute():
+            return [Path(chosen).expanduser() / "Fabric.app/Contents/Resources/bin/fabric-mcp"]
         # The user's own copy first: on a Mac with several users a copy in /Applications may be another user's
         # (FAA-229; the launcher's order from its PR #277, lib/catalog.js appPath, planned for launcher 0.2.76).
         return [home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp",
@@ -213,6 +222,17 @@ def another_users_copy(path: Path, platform: str = sys.platform, env: Optional[D
         return False
     owner = _owner_uid(path)
     return owner is not None and owner not in (os.getuid(), 0)
+
+
+def administrators_copy(path: Path, platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> bool:
+    """On macOS, a file outside the user's home that root owns: an install the administrator made (a pkg or MDM). This
+    user may run it, and the launcher does not update it (its doctor calls it the administrator's; FAA-237)."""
+    if platform != "darwin" or not hasattr(os, "getuid") or os.getuid() == 0 or not path.is_absolute():
+        return False
+    path = _real(path)
+    if _real(_home(os.environ if env is None else env)) in path.parents:
+        return False
+    return _owner_uid(path) == 0
 
 
 def find_fabric_bin(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> Optional[Path]:
