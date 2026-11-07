@@ -29,6 +29,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import socket
 import socketserver
 import sys
 import threading
@@ -504,6 +505,12 @@ class FakeHub:
             # Persistent connections, as Fabric's own hub keeps them: a client's checked connection (DEC-0154 HA-2) is
             # reused across calls instead of read from the socket table again for each.
             protocol_version = "HTTP/1.1"
+
+            def setup(self) -> None:
+                # No Nagle on a kept-alive connection: the handler writes headers and body apart, and Linux's delayed
+                # ACK would hold each answer about 40 ms (Fabric's own hub, on Node, sets no-delay by default).
+                super().setup()
+                self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
             def log_message(self, *a: Any) -> None:
                 pass

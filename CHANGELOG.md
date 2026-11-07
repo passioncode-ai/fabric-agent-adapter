@@ -67,7 +67,7 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 
 - `references/protocol.md` gains "The listener's owner (DEC-0154 HA-2)"; `references/board.md`, `references/lifecycle.md`,
   `references/kit-modules.md` and `SKILL.md` name the check.
-- The test fake hub keeps HTTP/1.1 connections, as Fabric's own hub does.
+- The test fake hub keeps HTTP/1.1 connections with no Nagle delay, as Fabric's own hub (Node) does.
 - `dashboard-links.md` (all three copies) opens a raw loopback address in a browser only after the listener is this OS
   account's (the pinned PL-3); the link gate enforcing it is FAA-251. `connectors.md` names the loopback owner check
   and the kind `foreign-user`; the skill card's Network row names the socket table the kit now reads; `SKILL.md` and
