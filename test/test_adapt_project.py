@@ -289,6 +289,26 @@ class LifecycleRuleTests(unittest.TestCase):
             (plugin / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "example", "mcpServers": {"x": {"command": "python3", "args": ["-m", "x"]}}}))
             self.assertTrue(any("LC-19" in r for r in self.receipts(root)["receipts"]))
 
+    def test_a_path_in_a_plugin_mcp_env_is_no_credential_and_a_key_still_is(self):
+        """FAA-266: the env check reads a value path-aware, like the plist writers; a key in env is still LC-21."""
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.scaffold(root)
+            plugin = root / "plugins" / "example"
+            (plugin / ".claude-plugin").mkdir(parents=True)
+            (plugin / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": "example"}))
+            release = "/Users/example/Library/Application Support/example-agent/releases/e7d6275a8aae"
+
+            def env(value):
+                (plugin / ".mcp.json").write_text(json.dumps({"mcpServers": {"example": {
+                    "type": "http", "url": "http://127.0.0.1:47201/mcp", "env": {"EXAMPLE_HOME": value}}}}))
+                return self.receipts(root)
+
+            self.assertFalse(any("LC-21" in r for r in env(release)["receipts"]), "a release folder is a path")
+            self.assertTrue(any("LC-21" in r for r in env("s" + "k-" + "y" * 24)["receipts"]))
+            key = "2rHJkKR3HPKhvnZRjBcyYugNz2g0gTAKrWDEmg" + "/hqbs="  # its `/` splits it, yet it is no path
+            self.assertTrue(any("LC-21" in r for r in env(key)["receipts"]), "LC-21 has no name check to fall back on")
+
     def test_the_detector_copies_are_identical(self):
         base = Path(__file__).resolve().parents[1] / "plugins/fabric-agent-adapter/skills"
         self.assertEqual((base / "adapting-projects-to-fabric/scripts/fabric_secrets.py").read_bytes(),

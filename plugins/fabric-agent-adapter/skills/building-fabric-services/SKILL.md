@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.75.0"
+  version: "0.76.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
@@ -419,9 +419,10 @@ this estate needs.
 
 ## Gotchas
 
-- `lsof` shows `*:<port>` or `0.0.0.0` → the bind is wrong even if the Host check works.
+- `lsof` shows `*:<port>` or `0.0.0.0` → the bind is wrong.
 - HTTP 200 alone accepts any program on the port: compare `service.id` and `service.instance`, read only from
-  this OS account's listener. On `listener.owner` FAIL (`foreign-user`) send that port nothing.
+  this OS account's listener. On `listener.owner` FAIL (`foreign-user`) send that port nothing; reason
+  `table-restricted`: `references/protocol.md`.
 - `launchctl bootstrap` right after `bootout` fails with I/O error 5: wait for the unload, then retry.
 - Under launchd `PATH` is bare. Pin the interpreter by absolute path; set `PATH`
   explicitly in the plist; never copy the whole shell environment into it.

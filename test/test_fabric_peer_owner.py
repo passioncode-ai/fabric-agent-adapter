@@ -417,7 +417,8 @@ class SelfContained(unittest.TestCase):
         names.discard("__future__")
         # sys.stdlib_module_names is 3.10's; on the kit's 3.9 floor the module's own list stands in.
         stdlib = set(getattr(sys, "stdlib_module_names", ())) or {
-            "ctypes", "http", "ipaddress", "os", "socket", "struct", "subprocess", "sys", "threading", "time", "typing"}
+            "ctypes", "http", "ipaddress", "os", "select", "socket", "struct", "subprocess", "sys", "threading", "time",
+            "typing"}
         self.assertTrue(names <= stdlib, names - stdlib)
 
     @unittest.skipIf(sys.platform == "win32", "the Windows kit sets token-file ACLs through ctypes (fabric_platform)")
@@ -478,6 +479,146 @@ class KitInstaller(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_a_restricted_table_takes_the_installers_own_job_as_proof(self):
+        """FAA-267: macOS 27.2 shows an ad-hoc-signed interpreter only its own sockets. The table's answer is
+        table-restricted, never foreign-user, and the launchd job the installer started vouches with its pid."""
+        sup = importlib.import_module("fabric_supervisors")
+
+        class WellKnown(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                body = b'{"service": {"id": "example-agent", "instance": "default"}}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), WellKnown)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+        origin = "http://127.0.0.1:%d" % server.server_address[1]
+        restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED + ": netstat printed nothing")
+        try:
+            with mock.patch.object(P, "server_end", return_value=restricted):
+                doc, why = sup._read_well_known(origin)
+                self.assertIsNone(doc)
+                self.assertTrue(why.startswith(P.TABLE_RESTRICTED + ": "), why)
+                with mock.patch.object(P, "pid_listens", return_value=False):
+                    self.assertIsNone(sup._read_well_known(origin, vouch_pid=4242)[0])
+                with mock.patch.object(P, "pid_listens", return_value=True) as listens:
+                    doc, why = sup._read_well_known(origin, vouch_pid=4242)
+                self.assertEqual(doc["service"]["id"], "example-agent")
+                self.assertIsNone(why)
+                listens.assert_called_with(4242, server.server_address[1])
+            with mock.patch.object(P, "server_end", return_value=P.Owner(P.ANOTHER_ACCOUNT, 502, 9, "x")), \
+                    mock.patch.object(P, "pid_listens", return_value=True):
+                self.assertIsNone(sup._read_well_known(origin, vouch_pid=4242)[0], "a readable table is never overridden")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
+class RestrictedTable(unittest.TestCase):
+    """FAA-267: a socket table that shows this process alone."""
+
+    def test_an_empty_netstat_is_table_restricted(self):
+        for text in ("", "\n \n"):
+            with self.assertRaises(P.TableUnreadable) as caught:
+                P.parse_netstat(text)
+            self.assertTrue(str(caught.exception).startswith(P.TABLE_RESTRICTED))
+
+    def test_lsof_listeners(self):
+        self.assertEqual(P.parse_lsof_listeners("p78564\nf4\nn127.0.0.1:47480\nn*:5000\nn[::1]:7\nnoise\n"),
+                         [("127.0.0.1", 47480), ("*", 5000), ("::1", 7)])
+
+    def test_a_table_without_the_childs_listener_fails_calibration(self):
+        self.assertIs(P._child_listener_seen(lambda: []), False)
+        if sys.executable:
+            self.assertIn(P._child_listener_seen(lambda: [P.Row(("127.0.0.1", 1), ("*", 0), True, 501, 1, False)]),
+                          (False,))
+
+    @unittest.skipIf(sys.platform == "win32", "a shell script as the interpreter")
+    def test_a_child_that_never_answers_proves_nothing_and_does_not_hang(self):
+        import tempfile
+        import time
+        with tempfile.TemporaryDirectory() as d:
+            fake = os.path.join(d, "python3")
+            with open(fake, "w") as f:
+                f.write("#!/bin/sh\nexec sleep 30\n")
+            os.chmod(fake, 0o755)
+            with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 0.3):
+                start = time.monotonic()
+                self.assertIsNone(P._child_listener_seen(lambda: []))
+                self.assertLess(time.monotonic() - start, 5)
+        with mock.patch.object(sys, "frozen", True, create=True):
+            self.assertIsNone(P._child_listener_seen(lambda: []), "a frozen host has no interpreter to start")
+
+    @unittest.skipUnless(sys.platform == "darwin", "sysctl on macOS")
+    def test_sysctl_is_trusted_only_when_the_child_is_seen(self):
+        with mock.patch.object(P, "_child_listener_seen", return_value=None):
+            self.assertFalse(P._calibrate_sysctl(), "a child that could not be started proves nothing")
+        with mock.patch.object(P, "_child_listener_seen", return_value=False):
+            self.assertFalse(P._calibrate_sysctl())
+
+    def test_own_connection_takes_the_vouch_as_the_node_twin_does(self):
+        restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED + ": netstat printed nothing")
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(8)
+        port = server.getsockname()[1]
+        try:
+            with mock.patch.object(P, "server_end", return_value=restricted):
+                with self.assertRaises(P.ListenerRefused):
+                    P.own_connection(port, timeout=2)
+                with mock.patch.object(P, "pid_listens", return_value=True) as listens:
+                    P.own_connection(port, timeout=2, vouch_pid=4242).close()
+                listens.assert_called_with(4242, port)
+        finally:
+            server.close()
+
+    @unittest.skipIf(sys.platform == "win32", "ps and lsof")
+    def test_a_vouch_is_an_integer_pid_and_asks_lsof_for_ipv4_alone(self):
+        for pid in ("4242", True, None, 1, 0, -5):
+            self.assertFalse(P.pid_listens(pid, 80), pid)
+        calls = []
+
+        def run(argv):
+            calls.append(argv)
+            return "%d\n" % os.getuid() if argv[0] == P.PS else "p4242\nf4\nn*:80\n"
+
+        with mock.patch.object(P, "_run", side_effect=run), mock.patch.object(P.sys, "platform", "darwin"):
+            self.assertTrue(P.pid_listens(4242, 80))
+            self.assertFalse(P.pid_listens(4242, 81))
+        self.assertIn("-i4TCP", calls[-1])
+        self.assertNotIn("-iTCP", calls[-1])
+
+    @unittest.skipIf(sys.platform == "win32", "launchd")
+    def test_launchd_pid(self):
+        import subprocess
+        sup = importlib.import_module("fabric_supervisors")
+        done = lambda code, out: subprocess.CompletedProcess(["launchctl"], code, out, "")  # noqa: E731
+        with mock.patch.object(sup, "_launchctl", return_value=done(0, "gui/501/a.b = {\n\tstate = running\n\tpid = 4242\n}\n")):
+            self.assertEqual(sup.launchd_pid("a.b"), 4242)
+        with mock.patch.object(sup, "_launchctl", return_value=done(0, "gui/501/a.b = {\n\tstate = waiting\n}\n")):
+            self.assertIsNone(sup.launchd_pid("a.b"))
+        with mock.patch.object(sup, "_launchctl", return_value=done(113, "")):
+            self.assertIsNone(sup.launchd_pid("a.b"))
+
+    @unittest.skipUnless(sys.platform == "darwin" and os.path.exists(P.LSOF), "lsof on macOS")
+    def test_pid_listens_on_a_real_child(self):
+        import subprocess
+        child = subprocess.Popen([sys.executable, "-I", "-c", P._CHILD_LISTENER], stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE)
+        try:
+            port = int(child.stdout.readline())
+            self.assertTrue(P.pid_listens(child.pid, port))
+            self.assertFalse(P.pid_listens(child.pid, port + 1 if port < 65535 else port - 1))
+            self.assertFalse(P.pid_listens(1, port))
+        finally:
+            child.stdin.close()
+            child.wait(timeout=5)
 
 
 class SharedCases(unittest.TestCase):

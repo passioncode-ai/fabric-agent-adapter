@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.76.0 (2026-11-07)
+
+The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `fabric-peer-owner.mjs` (peer_owner
+`1.1.0+kit.2`), `fabric_supervisors` and `fabric-supervisors.mjs`, `fabric_http`, and the facades `fabric_service` and
+`fabric-service.mjs` (one more export each).
+
+### Fixed
+
+- **The launchd installers prove their own job on a restricted socket table** (FAA-267). macOS 27.2 shows an
+  ad-hoc-signed interpreter (a Homebrew Python) only its own sockets through sysctl and nothing through netstat, so
+  `launchd_install` refused a service it had just started (`foreign-user`, `no-row`). The sysctl calibration now also
+  requires a child process's listener; an empty netstat answers `unknown` with reason `table-restricted`, never another
+  account's. `CheckedHTTPConnection(vouch_pid=...)` and the Node `checkedSocket({vouchPid})` accept a listener on the
+  port that `lsof -p` shows belongs to that pid of this account; `launchd_install` and `launchdInstall` vouch with their
+  own job's pid (`launchd_pid`, `launchdPid`, read only after a `table-restricted` answer), and a refusal that remains reads `<origin> could not be proved this service's:
+  table-restricted: ...`: the Python installer names the way round it (Apple's `/usr/bin/python3`), the Node one asks for a runtime that sees the table
+  (no Node was measured). `lsof` is asked for IPv4 alone, so a v6-only wildcard never vouches for a `127.0.0.1`
+  connection, and a vouch is an integer pid. The calibration child (one short-lived interpreter per process) is bounded
+  by the table timeout, and a child that cannot be started or does not answer proves nothing. Measured on a host
+  agent's Mac (macOS 27.2) with a pre-release build: the install passes, a root listener on another port is still
+  refused, the method is netstat under Homebrew Python and sysctl under Apple's; the final form was not rerun there
+  ([record](docs/reports/2026-11-07-faa-267/README.md)).
+- **A release folder in a plist's or a supervisor file's environment is no credential** (FAA-266): `PYTHONPATH`
+  holding a release folder under Application Support was refused as a key. An environment value that reads as a path
+  (it starts with `/`, `~`, `.` or a drive, has at least two separators and one all-lower-case part such as
+  `example-agent`) is now read by the path-aware detector (`secret_argument`, `secretArgument`); any other value keeps
+  the strict `secret_value`, so a base64 key whose `/` splits it is still refused: of 60,000 random keys 20 pass,
+  against 13 for the strict detector alone ([record](docs/reports/2026-11-07-faa-267/README.md)). `adapt_project.py`'s LC-21 check reads a plugin MCP
+  server's `env` the same way. A path whose part after a space has no all-lower-case folder and holds a digit
+  run (`.../Application Support/ExampleAgent/Releases/2026-11-07`) is still refused, as in 0.75.0 (FAA-273).
+
+### Known limits
+
+- Only the launchd installers vouch. On a restricted table (macOS 27.2 under an ad-hoc-signed interpreter) every
+  other caller of the owner check still refuses a loopback listener whose owner cannot be told: the probe
+  (`check_service.py`, rule `listener.owner`), the hub client and so the board responder, `fabric_http` and so the
+  OpenRouter connector, `mcp-register`, the `dashboard` command, and the layout probe. The
+  probe and `fabric_http` say `foreign-user` and carry the `table-restricted` reason; the hub client says only
+  `unknown` (FAA-272). The way round for Python is Apple's `/usr/bin/python3`; a Node service has no measured way
+  round yet.
+- The vouch is the launchd job's own pid: a `ProgramArguments` wrapper that starts the server as a child (`sh -c`
+  without `exec`, `uv run`, `npm start`) cannot vouch for it. Start the server with `exec`, or use Apple's Python.
+
+### Upgrading
+
+- `wellKnownOf`'s `ForeignUserAnswer.reason` may start with `table-restricted` beside `foreign-user`. A
+  `launchd_install` or `launchdInstall` refusal on a restricted table now reads `<origin> could not be proved this
+  service's: table-restricted: ...` where it read `<origin> is not this service's: foreign-user: ...`: match the
+  reason as a substring, not the start of the message.
+- New optional arguments: `vouch_pid` on `CheckedHTTPConnection` and `own_connection`, `vouchPid` on `checkedSocket`, `CheckedAgent` and
+  `wellKnownOf`. The vouch is consulted only on macOS when the owner reads `table-restricted`; it never overrides
+  another account's listener or another unknown reason. New names in both peer-owner twins: `TABLE_RESTRICTED` (the
+  reason to match on), `LSOF`, `pid_listens` / `pidListens` and `parse_lsof_listeners` / `parseLsofListeners`; the facades export `launchd_pid` (`fabric_service`) and
+  `launchdPid` (`fabric-service.mjs`).
+- A service that vendored the 0.74.0 or 0.75.0 kit keeps refusing its own install on macOS 27.2 until its copies are
+  refreshed (`fabric_kit.py status` names them older).
+
 ## 0.75.0 (2026-11-07)
 
 Guidance only: no kit module, probe rule or hook changes; the contract pin stays `18f8d487`.

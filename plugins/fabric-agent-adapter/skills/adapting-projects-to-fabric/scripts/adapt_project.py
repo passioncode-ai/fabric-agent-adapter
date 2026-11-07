@@ -586,6 +586,15 @@ def _credential_problems(manifest: Dict[str, Any]) -> List[str]:
 _PLUGIN_SKIP = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", ".worktrees"}
 
 
+def _secret_env_value(value: str) -> bool:
+    """An MCP server's environment value: path-aware only when it reads as a path (it starts as one, has two separators
+    and a lower-case word between them), as the kit's supervisor writers read one (FAA-266); else `secret_value`."""
+    pieces = re.split(r"[\\/]", value)
+    path = bool(re.match(r"(?:[/~.]|[A-Za-z]:[\\/])", value)) and len(pieces) >= 3 and any(
+        re.fullmatch(r"[a-z][a-z0-9_-]{2,}", x) for x in pieces)
+    return _secrets.secret_argument(value) if path else _secrets.secret_value(value)
+
+
 def _plugin_problems(root: Path) -> List[str]:
     """LC-19 (FAA-22) and LC-21 for the Claude Code plugins in the project: a plugin's stdio MCP server starts in
     every session that enables the plugin; serve it over HTTP from one resident process, or register it at project
@@ -614,7 +623,7 @@ def _plugin_problems(root: Path) -> List[str]:
             if any(isinstance(a, str) and _secrets.secret_argument(a) for a in argv) or (isinstance(entry.get("url"), str) and _secrets.secret_url(entry["url"])):
                 problems.append("LC-21: plugin %s's MCP server %s carries a credential in its argv or URL" % (name, server))
             env = entry.get("env") if isinstance(entry.get("env"), dict) else {}
-            if any(isinstance(v, str) and _secrets.secret_value(v) for v in env.values()):
+            if any(isinstance(v, str) and _secret_env_value(v) for v in env.values()):  # path-aware for a path (FAA-266)
                 problems.append("LC-21: plugin %s's MCP server %s writes a credential value in env; reference it instead" % (name, server))
     return problems
 

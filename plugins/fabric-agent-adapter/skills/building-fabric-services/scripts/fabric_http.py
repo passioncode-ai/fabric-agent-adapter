@@ -354,6 +354,7 @@ class _CheckedHTTPConnection(_po.CheckedHTTPConnection):
                  **kwargs: Any) -> None:
         http.client.HTTPConnection.__init__(self, host, port, timeout=timeout, **kwargs)
         self.expect_pid = None
+        self.vouch_pid = None  # a loopback URL is never a process this caller started (FAA-267)
 
 
 def _opener(watchdog: _Watchdog, direct: bool = False) -> urllib.request.OpenerDirector:

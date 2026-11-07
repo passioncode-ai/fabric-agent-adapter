@@ -53,6 +53,20 @@ def _no_marker_argument(argv: Sequence[str]) -> None:
         raise ServiceError("%s is written by the supervisor file's writer; leave it out of the program arguments" % SUPERVISOR_ARG)
 
 
+_PATH_ANCHOR = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/])")
+_PATH_WORD = re.compile(r"[a-z][a-z0-9_-]{2,}")
+
+
+def _secret_env_value(value: str) -> bool:
+    """An environment value: read path-aware (`secret_argument`) only when it reads as a path (it starts as one, has at
+    least two separators and a lower-case word between them), so a release folder under Application Support is no key
+    (FAA-266) while a base64 key whose `/` splits it stays one; any other value keeps the strict `secret_value`."""
+    import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
+    pieces = re.split(r"[\\/]", value)
+    path = bool(_PATH_ANCHOR.match(value)) and len(pieces) >= 3 and any(_PATH_WORD.fullmatch(x) for x in pieces)
+    return fabric_secrets.secret_argument(value) if path else fabric_secrets.secret_value(value)
+
+
 def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dict[str, str]]) -> None:
     """No supervisor file carries a secret (service.md): not in an argument, an environment name or its value."""
     import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
@@ -60,7 +74,7 @@ def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dic
         if fabric_secrets.secret_argument(arg):
             raise ServiceError("an argument carries a credential; a supervisor file never does (read it from the token file or a secret reference)")
     for name, value in (environment or {}).items():
-        if fabric_secrets.credential_name(name) or fabric_secrets.secret_value(str(value)):
+        if fabric_secrets.credential_name(name) or _secret_env_value(str(value)):
             raise ServiceError("environment %s looks like a credential; a supervisor file never carries one" % name)
 
 
@@ -263,7 +277,7 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
     for key, value in env.items():
         if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)\Z", key) and not key.endswith("_FILE"):
             raise ServiceError("Environment variable %s looks like a secret; pass a *_FILE path instead." % key)
-        if fabric_secrets.secret_value(str(value)):
+        if _secret_env_value(str(value)):  # path-aware only for a path: a release folder is no key (FAA-266)
             raise ServiceError("Environment %s holds a value shaped like a credential; a plist never carries one." % key)
     for arg in argv:
         if fabric_secrets.secret_argument(arg):
@@ -307,19 +321,37 @@ def launchd_loaded(label: str) -> bool:
     return _launchctl("print", "%s/%s" % (_domain(), label)).returncode == 0
 
 
-def _read_well_known(origin: str, timeout: float = 2.0) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+_PID_ROW = re.compile(r"^\s*pid\s*=\s*(\d+)\s*\Z")
+
+
+def launchd_pid(label: str) -> Optional[int]:
+    """The running pid of this account's launchd job ``label``, or None (not running, or not readable)."""
+    result = _launchctl("print", "%s/%s" % (_domain(), label))
+    if result.returncode != 0:
+        return None
+    for line in (result.stdout or "").splitlines():
+        hit = _PID_ROW.match(line)
+        if hit:
+            return int(hit.group(1))
+    return None
+
+
+def _read_well_known(origin: str, timeout: float = 2.0,
+                     vouch_pid: Optional[int] = None) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """(the well-known answer or None, why the listener was refused or None). A loopback origin is read only on a
     connection whose server end is this OS account's process (DEC-0154 HA-2): another account's, root's, or one whose
-    owner cannot be told is `foreign-user`, never this service's answer."""
+    owner cannot be told is `foreign-user`, never this service's answer. `vouch_pid`, the pid of a launchd job this
+    caller started, proves the listener when the socket table hides other processes (FAA-267)."""
     parts = urllib.parse.urlsplit(origin)
     if parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port:
-        conn = _po.CheckedHTTPConnection("127.0.0.1", parts.port, timeout=timeout)
+        conn = _po.CheckedHTTPConnection("127.0.0.1", parts.port, timeout=timeout, vouch_pid=vouch_pid)
         try:
             conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % parts.port})
             response = conn.getresponse()
             return (json.loads(response.read().decode()) if response.status == 200 else None), None
         except _po.ListenerRefused as exc:
-            return None, "foreign-user: %s" % exc
+            restricted = exc.owner is not None and (exc.owner.reason or "").startswith(_po.TABLE_RESTRICTED)
+            return None, "%s: %s" % (_po.TABLE_RESTRICTED if restricted else "foreign-user", exc)
         except (OSError, ValueError, http.client.HTTPException):
             return None, None
         finally:
@@ -392,14 +424,20 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     else:
         raise ServiceError("launchctl bootstrap failed: %s" % last)
     deadline = time.time() + timeout
-    foreign = None
+    foreign = vouch = None
     while time.time() < deadline:
-        doc, foreign = _read_well_known(origin)
+        doc, foreign = _read_well_known(origin, vouch_pid=vouch)
+        if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
+            vouch = launchd_pid(label)  # only a restricted table needs the job's pid (FAA-267)
         if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
             return doc
         time.sleep(0.5)
     if foreign:
         # DEC-0154 HA-2 and service.md's Install row: a listener of another account is never a successful install.
+        if foreign.startswith(_po.TABLE_RESTRICTED):
+            raise ServiceError("%s could not be proved this service's: %s (DEC-0154 HA-2); this interpreter sees no other "
+                               "process's sockets and the job's pid did not show the listener: run the installer from "
+                               "Apple's /usr/bin/python3, or read the job's log." % (origin, foreign))
         raise ServiceError("%s is not this service's: %s (DEC-0154 HA-2); the port is another OS account's or its owner "
                            "cannot be told." % (origin, foreign))
     raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))

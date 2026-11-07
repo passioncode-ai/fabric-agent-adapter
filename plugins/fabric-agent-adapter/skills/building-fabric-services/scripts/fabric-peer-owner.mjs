@@ -45,7 +45,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 
-export const PEER_OWNER_VERSION = '1.1.0+kit.1'; // the Python twin's, Observatory's 1.1.0 with the kit's differences
+export const PEER_OWNER_VERSION = '1.1.0+kit.2'; // the Python twin's, Observatory's 1.1.0 with the kit's differences
 export const THIS_ACCOUNT = 'this-account';
 export const ANOTHER_ACCOUNT = 'another-account';
 export const SYSTEM = 'system';
@@ -58,6 +58,10 @@ export const WINDOWS_TIMEOUT_MS = 5000;
 export const LISTENER_TTL_MS = 1000;
 export const NETSTAT = '/usr/sbin/netstat';
 export const PS = '/bin/ps';
+export const LSOF = '/usr/sbin/lsof';
+// The reason a socket table hides other processes' sockets from this one (FAA-267): macOS 27.2 gives an ad-hoc-signed
+// runtime an empty netstat.
+export const TABLE_RESTRICTED = 'table-restricted';
 export const SERVER_NOT_OWN = 'server-not-own';
 export const SERVER_UNVERIFIED = 'server-unverified';
 export const SERVER_NOT_THIS_WORKSPACE = 'server-not-this-workspace';
@@ -143,6 +147,7 @@ function netstatAddress(text) {
 // leading and the trailing columns, both counted from the header; a header without process:pid is unreadable.
 export function parseNetstat(text) {
   const lines = String(text).split(/\r?\n/);
+  if (!lines.some((line) => line.trim())) throw new TableUnreadable(`${TABLE_RESTRICTED}: netstat printed nothing to this process`);
   const header = lines.findIndex((line) => line.includes('process:pid') && line.includes('Proto'));
   if (header < 0) throw new TableUnreadable('netstat-format: no process:pid column');
   const names = lines[header].split(/\s+/).filter(Boolean);
@@ -163,6 +168,18 @@ export function parseNetstat(text) {
     rows.push({ local, remote, listening: tok[5] === 'LISTEN', uid: null, pid, timeWait: tok[5] === 'TIME_WAIT' });
   }
   return rows;
+}
+
+// `lsof -nP -a -p PID -i4TCP -sTCP:LISTEN -Fn`: the `n` lines, 127.0.0.1:47480, *:47480 or [::1]:47480.
+export function parseLsofListeners(text) {
+  const found = [];
+  for (const line of String(text).split(/\r?\n/)) {
+    if (!line.startsWith('n') || !line.includes(':')) continue;
+    const at = line.lastIndexOf(':');
+    const port = line.slice(at + 1);
+    if (/^[0-9]+$/.test(port)) found.push([normHost(line.slice(1, at).replace(/^\[|\]$/g, '')), Number(port)]);
+  }
+  return found;
 }
 
 // `ps -o uid= -p PID`: one number, or nothing when the process is gone.
@@ -497,10 +514,25 @@ export function refusal(who, port, expectPid = null) {
   return null;
 }
 
+// macOS, when the socket table is restricted (FAA-267): whether process `pid`, this account's, listens on 127.0.0.1:<port>
+// or the IPv4 wildcard (IPv4 alone: a v6-only wildcard never vouches for a 127.0.0.1 connection). `lsof -p` asks the process itself, which the restriction does not hide. Only a caller that started
+// `pid` itself (a launchd job it installed) may vouch with it.
+export async function pidListens(pid, port, { run = runProgram, platform = process.platform, ownUid: mine } = {}) {
+  if (platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
+  try {
+    const uid = parsePsUid(await run(PS, ['-o', 'uid=', '-p', String(pid)]));
+    if (uid === null || uid !== (mine ?? ownUid())) return false;
+    const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
+    return parseLsofListeners(out).some(([host, p]) => (host === '127.0.0.1' || host === '*') && p === port);
+  } catch {
+    return false;
+  }
+}
+
 // A connected socket to host:port whose server end is this account's (and, with expectPid, that process's). The check
 // runs on the very socket the caller then writes on, so no listener can change between the check and the request.
 // Rejects with ListenerRefused (the socket destroyed, nothing written) or with the connection's own error.
-export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, expectPid = null, ...ask } = {}) {
+export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, expectPid = null, vouchPid = null, ...ask } = {}) {
   return new Promise((resolveSocket, reject) => {
     const socket = net.connect({ host, port, noDelay: true }); // as a plain http.Agent's socket
     const timer = setTimeout(() => socket.destroy(Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' })), timeoutMs);
@@ -514,6 +546,11 @@ export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, exp
       } catch (err) {
         // A reader that throws (an injected one; the readers themselves answer unknown) fails closed.
         who = owner(UNKNOWN, { method: method(), reason: `check: ${err?.name ?? 'Error'}` });
+      }
+      if (who.kind === UNKNOWN && String(who.reason ?? '').startsWith(TABLE_RESTRICTED) && vouchPid
+        && await pidListens(vouchPid, port, ask)) {
+        // The table hides other processes (FAA-267); the process this caller started holds the listener.
+        who = owner(THIS_ACCOUNT, { uid: ask.ownUid ?? ownUid(), pid: vouchPid, method: 'lsof-pid' });
       }
       const refused = refusal(who, port, expectPid);
       if (refused) {
@@ -532,14 +569,15 @@ export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, exp
 // when it is made. A refusal reaches the request as its 'error', a ListenerRefused. Free sockets do not keep the process
 // alive (Node unrefs them).
 export class CheckedAgent extends http.Agent {
-  constructor({ expectPid = null, ask = {}, ...options } = {}) {
+  constructor({ expectPid = null, vouchPid = null, ask = {}, ...options } = {}) {
     super(options);
     this.expectPid = expectPid;
+    this.vouchPid = vouchPid;
     this.ask = ask;
   }
 
   createConnection(options, callback) {
     checkedSocket(Number(options.port), { host: options.host ?? '127.0.0.1', timeoutMs: options.timeout ?? 10000,
-      expectPid: this.expectPid, ...this.ask }).then((socket) => callback(null, socket), (err) => callback(err));
+      expectPid: this.expectPid, vouchPid: this.vouchPid, ...this.ask }).then((socket) => callback(null, socket), (err) => callback(err));
   }
 }

@@ -214,7 +214,8 @@ class DefaultTransport(unittest.TestCase):
         po = fh._po
         before = len(Handler.seen)
         for owner in (po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "x"), po.Owner(po.SYSTEM, 0, 1, "x"),
-                      po.Owner(po.UNKNOWN, None, None, "x", "no-row")):
+                      po.Owner(po.UNKNOWN, None, None, "x", "no-row"),
+                      po.Owner(po.UNKNOWN, None, None, "netstat", po.TABLE_RESTRICTED + ": netstat printed nothing")):
             with self.subTest(kind=owner.kind), mock.patch.object(po, "server_end", return_value=owner) as checked:
                 with self.assertRaises(fh.HttpError) as cm:
                     fh.request("GET", self.base + "/ok", headers={"Authorization": "Bearer synthetic"}, deadline_s=10)

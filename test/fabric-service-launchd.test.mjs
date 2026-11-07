@@ -10,6 +10,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { instanceDirs } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-paths.mjs';
+import { ForeignUserAnswer } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
@@ -108,6 +109,17 @@ test('the plist refuses what it cannot carry', () => {
   refuse(['/bin/x'], {}, 'bad/label');
   refuse(['/bin/x'], {}, '');
   assert.throws(() => k.launchdPlist('a.b', ['/bin/x'], { stdoutPath: '/l' }), k.ServiceError);
+});
+
+test('a release folder with a space is no credential (FAA-266)', () => {
+  const release = '/Users/example/Library/Application Support/example-agent/releases/e7d6275a8aae';
+  const text = k.launchdPlist('a.b', ['/bin/x'], { workingDirectory: '/', stdoutPath: '/l', environment: { PYTHONPATH: release } });
+  assert.ok(text.includes(`<string>${release}</string>`));
+  // A base64 key whose `/` splits it into short pieces is no path: it stays a credential (0.76.0 product reading).
+  const key = '2rHJkKR3HPKhvnZRjBcyYugNz2g0gTAKrWDEmg' + '/hqbs=';
+  for (const value of [key, `/${key.slice(0, 20)}/${key.slice(20)}`]) {
+    assert.throws(() => k.launchdPlist('a.b', ['/bin/x'], { workingDirectory: '/', stdoutPath: '/l', environment: { EXAMPLE_MODE: value } }), /credential/);
+  }
 });
 
 test('the plist escapes markup', () => {
@@ -370,4 +382,30 @@ test('FAA-226: the installer reads the well-known answer on the one connection i
   for (let i = 0; i < 100 && closed.length < opened.length; i += 1) await new Promise((r) => setTimeout(r, 10));
   assert.equal(opened.length, 1, 'one connection: the checked one carries the request');
   assert.deepEqual(closed, opened, 'and it is closed after the answer');
+});
+
+test('the install vouches with its own job\'s pid, which a restricted table needs (FAA-267)', async (t) => {
+  const s = setup(t);
+  const fake = fakeLaunchd();
+  const seen = [];
+  const doc = await install(s, fake, '1', { fetchWellKnown: async (origin, opts) => {
+    seen.push(opts?.vouchPid);
+    return seen.length === 1 ? new ForeignUserAnswer('table-restricted: netstat printed nothing to this process')
+      : { service: { id: 'example-agent', instance: 'default' } };
+  } });
+  assert.equal(doc.service.id, 'example-agent');
+  assert.deepEqual(seen, [null, 4242], 'only a restricted answer makes the job\'s pid vouch');
+  assert.equal(k.launchdPid(s.name, { run: fake.run, platform: 'darwin', uid: UID }), 4242);
+  assert.equal(k.launchdPid('ai.passioncode.test.absent', { run: fake.run, platform: 'darwin', uid: UID }), null);
+});
+
+test('a listener the job cannot prove is table-restricted, and the error asks for a runtime that sees the table (FAA-267)', async (t) => {
+  const s = setup(t);
+  const fake = fakeLaunchd();
+  await assert.rejects(install(s, fake, '1', { timeout: 0.05,
+    fetchWellKnown: async () => new ForeignUserAnswer('table-restricted: netstat printed nothing to this process') }),
+  (err) => /could not be proved this service's: table-restricted: /.test(err.message) && /a runtime that sees them/.test(err.message));
+  await assert.rejects(install(s, fake, '1', { timeout: 0.05,
+    fetchWellKnown: async () => new ForeignUserAnswer('foreign-user: the server on port 47201 belongs to system') }),
+  (err) => /is not this service's: foreign-user: /.test(err.message));
 });
