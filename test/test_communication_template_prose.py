@@ -61,6 +61,15 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
         self.assertNotIn("no fact to cite", readme)
         self.assertNotIn("no fact to cite", flat(TEMPLATE))
 
+    def test_the_declaration_rules_a_builder_follows_hold_under_the_probe(self):
+        """0.75.0 readings, round 10: a real answered signal drops the queue's recommendation (FAC-SEM-164), and the
+        operator's in-chat decision is carried out once, never held again (CA-8, the standard's 4.10)."""
+        body = flat(TEMPLATE)
+        for phrase in ("replaces with a real signal and then drops its `recommendation`",
+                       "carried out once within CA-8's bounds and never held again"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, body)
+
     def test_the_changelog_counts_the_adversarial_batches_the_template_lists(self):
         import re
         body = flat(TEMPLATE)

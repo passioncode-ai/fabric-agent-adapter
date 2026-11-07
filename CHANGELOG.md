@@ -15,7 +15,7 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   suspected, then the pre-send gates with a checker of another vendor. It also carries the business patterns, the
   knowledge and data connections (the handoff queue's «a person answered» signal, the account state and version facts
   as tools of every turn, retrieval over the whole conversation), leads handed to a sales agent of their own that owns
-  the CRM, the learning loop, the model lanes, the Fabric integration and the acceptance with 17 adversarial batches, and maps its sections to the parts of an organization agent template one file can carry (fabric-workspace
+  the CRM, the learning loop, the model lanes, the Fabric integration and the acceptance with 18 adversarial batches, and maps its sections to the parts of an organization agent template one file can carry (fabric-workspace
   `knowledge/system/templates.md`, S2; S2's operating rules A1 to A12 apply by reference until the folder, FAA-265). `SKILL.md` links it beside `agents-that-answer-people.md`.
 - A scenario eval (`a-channel-agent-starts-from-the-communication-template`) and a trigger query for it (measured with a
   real client: creating-fabric-agents 28 of 31, the new query routed right;
@@ -55,6 +55,8 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
 - Adopting the template starts a new series for `nobodyDropped.turns` (batched turns) and the outcome shares
   (`customer_silent` up, `no_reply_owed` down); say so in the owner's report, never inside `support.quality_daily`.
 - A declaration copied from the 0.74.0 support-agent example replaces its `texts.final`, which claimed an answer.
+- An agent whose operator channel shares its answering bot moves the operator channel to a bot of its own (a new token
+  slot and link code), and binds the operator's id on the answering bot by its own link code (CA-8).
 
 ## 0.74.0 (2026-11-07)
 
