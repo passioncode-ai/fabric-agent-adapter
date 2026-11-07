@@ -310,7 +310,7 @@ from a release folder needs it), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
 propagation, event trace pairs, `interop.action-tools` (every declared action's tool is served), `well-known.a2a` and
 `a2a.card` (DEC-0122: the card is fetched without the token and its interfaces are never called; the surfaces
-reference's *A2A for remote agents* section), and
+reference's *A2A for remote agents* section), `channel-agent.declaration` (DEC-0150), and
 `board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768

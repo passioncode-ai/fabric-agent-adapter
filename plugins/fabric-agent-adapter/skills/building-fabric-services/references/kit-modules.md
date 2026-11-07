@@ -99,7 +99,9 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L4 | `fabric_http` | outbound HTTP: deadline, bounded retries, `Retry-After`, size cap ([connectors](connectors.md)) |
 | L4 | `fabric_openrouter` | OpenRouter chat: own key, spend ceiling, receipts, fallback ([connectors](connectors.md)) |
 
-Beside the kit, not in `kit.json`: the probe (`check_service.py`, `check_service_rules.py`), the sample
+Beside the kit, not in `kit.json`: the probe (`check_service.py`, `check_service_rules.py`,
+`check_service_channel_agent.py`, `check_service_channel_agent_schema.py` and the
+`service-channel-agent-extension.schema.json` it reads at run time), the sample
 (`sample_service.py`, `sample-remote-service.mjs`), `fabric_kit.py` itself and the dashboard tools. Recipes built on
 the kit live in `../recipes/` ([the draft-and-check step of a support agent](../recipes/support-agent/README.md)).
 
