@@ -17,12 +17,26 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   as tools of every turn, retrieval over the whole conversation), leads handed to a sales agent of their own that owns
   the CRM, the learning loop, the model lanes, the Fabric integration and the acceptance with 15 adversarial batches, and maps its sections to the parts of an organization agent template (fabric-workspace
   `knowledge/system/templates.md`, S2). `SKILL.md` links it beside `agents-that-answer-people.md`.
-- A scenario eval (`a-channel-agent-starts-from-the-communication-template`) and a trigger query for it.
+- A scenario eval (`a-channel-agent-starts-from-the-communication-template`) and a trigger query for it (measured with a
+  real client: creating-fabric-agents 28 of 31, the new query routed right), and `test/test_communication_template_prose.py`,
+  which pins the template phrases that scenario grades and checks every event kind it names against the kit's writer.
 
 ### Changed
 
 - `references/models-and-providers.md`: a new agent's model key gets USD 100 a month unless the operator names a higher
   one, and the agent's own stop sits a little under the key's limit (the operator's decision of 2026-11-07).
+  It also names the template's open-vendor rule (every route of a lane reading people's words, fallbacks included) as
+  narrower than DEC-0083, and excepts a channel agent's batch triage from the volume row.
+- The template is reached from the creating-fabric-agents grill rows «Does it answer people?» and «Who pays?» (the USD
+  100 default), `agents-that-answer-people.md`, `practices.md`, building-fabric-services `SKILL.md` and the
+  support-agent recipe's README, which now says how the recipe serves the template: the plan's draft carries `[KB:<id>]`
+  markers and the agent runs `check_reply` on it; the checker of another vendor stays the agent's own.
+
+### Upgrading
+
+- An answering agent that adopts the template moves every route that reads people's text to an open-vendor model,
+  fallbacks included (template rule 6); one that does not adopt it keeps what DEC-0083 asks. Its monthly stop uses the
+  kit's OpenRouter client with `window="month"` (the default window is a day).
 
 ## 0.74.0 (2026-11-07)
 

@@ -239,6 +239,18 @@ class Recipe(unittest.TestCase):
                              sources={"password-reset": source})
         self.assertIn("unsupported:url", got["problems"])
 
+    def test_a_template_plan_draft_goes_through_check_reply(self):
+        """0.75.0 seam reading 2: under communication-agent-template.md the plan-and-draft call writes the draft and the
+        agent runs check_reply on it, with the plan's evidence ids as `given` and a [KB:<id>] marker per id used."""
+        plan = {"evidence": ["refund-window"], "draft": "You can get a refund within 14 days from the store. [KB:refund-window]"}
+        sources = {"refund-window": "Refunds within 14 days from the store."}
+        got = sa.check_reply(plan["draft"], "Can I get a refund?", plan["evidence"], max_chars=1200, sources=sources)
+        self.assertTrue(got["ok"], got["problems"])
+        self.assertNotIn("[KB:", got["reply"])
+        bare = sa.check_reply("You can get a refund within 14 days from the store.", "Can I get a refund?",
+                              plan["evidence"], max_chars=1200, sources=sources)
+        self.assertIn("no-citation", bare["problems"])
+
     def test_an_address_or_a_phone_number_is_checked_by_equality(self):
         source = "Write to help@acme.com or call +1 555 010 0199."
         self.assertIn("unsupported:email", sa.unsupported("Write to help@acme.co.", source))

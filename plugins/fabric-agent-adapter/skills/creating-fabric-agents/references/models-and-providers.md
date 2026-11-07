@@ -94,7 +94,8 @@ change an embedding model without re-indexing every stored vector (search silent
 - **Each agent spends its own key, with its own ceiling.** The key is minted for that agent (and that project) by the
   estate's key manager, with a monthly limit; it is never pasted by a person into a file, a prompt or a command line.
   A new agent's key gets USD 100 a month unless the operator names a higher one for that agent, and the agent's own
-  stop sits a little under the key's limit, so the provider never refuses first.
+  stop sits a little under the key's limit, so the provider never refuses first (the kit's OpenRouter client counts a
+  month with window="month"; its default window is a day).
   Read it from the environment the service manager or the session gives the agent (Fabric Switchboard hands an agent
   the key of the project it starts in).
 - **An organization's instance spends the organization's key** under its grant; a personal key never pays for an

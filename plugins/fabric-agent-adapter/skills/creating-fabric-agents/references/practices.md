@@ -121,7 +121,7 @@ The channel-agent standard v1 (`channel-agent-standard/1`, its round 4 of 2026-1
 owner on the Fabric board, FAA-197) sets what every agent answering people on a channel does, so two agents count
 alike. Unlike the sections above, these are the standard's rules rather than lessons from one measured failure;
 each names its check where the kit has one. The support-agent recipe (`building-fabric-services/recipes/support-agent`) carries the parts of it a
-draft-and-check step owns.
+draft-and-check step owns; a whole channel agent starts from [communication-agent-template.md](communication-agent-template.md).
 
 - **The unit is the ticket, and a channel rule bounds it**: a private chat until 24 hours of silence, a group's one
   root message, a mail thread, one review. A message after a ticket ended opens a new one linked to the old. One

@@ -134,7 +134,8 @@ brief disagree, ask the owner before you build.
      scope (the product or off-topic), injection {suspected, what},
      covered (yes | partly | no) and evidence (the knowledge ids it used),
      actions [{type: reply | ask_clarification | handoff | <tool name>, why}],
-     points (what the reply must say), draft.
+     points (what the reply must say), draft (marking each knowledge id it uses inline as [KB:<id>], so the
+     kit's check_reply can run on it).
    On a partly covered question the draft answers what the knowledge covers, specifically, then says what it does not.
    Measured: this call's draft equals a single answering call on plain questions (6.88 against 6.85 of 7) and leads on
    behaviour cases (6.89 against 6.53 for one call of the same model and 6.00 for the cheaper drafter in use); a separate
@@ -153,7 +154,8 @@ brief disagree, ask the owner before you build.
 5. Pre-send gates, in this order: deterministic false-state gates (money arrived, live, enabled, fixed, a person did
    something: only when the system backs it), links, handles, numbers and amounts only from the material, language and
    script, length, the dash, no repeat of the previous reply; then a checker of another vendor than the drafter that
-   sees the material before the instructions. A refusal: one repair naming the reason, then one research turn on a
+   sees the material before the instructions. A turn whose plan has no injection verdict, or whose call failed, is
+   held, never sent on a guess. A refusal: one repair naming the reason, then one research turn on a
    stronger model under a time cap (never for money), then an honest holding line; a hold comes back by itself when
    its gap closes.
 
@@ -165,7 +167,8 @@ brief disagree, ask the owner before you build.
   answer in substance beats a pointer.
 - Sales and leads: a sales agent of its own owns the CRM and the lead; every other channel hands a lead to its queue
   as one more handoff queue, with a summary and the lead's consent (the four owners asked who answer people put leads
-  there; none of them has a CRM). In the sales agent the plan qualifies the lead (need, fit, urgency, budget signal, decision role) and picks the next
+  there; none of them has a CRM). Until the estate has a sales agent, the brief names the lead's queue and its person.
+  In the sales agent the plan qualifies the lead (need, fit, urgency, budget signal, decision role) and picks the next
   step (answer, offer a demo or a trial, send the price the knowledge holds, hand to the sales owner with a summary).
   Prices, discounts and terms only from the knowledge or the CRM; never a promise outside them; the lead and every
   step go to the CRM through its tool, with the consent the channel requires; follow-ups on a cadence the owner sets,
@@ -175,8 +178,8 @@ brief disagree, ask the owner before you build.
   answer or stay silent (no visible handoff in a group); answer only questions, not chatter; at most 2 replies to one
   asker in 15 minutes; staff answers win and are proposed as knowledge, which the owner accepts; spam and lure verdicts silence the agent; moderation
   rules ship only after a measurement against the moderators' own removals, and every exception checks who acted (the
-  agent's own actions are in the same log); with privacy mode on, a bot sees commands, mentions and replies to its own messages; it reads every message only
-  with privacy mode off or as a group admin.
+  agent's own actions are in the same log); with privacy mode on, a bot sees only commands meant for it, replies to its own messages and its inline messages
+  (not a plain mention); it reads every message only with privacy mode off or as a group admin.
 - Inbox (mail): header prefilter, one elected answerer per message, a waiting reply after 24 hours and a closing reply
   when no answer is found; replies only to the From address; drafts only where the owner requires approval.
 - Store reviews: public and short, no account details, the store's own refund route, one reply per review, the
@@ -215,8 +218,10 @@ brief disagree, ask the owner before you build.
   with the answers unchanged). A judge without human labels is uncalibrated and says so: plan a steady weekly
   labelling of judged pairs by a person from the first week (one mail channel had 0 labelled pairs in 14 days).
 - Every unanswered or held question gets a background second look on a stronger model that names the cause
-  (retrieval, draft or check, person, data); fixable ones are answered. An answer found later is sent within 7 days
-  (a 6-hour return window left most found answers undelivered in one group channel).
+  (retrieval, draft or check, person, data); fixable ones are answered. An answer found later is sent within the ticket's final limit:
+  7 days in a private chat or mail; in a group its late-answer window (the standard's reference 6 hours, no late
+  answer after it). A 6-hour window left most found answers undelivered in one group channel, so a group that wants
+  longer declares its own final limit, as the standard lets a runtime do.
 - A person's answer to a handed-over question becomes knowledge after the owner accepts it; the held tickets re-run.
 - Every reply the agent got wrong becomes a scrubbed eval ticket, re-run on each new version; a weekly replay re-runs
   last week's questions through the deployed build.
@@ -231,7 +236,9 @@ brief disagree, ask the owner before you build.
 - Checker: another vendor than the drafter (2026-11: z-ai/glm-5.3 at low effort, deepseek/deepseek-v4.1-flash or
   qwen/qwen3.8-flash).
 - Judge: another vendor than the writers and the checkers, open-vendor because it reads what people wrote.
-- Vision and audio: an open-vendor primary, as rule 6 says (the planning model reads pictures).
+- Vision and audio: an open-vendor primary, as rule 6 says (the planning model reads pictures). The kit's OpenRouter
+  client sends text only, so pictures go through the agent's own client or a vision lane that describes them first;
+  audio is transcribed first by an open-vendor route, or a second open-vendor audio route is named.
 - The steps are the rule; each step's model is chosen on the project's own replay set (a cheaper plan-and-draft model
   stays where it wins there). A switch must win on the project's own set.
 - Every lane has a fallback of another vendor; fallback recoveries are counted. Expect the plan-and-draft call to hold
@@ -241,14 +248,16 @@ brief disagree, ask the owner before you build.
 ## 8. Fabric integration
 
 - A fabric-service/0.1 service: /.well-known/fabric-service, events, usage, a dashboard page opened in Fabric
-  Dashboards, a lifecycle row (who starts it, cadence, who stops it, idle budget).
+  Dashboards, a lifecycle row (who starts it, cadence, who stops it, idle budget); the fabric-agent-contract revision
+  the kit pins (its fabric-contract.lock.json) and the doors the agent serves (its capabilities as MCP tools, jobs).
 - The channel-agent declaration under the extension key (the recipe's channel-agent.example.json).
-- A spend policy in the repository before the first model call; the code's monthly stop under the key's limit.
+- A spend policy in the repository before the first model call; the code's monthly stop under the key's limit (the
+  kit's OpenRouter client with window="month"; its default window is a day).
 - Two keys before live sending: the channel set to live and an environment switch; a demo sender that cannot send.
 - Telegram: through the sending service the estate names for it (rule 9); bind the support account to its own agents (others are refused); with
   replies on, an answer to a person who wrote within 24 hours goes at once, while a first message to someone who did not
-  write, an edit or a late answer waits for the operator; read each message's `out` field to tell the agent's own from
-  an inbound one.
+  write, an edit or a late answer waits for the operator; tell the agent's own messages from inbound ones by the transport: a bot by
+  the sender, an account session or the sending service by each message's `out` field.
 
 ## 9. Acceptance (the agent is done when all of these pass on the build the channel runs)
 
@@ -265,7 +274,8 @@ brief disagree, ask the owner before you build.
 - Clarifying questions and referrals counted as shares of answered turns from the first day.
 - The first week's support.quality_daily reported per channel, with these targets (a metric not measured is null and
   named; helped binds as a gate only once the judge is calibrated, until then it is reported): helped yes at least
-  60% and no at most 15%; every rubric check at least 90%; repeat-ask under 3%; agent-repeat 0; first-reply p90 of
+  60% and no at most 15%; every rubric check at least 90% (each binds, like helped, only once people agree with it
+  at least 80% of the time; until then it is reported); repeat-ask under 3%; agent-repeat 0; first-reply p90 of
   30 s in private chat, the channel's declared first_reply_limit in a group (the standard's 1 h), 4 h by mail, 24 h
   for a store review.
 ```
