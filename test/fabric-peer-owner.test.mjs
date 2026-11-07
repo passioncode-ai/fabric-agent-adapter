@@ -282,3 +282,15 @@ test('a restricted table answers table-restricted, and a vouched pid that listen
   socket.destroy();
   assert.deepEqual(received, []);
 });
+
+test('a vouch is an integer pid of this account, and lsof is asked for IPv4 alone (FAA-267)', async () => {
+  const calls = [];
+  const run = async (file, args) => { calls.push(args); return file === po.PS ? '501\n' : 'p4242\nf4\nn*:80\n'; };
+  for (const pid of ['4242', true, null, 1, 0, -5]) {
+    assert.equal(await po.pidListens(pid, 80, { run, platform: 'darwin', ownUid: 501 }), false, String(pid));
+  }
+  assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501 }), true);
+  assert.equal(await po.pidListens(4242, 81, { run, platform: 'darwin', ownUid: 501 }), false);
+  assert.equal(await po.pidListens(4242, 80, { run, platform: 'linux', ownUid: 501 }), false);
+  assert.ok(calls.at(-1).includes('-i4TCP') && !calls.at(-1).includes('-iTCP'), calls.at(-1).join(' '));
+});

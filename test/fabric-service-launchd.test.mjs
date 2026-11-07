@@ -10,6 +10,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as k from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs';
 import { instanceDirs } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-paths.mjs';
+import { ForeignUserAnswer } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
@@ -387,4 +388,15 @@ test('the install vouches with its own job\'s pid, which a restricted table need
   assert.deepEqual(seen, [4242]);
   assert.equal(k.launchdPid(s.name, { run: fake.run, platform: 'darwin', uid: UID }), 4242);
   assert.equal(k.launchdPid('ai.passioncode.test.absent', { run: fake.run, platform: 'darwin', uid: UID }), null);
+});
+
+test('a listener the job cannot prove is table-restricted, and the error asks for a runtime that sees the table (FAA-267)', async (t) => {
+  const s = setup(t);
+  const fake = fakeLaunchd();
+  await assert.rejects(install(s, fake, '1', { timeout: 0.05,
+    fetchWellKnown: async () => new ForeignUserAnswer('table-restricted: netstat printed nothing to this process') }),
+  (err) => /could not be proved this service's: table-restricted: /.test(err.message) && /a runtime that sees them/.test(err.message));
+  await assert.rejects(install(s, fake, '1', { timeout: 0.05,
+    fetchWellKnown: async () => new ForeignUserAnswer('foreign-user: the server on port 47201 belongs to system') }),
+  (err) => /is not this service's: foreign-user: /.test(err.message));
 });

@@ -273,7 +273,7 @@ def _netstat_address(text: str) -> Optional[tuple[str, int]]:
 
 
 def parse_lsof_listeners(text: str) -> list[tuple[str, int]]:
-    """`lsof -nP -a -p PID -iTCP -sTCP:LISTEN -Fn`: the `n` lines, `127.0.0.1:47480`, `*:47480` or `[::1]:47480`."""
+    """`lsof -nP -a -p PID -i4TCP -sTCP:LISTEN -Fn`: the `n` lines, `127.0.0.1:47480`, `*:47480` or `[::1]:47480`."""
     found: list[tuple[str, int]] = []
     for line in text.splitlines():
         if not line.startswith("n") or ":" not in line:
@@ -499,8 +499,9 @@ _CHILD_LISTENER = ("import socket,sys\ns=socket.socket();s.bind(('127.0.0.1',0))
 
 def _child_listener_seen(rows_of) -> Optional[bool]:
     """Whether the table shows a listener of a child process of this one: False when it does not (the table shows
-    this process alone, FAA-267), None when no child could be started (the check is then skipped)."""
-    if not sys.executable:
+    this process alone, FAA-267), None when no child could be started or did not answer within TIMEOUT_SECONDS (a
+    frozen or embedded host has no interpreter to start). The calibration trusts only True."""
+    if not sys.executable or getattr(sys, "frozen", False):
         return None
     try:
         child = subprocess.Popen([sys.executable, "-I", "-c", _CHILD_LISTENER], stdin=subprocess.PIPE,
@@ -508,6 +509,9 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
     except OSError:
         return None
     try:
+        import select  # POSIX: this reader runs on macOS alone
+        if not select.select([child.stdout], [], [], TIMEOUT_SECONDS)[0]:
+            return None
         line = child.stdout.readline().strip()
         if not line.isdigit():
             return None
@@ -521,6 +525,8 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
             child.wait(timeout=TIMEOUT_SECONDS)
         except (OSError, subprocess.TimeoutExpired):
             child.kill()
+            child.wait()
+        child.stdout.close()
 
 
 def _calibrate_sysctl() -> bool:
@@ -539,7 +545,7 @@ def _calibrate_sysctl() -> bool:
         if not calibration_holds(rows, _address(probe.getsockname()), _address(client.getsockname()),
                                  uid=_posix_uid(), pid=os.getpid()):
             return False
-        return _child_listener_seen(lambda: parse_pcblist_n(_sysctl_blob())) is not False
+        return _child_listener_seen(lambda: parse_pcblist_n(_sysctl_blob())) is True
     except (TableUnreadable, OSError, struct.error, ValueError):
         return False
     finally:
@@ -865,15 +871,16 @@ def refusal(owner: Owner, port: int, expect_pid: Optional[int] = None) -> Option
 
 def pid_listens(pid: int, port: int) -> bool:
     """macOS, when the socket table is restricted (FAA-267): whether process `pid`, this account's, listens on
-    127.0.0.1:<port> or the wildcard. `lsof -p` asks the process itself (libproc), which the restriction does not
-    hide. Only a caller that started `pid` itself (a launchd job it installed) may vouch with it."""
-    if sys.platform != "darwin" or pid is None or pid <= 1:
+    127.0.0.1:<port> or the IPv4 wildcard (IPv4 alone: a v6-only wildcard never vouches for a 127.0.0.1 connection).
+    `lsof -p` asks the process itself (libproc), which the restriction does not hide. Only a caller that started `pid`
+    itself (a launchd job it installed) may vouch with it."""
+    if sys.platform != "darwin" or not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
         return False
     try:
         uid = parse_ps_uid(_run([PS, "-o", "uid=", "-p", str(pid)]))
         if uid is None or uid != _posix_uid():
             return False
-        out = _run([LSOF, "-nP", "-a", "-p", str(pid), "-iTCP", "-sTCP:LISTEN", "-Fn"])
+        out = _run([LSOF, "-nP", "-a", "-p", str(pid), "-i4TCP", "-sTCP:LISTEN", "-Fn"])
     except TableUnreadable:
         return False
     return any(host in ("127.0.0.1", "*") and p == port for host, p in parse_lsof_listeners(out))

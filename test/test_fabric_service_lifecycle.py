@@ -186,6 +186,19 @@ class LaunchdInstallTests(unittest.TestCase):
         return fs.launchd_install(self.label, self.plist, body, origin=self.web.origin,
                                   service_id="example-agent", timeout=5, **kw)
 
+    def test_faa267_a_listener_the_job_cannot_prove_names_the_way_round(self):
+        sup = sys.modules["fabric_supervisors"]
+        body = fs.launchd_plist(self.label, ["/bin/echo", "1"], working_directory=Path(self.temp.name),
+                                stdout_path=Path(self.temp.name) / "service.log")
+        restricted = (None, sup._po.TABLE_RESTRICTED + ": netstat printed nothing to this process")
+        with FakeLaunchd(), mock.patch.object(sup, "_read_well_known", return_value=restricted) as read:
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, body, origin=self.web.origin, service_id="example-agent",
+                                   timeout=1)
+        self.assertIn("could not be proved this service's: table-restricted: ", str(caught.exception))
+        self.assertIn("Apple's /usr/bin/python3", str(caught.exception))
+        self.assertIn("vouch_pid", read.call_args.kwargs)
+
     def test_lc14_first_install_enables_and_starts(self):
         with FakeLaunchd() as fake:
             doc = self.install()

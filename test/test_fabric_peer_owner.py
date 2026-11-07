@@ -538,6 +538,45 @@ class RestrictedTable(unittest.TestCase):
             self.assertIn(P._child_listener_seen(lambda: [P.Row(("127.0.0.1", 1), ("*", 0), True, 501, 1, False)]),
                           (False,))
 
+    @unittest.skipIf(sys.platform == "win32", "a shell script as the interpreter")
+    def test_a_child_that_never_answers_proves_nothing_and_does_not_hang(self):
+        import tempfile
+        import time
+        with tempfile.TemporaryDirectory() as d:
+            fake = os.path.join(d, "python3")
+            with open(fake, "w") as f:
+                f.write("#!/bin/sh\nexec sleep 30\n")
+            os.chmod(fake, 0o755)
+            with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 0.3):
+                start = time.monotonic()
+                self.assertIsNone(P._child_listener_seen(lambda: []))
+                self.assertLess(time.monotonic() - start, 5)
+        with mock.patch.object(sys, "frozen", True, create=True):
+            self.assertIsNone(P._child_listener_seen(lambda: []), "a frozen host has no interpreter to start")
+
+    @unittest.skipUnless(sys.platform == "darwin", "sysctl on macOS")
+    def test_sysctl_is_trusted_only_when_the_child_is_seen(self):
+        with mock.patch.object(P, "_child_listener_seen", return_value=None):
+            self.assertFalse(P._calibrate_sysctl(), "a child that could not be started proves nothing")
+        with mock.patch.object(P, "_child_listener_seen", return_value=False):
+            self.assertFalse(P._calibrate_sysctl())
+
+    @unittest.skipIf(sys.platform == "win32", "ps and lsof")
+    def test_a_vouch_is_an_integer_pid_and_asks_lsof_for_ipv4_alone(self):
+        for pid in ("4242", True, None, 1, 0, -5):
+            self.assertFalse(P.pid_listens(pid, 80), pid)
+        calls = []
+
+        def run(argv):
+            calls.append(argv)
+            return "%d\n" % os.getuid() if argv[0] == P.PS else "p4242\nf4\nn*:80\n"
+
+        with mock.patch.object(P, "_run", side_effect=run), mock.patch.object(P.sys, "platform", "darwin"):
+            self.assertTrue(P.pid_listens(4242, 80))
+            self.assertFalse(P.pid_listens(4242, 81))
+        self.assertIn("-i4TCP", calls[-1])
+        self.assertNotIn("-iTCP", calls[-1])
+
     @unittest.skipIf(sys.platform == "win32", "launchd")
     def test_launchd_pid(self):
         import subprocess

@@ -170,7 +170,7 @@ export function parseNetstat(text) {
   return rows;
 }
 
-// `lsof -nP -a -p PID -iTCP -sTCP:LISTEN -Fn`: the `n` lines, 127.0.0.1:47480, *:47480 or [::1]:47480.
+// `lsof -nP -a -p PID -i4TCP -sTCP:LISTEN -Fn`: the `n` lines, 127.0.0.1:47480, *:47480 or [::1]:47480.
 export function parseLsofListeners(text) {
   const found = [];
   for (const line of String(text).split(/\r?\n/)) {
@@ -515,14 +515,14 @@ export function refusal(who, port, expectPid = null) {
 }
 
 // macOS, when the socket table is restricted (FAA-267): whether process `pid`, this account's, listens on 127.0.0.1:<port>
-// or the wildcard. `lsof -p` asks the process itself, which the restriction does not hide. Only a caller that started
+// or the IPv4 wildcard (IPv4 alone: a v6-only wildcard never vouches for a 127.0.0.1 connection). `lsof -p` asks the process itself, which the restriction does not hide. Only a caller that started
 // `pid` itself (a launchd job it installed) may vouch with it.
 export async function pidListens(pid, port, { run = runProgram, platform = process.platform, ownUid: mine } = {}) {
   if (platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
   try {
     const uid = parsePsUid(await run(PS, ['-o', 'uid=', '-p', String(pid)]));
     if (uid === null || uid !== (mine ?? ownUid())) return false;
-    const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-iTCP', '-sTCP:LISTEN', '-Fn']);
+    const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
     return parseLsofListeners(out).some(([host, p]) => (host === '127.0.0.1' || host === '*') && p === port);
   } catch {
     return false;
