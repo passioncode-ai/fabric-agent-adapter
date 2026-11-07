@@ -264,7 +264,7 @@
         "analyses, plans and drafts in one call (injection check, product-only scope, the knowledge ids it used), with no separate cheap drafter",
         "runs a final pass only when an action returned new facts or an injection is suspected",
         "keeps the pre-send gates and a checker of another vendor than the drafter",
-        "qualifies leads into the CRM through its tool, with prices only from the knowledge or the CRM",
+        "hands a lead to the sales agent's queue with a summary and the lead's consent; the sales agent owns the CRM and the qualification, and prices come only from the knowledge or the CRM",
         "gives the agent's model key USD 100 a month by default, its own stop under the key's limit"
       ]
     }
