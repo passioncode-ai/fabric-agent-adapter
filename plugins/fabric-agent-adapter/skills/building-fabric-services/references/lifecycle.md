@@ -89,7 +89,9 @@ systemd and Task Scheduler do not poll yet, FAA-253).
 1. Build or unpack the release into `~/.local/share/<id>/releases/<version>-<sha12>/`
    (a venv or `node_modules` inside it). Never edit a release after it is written.
 2. `write_descriptor` (port and id claims are checked here, and a new descriptor without `source.repository` is
-   refused; a rewrite of an installed one warns, FAA-198).
+   refused; a rewrite of an installed one warns, FAA-198). "Port claim" here is the kit's older sense, a port no other
+   descriptor declares; the pinned contract's HA-1 claim file per OS account, and a port free on the whole computer,
+   are not written or checked yet (FAA-225, after the contract's CT-228).
 3. `launchd_install` (Node: `await launchdInstall(...)`, the same steps): write + `plutil -lint`, read `launchctl print-disabled gui/<uid>`,
    `enable` **only when no override is recorded** (a first install), `bootout` and wait
    until `launchctl print gui/<uid>/<label>` fails, `bootstrap` with up to five retries,

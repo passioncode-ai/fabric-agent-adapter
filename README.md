@@ -188,9 +188,9 @@ KIT=plugins/fabric-agent-adapter/skills/building-fabric-services/scripts   # or 
 DATA=$(mktemp -d); SERVICES=$(mktemp -d); WORK=$(mktemp -d)
 python3 "$KIT/sample_service.py" serve --port 47190 --data-dir "$DATA" &
 python3 "$KIT/sample_service.py" register --port 47190 --data-dir "$DATA" --services-dir "$SERVICES"
-python3 "$KIT/check_service.py" sample --services-dir "$SERVICES"   # exit 0: no FAIL; on a FAIL stop here
-# Register the service for one client run, only after the probe passed (listener.owner proves the port is this
-# account's, and the client cannot check it); the token goes in a header, never in argv.
+# The probe exits 0 (no FAIL); only then is the service registered for one client run (listener.owner proves the port
+# is this account's, and the client cannot check it). The token goes in a header, never in argv.
+python3 "$KIT/check_service.py" sample --services-dir "$SERVICES" && \
 python3 - "$DATA/service.token" "$WORK/mcp.json" <<'EOF'
 import json, os, sys
 token = open(sys.argv[1]).read().strip()

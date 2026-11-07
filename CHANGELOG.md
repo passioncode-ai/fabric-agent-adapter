@@ -19,7 +19,7 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
     `GetExtendedTcpTable` and the owner's SID. The Node twin reads `netstat -anv` and `ps` on macOS, the same `/proc`
     files on Linux, `netstat -ano`, `whoami /user` and a PowerShell `GetOwnerSid` (SIDs, never names) on Windows; `checkedSocket` and `CheckedAgent` check a connection
     before a byte is written. Both twins answer the same questions over `test/fixtures/peer-owner/peer-owner-cases.json`.
-  - `check_service.py`: a first rule for a local placement, `listener.owner`, read from the server end of a connection
+  - `check_service.py`: a new rule for a local placement, `listener.owner`, the first that reads the port, from the server end of a connection
     of the probe's own on which nothing is sent: `PASS` for this OS account's process,
     `FAIL` `foreign-user` (then no rule reads the port and no token is sent), `NOT_RUN` when nothing listens. Every
     local request goes on a checked connection.
@@ -53,10 +53,10 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   rootful container proxy in front of a local model gateway, for one): use a rootless runtime or a forwarder of your own
   account. The Python `fabric_http` no longer sends a loopback URL through a proxy from the environment (`http_proxy`).
 - `fabric_peer_owner` is now imported by `check_service.py`, `fabric_hub`, `fabric_http`, `fabric_supervisors` and the
-  Node `fabric-hub.mjs`, `fabric-http.mjs` and `fabric-supervisors.mjs` (which imported no kit module before): a project
+  Node `fabric-hub.mjs`, `fabric-supervisors.mjs` and `fabric-http.mjs` (which imported no kit module before): a project
   that refreshes vendored copies file by file takes each module's `kit.json` closure, or the import fails.
-- A socket table over 4 MiB (several thousand TCP sockets; about 617 bytes each in macOS's `pcblist_n`, 150 in Linux's
-  `/proc/net/tcp`) cannot be read, so every loopback send fails closed as `foreign-user` on such a host.
+- A socket table over 4 MiB cannot be read (about 6,800 TCP sockets for the Python reader on macOS, 617 bytes each in
+  `pcblist_n`; about 19,000 for `netstat -anv`, the Node reader there; about 28,000 in Linux's `/proc/net/tcp`), so every loopback send fails closed as `foreign-user` on such a host.
 - A client running as root or SYSTEM reads root's or SYSTEM's listener as its own account's (launchd's pid 1 stays
   `system`): the vendored module put the system rule first, which would have refused a root container's own sidecar.
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process
@@ -67,7 +67,8 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 
 - `references/protocol.md` gains "The listener's owner (DEC-0154 HA-2)"; `references/board.md`, `references/lifecycle.md`,
   `references/kit-modules.md` and `SKILL.md` name the check.
-- The test fake hub keeps HTTP/1.1 connections with no Nagle delay, as Fabric's own hub (Node) does.
+- The test fake hub keeps HTTP/1.1 connections with no Nagle delay, as a Node server does by default (whether Fabric's
+  own hub keeps idle connections past the Node client's 2 s is FAA-256).
 - `dashboard-links.md` (all three copies) opens a raw loopback address in a browser only after the listener is this OS
   account's (the pinned PL-3); the link gate enforcing it is FAA-251. `connectors.md` names the loopback owner check
   and the kind `foreign-user`; the skill card's Network row names the socket table the kit now reads; `SKILL.md` and

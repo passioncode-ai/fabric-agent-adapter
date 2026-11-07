@@ -224,7 +224,7 @@ and `/proc/net/tcp6`, Windows through `GetExtendedTcpTable` and the owner's toke
 on macOS, the same `/proc` files on Linux, and `netstat -ano` with the owner SID from PowerShell `GetOwnerSid` against `whoami /user` on Windows (SIDs, never names). Fail closed: everything but
 `this-account` refuses, `unknown` included.
 
-Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, first for
+Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
 a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`),
 `fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user`, never retried),
 `check_dashboard_layout.mjs` before a local login code, and the launchd installers' poll (a listener of another account

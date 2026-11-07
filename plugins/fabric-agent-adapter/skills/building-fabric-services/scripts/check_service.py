@@ -9,7 +9,7 @@
            --repo PATH                            (dashboard.opens-in-host: the service's checkout)
 
 A local placement is read only when this OS account's process holds its port (DEC-0154 HA-2): `listener.owner`
-comes first, from the computer's socket table (fabric_peer_owner). Nothing listening is NOT_RUN (`down`, and
+comes before every rule that reads the port, from the computer's socket table (fabric_peer_owner). Nothing listening is NOT_RUN (`down`, and
 `well-known.answers` fails as before); another OS account's, root's or SYSTEM's listener, or one whose owner cannot be
 told, FAILs as `foreign-user`, and then no rule reads the port and no credential is sent. Every local connection, a
 reconnect included, is checked again before a byte goes out on it.
