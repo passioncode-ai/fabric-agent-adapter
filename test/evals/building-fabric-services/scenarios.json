@@ -678,6 +678,15 @@
         "the handler reads ctx.mandate and asks ctx.mandate_covers({capability, effect, ...}) (Node ctx.mandateCovers): a covered call answers ok with recordAs (via mandate, the task, the chain, the sender Project as caller), which the handler records as its reason; an outside-mandate or decision-invalid answer goes back to the requester as the request's outcome, failed_known naming the part or the detail (MD-1, MD-4), never asked from the service's own page; and None means no mandate travelled",
         "two mandate/1 blocks, or one whose text holds mandate/1 and is not JSON, read as none with a board.request.mandate_unread warning carrying the request id and its reason, never the block; a broken block that holds no mandate/1 is skipped and cancels no mandate beside it; the operator's words reach no event, log or checkpoint, and the body stays data: admit still runs first and a mandate never widens what it refuses"
       ]
+    },
+    {
+      "id": "a-release-contributes-its-measured-wins",
+      "request": "We just released 2.3.0 of our service; the median answer time fell from 1.8 s to 0.9 s over last week's traffic. Wrap it up.",
+      "expected": [
+        "contributes the win to the agents database (agents-db.contribute) as a success case: the metric, before and after, the unit, the window and the evidence",
+        "contributes a new technical decision without a number as a decision",
+        "puts no person's or client's name, user content, key or private path into the contribution"
+      ]
     }
   ]
 }

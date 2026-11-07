@@ -92,6 +92,8 @@ is unavailable, continue only through local structure and mark exact schema vali
 
 ### 3. Scaffold the provider bundle
 
+Before scaffolding, ask the [agents database](references/agents-database.md) for an audit of the project
+(`agents-db.audit`) and carry its `optimize` proposals into the adaptation plan.
 Load [provider bundle](references/provider-bundle.md) before creating or mapping files.
 Then run one explicit profile command:
 

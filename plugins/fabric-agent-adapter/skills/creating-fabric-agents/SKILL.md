@@ -49,6 +49,9 @@ and say in the report which skill was missing.
 
 No file is created until every row has an answer. An answer of "later" fails the grill.
 
+Before its design questions, consult the [agents database](references/agents-database.md): `agents-db.consult` on the
+board (or, with a grant, its `tools/audit.py scan` over the source projects), and build from the template it names.
+
 | Question | The gate |
 |---|---|
 | **What capability?** | one capability, named as `domain.action` (optionally `@surface`), with input and output shapes statable now |
@@ -237,7 +240,7 @@ file and a test per line, or `NOT_RUN` where the agent has no such stage.
 Report: capability, consumer, profile with the step-0 grill answers; the knowledge pack
 and which traps became fixtures; created files; contract version and commit; the gate
 table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`; remaining placeholders; the
-operator channel answer (step 6); and the exact next command. Never summarize the outcome as
+operator channel answer (step 6); the template it was built from (id and version, or none); and the exact next command. Never summarize the outcome as
 "Fabric-compatible" unless every required admission gate passed against the real provider.
 
 ## Agent pages open only in Fabric Dashboards

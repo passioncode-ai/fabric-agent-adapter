@@ -166,13 +166,13 @@ A Fabric with no `fabric_work_*` tools listed (before v0.3.5): use `fabric_tasks
 
 ## Step 5: while you work
 
-- **Every three minutes, and before any wait** (Fabric's rule `work.check-every-three-minutes`, which
-  `fabric_whoami` serves from Fabric 0.3.13): call `fabric_work_list` and act first on its `nudges` and
+- **Every three minutes, and before any wait** (Fabric's rule `work.check-every-three-minutes`,
+  from Fabric 0.3.13): call `fabric_work_list` and act first on its `nudges` and
   `waiting_for_you` (each is given once, there or in `fabric_heartbeat`); then read your unread board answers with
   `com.list {unread: true}` and mark what you handled with `com.read_ack`. Never leave a task you hold still: move
   it, hand it over or let it go. Fabric sweeps abandoned work on the same cadence.
 - `fabric_stage_report`: where you are in the work, as a claim beside what Fabric observes; give `step` and
-  `ofSteps` (step 2 of 3), which Fabric shows to the operator as your current step.
+  `ofSteps` (step 2 of 3), shown to the operator as your current step.
 - `fabric_task_note`: working notes on the task, append-only.
 - `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim. Before
   you wait on the person or a question, send it with `phase: "waiting"`: `waitingOn: {kind: "question", id}` for a
@@ -306,7 +306,8 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 2. `fabric_task_handoff` when a task follows this one: a NAMED result, not a summary of the chat.
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
    the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. After `done` or at session end, the retro:
-   `observatory_lesson`, insight/1 lines in `insights/`, or one line that there is nothing.
+   `observatory_lesson`, insight/1 lines in `insights/`, or one line that there is nothing (measured wins:
+   [agents database](references/agents-database.md)).
 
 Release anyway: a lapsed claim reads as stuck work.
 

@@ -217,7 +217,7 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
    claims, and a new one without `source.repository` (a rewrite warns). A preview or branch
    copy is a second **instance**, never a second id: one more service the operator sees. Verify a release with its
    own doctor or self-check before it replaces `default`; a temporary instance is uninstalled
-   (`launchd_uninstall`, `remove_descriptor`) as soon as its check is done, not left running.
+   (`launchd_uninstall`, `remove_descriptor`) once its check is done.
 2. `launchd_plist(...)` then `launchd_install(...)`: writes and lints the plist,
    `bootout` and waits for the unload, `bootstrap` with retries on the transient I/O
    error, then polls the well-known document until **this** identity answers on this OS account's listener (HA-2).
@@ -225,7 +225,7 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
 3. Uninstall: `launchd_uninstall` (waits for the unload, removes the plist, resets the
    override; `purge=True` removes data only when the operator asks), `remove_descriptor`.
 4. After an upgrade, `prune_releases(releases_dir, current=…)` keeps the running release
-   and the one before it.
+   and the one before it. Each release's measured wins: [agents database](references/agents-database.md).
 
 On Linux the supervisor is a systemd user unit (`systemd_unit` + `systemd_install`), on
 Windows a per-user Scheduled Task (`task_xml` + `task_install`); the Node kit has the same
