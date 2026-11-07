@@ -336,7 +336,8 @@ def _read_well_known(origin: str, timeout: float = 2.0,
             response = conn.getresponse()
             return (json.loads(response.read().decode()) if response.status == 200 else None), None
         except _po.ListenerRefused as exc:
-            return None, "foreign-user: %s" % exc
+            restricted = exc.owner is not None and (exc.owner.reason or "").startswith(_po.TABLE_RESTRICTED)
+            return None, "%s: %s" % (_po.TABLE_RESTRICTED if restricted else "foreign-user", exc)
         except (OSError, ValueError, http.client.HTTPException):
             return None, None
         finally:
@@ -417,6 +418,10 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         time.sleep(0.5)
     if foreign:
         # DEC-0154 HA-2 and service.md's Install row: a listener of another account is never a successful install.
+        if foreign.startswith(_po.TABLE_RESTRICTED):
+            raise ServiceError("%s could not be proved this service's: %s (DEC-0154 HA-2); this interpreter sees no other "
+                               "process's sockets and the job's pid did not show the listener: run the installer from "
+                               "Apple's /usr/bin/python3, or read the job's log." % (origin, foreign))
         raise ServiceError("%s is not this service's: %s (DEC-0154 HA-2); the port is another OS account's or its owner "
                            "cannot be told." % (origin, foreign))
     raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))

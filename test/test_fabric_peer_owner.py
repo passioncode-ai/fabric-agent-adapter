@@ -503,7 +503,7 @@ class KitInstaller(unittest.TestCase):
             with mock.patch.object(P, "server_end", return_value=restricted):
                 doc, why = sup._read_well_known(origin)
                 self.assertIsNone(doc)
-                self.assertIn(P.TABLE_RESTRICTED, why)
+                self.assertTrue(why.startswith(P.TABLE_RESTRICTED + ": "), why)
                 with mock.patch.object(P, "pid_listens", return_value=False):
                     self.assertIsNone(sup._read_well_known(origin, vouch_pid=4242)[0])
                 with mock.patch.object(P, "pid_listens", return_value=True) as listens:

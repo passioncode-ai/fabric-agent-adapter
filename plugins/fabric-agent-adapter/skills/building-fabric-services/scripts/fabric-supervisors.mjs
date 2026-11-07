@@ -9,7 +9,7 @@ import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabri
 import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
-import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';
+import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED } from './fabric-peer-owner.mjs';
 import http from 'node:http';
 
 export const DEFAULT_EXIT_TIMEOUT = 15;
@@ -358,7 +358,9 @@ export async function wellKnownOf(origin, { vouchPid = null } = {}) {
       res.on('error', () => resolve(null));
     });
     req.on('timeout', () => req.destroy());
-    req.on('error', (err) => resolve(err instanceof ListenerRefused ? new ForeignUserAnswer(`foreign-user: ${err.message}`) : null));
+    req.on('error', (err) => resolve(err instanceof ListenerRefused
+      ? new ForeignUserAnswer(`${String(err.owner?.reason ?? '').startsWith(TABLE_RESTRICTED) ? TABLE_RESTRICTED : 'foreign-user'}: ${err.message}`)
+      : null));
     req.end();
   }).finally(() => agent.destroy());
 }
@@ -405,6 +407,9 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
     await sleep(500);
   }
   // DEC-0154 HA-2 and service.md's Install row: a listener of another account is never a successful install.
+  if (foreign?.startsWith(TABLE_RESTRICTED)) {
+    throw new ServiceError(`${origin} could not be proved this service's: ${foreign} (DEC-0154 HA-2); this runtime sees no other process's sockets and the job's pid did not show the listener: run the installer from a runtime that sees them, or read the job's log.`);
+  }
   if (foreign) {
     throw new ServiceError(`${origin} is not this service's: ${foreign} (DEC-0154 HA-2); the port is another OS account's or its owner cannot be told.`);
   }
