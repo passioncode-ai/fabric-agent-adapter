@@ -49,7 +49,7 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
   `launchd_install` or `launchdInstall` refusal on a restricted table now reads `<origin> could not be proved this
   service's: table-restricted: ...` where it read `<origin> is not this service's: foreign-user: ...`: match the
   reason as a substring, not the start of the message.
-- New optional arguments: `vouch_pid` on `CheckedHTTPConnection`, `vouchPid` on `checkedSocket`, `CheckedAgent` and
+- New optional arguments: `vouch_pid` on `CheckedHTTPConnection` and `own_connection`, `vouchPid` on `checkedSocket`, `CheckedAgent` and
   `wellKnownOf`. The vouch is consulted only on macOS when the owner reads `table-restricted`; it never overrides
   another account's listener or another unknown reason. New names in both peer-owner twins: `TABLE_RESTRICTED` (the
   reason to match on), `LSOF`, `pid_listens` / `pidListens` and `parse_lsof_listeners` / `parseLsofListeners`; the facades export `launchd_pid` (`fabric_service`) and

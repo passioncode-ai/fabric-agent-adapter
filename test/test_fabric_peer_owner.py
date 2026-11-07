@@ -417,7 +417,8 @@ class SelfContained(unittest.TestCase):
         names.discard("__future__")
         # sys.stdlib_module_names is 3.10's; on the kit's 3.9 floor the module's own list stands in.
         stdlib = set(getattr(sys, "stdlib_module_names", ())) or {
-            "ctypes", "http", "ipaddress", "os", "socket", "struct", "subprocess", "sys", "threading", "time", "typing"}
+            "ctypes", "http", "ipaddress", "os", "select", "socket", "struct", "subprocess", "sys", "threading", "time",
+            "typing"}
         self.assertTrue(names <= stdlib, names - stdlib)
 
     @unittest.skipIf(sys.platform == "win32", "the Windows kit sets token-file ACLs through ctypes (fabric_platform)")
@@ -560,6 +561,22 @@ class RestrictedTable(unittest.TestCase):
             self.assertFalse(P._calibrate_sysctl(), "a child that could not be started proves nothing")
         with mock.patch.object(P, "_child_listener_seen", return_value=False):
             self.assertFalse(P._calibrate_sysctl())
+
+    def test_own_connection_takes_the_vouch_as_the_node_twin_does(self):
+        restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED + ": netstat printed nothing")
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(8)
+        port = server.getsockname()[1]
+        try:
+            with mock.patch.object(P, "server_end", return_value=restricted):
+                with self.assertRaises(P.ListenerRefused):
+                    P.own_connection(port, timeout=2)
+                with mock.patch.object(P, "pid_listens", return_value=True) as listens:
+                    P.own_connection(port, timeout=2, vouch_pid=4242).close()
+                listens.assert_called_with(4242, port)
+        finally:
+            server.close()
 
     @unittest.skipIf(sys.platform == "win32", "ps and lsof")
     def test_a_vouch_is_an_integer_pid_and_asks_lsof_for_ipv4_alone(self):

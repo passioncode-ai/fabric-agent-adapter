@@ -919,7 +919,7 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
 
 
 def own_connection(port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0,
-                   host: str = "127.0.0.1") -> CheckedHTTPConnection:
+                   host: str = "127.0.0.1", vouch_pid: Optional[int] = None) -> CheckedHTTPConnection:
     """A `CheckedHTTPConnection` to `host:port`, connected, whose server end is this account's
     (and, with `expect_pid`, that process's). The check runs on the very connection the caller
     then sends on, so no listener can change between the check and the request, and it runs
@@ -929,7 +929,10 @@ def own_connection(port: int, *, expect_pid: Optional[int] = None, timeout: floa
         server-not-own             another account's or the system's process accepted it
         server-unverified          its owner could not be told (nothing is sent: fail closed)
         server-not-this-workspace  this account's process, but not the pid expected
+
+    `vouch_pid`, as on `CheckedHTTPConnection` and the Node twin's `checkedSocket`: a pid the caller started
+    (FAA-267).
     """
-    conn = CheckedHTTPConnection(host, port, expect_pid=expect_pid, timeout=timeout)
+    conn = CheckedHTTPConnection(host, port, expect_pid=expect_pid, timeout=timeout, vouch_pid=vouch_pid)
     conn.connect()
     return conn
