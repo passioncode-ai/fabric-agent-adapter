@@ -89,6 +89,11 @@ brief disagree, ask the owner before you build.
   review id. Claim the ticket atomically with an idempotency key before any model call, so nothing is sent twice.
 - Re-read the conversation's live tail just before sending; if a person or the agent already answered, send nothing.
 - Every turn has a trace id on its row, every model call, its log line and any copy a person reads.
+- Search the knowledge with the whole conversation restated, never the last few messages alone (an owner named a query
+  built from the last four messages as a defect).
+- Outgoing messages go through a queue: the channel's working window where one applies, long replies split, each send
+  a separate step that survives a network error; a delivery refused by the platform (Telegram 403: the person never
+  opened the chat with the bot) is counted apart, never as a reply sent.
 
 ## 3. The inbound pipeline (measured; build exactly these steps)
 
@@ -129,6 +134,9 @@ brief disagree, ask the owner before you build.
 3. Actions run one by one, each idempotent, each result recorded: a handoff into the person's queue with the
    commitments ledger row (owner, due date), a clarifying question (at most one, never two in a row), a tool call, a
    chain. A handoff or a clarifying question needs no model after it; code adds the channel's handoff line.
+   Every handoff queue has an answered signal (the person replied, and when): two of the owners surveyed named its absence
+   as their main data gap, and without it a handoff never closes. A clarifying question nobody answered stays on the ticket; it
+   is not deleted.
 4. Final pass (the planning model, thinking low) only when an action returned information the reply must use (a tool
    result, an account state, an order) or the plan suspects an injection. It may add and correct, keeps the draft's steps
    and facts, keeps the contact on a handoff, never claims more than the actions did, and may decide no message is due.
@@ -144,22 +152,29 @@ brief disagree, ask the owner before you build.
 ## 4. Business patterns (one channel may carry several)
 
 - Support: answer from the knowledge; hand-offs counted by cause (policy, inability, infrastructure); the person's
-  queue has an SLA and a pre-agreed safe default; a closed gap re-answers the held ticket once.
-- Sales and leads: the plan qualifies the lead (need, fit, urgency, budget signal, decision role) and picks the next
+  queue has an SLA and a pre-agreed safe default; a closed gap re-answers the held ticket once. Count the shares of
+  clarifying questions and of "write there" referrals: owners judged 26% clarifications and 33% referrals too high; an
+  answer in substance beats a pointer.
+- Sales and leads: a sales agent of its own owns the CRM and the lead; every other channel hands a lead to its queue
+  as one more handoff queue, with a summary and the lead's consent (the four owners asked who answer people put leads
+  there; none of them has a CRM). In the sales agent the plan qualifies the lead (need, fit, urgency, budget signal, decision role) and picks the next
   step (answer, offer a demo or a trial, send the price the knowledge holds, hand to the sales owner with a summary).
   Prices, discounts and terms only from the knowledge or the CRM; never a promise outside them; the lead and every
   step go to the CRM through its tool, with the consent the channel requires; follow-ups on a cadence the owner sets,
   stopped by any reply or an opt-out. A partner or ads channel is a sales channel with a stricter policy: in the
   audit its policy_safe check passed only 70% of judged replies, the weakest of all channels.
-- Community and groups: answer or stay silent (no visible handoff in a group); answer only questions, not chatter; at
-  most 2 replies to one asker in 15 minutes; staff answers win and become knowledge; spam and lure verdicts silence the
-  agent; a bot sees group messages only with privacy mode off or a mention.
+- Community and groups: let a person answer first and answer only what is left (first reply p50 about a minute);
+  answer or stay silent (no visible handoff in a group); answer only questions, not chatter; at most 2 replies to one
+  asker in 15 minutes; staff answers win and become knowledge; spam and lure verdicts silence the agent; moderation
+  rules ship only after a measurement against the moderators' own removals, and every exception checks who acted (the
+  agent's own actions are in the same log); a bot sees group messages only with privacy mode off or a mention.
 - Inbox (mail): header prefilter, one elected answerer per message, a waiting reply after 24 hours and a closing reply
   when no answer is found; replies only to the From address; drafts only where the owner requires approval.
 - Store reviews: public and short, no account details, the store's own refund route, one reply per review, the
   reply's language follows the review.
-- Team assistant (internal): answers only when addressed, roster-limited access, intents routed, private data only to
-  admins.
+- Team assistant (internal): answers only when addressed, roster-limited access, deterministic rules before the model
+  (commands, removing anything that looks like a key, refusing strangers), intents routed, escalations to roles never
+  to one person, an event for every action, private data only to admins.
 
 ## 5. Knowledge and data connections
 
@@ -168,7 +183,9 @@ brief disagree, ask the owner before you build.
   keeps no threshold of its own. Small closed rule sets go into the prompt whole, dated.
 - Order of authority when sources disagree: the owner's corrections, then reviewed feature knowledge, then the wiki,
   then the public site.
-- Per turn the agent reads the account state, orders, plan or CRM record from tools, never from memory.
+- Per turn the agent reads the account state, orders, plan or CRM record from tools, never from memory. The data the
+  owners miss most: the person's account state (plan, purchases, refunds) and facts per app version; build both tools
+  before launch, or name them in notMeasured.
 - Events out, on /fabric/v1/events, codes and paraphrases only: answer.cited (the answer and the knowledge ids it
   used), support.handedOff, support.diagnosed (a second look's cause), knowledge.learned / knowledge.retracted, gaps
   (a question the knowledge lacks, restated without personal data), support.tickets_daily, support.quality_daily.
@@ -182,9 +199,11 @@ brief disagree, ask the owner before you build.
   support.quality_daily per closed UTC day and channel. A metric not computed is null and named in notMeasured. No
   alert from a check until people agree with it at least 80% of the time; a judge change starts a new series (the
   numbers of two judges are never compared: one estate's helped share fell from 57-80% to 44% the day its judge changed,
-  with the answers unchanged).
+  with the answers unchanged). A judge without human labels is uncalibrated and says so: plan a steady weekly
+  labelling of judged pairs by a person from the first week (one mail channel had 0 labelled pairs in 14 days).
 - Every unanswered or held question gets a background second look on a stronger model that names the cause
-  (retrieval, draft or check, person, data); fixable ones are answered.
+  (retrieval, draft or check, person, data); fixable ones are answered. An answer found later is sent within 7 days
+  (a 6-hour return window left most found answers undelivered in one group channel).
 - A person's answer to a handed-over question becomes knowledge after the owner accepts it; the held tickets re-run.
 - Every reply the agent got wrong becomes a scrubbed eval ticket, re-run on each new version; a weekly replay re-runs
   last week's questions through the deployed build.
@@ -213,6 +232,10 @@ brief disagree, ask the owner before you build.
 - The channel-agent declaration under the extension key (the recipe's channel-agent.example.json).
 - A spend policy in the repository before the first model call; the code's monthly stop under the key's limit.
 - Two keys before live sending: the channel set to live and an environment switch; a demo sender that cannot send.
+- Telegram: through the sending service the estate names for it (rule 9); bind the support account to its own agents (others are refused); with
+  replies on, an answer to a person who wrote within 24 hours goes at once, while a first message to someone who did not
+  write, an edit or a late answer waits for the operator; read each message's `out` field to tell the agent's own from
+  an inbound one.
 
 ## 9. Acceptance (the agent is done when all of these pass on the build the channel runs)
 
@@ -225,6 +248,7 @@ brief disagree, ask the owner before you build.
   injection inside a real question; a claim the agent must not make (unban, refund done); an off-topic poem; a refund
   in chat and in a public review; a screenshot described in words; another language; a closing "thanks, it works now"
   (a short closing or no reply).
+- Clarifying questions and referrals counted as shares of answered turns from the first day.
 - The first week's support.quality_daily with targets per channel: helped yes at least 60% and no at most 15%; every
   rubric check at least 90%; repeat-ask under 3%; agent-repeat 0; first-reply p90 of 30 s in private chat, 6 h in a
   group, 4 h by mail, 24 h for a store review.
@@ -243,6 +267,9 @@ brief disagree, ask the owner before you build.
   prompt line; an assistant with no judge and no injection rule; a group channel where an unanswered asker hears
   nothing; general chat assistants with no grounding, guard or evaluation (one with a provider key hard-coded in a
   comment).
+- The owners' own top failures over 14 days: no fact in the knowledge (the largest by far; by its second look, missing
+  data two to three times as often as retrieval misses), a checker refusal after the repair, foreign links and handles stopped
+  by code, silence in a group when the knowledge lacked the answer, and referrals instead of answers by mail.
 - The weakest measured channel was a partner or ads direct-message desk (policy_safe 70%, helped yes 33%); the
   strongest private-chat support bot answered 74% of turns itself with helped yes 44% under a strict judge, first reply
   p90 25 s, and 0 dropped turns in a week.
