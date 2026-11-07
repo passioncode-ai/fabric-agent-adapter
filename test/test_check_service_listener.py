@@ -88,6 +88,22 @@ class Served(unittest.TestCase):
         self.assertIn("listener.owner FAIL", results[1]["evidence"])
         self.assertEqual(self.seen, [])
 
+    def test_a_well_known_answer_with_nothing_to_read_names_the_port_rules(self):
+        """0.74.0 unit reading 9: a body that is not a JSON object (null, a list, text) fails well-known.answers, and one
+        port.rules NOT_RUN line names the rules that could not read it; the probe never dies on it."""
+        for body in (b"null", b"[]", b"not json"):
+            with self.subTest(body=body):
+                self.probe.results.clear()
+                self.probe.wk = None
+                with mock.patch.object(cs.Probe, "request", return_value=(200, {}, body)), \
+                        mock.patch.object(cs.Probe, "descriptor_rules", lambda self: None), \
+                        mock.patch.object(cs.Probe, "lifecycle_rules", lambda self: None):
+                    results = self.probe.run()
+                rules = {r["rule"]: r for r in results}
+                self.assertEqual(rules["well-known.answers"]["verdict"], "FAIL")
+                self.assertEqual(rules["port.rules"]["verdict"], "NOT_RUN")
+                self.assertIn("got no document", rules["port.rules"]["evidence"])
+
     def test_two_sockets_of_this_account_on_one_port_pass(self):
         """0.74.0 seam reading 2: SO_REUSEPORT workers of one account are two listeners on one port; the rule reads its
         own connection's server end, so they pass where a look at the port alone read 'several-rows'."""

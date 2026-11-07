@@ -299,7 +299,7 @@ those it could not:
 python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 ```
 
-It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, `descriptor.source-repository`, `listener.owner` (HA-2),
+It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, `descriptor.source-repository`, `listener.owner` (HA-2), `port.rules`,
 `well-known.connections`, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,

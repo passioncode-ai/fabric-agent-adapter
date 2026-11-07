@@ -420,6 +420,7 @@ class SelfContained(unittest.TestCase):
             "ctypes", "http", "ipaddress", "os", "socket", "struct", "subprocess", "sys", "threading", "time", "typing"}
         self.assertTrue(names <= stdlib, names - stdlib)
 
+    @unittest.skipIf(sys.platform == "win32", "the Windows kit sets token-file ACLs through ctypes (fabric_platform)")
     def test_the_kit_imports_without_ctypes(self):
         """0.74.0 seam reading 6: a CPython built without libffi still imports every kit module that reaches this one;
         the owner check then reads netstat on macOS, or fails closed."""

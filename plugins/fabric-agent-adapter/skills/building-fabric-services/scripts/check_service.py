@@ -11,8 +11,9 @@
 A local placement is read only when this OS account's process holds its port (DEC-0154 HA-2): `listener.owner`
 comes before every rule that reads the port, from the computer's socket table (fabric_peer_owner). Nothing listening is NOT_RUN (`down`, and
 `well-known.answers` fails as before); another OS account's, root's or SYSTEM's listener, or one whose owner cannot be
-told, FAILs as `foreign-user`, and then no rule reads the port and no credential is sent. Every local connection, a
-reconnect included, is checked again before a byte goes out on it.
+told, FAILs as `foreign-user`, and then no rule reads the port and no credential is sent; one `port.rules` NOT_RUN
+line names the rules not read (as it does when the well-known document gives nothing to read). Every local
+connection, a reconnect included, is checked again before a byte goes out on it.
 
 A remote placement (DEC-0019 — an online agent or dashboard at an https origin) is probed over
 TLS with the certificate verified: the well-known document must refuse a request without the
@@ -219,7 +220,7 @@ class Probe:
         elif "origin" not in self.d:
             unique = "an app's descriptor names no origin, so it claims no port (FAC-SEM-010)"
         else:
-            unique = "port %d is unique" % self.port
+            unique = "no other descriptor here declares port %d (HA-1's claim on the computer is FAA-225)" % self.port
         self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
         # FAA-198: the repository that links the agent to its project; a new install is refused without it, an installed one
         # is named here (NOT_RUN is no pass) until its owner adds it.
@@ -279,6 +280,12 @@ class Probe:
             if self.remote:
                 self.add_no_token(no_token, None)
             self.add("well-known.answers", "FAIL", "body is not JSON")
+            return
+        if not isinstance(self.wk, dict):
+            self.wk = None
+            if self.remote:
+                self.add_no_token(no_token, None)
+            self.add("well-known.answers", "FAIL", "body is not a JSON object")
             return
         if self.remote:
             self.add_no_token(no_token, self.wk)
@@ -925,8 +932,8 @@ class Probe:
             return self.results
         self.well_known_rules()
         if self.wk is None:
-            self.add("port.rules", "NOT_RUN", "not read: " + PORT_RULES_UNREAD + ", because the well-known document "
-                     "gave no answer")
+            self.add("port.rules", "NOT_RUN", "not read: " + PORT_RULES_UNREAD + ", because well-known.answers above "
+                     "got no document to read")
         else:
             self.network_rules()
             self.auth_rules()

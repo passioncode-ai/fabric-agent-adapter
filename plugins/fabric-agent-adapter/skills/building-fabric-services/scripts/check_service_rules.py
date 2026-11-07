@@ -26,8 +26,8 @@ import socket  # noqa: E402
 
 # The rules that ask the service's port, named on one NOT_RUN line when none of them can be read (0.74.0 product
 # reading 8): a probe names what it could not check.
-PORT_RULES_UNREAD = ("the well-known shape and identity, the network, auth, usage, A2A, dashboard, login, interop, "
-                     "channel-agent and board rules")
+PORT_RULES_UNREAD = ("every rule that reads the port (well-known, network, auth, usage, A2A, dashboard, login, "
+                     "interop, channel-agent, board)")
 
 
 class ForeignUser(ConnectionError):

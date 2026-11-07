@@ -417,7 +417,7 @@
     "fabric_peer_owner",
     "fabric_service"
    ],
-   "sha256": "bcf1eea628d0fb46c449210393d7464ae9256389fcc869171372707dc29d44c6"
+   "sha256": "c261a81616c52f603eb28cc12ec4034dc479f0517328a65f0dc48d436cf0708b"
   },
   {
    "module": "fabric_board_shapes",
@@ -5914,7 +5914,7 @@
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
    "fabric_interop.py": "d27e31834611a37cf2a117746f2f60fc187ccc48718eb546ff923c5d0fce7dea",
-   "fabric_hub.py": "bcf1eea628d0fb46c449210393d7464ae9256389fcc869171372707dc29d44c6",
+   "fabric_hub.py": "c261a81616c52f603eb28cc12ec4034dc479f0517328a65f0dc48d436cf0708b",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "052bc3c474ece835bb428c37ca864810d04e394d991ddb9c93989a7a825073a5",
    "fabric_board_slots.py": "92b065e3df935547cf46653245f1129e4a1f8b59b0a41e8fa9ffdc41596ee592",

@@ -24,7 +24,7 @@ hub, and this module does exactly those, standard library only:
 When Fabric is down every call raises `HubError` with `retryable=True`; `Backoff` gives the bounded, jittered wait a
 loop sleeps before trying again (2 s doubling to 5 minutes), so nothing spins.
 
-fabric-hub/0.1 publishes no hub key, so the door is trusted by the pid check alone. If a later `hub.json` names
+fabric-hub/0.1 publishes no hub key; the door is trusted once its listener is this OS account's. If a later `hub.json` names
 `hubKey {kid, x}` and the caller passes an estate record (DEC-0055), `locate_hub(estate=…)` checks it with
 `fabric_estate.hub_key_certified` and refuses with DEC-0060's own detail (`kid-not-certified`, `estate-outside-window`,
 `estate-rolled-back`, `estate-forked`, `estate-unreadable`, `no-clock`)."""

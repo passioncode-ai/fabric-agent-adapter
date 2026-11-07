@@ -41,7 +41,7 @@
 ## CLI for people and scripts
 
 `<tool> service status|start|stop|restart` (launchctl on the label, then the
-well-known document), `<tool> dashboard` (resolve the exact registered service with the `fabric-dashboards`
+well-known document from this OS account's listener, else `foreign-user`: protocol.md, The listener's owner), `<tool> dashboard` (resolve the exact registered service with the `fabric-dashboards`
 MCP, run `check_dashboard_link.py` on the action, then open its `open_link` with the host's `open` and
 `fallback=never`; never `open <url>`, `open -a Safari`, `xdg-open` or `webbrowser.open`; an installed host that
 failed is reported, never replaced by a browser; only a confirmed `not_installed` host permits an explicit browser
