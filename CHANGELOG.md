@@ -23,8 +23,8 @@
 ### Upgrading
 
 - Every probe report whose well-known answer is read gains a `channel-agent.declaration` line: `NOT_RUN` («not a channel agent») for a service that
-  declares nothing, so a reader that counts `NOT_RUN` per service moves by one. A channel agent whose declaration has
-  findings the rule fails, and a service with a string shaped like a credential in any copy of the key (read or not),
+  declares nothing, so a reader that counts `NOT_RUN` per service moves by one. A channel agent whose declaration the contract's
+  reader still reads and that owes an obligation (FAC-SEM-164), and a service with a string shaped like a credential in any copy of the key (read or not),
   now makes `check_service.py` exit 1 where 0.72.0 exited 0.
 
 ### Changed
@@ -33,7 +33,7 @@
   from the pinned `channel-agent.md` in place of 0.71.0's paraphrase.
 - `creating-fabric-agents/references/models-and-providers.md`: «A starting choice» follows the operator's model map
   of 2026-11-06 (Kimi K3.1 Pro for decisions, Sonnet 5.5 for verifying another model's output, a panel of three
-  vendors for plans, GLM-5.3 and DeepSeek at volume, open vendors on user content), and names two measured traps:
+  vendors for plans, GLM-5.3 and DeepSeek at volume, open vendors on user content), and names two traps reported on OpenRouter that day:
   models that will not turn reasoning off (Kimi writes it into the answer; GLM-5.3, Sonnet and Opus answer 400) and a
   judge that refuses to judge.
 - `references/protocol.md`, `references/interop.md` and the support-agent recipe's README describe the new rule in

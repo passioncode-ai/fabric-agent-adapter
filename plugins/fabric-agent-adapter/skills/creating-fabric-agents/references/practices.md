@@ -155,7 +155,8 @@ draft-and-check step owns.
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.
 - **The declaration lives under the extension key**
-  `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, one entry per project (the contract's
+  `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1`, under `provider.extensions` of
+  `fabric-agent.json`, or the well-known answer's `extensions` only for a service with no manifest (CA-1), one entry per project (the contract's
   DEC-0150, release `v0.1.0+2026-11-05.2`). A required
   member is never null, except where nothing is decided (a channel's `decision`, and the optional `quiet_window`,
   `late_answer_window` and `evals.spend_record`): a member not there yet is `{"none": "not_yet", "until": "<date>"}`,

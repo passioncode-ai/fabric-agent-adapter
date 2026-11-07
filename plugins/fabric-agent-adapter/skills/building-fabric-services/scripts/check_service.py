@@ -648,7 +648,8 @@ class Probe:
 
     def channel_agent_rule(self) -> None:
         """DEC-0150 (FAA-197): the channel agent's declaration, read from the manifest the descriptor names, else from the
-        well-known answer (CA-1); one read as not declared is NOT_RUN with its evidence, never a FAIL (D3)."""
+        well-known answer (CA-1); one read as not declared is NOT_RUN with its evidence, never a FAIL (D3), except a string
+        shaped like a credential, which fails wherever it sits (CA-5)."""
         manifest, _, where = self.load_manifest()
         self.add("channel-agent.declaration", *cac.declaration_verdict(
             manifest, bool(self.d.get("fabricManifest")), where, self.wk, getattr(self, "wk_bytes", None)))

@@ -76,7 +76,7 @@ change an embedding model without re-indexing every stored vector (search silent
 - **Reasoning spends the output budget.** With reasoning on and a tight `max_tokens`, a light model returns empty
   content (`finish_reason: length`). Leave the budget generous, or turn reasoning off for short outputs where the
   model allows it; some models refuse to turn it off.
-- **Some models will not turn reasoning off.** Measured 2026-11-06: `kimi-k3.1-pro` ignores the flag and writes its
+- **Some models will not turn reasoning off.** Reported on OpenRouter on 2026-11-06 (not measured in this repository; check on your key): `kimi-k3.1-pro` ignores the flag and writes its
   reasoning into the answer, running into `max_tokens`; `glm-5.3`, `claude-sonnet-5.5` and `claude-opus-5.5` answer
   HTTP 400 to it. Before switching a lane that sends reasoning off, drop the flag for such a model and give it a
   generous budget, or the lane fails on every call, its fallback included.
