@@ -359,8 +359,10 @@ async function ownerOf(local, remote, opts = {}) {
   const found = find(table.rows, local, remote);
   if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: 'no-row' });
   if (found.length > 1) return owner(UNKNOWN, { method: table.how, reason: 'several-rows' });
-  if (table.how === 'proc' && found[0].uid === null) {
-    // A connection the server has not accept()ed yet belongs to the socket that listens on its local address.
+  if (table.how === 'proc' && (opts.server || found[0].uid === null)) {
+    // Linux: a server end is told by the listener on its local address, the one row the contract's HA-2 source table
+    // names there (state 0A). A connection not yet accept()ed is printed with uid 0 and inode 0; an accepted one
+    // inherits its listener's uid, so the listener row answers both.
     return oneOwner(listenersOf(table.rows, found[0].local), table.how, opts, 'not-accepted');
   }
   return resolve(found[0], table.how, opts);
@@ -402,7 +404,7 @@ export function peer(socket, opts) {
 // for the one that answers.
 export function serverEnd(socket, opts) {
   if (!socket.remoteAddress || !socket.localAddress) return Promise.resolve(owner(UNKNOWN, { reason: 'socket: not connected' }));
-  return ownerOf(address(socket.remoteAddress, socket.remotePort), address(socket.localAddress, socket.localPort), opts);
+  return ownerOf(address(socket.remoteAddress, socket.remotePort), address(socket.localAddress, socket.localPort), { ...opts, server: true });
 }
 
 const LISTEN_ORDER = ['127.0.0.1', '*', '::1'];

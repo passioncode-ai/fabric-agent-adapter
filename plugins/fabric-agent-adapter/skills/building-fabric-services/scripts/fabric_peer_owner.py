@@ -9,8 +9,10 @@
     for `X | None` in its signatures (the kit's floor is Python 3.9, where `typing.get_type_hints`
     cannot read `X | None`), in `classify` / `classify_sid` asking for this process's own uid or
     SID before the system's (a client running as root or SYSTEM owns root's listener), and in
-    two Linux and selection rules: a /proc row with inode 0 (not accept()ed yet) takes its
-    listener's owner, never its printed uid 0, and several rows of one owner are that owner. Standard library only, no import of another kit module.
+    two Linux and selection rules: on Linux `server_end` reads the listener row on the
+    connection's local address (state 0A, as the contract's HA-2 source table names it; a
+    connection not accept()ed yet is printed with uid 0 and inode 0), and several rows of one
+    owner are that owner. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
     its Node twin is `fabric-peer-owner.mjs` (netstat, /proc and PowerShell, no ctypes).
 
@@ -656,7 +658,7 @@ def find(rows: list[Row], local: tuple[str, int], remote: tuple[str, int]) -> li
             if not row.listening and not row.time_wait and row.local == local and row.remote == remote]
 
 
-def _owner_of(local: tuple[str, int], remote: tuple[str, int]) -> Owner:
+def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = False) -> Owner:
     try:
         rows, how = read_table()
     except TableUnreadable as exc:
@@ -666,8 +668,10 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int]) -> Owner:
         return Owner(UNKNOWN, None, None, how, "no-row")
     if len(found) > 1:
         return Owner(UNKNOWN, None, None, how, "several-rows")
-    if how == "proc" and found[0].uid is None:
-        # A connection the server has not accept()ed yet belongs to the socket that listens on its local address.
+    if how == "proc" and (server or found[0].uid is None):
+        # Linux: a server end is told by the listener on its local address, the one row the contract's HA-2 source
+        # table names there (state 0A). A connection the server has not accept()ed yet is printed with uid 0 and
+        # inode 0, and an accepted one inherits its listener's uid, so the listener row answers both.
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
     return resolve(found[0], how)
 
@@ -717,7 +721,7 @@ def server_end(sock: socket.socket) -> Owner:
         own, server = sock.getsockname(), sock.getpeername()
     except OSError as exc:
         return Owner(UNKNOWN, None, None, "none", f"socket: {type(exc).__name__}")
-    return _owner_of(_address(server), _address(own))
+    return _owner_of(_address(server), _address(own), server=True)
 
 
 #: port -> (time.monotonic() of the read, the Owner)
