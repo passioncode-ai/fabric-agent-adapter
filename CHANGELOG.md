@@ -25,7 +25,9 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
 - **A path in a plist's or a supervisor file's environment is no credential** (FAA-266): `PYTHONPATH` holding a
   release folder under Application Support was refused as a key; environment values are now read by the path-aware
   detector (`secret_argument`, `secretArgument`), which still refuses a key. `adapt_project.py`'s LC-21 check reads a
-  plugin MCP server's `env` the same way.
+  plugin MCP server's `env` the same way. The cost, as for arguments already: a base64 key whose `/` splits it into
+  path-like pieces under 40 characters passes the value check (about 2 in 100 random 32-byte keys); the name check
+  still refuses a credential-shaped name.
 
 ### Known limits
 
