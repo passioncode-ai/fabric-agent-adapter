@@ -16,8 +16,9 @@ SCENARIO = "an-agent-that-answers-people"
 # retention, and the CHANGELOG entry are pinned whole (whitespace normalized), so removing any clause of one fails here;
 # a deliberate change edits these in the same commit.
 PARTS = (
-    'Every inbound message belongs to one turn with a trace id** (A1): a burst batched into one turn (the '
-    'communication agent template) lists its message ids on the turn row; the id is on the turn row, on each model call of that '
+    'Every inbound message belongs to one turn with a trace id** (A1 counts each message as a turn; a burst the '
+    'communication agent template batches is one turn listing its message ids, so `turns` counts batched turns while '
+    '`replyCoverage` stays over inbound messages: each message of a turn whose reply was accepted counts as covered); the id is on the turn row, on each model call of that '
     'turn, on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance,'
     ' not covered, handed off, small talk, limit, error), the hand-off reason and category, the latency, the '
     'knowledge revision the answer used, and whether the channel accepted the reply. Conversation text stays inside'

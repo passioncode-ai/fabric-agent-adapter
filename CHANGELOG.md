@@ -36,7 +36,9 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
 - `agents-that-answer-people.md` A1: every inbound message belongs to one turn; a burst the template batches is one
   turn listing its message ids (it said every message is a turn). The support-agent recipe's README names what goes in
   `check_reply`'s `given`: the ids placed in the prompt, never the plan's own list, with tool results as entries of their own.
-- `docs/backlog.md`: FAA-263 (SKILL.md word headroom).
+- The operator channel's first step (`operator-channel-and-repository.md`, in adapting-projects-to-fabric and
+  creating-fabric-agents) says an agent that answers people on Telegram gives the operator channel a bot of its own.
+- `docs/backlog.md`: FAA-263 (SKILL.md word headroom) and FAA-264 (the readings' follow-ups that block nothing).
 
 ### Upgrading
 
