@@ -23,6 +23,12 @@ forecast for yours.
 
 ## How to use it
 
+The prompt carries every part of an organization agent template (fabric-workspace `knowledge/system/templates.md`, S2):
+role and duties (sections 1 and 4), connections and data (5), access levels and data rooms (0), the contract and its
+doors (8), placement (0 and 8), checks (9) and learning (6). Until the template format is a schema (S2, «Open for W1»),
+it lives here as one reference.
+
+
 1. Fill in the brief (section 0 of the prompt). Every `<...>` is a decision of the agent's owner; a field you cannot fill
    is a question for the owner before the build, not a guess.
 2. Give the whole prompt to the coding agent in the agent's own repository.
@@ -49,6 +55,9 @@ brief disagree, ask the owner before you build.
 - Spend: <the model key's monthly limit; default USD 100 a month for a new agent, more only for agents the operator
   names; the code stops a little under the key's limit>
 - Owner and escalation: <who answers the agent's questions; who receives the daily report>
+- Access levels: <what it does without asking for the owner, administrators and project architects; what it asks for
+  members>; which data rooms and blocks it reads, at which level
+- Placement: <one per organization, per machine or per project; own machine, cloud or both>
 
 ## 1. Non-negotiable rules
 
