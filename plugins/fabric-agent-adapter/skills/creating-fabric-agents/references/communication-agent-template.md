@@ -23,10 +23,11 @@ repositories and not reproducible from this one, never a forecast for yours.
 
 ## How to use it
 
-The prompt carries every part of an organization agent template (fabric-workspace `knowledge/system/templates.md`, S2,
-readable by the organization's members): role and duties (sections 1 and 4), connections and data (5), access levels
-and data rooms (0), the contract, its pin and its doors (8), placement (0 and 8), checks (9) and learning (6). Until the template format is a schema (S2, «Open for W1»),
-it lives here as one reference.
+The prompt carries the parts of an organization agent template (fabric-workspace `knowledge/system/templates.md`, S2,
+readable by the organization's members) that one file can: role and duties (sections 1 and 4), connections and data (5), access levels
+and data rooms (0), the contract, its pin and its doors (8), placement (0 and 8), checks (9) and learning (6). The operating rules A1 to A12, the manifest,
+assembly.md and the template's own CHANGELOG.md come with the folder; until the template format is a schema (S2, «Open for
+wave 2»; FAA-265), it lives here as one reference, and the operating rules apply by reference.
 
 
 1. Fill in the brief (section 0 of the prompt). Every `<...>` is a decision of the agent's owner; a field you cannot fill
@@ -58,7 +59,8 @@ brief disagree, ask the owner before you build.
   named higher limit before launch; the judge and the replays get their own budgets in the declaration (section 8)
 - Owner and escalation: <who answers the agent's questions; who receives the daily report>
 - Access levels: <what it does without asking for the owner, administrators and project architects; what it asks for
-  members>; which data rooms and blocks it reads, at which level
+  members>; which data rooms and blocks it reads, at which level. These levels apply on the agent's doors (its tools,
+  the board, the operator channel); on a channel people write to only CA-8's operator word counts, and only in that chat
 - Placement: <one per organization, per machine or per project; own machine, cloud or both>
 
 ## 1. Non-negotiable rules
@@ -76,8 +78,8 @@ brief disagree, ask the owner before you build.
 5. People's words never leave the agent's side: logs, events, gap reports and the daily report carry codes, counts and
    at most an 80-character paraphrase that passed a personal-data check.
 6. Every lane that reads what people wrote, its fallbacks included, runs only on open-vendor models (the catalogue's
-   open-vendor class; for example Kimi, GLM, DeepSeek, MiMo, Qwen), and the config refuses any closed route on such a
-   lane. This is narrower than the contract's floor (DEC-0083 also allows a closed primary with an open-vendor
+   open-vendor class; for example Kimi, GLM, DeepSeek, MiMo, Qwen), and the config loader, reading the catalogue's class and
+   never a vendor list in code, refuses any closed route on such a lane. This is narrower than the contract's floor (DEC-0083 also allows a closed primary with an open-vendor
    fallback; models-and-providers.md).
 7. No em dash (U+2014) and no substitute for it (`--`, a spaced hyphen used as a dash) in any text a person reads,
    every lane's prompt included; a test fails on it. The person's language in every reply, with no
@@ -121,7 +123,7 @@ brief disagree, ask the owner before you build.
                   5 pre-send gates -> send
 
 0. Prefilter, in code, no model: automated senders (no-reply, bounces, bulk, auto-replies), the agent's own and the
-   staff's messages, a spam or lure verdict, the rate per person, the budget, a closed product. Each of these ends
+   staff's messages (except the operator's word, identified by transport as CA-8 says, which goes to the plan), a spam or lure verdict, the rate per person, the budget, a closed product. Each of these ends
    with a fixed reply in the person's language or silence, and is counted. Money in dispute, a request for a person
    whose reason only a person may handle (money, account access, legal, privacy, partnerships, a decision) and «I
    already tried, it still does not work» go by a deterministic rule straight to step 3's handoff (the person's queue
@@ -150,7 +152,9 @@ brief disagree, ask the owner before you build.
      points (what the reply must say), draft (marking each knowledge id it uses inline as [KB:<id>], so the
      support-agent recipe's check_reply, Python, can run on it).
    Its `given` is the ids of the knowledge items placed in this call's prompt, never the plan's own `evidence`; a plan
-   whose `evidence` names an id outside that set is held as a suspected injection. check_reply takes each tool result of this turn into its `given` and `sources`
+   whose `evidence` names an id outside check_reply's `given` (those knowledge ids and this turn's tool-result ids) is
+   held as a suspected injection. check_reply takes each tool result of this turn (its system-of-record fields, never a field a customer wrote,
+   such as a note or a profile name) into its `given` and `sources`
    under an id of its own in the citation's grammar (an ASCII letter or digit first, then ASCII letters, digits, dot, dash or
    underscore, at most 64 characters; for example `tool.order`),
    so a draft can cite an account state as [KB:tool.order]. Knowledge ids follow the same grammar (map one that does
@@ -174,7 +178,8 @@ brief disagree, ask the owner before you build.
    Measured: a final pass over every reply never improved a plain one and lost 0.4 of 7 after a handoff (it rewrote,
    hedged and dropped steps).
 5. Pre-send gates, in this order: deterministic false-state gates (money arrived, live, enabled, fixed, a person did
-   something: only when the system backs it), links, handles, numbers and amounts only from the material, language and
+   something: only when the system backs it), links, handles, numbers and amounts only from the material (check_reply covers links, mail, phone numbers,
+   amounts and numbers; a handle such as @name is the agent's own gate), language and
    script, length, the dash, no repeat of the previous reply; then a checker of another vendor than the model that
    drafted this turn (its fallback included) that sees the material before the instructions. check_reply runs on the
    final text first, on every turn that went through step 2, except these routes, whose text takes the other gates: an
@@ -255,7 +260,8 @@ brief disagree, ask the owner before you build.
   7 days in a private chat or mail by reference (a mail runtime may declare 30); in a group 6 hours, its late-answer
   window, no late answer after it. A 6-hour window left most found answers undelivered in one group channel, so a
   group that wants longer raises `final_limit` and `late_answer_window` together.
-- A person's answer to a handed-over question becomes knowledge after the owner accepts it; the held tickets re-run.
+- A person's answer to a handed-over question answers every ticket held on that gap when it arrives (the standard's
+  6.5); it becomes knowledge after the owner accepts it.
 - Every reply the agent got wrong becomes an invented eval ticket with no customer words (the standard's 5.3), re-run
   on each new version; a weekly replay re-runs last week's questions through the deployed build. Real questions, the
   offline set and the replay samples live in the agent's data home, never in its repository or tests
@@ -282,8 +288,8 @@ brief disagree, ask the owner before you build.
   model that reads audio, or is transcribed by an open-vendor route where none does. That client writes its receipts
   to the same usage ledger and checks the same monthly stop before each call, at a worst case per picture or minute of
   audio, so no model call is outside the limit; every text lane shares one kit Client (two clients on one ledger each
-  hold only their own calls in flight), and the media client reserves its worst case under that ceiling, or keeps a
-  sub-ceiling of its own with the text client's ceiling lowered by it.
+  hold only their own calls in flight), and the media client keeps a sub-ceiling of its own with the text client's
+  ceiling lowered by it (it cannot reserve under the text client's ceiling, whose calls in flight it does not see).
 - The steps are the rule; each step's model is chosen on the project's own replay set (a cheaper plan-and-draft model
   stays where it wins there). A switch must win on the project's own set.
 - Every lane has a fallback of another vendor; fallback recoveries are counted. Expect the plan-and-draft call to hold
@@ -295,7 +301,8 @@ brief disagree, ask the owner before you build.
 - A fabric-service/0.1 service: /.well-known/fabric-service, events, usage, a dashboard page opened in Fabric
   Dashboards, a lifecycle row (who starts it, cadence, who stops it, idle budget); the fabric-agent-contract revision
   the plugin pins (fabric-contract.lock.json; `contract-commit` or `extension-commit` in the builder skills' metadata) and the doors the agent serves (its capabilities as MCP tools, jobs).
-- The channel-agent declaration under the extension key (the recipe's channel-agent.example.json), and what its
+- The channel-agent declaration under the extension key (the recipe's channel-agent.example.json; its queue's `answered_signal`
+  `none` is a placeholder the agent replaces with a real signal), and what its
   members name, built before they are declared: tickets written to the signal server (`support-ticket/1`, its
   `fallback` flag included) from the declared `tickets.outbox`, never declared without a working outbox; the daily
   `support-daily-note/1`; questions to a desk through `team.ask` or `operator.ask` (or `question_route` and

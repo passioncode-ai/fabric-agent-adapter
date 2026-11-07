@@ -20,7 +20,7 @@ class TheEveryLimitSnippetRuns(unittest.TestCase):
         code = re.search(r"```python\n(.*?)```", section, re.S).group(1)
         with tempfile.TemporaryDirectory() as folder:
             ledger = fabric_usage.JsonlUsageLedger(pathlib.Path(folder) / "usage.jsonl")
-            report = eval(code, {"fabric_usage": fabric_usage, "ledger": ledger, "ID": "example-agent"})
+            report = eval(code, {"fabric_usage": fabric_usage, "ledger": ledger, "ID": "example-agent", "INSTANCE": "default"})
         self.assertEqual(3, len(report["budgets"]))
 
 

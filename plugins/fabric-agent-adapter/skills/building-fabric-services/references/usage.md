@@ -71,7 +71,7 @@ enforced or not, so the spend view shows all of them; the operator asked for tha
 them through):
 
 ```python
-fabric_usage.usage_report(ledger.receipts(), service_id=ID, budget={"period": "month", "limitUsd": 100}, budgets=[
+fabric_usage.usage_report(ledger.receipts(), service_id=ID, instance=INSTANCE, budget={"period": "month", "limitUsd": 100}, budgets=[
     {"id": "machine.monthly", "scope": "machine", "kind": "monthly", "period": "month", "limitUsd": 100, "enforced": True},
     {"id": "project.demo.daily", "scope": "project", "subject": "demo", "kind": "daily", "windowSeconds": 86400,
      "limitUsd": 5, "spentUsd": 0.31, "enforced": True},
