@@ -4,7 +4,7 @@ report: fabric-agent-adapter / 2026-11-07 / faa-267
 
 ## What was measured
 
-A host agent ran these on its own Mac (macOS 27.2, a per-user account, the service under its own launchd job) and
+A host agent ran these, with a pre-release build of 0.76.0 (`6e0903b0`, a branch commit since rebased), on its own Mac (macOS 27.2, a per-user account, the service under its own launchd job) and
 relayed the output on 2026-11-07 (14:07, 14:11 and 14:25 UTC). The account, host and agent names are left out; the
 numbers and messages are as relayed.
 
@@ -35,5 +35,7 @@ refusal start with `table-restricted` itself.
 - The release's final form: the lsof call asks for IPv4 alone (`-i4TCP`) and a calibration child that does not answer
   within the timeout proves nothing; both are covered by unit tests on an unrestricted host (Darwin 25.6), not by a
   rerun on macOS 27.2.
-- The cost of the calibration child per process on macOS 27.2. On the unrestricted host the child check took 133 ms
-  under Homebrew Python 3.14 and 528 ms under `/usr/bin/python3` (0.76.0 unit reading).
+- That the installer reads the job's pid only after a `table-restricted` answer (`ccbe22b0`): the measured build read
+  it on every poll. Unit tests cover the new order.
+- The cost of the calibration child per process. Its time was read only on an unrestricted Mac under load, with no
+  record kept, so no figure is given here.

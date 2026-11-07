@@ -419,9 +419,10 @@ this estate needs.
 
 ## Gotchas
 
-- `lsof` shows `*:<port>` or `0.0.0.0` → the bind is wrong even if the Host check works.
+- `lsof` shows `*:<port>` or `0.0.0.0` → the bind is wrong.
 - HTTP 200 alone accepts any program on the port: compare `service.id` and `service.instance`, read only from
-  this OS account's listener. On `listener.owner` FAIL (`foreign-user`) send that port nothing.
+  this OS account's listener. On `listener.owner` FAIL (`foreign-user`) send that port nothing; reason
+  `table-restricted`: `references/protocol.md`.
 - `launchctl bootstrap` right after `bootout` fails with I/O error 5: wait for the unload, then retry.
 - Under launchd `PATH` is bare. Pin the interpreter by absolute path; set `PATH`
   explicitly in the plist; never copy the whole shell environment into it.
