@@ -770,15 +770,27 @@ def _shown(findings: List[Dict[str, str]], limit: int = 5) -> str:
     return text + ("; and %d more" % (len(findings) - limit) if len(findings) > limit else "")
 
 
+def _size_note(well_known_bytes: int) -> str:
+    return ("the well-known answer is %d bytes, %s the 2 MiB cap of Fabric Dashboards' probe: keep a large declaration in "
+            "the manifest (CT-223)" % (well_known_bytes, "over" if well_known_bytes > WELL_KNOWN_CAP else "near"))
+
+
 def declaration_verdict(manifest: Optional[Dict[str, Any]], manifest_named: bool, manifest_problem: str,
                         well_known: Optional[Dict[str, Any]], well_known_bytes: Optional[int] = None) -> Tuple[str, str]:
-    """`channel-agent.declaration`: PASS for a declaration read and free of findings, FAIL with its first findings, and
-    NOT_RUN, never FAIL, when nothing is declared or a declaration is read as not declared (D3): a key where a reader
-    does not read it, another version's key, or a copy in the well-known answer of a service with a manifest (D1)."""
+    """`channel-agent.declaration`: PASS for a declaration read and free of findings; FAIL with its first findings when
+    the contract's reader still reads it as declared (FAC-SEM-164's obligations) or a string is shaped like a credential
+    (FAC-SEM-165); NOT_RUN, never FAIL, when nothing is declared or the reader reads it as not declared (D3): a key
+    where a reader does not read it, another version's key, a copy in the well-known answer of a service with a
+    manifest (D1), or a declaration the schema or FAC-SEM-163 refuses (an older form)."""
     notes: List[str] = []
     wk_has = isinstance(well_known, dict) and KEY in (_extensions_at(well_known, "well-known") or {})
     if manifest_named and manifest is None:
-        return "NOT_RUN", "the manifest the descriptor names is not read (%s); a service with a manifest declares there only (CA-1)" % manifest_problem
+        if wk_has:
+            notes.append("the well-known answer's copy is not read: a service with a manifest declares there only (CA-1)")
+            if well_known_bytes is not None and well_known_bytes >= WELL_KNOWN_NEAR:
+                notes.append(_size_note(well_known_bytes))
+        return "NOT_RUN", "the manifest the descriptor names is not read (%s); a service with a manifest declares there only (CA-1)%s" % (
+            manifest_problem, (" (%s)" % "; ".join(notes)) if notes else "")
     site, doc = ("manifest", manifest) if manifest is not None else ("well-known", well_known)
     root = CHANNEL_AGENT_PATHS[site]
     findings = channel_agent_rules(doc, site)
@@ -795,12 +807,16 @@ def declaration_verdict(manifest: Optional[Dict[str, Any]], manifest_named: bool
         notes.append("the well-known answer's copy is ignored: a service with a manifest is read from it only (CA-1)%s"
                      % ("; the copy has %d finding(s): %s" % (len(copy), _shown(copy, 3)) if copy else ""))
     if wk_has and well_known_bytes is not None and well_known_bytes >= WELL_KNOWN_NEAR:
-        notes.append("the well-known answer is %d bytes, %s the 2 MiB cap of Fabric Dashboards' probe: keep a large declaration in "
-                     "the manifest (CT-223)" % (well_known_bytes, "over" if well_known_bytes > WELL_KNOWN_CAP else "near"))
+        notes.append(_size_note(well_known_bytes))
     tail = (" (%s)" % "; ".join(notes)) if notes else ""
     declared = isinstance(doc, dict) and KEY in (_extensions_at(doc, site) or {})
     where = "the manifest's provider.extensions" if site == "manifest" else "the well-known answer's extensions"
     if declared and own:
+        if not channel_agent_view(doc, site)["declared"] and not any(f["code"] == "FAC-SEM-165" for f in own):
+            # D3: what the contract's reader reads as not declared (an older form, a repeat, a dangling reference) is
+            # reported while producers move to this revision; a credential's shape (FAC-SEM-165) always fails.
+            return "NOT_RUN", "read as not declared, never a failure (D3): %d finding(s) on the declaration in %s: %s%s" % (
+                len(own), where, _shown(own), tail)
         return "FAIL", "%d finding(s) on the declaration in %s: %s%s" % (len(own), where, _shown(own), tail)
     if declared:
         projects = schema_view(doc, site).get("projects") or []

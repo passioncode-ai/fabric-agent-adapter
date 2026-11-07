@@ -152,12 +152,21 @@ class Verdict(unittest.TestCase):
         self.assertIn("FAC-SEM-164 at %s/projects/0/channels/0/texts/final/*" % ca.CHANNEL_AGENT_PATHS["manifest"], evidence)
         self.assertNotIn("\u2014", evidence)
 
-    def test_an_invalid_declaration_at_the_read_site_fails(self):
+    def test_d3_a_declaration_the_reader_reads_as_not_declared_is_reported_never_failed(self):
         declaration = valid_declaration()
-        declaration["standard"] = "channel-agent-standard/2"
+        declaration["standard"] = "channel-agent-standard/2"  # an older or other form under the key: CA-2 reads it as not declared
         verdict, evidence = ca.declaration_verdict(None, False, "", {"extensions": {KEY: declaration}})
-        self.assertEqual(verdict, "FAIL")
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("read as not declared, never a failure (D3)", evidence)
         self.assertIn("FAC-SEM-162 at %s" % ca.CHANNEL_AGENT_PATHS["well-known"], evidence)
+
+    def test_d3_a_credentials_shape_always_fails(self):
+        declaration = valid_declaration()
+        declaration["projects"][0]["channels"][0]["texts"]["final"] = {"en": "key " + "s" + "k-or-v1-" + "a1b2c3d4" * 8}
+        verdict, evidence = ca.declaration_verdict(None, False, "", {"extensions": {KEY: declaration}})
+        self.assertEqual(verdict, "FAIL", "a credential's shape is never a compatibility matter (FAC-SEM-165)")
+        self.assertIn("FAC-SEM-165", evidence)
+        self.assertNotIn("k-or-v1", evidence)
 
     def test_ca1_a_service_with_a_manifest_is_read_from_the_manifest_only(self):
         bad = valid_declaration()
@@ -191,7 +200,7 @@ class Verdict(unittest.TestCase):
         verdict, evidence = ca.declaration_verdict(doc, True, "", {})
         self.assertEqual(verdict, "NOT_RUN")
         self.assertIn("another version is not read (CA-7): /provider/extensions (version 0.0)", evidence)
-        doc = {"provider": {"extensions": {ca.KEY_PREFIX + "sk-ABCDEFGHIJKLMNOPQRST": {}}}}
+        doc = {"provider": {"extensions": {ca.KEY_PREFIX + "s" + "k-ABCDEFGHIJKLMNOPQRST": {}}}}
         self.assertNotIn("sk-", ca.declaration_verdict(doc, True, "", {})[1], "a key that is not a version is not echoed")
 
     def test_nothing_declared_is_not_run(self):
@@ -204,6 +213,9 @@ class Verdict(unittest.TestCase):
         verdict, evidence = ca.declaration_verdict(None, True, "manifest x does not resolve", {"extensions": {KEY: valid_declaration()}})
         self.assertEqual(verdict, "NOT_RUN")
         self.assertIn("does not resolve", evidence)
+        self.assertIn("the well-known answer's copy is not read", evidence)
+        self.assertIn("over the 2 MiB cap", ca.declaration_verdict(
+            None, True, "x", {"extensions": {KEY: valid_declaration()}}, ca.WELL_KNOWN_CAP + 1)[1])
 
     def test_d4_the_well_known_answer_near_or_over_the_2_mib_cap_is_named(self):
         wk = {"extensions": {KEY: valid_declaration()}}
@@ -241,7 +253,7 @@ class Probe(unittest.TestCase):
         probe = self.probe({}, {"extensions": {KEY: declaration}}, ca.WELL_KNOWN_CAP + 1)
         probe.channel_agent_rule()
         result = probe.results[-1]
-        self.assertEqual(result["verdict"], "FAIL")
+        self.assertEqual(result["verdict"], "NOT_RUN", "a repeated project: the reader reads it as not declared (D3)")
         self.assertIn("FAC-SEM-163 at /extensions/", result["evidence"])
         self.assertIn("over the 2 MiB cap", result["evidence"])
 
