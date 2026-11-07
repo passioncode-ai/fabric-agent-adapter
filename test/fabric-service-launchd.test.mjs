@@ -115,6 +115,11 @@ test('a release folder with a space is no credential (FAA-266)', () => {
   const release = '/Users/example/Library/Application Support/example-agent/releases/e7d6275a8aae';
   const text = k.launchdPlist('a.b', ['/bin/x'], { workingDirectory: '/', stdoutPath: '/l', environment: { PYTHONPATH: release } });
   assert.ok(text.includes(`<string>${release}</string>`));
+  // A base64 key whose `/` splits it into short pieces is no path: it stays a credential (0.76.0 product reading).
+  const key = '2rHJkKR3HPKhvnZRjBcyYugNz2g0gTAKrWDEmg' + '/hqbs=';
+  for (const value of [key, `/${key.slice(0, 20)}/${key.slice(20)}`]) {
+    assert.throws(() => k.launchdPlist('a.b', ['/bin/x'], { workingDirectory: '/', stdoutPath: '/l', environment: { EXAMPLE_MODE: value } }), /credential/);
+  }
 });
 
 test('the plist escapes markup', () => {

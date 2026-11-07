@@ -53,6 +53,20 @@ def _no_marker_argument(argv: Sequence[str]) -> None:
         raise ServiceError("%s is written by the supervisor file's writer; leave it out of the program arguments" % SUPERVISOR_ARG)
 
 
+_PATH_ANCHOR = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/])")
+_PATH_WORD = re.compile(r"[a-z][a-z0-9_-]{2,}")
+
+
+def _secret_env_value(value: str) -> bool:
+    """An environment value: read path-aware (`secret_argument`) only when it reads as a path (it starts as one, has at
+    least two separators and a lower-case word between them), so a release folder under Application Support is no key
+    (FAA-266) while a base64 key whose `/` splits it stays one; any other value keeps the strict `secret_value`."""
+    import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
+    pieces = re.split(r"[\\/]", value)
+    path = bool(_PATH_ANCHOR.match(value)) and len(pieces) >= 3 and any(_PATH_WORD.fullmatch(x) for x in pieces)
+    return fabric_secrets.secret_argument(value) if path else fabric_secrets.secret_value(value)
+
+
 def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dict[str, str]]) -> None:
     """No supervisor file carries a secret (service.md): not in an argument, an environment name or its value."""
     import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
@@ -60,7 +74,7 @@ def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dic
         if fabric_secrets.secret_argument(arg):
             raise ServiceError("an argument carries a credential; a supervisor file never does (read it from the token file or a secret reference)")
     for name, value in (environment or {}).items():
-        if fabric_secrets.credential_name(name) or fabric_secrets.secret_argument(str(value)):
+        if fabric_secrets.credential_name(name) or _secret_env_value(str(value)):
             raise ServiceError("environment %s looks like a credential; a supervisor file never carries one" % name)
 
 
@@ -263,7 +277,7 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
     for key, value in env.items():
         if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)\Z", key) and not key.endswith("_FILE"):
             raise ServiceError("Environment variable %s looks like a secret; pass a *_FILE path instead." % key)
-        if fabric_secrets.secret_argument(str(value)):  # path-aware: a release folder is no key (FAA-266)
+        if _secret_env_value(str(value)):  # path-aware only for a path: a release folder is no key (FAA-266)
             raise ServiceError("Environment %s holds a value shaped like a credential; a plist never carries one." % key)
     for arg in argv:
         if fabric_secrets.secret_argument(arg):

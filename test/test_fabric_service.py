@@ -558,6 +558,14 @@ class DocumentTests(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"), stdout_path=Path("/tmp/l"),
                              environment={"EXAMPLE_MODE": "s" + "k-" + "or-v1-" + "q" * 40})
+        # A base64 key whose `/` splits it into short pieces is no path: it stays a credential (0.76.0 product reading).
+        key = "2rHJkKR3HPKhvnZRjBcyYugNz2g0gTAKrWDEmg" + "/hqbs="
+        for value in (key, "/" + key[:20] + "/" + key[20:]):
+            with self.subTest(value=value[:6]), self.assertRaises(fs.ServiceError):
+                fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"), stdout_path=Path("/tmp/l"),
+                                 environment={"EXAMPLE_MODE": value})
+            with self.subTest(value=value[:6]), self.assertRaises(fs.ServiceError):
+                fs.systemd_unit("x.service", ["/bin/x"], working_directory=Path("/tmp"), environment={"EXAMPLE_MODE": value})
 
     def test_probe_names_a_background_priority_job(self):
         slow = {"Label": "a.b.c", "RunAtLoad": True, "KeepAlive": True, "ProcessType": "Background", "Nice": 5, "LowPriorityIO": True}

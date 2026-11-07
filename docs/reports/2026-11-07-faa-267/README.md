@@ -39,3 +39,18 @@ refusal start with `table-restricted` itself.
   it on every poll. Unit tests cover the new order.
 - The cost of the calibration child per process. Its time was read only on an unrestricted Mac under load, with no
   record kept, so no figure is given here.
+
+## FAA-266: the environment value check, measured on this repository
+
+60,000 random base64 keys (20,000 each of 32, 48 and 64 bytes, `random.Random(2026)`), run from the worktree with
+`S=plugins/fabric-agent-adapter/skills/building-fabric-services/scripts` on 2026-11-07:
+
+```
+python3 -I -c "import sys,base64,random;sys.path.insert(0,'$S');import fabric_secrets as s,fabric_supervisors as f
+r=random.Random(2026);keys=[base64.b64encode(bytes(r.getrandbits(8) for _ in range(n))).decode() for n in (32,48,64) for _ in range(20000)]
+print(len(keys),'keys: secret_value',sum(map(s.secret_value,keys)),'secret_argument',sum(map(s.secret_argument,keys)),'_secret_env_value',sum(map(f._secret_env_value,keys)))"
+60000 keys: secret_value 59987 secret_argument 59313 _secret_env_value 59980
+```
+
+The path-aware detector alone would let 687 keys through an environment value; the rule 0.76.0 ships (path-aware only
+for a value that reads as a path) lets 20 through, against the strict detector's 13.

@@ -338,7 +338,7 @@
     "fabric_peer_owner",
     "fabric_secrets"
    ],
-   "sha256": "21169f482cefbabd048a1f5c956fc634c3c63487e3e160e572c27522bbd6cd39"
+   "sha256": "1ebf842de248ff0f154939ae6c9d5d0229b3358aecaefea07a80ed1b8755ac70"
   },
   {
    "module": "fabric_service",
@@ -841,7 +841,7 @@
     "fabric-peer-owner",
     "fabric-secrets"
    ],
-   "sha256": "1b194e03ddb5edde99fec1157ae2f5f08c0f5268a461a27c47c8b1b622dd9b8a"
+   "sha256": "de6468aa2876be437a374499dd084281a10d62c3fd23bd7c65285da3ee282ce2"
   },
   {
    "module": "fabric-service",
@@ -6093,7 +6093,7 @@
    "fabric_auth.py": "74ccc10239b65a3567cec5213a7b344cbd88d6eee1fd1c5f7be1d6daf985993c",
    "fabric_events.py": "cd94b186e2a8f8cb4ad2b6bd44d83ec5021933075e28c5d655f387f16dff42b8",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
-   "fabric_supervisors.py": "21169f482cefbabd048a1f5c956fc634c3c63487e3e160e572c27522bbd6cd39",
+   "fabric_supervisors.py": "1ebf842de248ff0f154939ae6c9d5d0229b3358aecaefea07a80ed1b8755ac70",
    "fabric_service.py": "73082f69844739708732f6331742e00f17d27385d3c3efa3331a1fd61b523595",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
@@ -6137,7 +6137,7 @@
    "fabric-auth.mjs": "10ff37a39f9e3adb4d0f05db66c45f49b10eef582e9220c213907964109d7e52",
    "fabric-events.mjs": "c463d6ffcae24229a5c608d8fcea4268d2ccc5024b19fa10e5a452284068fa71",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
-   "fabric-supervisors.mjs": "1b194e03ddb5edde99fec1157ae2f5f08c0f5268a461a27c47c8b1b622dd9b8a",
+   "fabric-supervisors.mjs": "de6468aa2876be437a374499dd084281a10d62c3fd23bd7c65285da3ee282ce2",
    "fabric-service.mjs": "2fec45eb56d4a9ddc479f05d99abda4d2bb324746e94c156d96157462b824de0",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458",

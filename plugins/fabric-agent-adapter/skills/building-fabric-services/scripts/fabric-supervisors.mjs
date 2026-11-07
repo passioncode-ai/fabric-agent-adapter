@@ -55,13 +55,22 @@ function noMarkerArgument(argv) {
   if (markerArguments(argv).length) throw new ServiceError(`${SUPERVISOR_ARG} is written by the supervisor file's writer; leave it out of the program arguments.`);
 }
 
+// An environment value: read path-aware (secretArgument) only when it reads as a path (it starts as one, has at least two
+// separators and a lower-case word between them), so a release folder under Application Support is no key (FAA-266) while
+// a base64 key whose `/` splits it stays one; any other value keeps the strict secretValue.
+const secretEnvValue = (value) => {
+  const pieces = value.split(/[\\/]/);
+  const path = /^(?:[/~.]|[A-Za-z]:[\\/])/.test(value) && pieces.length >= 3 && pieces.some((x) => /^[a-z][a-z0-9_-]{2,}$/.test(x));
+  return path ? secretArgument(value) : secretValue(value);
+};
+
 function noSecretInSupervisorFile(argv, environment) {
   // No supervisor file carries a secret (service.md): not in an argument, an environment name or its value.
   for (const arg of argv) {
     if (secretArgument(arg)) throw new ServiceError('An argument carries a credential; a supervisor file never does (read it from the token file or a secret reference).');
   }
   for (const [name, value] of Object.entries(environment ?? {})) {
-    if (credentialName(name) || secretArgument(String(value))) throw new ServiceError(`Environment ${name} looks like a credential; a supervisor file never carries one.`);
+    if (credentialName(name) || secretEnvValue(String(value))) throw new ServiceError(`Environment ${name} looks like a credential; a supervisor file never carries one.`);
   }
 }
 
@@ -264,7 +273,7 @@ export function launchdPlist(label, programArguments, { workingDirectory, stdout
   const env = { ...environment };
   for (const [name, value] of Object.entries(env)) {
     if (/(TOKEN|SECRET|PASSWORD|KEY)$/.test(name) && !name.endsWith('_FILE')) throw new ServiceError(`Environment variable ${name} looks like a secret; pass a *_FILE path instead.`);
-    if (secretArgument(String(value))) throw new ServiceError(`Environment ${name} holds a value shaped like a credential; a plist never carries one.`);
+    if (secretEnvValue(String(value))) throw new ServiceError(`Environment ${name} holds a value shaped like a credential; a plist never carries one.`);
   }
   for (const arg of argv) {
     if (secretArgument(arg)) throw new ServiceError('An argument carries a credential; a plist never does (read it from the token file or a secret reference).');

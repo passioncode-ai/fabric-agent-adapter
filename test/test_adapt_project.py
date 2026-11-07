@@ -306,6 +306,8 @@ class LifecycleRuleTests(unittest.TestCase):
 
             self.assertFalse(any("LC-21" in r for r in env(release)["receipts"]), "a release folder is a path")
             self.assertTrue(any("LC-21" in r for r in env("s" + "k-" + "y" * 24)["receipts"]))
+            key = "2rHJkKR3HPKhvnZRjBcyYugNz2g0gTAKrWDEmg" + "/hqbs="  # its `/` splits it, yet it is no path
+            self.assertTrue(any("LC-21" in r for r in env(key)["receipts"]), "LC-21 has no name check to fall back on")
 
     def test_the_detector_copies_are_identical(self):
         base = Path(__file__).resolve().parents[1] / "plugins/fabric-agent-adapter/skills"

@@ -23,18 +23,17 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
   refused, the method is netstat under Homebrew Python and sysctl under Apple's; the final form was not rerun there
   ([record](docs/reports/2026-11-07-faa-267/README.md)).
 - **A path in a plist's or a supervisor file's environment is no credential** (FAA-266): `PYTHONPATH` holding a
-  release folder under Application Support was refused as a key; environment values are now read by the path-aware
-  detector (`secret_argument`, `secretArgument`), which still refuses a key. `adapt_project.py`'s LC-21 check reads a
-  plugin MCP server's `env` the same way. The cost, as for arguments already: a base64 key whose `/` splits it into
-  path-like pieces under 40 characters passes the value check (about 2 in 100 random 32-byte keys); the name check
-  still refuses a credential-shaped name.
+  release folder under Application Support was refused as a key. An environment value that reads as a path (it starts
+  with `/`, `~`, `.` or a drive, has two separators and a lower-case word between them) is now read by the path-aware
+  detector (`secret_argument`, `secretArgument`); any other value keeps the strict `secret_value`, so a base64 key whose
+  `/` splits it is still refused. `adapt_project.py`'s LC-21 check reads a plugin MCP server's `env` the same way.
 
 ### Known limits
 
 - Only the launchd installers vouch. On a restricted table (macOS 27.2 under an ad-hoc-signed interpreter) every
   other caller of the owner check still refuses a loopback listener whose owner cannot be told: the probe
   (`check_service.py`, rule `listener.owner`), the hub client and so the board responder, `fabric_http` and so the
-  OpenRouter connector, `mcp-register`, the `dashboard` command and the dashboard-link gate, and the layout probe. The
+  OpenRouter connector, `mcp-register`, the `dashboard` command, and the layout probe. The
   probe and `fabric_http` say `foreign-user` and carry the `table-restricted` reason; the hub client says only
   `unknown` (FAA-272). The way round for Python is Apple's `/usr/bin/python3`; a Node service has no measured way
   round yet.
@@ -47,8 +46,9 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
   `launchd_install` or `launchdInstall` refusal on a restricted table now reads `<origin> could not be proved this
   service's: table-restricted: ...` where it read `<origin> is not this service's: foreign-user: ...`: match the
   reason as a substring, not the start of the message.
-- New optional arguments: `vouch_pid` on `CheckedHTTPConnection` and `_read_well_known`, `vouchPid` on
-  `checkedSocket`, `CheckedAgent` and `wellKnownOf`; the facades export `launchd_pid` (`fabric_service`) and
+- New optional arguments: `vouch_pid` on `CheckedHTTPConnection`, `vouchPid` on `checkedSocket`, `CheckedAgent` and
+  `wellKnownOf`. New names in both peer-owner twins: `TABLE_RESTRICTED` (the reason to match on), `pid_listens` /
+  `pidListens` and `parse_lsof_listeners` / `parseLsofListeners`; the facades export `launchd_pid` (`fabric_service`) and
   `launchdPid` (`fabric-service.mjs`).
 - A service that vendored the 0.74.0 or 0.75.0 kit keeps refusing its own install on macOS 27.2 until its copies are
   refreshed (`fabric_kit.py status` names them older).
