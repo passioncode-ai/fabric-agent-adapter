@@ -138,7 +138,7 @@ test('a checked socket refuses another account\'s server before a byte is writte
     // The live table, read as if this process were another account: its own server reads another-account.
     [{ ownUid: 424242, ownSid: 'S-1-5-21-9-9-9-424242' }, po.SERVER_NOT_OWN],
     // Every row owned by uid 0: the server reads system.
-    [{ read: async () => ({ rows: (await po.readTable()).rows.map((r) => ({ ...r, uid: 0 })), how: 'proc' }) }, po.SERVER_NOT_OWN],
+    [{ read: async () => ({ rows: (await po.readTable()).rows.map((r) => ({ ...r, uid: 0 })), how: 'proc' }), ownUid: 424242 }, po.SERVER_NOT_OWN],
     // A table that cannot be read: unknown, fail closed.
     [{ read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }, po.SERVER_UNVERIFIED],
   ];

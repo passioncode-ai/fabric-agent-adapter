@@ -397,7 +397,8 @@ class SelfContained(unittest.TestCase):
         self.assertEqual(readers, {"_posix_uid"})
 
     def test_names_and_version(self):
-        self.assertRegex(P.PEER_OWNER_VERSION, r"^\d+\.\d+\.\d+$")
+        # Observatory's version with the kit's suffix: the kit's classify order and /proc reading differ (0.74.0)
+        self.assertRegex(P.PEER_OWNER_VERSION, r"^\d+\.\d+\.\d+\+kit\.\d+$")
         self.assertIn(f"peer_owner {P.PEER_OWNER_VERSION}", P.__doc__)
         for name in ("listener", "server_end", "peer", "Owner", "own_connection"):
             self.assertTrue(callable(getattr(P, name)), name)

@@ -1,6 +1,6 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
+    peer_owner 1.1.0+kit.1: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
     DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py` at
     commit f86f0622 (passioncode-ai/project-observatory-dashboard, the same licence). It differs
     from that file in this paragraph, in `Owner` and `Row` (NamedTuples here where it has
@@ -95,7 +95,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.1.0"
+PEER_OWNER_VERSION = "1.1.0+kit.1"  # Observatory's 1.1.0 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"

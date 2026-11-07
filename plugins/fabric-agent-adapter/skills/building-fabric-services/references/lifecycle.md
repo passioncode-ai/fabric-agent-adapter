@@ -52,7 +52,8 @@ authentication, from memory, in under 100 ms, with `service.id` and `service.ins
 on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers).
 `status` is `starting`, `ready`, `degraded` or `stopping`; `degraded` is always present, and an empty list asserts
 full health. A process that cannot serve does not answer, and a host derives `down`. An install or upgrade polls
-that document until `service.id` matches (at most 40 s) before it calls the service started.
+that document until `service.id` matches (at most 40 s) before it calls the service started (the launchd installers;
+systemd and Task Scheduler do not poll yet, FAA-253).
 
 | Id | Rule | Here | Kit (Python / Node) |
 |---|---|---|---|

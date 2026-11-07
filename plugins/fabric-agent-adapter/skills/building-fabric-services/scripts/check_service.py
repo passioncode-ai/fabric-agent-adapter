@@ -79,6 +79,7 @@ import fabric_connections as fcn  # noqa: E402
 from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
+from check_service_rules import ForeignUser, listener_owner_verdict  # noqa: E402 - DEC-0154 HA-2 (FAA-226)
 
 Result = Dict[str, str]
 
@@ -112,11 +113,6 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
     def connect(self) -> None:
         raw = socket.create_connection(self._dial, timeout=self.timeout)
         self.sock = self._ctx.wrap_socket(raw, server_hostname=self.host)
-
-
-class ForeignUser(ConnectionError):
-    """DEC-0154 HA-2: the server end of a local connection is not this OS account's process (`foreign-user`); nothing
-    was sent on it. A ConnectionError, so every rule that reads the port reports it as no answer."""
 
 
 class Probe:
@@ -185,32 +181,11 @@ class Probe:
 
     # the listener's owner (DEC-0154 HA-2) -------------------------------
     def listener_rule(self) -> bool:
-        """`down`, then `foreign-user`, then everything the listener answers: a local service is read only when this OS
-        account's process holds its port. The owner is the server end of a connection of the probe's own, on which
-        nothing is sent (HA-2's source: the client's own connection; two sockets of one account on one port, as
-        SO_REUSEPORT workers hold, read as that account). False when the port must not be read (`foreign-user`)."""
-        where = "127.0.0.1:%d" % self.port
-        try:
-            sock = socket.create_connection(("127.0.0.1", self.port), timeout=5)
-        except ConnectionRefusedError:
-            self.add("listener.owner", "NOT_RUN", "nothing listens on %s (down)" % where)
-            return True
-        except OSError as exc:  # a full backlog, a timeout: the well-known rule reports what answers, each call checked
-            self.add("listener.owner", "NOT_RUN", "could not connect to %s to tell its owner (%s)" % (where, type(exc).__name__))
-            return True
-        try:
-            owner = po.server_end(sock)
-        finally:
-            sock.close()
-        if owner.kind == po.THIS_ACCOUNT:
-            self.add("listener.owner", "PASS", "%s is held by this OS account's process (pid %s, read by %s)"
-                     % (where, owner.pid if owner.pid is not None else "not shown", owner.method))
-            return True
-        why = {po.ANOTHER_ACCOUNT: "another OS account's process", po.SYSTEM: "a system account's process"}.get(
-            owner.kind, "a process whose owner cannot be told (%s)" % owner.reason)
-        self.add("listener.owner", "FAIL", "foreign-user: %s is held by %s (read by %s); no credential was sent and "
-                 "nothing it answers is read as this service's" % (where, why, owner.method))
-        return False
+        """DEC-0154 HA-2, `down` then `foreign-user` then the answer (check_service_rules.listener_owner_verdict). False
+        when the port must not be read (`foreign-user`)."""
+        verdict, evidence = listener_owner_verdict(self.port)
+        self.add("listener.owner", verdict, evidence)
+        return verdict != "FAIL"
 
     # descriptor ------------------------------------------------------------
     def descriptor_rules(self) -> None:

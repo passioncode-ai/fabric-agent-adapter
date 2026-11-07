@@ -43,6 +43,12 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   account's copy of the service answered on the port.
 - The Node `fabric-http.mjs` sends a plain `http://` loopback request through `node:http` on a checked connection, not
   `fetch`: a caller or test that stubs the global `fetch` for a loopback URL is no longer reached (pass `transport`).
+- On a computer with more than one counted OS account a loopback caller with no token is not T0 until the door checks
+  its peer's account (the pinned HA-3 and DL-25; the kit's own peer check is FAA-227): pass `tier="T0"` to `gate` or
+  `server.handle` there only for a caller the descriptor token authenticated (`references/delegation.md`).
+- Services that vendored 0.73.0 kit files keep sending to loopback unchecked until their copies are refreshed
+  (`fabric_kit.py status` names them `older`). `fabric-supervisors.mjs` exports `wellKnownOf` and `ForeignUserAnswer`
+  (new names), and `fabric_peer_owner` reports its version as `1.1.0+kit.1`.
 - `fabric_http`, `fabric-http.mjs` and the hub client refuse a loopback listener of root or a service account too (a
   rootful container proxy in front of a local model gateway, for one): use a rootless runtime or a forwarder of your own
   account. The Python `fabric_http` no longer sends a loopback URL through a proxy from the environment (`http_proxy`).
@@ -66,8 +72,11 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   account's (the pinned PL-3); the link gate enforcing it is FAA-251. `connectors.md` names the loopback owner check
   and the kind `foreign-user`; the skill card's Network row names the socket table the kit now reads; `SKILL.md` and
   `references/lifecycle.md` read a service's identity only from this account's listener, with a scenario eval for a
-  port another account holds. Owed, each its own row: FAA-251 (the link gate), FAA-252 (a running board session's
-  reason), FAA-253 (the systemd and Task Scheduler installers' poll), FAA-254 (working-with-fabric's "Fabric is up").
+  port another account holds; `references/delegation.md` says when a token-free loopback caller is T0 (HA-3);
+  `SECURITY.md` names the socket-table reads and the programs the kit now starts. Owed, each its own row: FAA-251 (the
+  link gate), FAA-252 (a running board session's reason), FAA-253 (the systemd and Task Scheduler installers' poll),
+  FAA-254 (working-with-fabric's "Fabric is up"), FAA-255 (the delegation key set read over loopback), FAA-256 (the Node
+  check's cost on Windows), FAA-257 (the OpenRouter connector reports a refused loopback gateway as no answer).
 
 ## 0.73.0 (2026-11-07)
 
