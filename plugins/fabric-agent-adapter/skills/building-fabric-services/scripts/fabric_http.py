@@ -345,17 +345,15 @@ def _watched(base: type, watchdog: _Watchdog) -> type:
     return Watched
 
 
-class _CheckedHTTPConnection(http.client.HTTPConnection):
-    """Plain http to a loopback host (DEC-0154 HA-2): every connect, a reconnect included, tells the server end's owner
-    before returning, and refuses (closed, nothing sent) unless it is this OS account's process."""
+class _CheckedHTTPConnection(_po.CheckedHTTPConnection):
+    """Plain http to a loopback host (DEC-0154 HA-2): `fabric_peer_owner.CheckedHTTPConnection`, whose every connect, a
+    reconnect included, tells the server end's owner and refuses (closed, nothing sent) unless it is this OS account's
+    process, built the way urllib builds a connection (`host` as `host:port`, `timeout` by keyword)."""
 
-    def connect(self) -> None:
-        super().connect()
-        owner = _po.server_end(self.sock)
-        refused = _po.refusal(owner, self.port)
-        if refused is not None:
-            self.close()
-            raise _po.ListenerRefused(refused[0], "%s; nothing was sent" % refused[1], owner)
+    def __init__(self, host: str, port: Optional[int] = None, timeout: Any = socket._GLOBAL_DEFAULT_TIMEOUT,
+                 **kwargs: Any) -> None:
+        http.client.HTTPConnection.__init__(self, host, port, timeout=timeout, **kwargs)
+        self.expect_pid = None
 
 
 def _opener(watchdog: _Watchdog, direct: bool = False) -> urllib.request.OpenerDirector:

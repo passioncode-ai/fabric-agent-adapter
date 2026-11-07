@@ -158,9 +158,13 @@ const LOOPBACK_AGENT = new CheckedAgent();
 // redirect followed, the body read to one byte past maxBytes. fetch cannot hand its socket to the check.
 export function checkedLoopbackTransport({ method, url, headers, body, timeoutS, maxBytes, agent = LOOPBACK_AGENT }) {
   const parts = new URL(url);
+  // A body goes with its Content-Length, as fetch sent it: a server that reads only Content-Length (the kit's
+  // sample_service, the stdlib handlers) would read a chunked body as empty (0.74.0 seam reading 1).
+  const sent = { ...headers };
+  if (body && !Object.keys(sent).some((k) => k.toLowerCase() === 'content-length')) sent['Content-Length'] = String(body.length);
   return new Promise((resolve, reject) => {
     const req = http.request({ host: parts.hostname.replace(/^\[|\]$/g, ''), port: Number(parts.port || 80),
-      path: parts.pathname + parts.search, method, headers, agent }, (res) => {
+      path: parts.pathname + parts.search, method, headers: sent, agent }, (res) => {
       const chunks = [];
       let size = 0;
       res.on('data', (c) => {

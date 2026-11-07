@@ -141,3 +141,21 @@ test('FAA-226: a loopback server of another account gets nothing, kind foreign-u
   assert.equal((await fh.request('GET', url, { headers: { Authorization: 'Bearer synthetic' } })).status, 200);
   assert.deepEqual(seen, ['Bearer synthetic']);
 });
+
+test('FAA-226 seam reading 1: a loopback body goes with its Content-Length, never chunked', async (t) => {
+  const got = [];
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      got.push({ cl: req.headers['content-length'] ?? null, te: req.headers['transfer-encoding'] ?? null, body: Buffer.concat(chunks).toString() });
+      res.end('{}');
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const url = `http://127.0.0.1:${server.address().port}/mcp`;
+  assert.equal((await fh.request('POST', url, { body: { a: 1 } })).status, 200);
+  assert.equal((await fh.request('POST', url, { body: 'xyz', headers: { 'Content-Length': '3' } })).status, 200);
+  assert.deepEqual(got, [{ cl: '7', te: null, body: '{"a":1}' }, { cl: '3', te: null, body: 'xyz' }]);
+});

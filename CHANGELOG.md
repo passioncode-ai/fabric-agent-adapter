@@ -42,6 +42,11 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   account's copy of the service answered on the port.
 - The Node `fabric-http.mjs` sends a plain `http://` loopback request through `node:http` on a checked connection, not
   `fetch`: a caller or test that stubs the global `fetch` for a loopback URL is no longer reached (pass `transport`).
+- `fabric_http`, `fabric-http.mjs` and the hub client refuse a loopback listener of root or a service account too (a
+  rootful container proxy in front of a local model gateway, for one): use a rootless runtime or a forwarder of your own
+  account. The Python `fabric_http` no longer sends a loopback URL through a proxy from the environment (`http_proxy`).
+- `check_service.py` imports `fabric_peer_owner`: a project that copies the probe without the kit's installer copies
+  `fabric_peer_owner.py` beside it.
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process
   cannot read): nothing is sent. Fail closed, as HA-2 asks.
 - A copy of `check_dashboard_layout.mjs` alone refuses a local `--service`; run it from the kit's folder.
