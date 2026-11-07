@@ -479,6 +479,91 @@ class KitInstaller(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_a_restricted_table_takes_the_installers_own_job_as_proof(self):
+        """FAA-267: macOS 27.2 shows an ad-hoc-signed interpreter only its own sockets. The table's answer is
+        table-restricted, never foreign-user, and the launchd job the installer started vouches with its pid."""
+        sup = importlib.import_module("fabric_supervisors")
+
+        class WellKnown(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                body = b'{"service": {"id": "example-agent", "instance": "default"}}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), WellKnown)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+        origin = "http://127.0.0.1:%d" % server.server_address[1]
+        restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED + ": netstat printed nothing")
+        try:
+            with mock.patch.object(P, "server_end", return_value=restricted):
+                doc, why = sup._read_well_known(origin)
+                self.assertIsNone(doc)
+                self.assertIn(P.TABLE_RESTRICTED, why)
+                with mock.patch.object(P, "pid_listens", return_value=False):
+                    self.assertIsNone(sup._read_well_known(origin, vouch_pid=4242)[0])
+                with mock.patch.object(P, "pid_listens", return_value=True) as listens:
+                    doc, why = sup._read_well_known(origin, vouch_pid=4242)
+                self.assertEqual(doc["service"]["id"], "example-agent")
+                self.assertIsNone(why)
+                listens.assert_called_with(4242, server.server_address[1])
+            with mock.patch.object(P, "server_end", return_value=P.Owner(P.ANOTHER_ACCOUNT, 502, 9, "x")), \
+                    mock.patch.object(P, "pid_listens", return_value=True):
+                self.assertIsNone(sup._read_well_known(origin, vouch_pid=4242)[0], "a readable table is never overridden")
+        finally:
+            server.shutdown()
+            server.server_close()
+
+
+class RestrictedTable(unittest.TestCase):
+    """FAA-267: a socket table that shows this process alone."""
+
+    def test_an_empty_netstat_is_table_restricted(self):
+        for text in ("", "\n \n"):
+            with self.assertRaises(P.TableUnreadable) as caught:
+                P.parse_netstat(text)
+            self.assertTrue(str(caught.exception).startswith(P.TABLE_RESTRICTED))
+
+    def test_lsof_listeners(self):
+        self.assertEqual(P.parse_lsof_listeners("p78564\nf4\nn127.0.0.1:47480\nn*:5000\nn[::1]:7\nnoise\n"),
+                         [("127.0.0.1", 47480), ("*", 5000), ("::1", 7)])
+
+    def test_a_table_without_the_childs_listener_fails_calibration(self):
+        self.assertIs(P._child_listener_seen(lambda: []), False)
+        if sys.executable:
+            self.assertIn(P._child_listener_seen(lambda: [P.Row(("127.0.0.1", 1), ("*", 0), True, 501, 1, False)]),
+                          (False,))
+
+    @unittest.skipIf(sys.platform == "win32", "launchd")
+    def test_launchd_pid(self):
+        import subprocess
+        sup = importlib.import_module("fabric_supervisors")
+        done = lambda code, out: subprocess.CompletedProcess(["launchctl"], code, out, "")  # noqa: E731
+        with mock.patch.object(sup, "_launchctl", return_value=done(0, "gui/501/a.b = {\n\tstate = running\n\tpid = 4242\n}\n")):
+            self.assertEqual(sup.launchd_pid("a.b"), 4242)
+        with mock.patch.object(sup, "_launchctl", return_value=done(0, "gui/501/a.b = {\n\tstate = waiting\n}\n")):
+            self.assertIsNone(sup.launchd_pid("a.b"))
+        with mock.patch.object(sup, "_launchctl", return_value=done(113, "")):
+            self.assertIsNone(sup.launchd_pid("a.b"))
+
+    @unittest.skipUnless(sys.platform == "darwin" and os.path.exists(P.LSOF), "lsof on macOS")
+    def test_pid_listens_on_a_real_child(self):
+        import subprocess
+        child = subprocess.Popen([sys.executable, "-I", "-c", P._CHILD_LISTENER], stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE)
+        try:
+            port = int(child.stdout.readline())
+            self.assertTrue(P.pid_listens(child.pid, port))
+            self.assertFalse(P.pid_listens(child.pid, port + 1 if port < 65535 else port - 1))
+            self.assertFalse(P.pid_listens(1, port))
+        finally:
+            child.stdin.close()
+            child.wait(timeout=5)
+
 
 class SharedCases(unittest.TestCase):
     """The questions both twins answer over the same tables (the Node twin: test/fabric-peer-owner.test.mjs)."""

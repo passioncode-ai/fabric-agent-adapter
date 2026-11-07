@@ -61,7 +61,7 @@ function noSecretInSupervisorFile(argv, environment) {
     if (secretArgument(arg)) throw new ServiceError('An argument carries a credential; a supervisor file never does (read it from the token file or a secret reference).');
   }
   for (const [name, value] of Object.entries(environment ?? {})) {
-    if (credentialName(name) || secretValue(String(value))) throw new ServiceError(`Environment ${name} looks like a credential; a supervisor file never carries one.`);
+    if (credentialName(name) || secretArgument(String(value))) throw new ServiceError(`Environment ${name} looks like a credential; a supervisor file never carries one.`);
   }
 }
 
@@ -264,7 +264,7 @@ export function launchdPlist(label, programArguments, { workingDirectory, stdout
   const env = { ...environment };
   for (const [name, value] of Object.entries(env)) {
     if (/(TOKEN|SECRET|PASSWORD|KEY)$/.test(name) && !name.endsWith('_FILE')) throw new ServiceError(`Environment variable ${name} looks like a secret; pass a *_FILE path instead.`);
-    if (secretValue(String(value))) throw new ServiceError(`Environment ${name} holds a value shaped like a credential; a plist never carries one.`);
+    if (secretArgument(String(value))) throw new ServiceError(`Environment ${name} holds a value shaped like a credential; a plist never carries one.`);
   }
   for (const arg of argv) {
     if (secretArgument(arg)) throw new ServiceError('An argument carries a credential; a plist never does (read it from the token file or a secret reference).');
@@ -302,6 +302,14 @@ export function launchdLoaded(label, { run = defaultRun, platform = process.plat
   return run(['launchctl', 'print', `${launchdDomain(platform, uid)}/${launchdLabel(label)}`])?.status === 0;
 }
 
+// The running pid of this account's launchd job `label`, or null (not running, or not readable).
+export function launchdPid(label, { run = defaultRun, platform = process.platform, uid } = {}) {
+  const result = run(['launchctl', 'print', `${launchdDomain(platform, uid)}/${launchdLabel(label)}`]);
+  if (result?.status !== 0) return null;
+  const hit = /^\s*pid\s*=\s*([0-9]+)\s*$/m.exec(String(result.stdout ?? ''));
+  return hit ? Number(hit[1]) : null;
+}
+
 const OVERRIDE_ROW = /^\s*"([^"]+)"\s*=>\s*(\S+)\s*$/;
 
 /**
@@ -326,7 +334,7 @@ export class ForeignUserAnswer {
 // The well-known answer at a loopback origin, read only on a connection whose server end is this OS account's process
 // (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, a ForeignUserAnswer when the listener is another
 // account's or its owner cannot be told.
-export async function wellKnownOf(origin) {
+export async function wellKnownOf(origin, { vouchPid = null } = {}) {
   const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
   if (!m) {
     try {
@@ -338,7 +346,7 @@ export async function wellKnownOf(origin) {
   }
   // A CheckedAgent without keep-alive: the request goes on the very socket it checked, and the socket closes after the
   // answer, so a poll leaves no connection open behind it.
-  const agent = new CheckedAgent({ keepAlive: false });
+  const agent = new CheckedAgent({ keepAlive: false, vouchPid });
   return new Promise((resolve) => {
     const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/.well-known/fabric-service', agent,
       timeout: 2000 }, (res) => {
@@ -391,7 +399,7 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   const deadline = Date.now() + timeout * 1000;
   let foreign = null;
   while (Date.now() < deadline) {
-    const doc = await fetchWellKnown(origin);
+    const doc = await fetchWellKnown(origin, { vouchPid: launchdPid(label, opts) });
     foreign = doc instanceof ForeignUserAnswer ? doc.reason : null;
     if (!foreign && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
     await sleep(500);

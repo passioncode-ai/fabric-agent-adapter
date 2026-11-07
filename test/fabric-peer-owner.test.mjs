@@ -260,3 +260,25 @@ test('the hub client sends no bearer to a door another account holds, and does t
   assert.equal(answer.status, 204);
   assert.deepEqual(received, ['Bearer synthetic']);
 });
+
+test('a restricted table answers table-restricted, and a vouched pid that listens passes (FAA-267)', async (t) => {
+  assert.throws(() => po.parseNetstat(''), (err) => err instanceof po.TableUnreadable && err.message.startsWith(po.TABLE_RESTRICTED));
+  assert.deepEqual(po.parseLsofListeners('p78564\nf4\nn127.0.0.1:47480\nn*:5000\nn[::1]:7\nnoise\n'),
+    [['127.0.0.1', 47480], ['*', 5000], ['::1', 7]]);
+  const { server, received, port } = await recorder();
+  t.after(() => server.close());
+  const restricted = { read: async () => { throw new po.TableUnreadable(`${po.TABLE_RESTRICTED}: netstat printed nothing to this process`); } };
+  const lsof = (listens) => async (file) => (file === po.PS ? '501\n' : `p4242\nn127.0.0.1:${listens}\n`);
+  // No vouch: unknown, fail closed.
+  await assert.rejects(po.checkedSocket(port, restricted), (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
+  // A vouched pid that does not listen on this port: still refused.
+  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, run: lsof(port + 1) }),
+    (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
+  // A vouched pid of another account: refused.
+  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 502, run: lsof(port) }),
+    (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
+  // This account's vouched pid holds the listener: the socket is handed over.
+  const socket = await po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, run: lsof(port) });
+  socket.destroy();
+  assert.deepEqual(received, []);
+});

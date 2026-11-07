@@ -177,6 +177,7 @@ export {
   taskUninstall,
   launchdPlist,
   launchdLoaded,
+  launchdPid,
   launchdOverride,
   launchdInstall,
   launchdUninstall,
