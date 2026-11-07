@@ -70,11 +70,24 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process
   cannot read): nothing is sent. Fail closed, as HA-2 asks.
 - A copy of `check_dashboard_layout.mjs` alone refuses a local `--service`; run it from the kit's folder.
+- A service's own `<tool> mcp-register` now establishes that the listener is this OS account's before it writes the
+  token (`references/surfaces-and-auth.md`: `fabric_peer_owner.server_end` on a connection it opens and sends nothing
+  on, as `listener.owner` does; `foreign-user` writes nothing). The kit ships no `mcp-register` helper: one written for
+  0.73.0 or earlier writes the token unchecked until its author adds the check.
+- Every new checked loopback connection from the Node twin starts processes: on macOS `netstat -anv` and `ps` (about
+  20 to 35 ms), on Windows `netstat -ano` twice and one PowerShell `GetOwnerSid` (5 s cap each, not yet measured,
+  FAA-256). The hub client keeps its checked connection alive; `fabric-http.mjs` does not, so each loopback request
+  pays it.
+- The Python `fetch_well_known` answers `None` both when nothing listens and for a `foreign-user` listener; a status
+  command that must report `foreign-user` (the order `down`, `foreign-user`, `foreign`, then `status`) asks
+  `fabric_peer_owner.server_end` itself, or uses the Node `wellKnownOf`, which answers `ForeignUserAnswer` (FAA-259).
 
 ### Changed
 
 - `references/protocol.md` gains "The listener's owner (DEC-0154 HA-2)"; `references/board.md`, `references/lifecycle.md`,
-  `references/kit-modules.md` and `SKILL.md` name the check.
+  `references/kit-modules.md` and `SKILL.md` name the check. `references/surfaces-and-auth.md` gives `mcp-register` the
+  check, `references/interop.md`'s real-client gate waits for `listener.owner` PASS, and the README's MCP quick start
+  writes the client config only after the probe passes.
 - The test fake hub keeps HTTP/1.1 connections with no Nagle delay, as a Node server does by default (whether Fabric's
   own hub keeps idle connections past the Node client's 2 s is FAA-256).
 - `dashboard-links.md` (all three copies) opens a raw loopback address in a browser only after the listener is this OS
@@ -86,7 +99,8 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   link gate), FAA-252 (a running board session's reason), FAA-253 (the systemd and Task Scheduler installers' poll),
   FAA-254 (working-with-fabric's "Fabric is up"), FAA-255 (the delegation key set read over loopback), FAA-256 (the Node
   check's cost on Windows), FAA-257 (the OpenRouter connector reports a refused loopback gateway as no answer), FAA-258 (re-pinning
-  to CT-254 once it is tagged and reconciling with Observatory's `peer_owner.py` 1.2.0).
+  to CT-254 once it is tagged and reconciling with Observatory's `peer_owner.py` 1.2.0), FAA-259 (the Python
+  `fetch_well_known` telling `foreign-user` from `down`).
 
 ## 0.73.0 (2026-11-07)
 
