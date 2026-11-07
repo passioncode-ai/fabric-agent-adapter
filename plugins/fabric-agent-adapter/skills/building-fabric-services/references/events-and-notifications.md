@@ -25,7 +25,8 @@ in the URL.
 - `kind`: dotted, stable, past tense or state (`job.failed`, `job.awaiting_choice`,
   `service.started`, `collector.stale`). Hosts filter on it.
 - `level`: `info` (routine), `notice` (the operator may want to look), `warning`
-  (something is degrading), `error` (something failed and needs action).
+  (something is degrading), `error` (something failed and needs action). The kits take `warn`, the
+  dashboard chip's name, and store it as `warning` (FAA-276).
 - `text`: one sentence, in the operator's language, with the object named and the
   number stated: "The Q3 report draft is ready for your approval (12 sections, 3
   languages)." Never a machine id, never a stack trace.

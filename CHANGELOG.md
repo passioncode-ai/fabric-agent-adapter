@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.77.0 (2026-11-07)
+
+The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabric-events.mjs`.
+
+### Fixed
+
+- **`warn` is a level** (FAA-276): `make_event`, `makeEvent` and so `JsonlEventLog.append` take `warn`, the dashboard
+  chip's name, and store it as the feed's `warning`; any other level outside `info`, `notice`, `warning`, `error` is
+  refused as before. A host agent that vendored 0.76.0 found a failed action's event write refused at `warn`.
+
 ## 0.76.0 (2026-11-07)
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `fabric-peer-owner.mjs` (peer_owner

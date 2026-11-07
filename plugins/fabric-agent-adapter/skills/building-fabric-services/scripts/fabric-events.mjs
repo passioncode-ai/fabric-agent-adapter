@@ -5,6 +5,9 @@ import { feedDataProblems } from './fabric-protocols.mjs';
 
 export const LEVELS = ['info', 'notice', 'warning', 'error'];
 
+// The dashboard kit names its chip `warn`; an event written at that name is stored at the feed's `warning` (FAA-276).
+export const LEVEL_ALIASES = Object.freeze({ warn: 'warning' });
+
 export const EVENTS_DEFAULT_LIMIT = 50;
 
 export const EVENTS_MAX_LIMIT = 200;
@@ -15,9 +18,10 @@ const TRACE_ID = /^(?!0{32}$)[0-9a-f]{32}$/;
 
 const SPAN_ID = /^(?!0{16}$)[0-9a-f]{16}$/;
 
-/** One activity event. `data` (DEC-0070) adds machine-readable fields, `{schema, value}`, never a secret: refused here, so no feed carries one. */
-export function makeEvent(id, at, kind, level, text, { subject, link, notify, traceId, spanId, data } = {}) {
-  if (!LEVELS.includes(level)) throw new ServiceError(`level must be one of ${LEVELS.join(', ')}.`);
+/** One activity event. `level` is one of LEVELS; `warn`, the dashboard chip's name, is stored as `warning`. `data` (DEC-0070) adds machine-readable fields, `{schema, value}`, never a secret: refused here, so no feed carries one. */
+export function makeEvent(id, at, kind, given, text, { subject, link, notify, traceId, spanId, data } = {}) {
+  const level = typeof given === 'string' && Object.hasOwn(LEVEL_ALIASES, given) ? LEVEL_ALIASES[given] : given;
+  if (!LEVELS.includes(level)) throw new ServiceError(`level must be one of ${LEVELS.join(', ')} (or \`warn\` for \`warning\`).`);
   if (!KIND.test(kind)) throw new ServiceError(`kind ${kind} must be dotted lowercase.`);
   const sentence = String(text).split(/\s+/).filter(Boolean).join(' ');
   if (!sentence) throw new ServiceError('An event needs a sentence.');

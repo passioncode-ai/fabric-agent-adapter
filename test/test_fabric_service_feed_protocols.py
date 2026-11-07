@@ -108,6 +108,17 @@ class FeedData(unittest.TestCase):
         log.append("job.done", "info", "A note was drafted.", data={"schema": "https://example.com/s.json", "value": {"notes": 1}})
         self.assertEqual(log.fetch(None, 10)[0]["data"]["value"], {"notes": 1})
 
+    def test_warn_is_stored_as_warning(self):
+        """FAA-276: the dashboard chip is named `warn`; the feed's level is `warning`, and a wrong level is still refused."""
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        log = fs.JsonlEventLog(temp / "events.jsonl")
+        log.append("job.failed", "warn", "The weekly report failed to send.")
+        self.assertEqual(log.fetch(None, 10)[0]["level"], "warning")
+        for bad in ("warnings", "WARN", "fatal", None, ["warn"]):
+            with self.subTest(level=bad), self.assertRaises(fs.ServiceError):
+                fs.make_event(1, "2026-11-07T20:00:00Z", "job.failed", bad, "The weekly report failed to send.")
+
 
 class ProbeRules(unittest.TestCase):
     """check_service.py reads FAC-SEM-099 on the well-known document and FAC-SEM-101 on the feed it fetches."""
