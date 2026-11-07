@@ -21,10 +21,12 @@ facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_
 - **`warn` is a level** (FAA-276): `make_event`, `makeEvent` and so `JsonlEventLog.append` take `warn`, the dashboard
   chip's name, and store it as the feed's `warning`; any other level outside `info`, `notice`, `warning`, `error` is
   refused as before. A host agent that vendored 0.76.0 found a failed action's event write refused at `warn`.
-- **The calibration child is waited on without a ceiling and within its deadline** (FAA-273 items 11 and 13): the
-  Python owner check waits for the child's port with `selectors` (no FD_SETSIZE limit, so a process holding more than
-  1024 files still calibrates on sysctl) and reads it with `os.read` under the same deadline, so a partial line from an
-  interpreter that then waits no longer holds the process's first owner check (and its lock) past `TIMEOUT_SECONDS`.
+- **The calibration child is waited on without a ceiling and within one deadline** (FAA-273 item 13 and the `selectors`
+  half of item 11): the Python owner check waits for the child's port with `selectors` (no FD_SETSIZE limit, so a
+  process holding more than 1024 files still calibrates on sysctl) and reads it with `os.read` under the same deadline;
+  a child that answered no port (a partial line, a banner) is killed at once, and one that answered a port gets only
+  what is left of the deadline to exit. The process's first owner check (and its lock) no longer waits past
+  `TIMEOUT_SECONDS` for the child.
 - `board.md` and `connectors.md` say a `table-restricted` refusal does not clear by retrying (FAA-273 item 18).
 
 ## 0.76.0 (2026-11-07)

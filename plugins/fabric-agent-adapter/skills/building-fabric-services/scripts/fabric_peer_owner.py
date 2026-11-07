@@ -504,7 +504,8 @@ _CHILD_LISTENER = ("import socket,sys\ns=socket.socket();s.bind(('127.0.0.1',0))
 def _child_line(child: "subprocess.Popen[bytes]", deadline: float) -> Optional[bytes]:
     """The child's first line, or None when no newline came by `deadline`. It waits with `selectors` (kqueue on
     macOS: no FD_SETSIZE ceiling at fd 1024, which `select.select` refuses) and reads what is there, so a partial line
-    from an interpreter that then waits cannot hold the caller past the deadline (FAA-273 items 11 and 13)."""
+    from an interpreter that then waits cannot hold the caller past the deadline (FAA-273 item 13, and the `selectors`
+    half of item 11)."""
     import selectors  # POSIX: this reader runs on macOS alone
     got = b""
     try:
@@ -534,9 +535,10 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except OSError:
         return None
-    line = None
+    deadline = time.monotonic() + TIMEOUT_SECONDS
+    port = None
     try:
-        line = _child_line(child, time.monotonic() + TIMEOUT_SECONDS)
+        line = _child_line(child, deadline)
         if line is None or not line.strip().isdigit():
             return None
         port = int(line.strip())
@@ -545,11 +547,13 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
         except (TableUnreadable, OSError, struct.error, ValueError):
             return False
     finally:
+        # One deadline for the whole check: a child that gave no port is killed at once, and one that did gets what is
+        # left of the deadline to exit on its closed stdin before it is killed.
         try:
             child.stdin.close()
-            if line is None:  # no answer by the deadline: no second wait for a child that may never read its stdin
+            if port is None:
                 child.kill()
-            child.wait(timeout=TIMEOUT_SECONDS)
+            child.wait(timeout=max(0.0, deadline - time.monotonic()))
         except (OSError, subprocess.TimeoutExpired):
             child.kill()
             child.wait()

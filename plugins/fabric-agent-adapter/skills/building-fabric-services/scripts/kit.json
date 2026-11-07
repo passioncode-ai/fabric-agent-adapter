@@ -38,7 +38,7 @@
    "file": "fabric_peer_owner.py",
    "layer": "L0",
    "imports": [],
-   "sha256": "db026fcdc06f90cbad238d145eff244c13111a2df5895cc3ba9c9815f158113b"
+   "sha256": "4752a17a058f14f0fa1c2bf4d14610c8bf63ca22183abccb8d93231773ebf2e6"
   },
   {
    "module": "fabric_crypto",
@@ -315,7 +315,7 @@
     "fabric_paths",
     "fabric_protocols"
    ],
-   "sha256": "9dcf32864e138c61c39afecdd4ba14ff40cb0bb26e24008c82e36809c1f52835"
+   "sha256": "da3fe3e3e19d4c9754b90c719e9c069a3ac85e080b9fffd07adbaf63b5bfcf0d"
   },
   {
    "module": "fabric_logs",
@@ -6159,7 +6159,7 @@
    "fabric_time.py": "588f383da4ac6a243ea95b6ffc3a0aa99ca94245732dc4937734f190b7af4ae9",
    "fabric_identifiers.py": "0fd814d521ac3aa39907458265870753046a73f48af3d8581ab864b93b211607",
    "fabric_secrets.py": "53c5df8d6f2c87433c288853bfaad9a43f544789bdf1e39bda8d3ff14485c89d",
-   "fabric_peer_owner.py": "db026fcdc06f90cbad238d145eff244c13111a2df5895cc3ba9c9815f158113b",
+   "fabric_peer_owner.py": "4752a17a058f14f0fa1c2bf4d14610c8bf63ca22183abccb8d93231773ebf2e6",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
    "fabric_base.py": "f62bcc2ed9912660fa875d27a09f60867260cc4925f79873501fd9620be59611",
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",
@@ -6183,7 +6183,7 @@
    "fabric_descriptor.py": "c08c91ca0960c694ed7677e7e9247d6307c7b63f37a7e614db022c080cd92ccc",
    "fabric_context.py": "6ae311ddc7217a4aff915e7ce2646486931acd128462b7bebe4a52bbb5fbb6c7",
    "fabric_auth.py": "74ccc10239b65a3567cec5213a7b344cbd88d6eee1fd1c5f7be1d6daf985993c",
-   "fabric_events.py": "9dcf32864e138c61c39afecdd4ba14ff40cb0bb26e24008c82e36809c1f52835",
+   "fabric_events.py": "da3fe3e3e19d4c9754b90c719e9c069a3ac85e080b9fffd07adbaf63b5bfcf0d",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
    "fabric_supervisors.py": "1d920062f8c9806f68f27c84035d17e3860558ac4ccb5dbe83cc7a776cef706a",
    "fabric_service.py": "cb163324ebef9dfe4017210d65e4da4f5e910b6e606c7d1d36d7becf9adcf3f8",

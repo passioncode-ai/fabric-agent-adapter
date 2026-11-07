@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from types import MappingProxyType
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
@@ -34,7 +35,7 @@ LEVELS = ("info", "notice", "warning", "error")
 
 
 # The dashboard kit names its chip `warn`; an event written at that name is stored at the feed's `warning` (FAA-276).
-LEVEL_ALIASES = {"warn": "warning"}
+LEVEL_ALIASES = MappingProxyType({"warn": "warning"})
 
 
 _KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}\Z")

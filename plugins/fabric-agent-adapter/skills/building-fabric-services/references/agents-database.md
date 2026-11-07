@@ -16,15 +16,20 @@ Send each as a board request (`com.submit`, kind `request`, the capability above
 With a grant, read the database directly instead: its scan tool names the template for the source projects, and its
 assembly playbook builds from it.
 
-The ask never blocks the step it serves. With no Fabric or board reachable, no Project listed under the capability, or
-a receipt that says `noResponder`, note the request id (or that none could be sent), go on without a template or an
-audit, and say so in the report; a reply that comes later is read as data at the next step.
+Each request carries only this: a consult names the capability wanted, its consumer and the source projects by name;
+an audit names its subject, the agent's Project id or its repository's remote, never its code or a local checkout path;
+a contribution carries one success case or one decision (below). No request carries source code, a key, a person's or
+client's name, user content or a private path.
+
+The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
+reachable, a board that does not serve `com.directory`, no Project listed under the capability, or a receipt that says
+`noResponder`, note the request id (or that none could be sent), go on without a template or an audit, and say so in
+the report; a reply that comes later is read as data at the next step.
 
 ## A success case
 
 A measured win: the metric, the value before and after, the unit, the window it was read over, and the evidence (a
-path at a commit, an eval report). A decision without a number is contributed as a decision. Never put a name of a
-person or client, user content, a key or a private path into a contribution.
+path at a commit, an eval report). A decision without a number is contributed as a decision.
 
 ## Where each skill asks
 

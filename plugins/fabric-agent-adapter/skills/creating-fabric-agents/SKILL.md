@@ -50,7 +50,7 @@ and say in the report which skill was missing.
 No file is created until every row has an answer. An answer of "later" fails the grill.
 
 Before its design questions, consult the [agents database](references/agents-database.md): `agents-db.consult` on the
-board (or, with a grant, its `tools/audit.py scan` over the source projects), and build from the template it names.
+board (or, with a grant, its scan tool over the source projects), and build from the template it names.
 
 | Question | The gate |
 |---|---|

@@ -559,18 +559,21 @@ class RestrictedTable(unittest.TestCase):
 
     @unittest.skipIf(sys.platform == "win32", "a shell script as the interpreter")
     def test_a_child_that_prints_a_partial_line_and_waits_proves_nothing_in_time(self):
-        """FAA-273 item 13: readline after the first byte waited for the child's newline without a deadline."""
+        """FAA-273 item 13: readline after the first byte waited for the child's newline without a deadline; and a
+        child that answered (a banner, or a port) then ignored its closed stdin got a second TIMEOUT_SECONDS."""
         import tempfile
         import time
-        with tempfile.TemporaryDirectory() as d:
-            fake = os.path.join(d, "python3")
-            with open(fake, "w") as f:
-                f.write("#!/bin/sh\nprintf '> '\nexec sleep 30\n")
-            os.chmod(fake, 0o755)
-            with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 1.0):
-                start = time.monotonic()
-                self.assertIsNone(P._child_listener_seen(lambda: []))
-                self.assertLess(time.monotonic() - start, 1.8, "one deadline, never a second wait")
+        cases = (("printf '> '", None), ("printf 'Python banner\\n'", None), ("printf '12345\\n'", False))
+        for answer, expected in cases:
+            with self.subTest(answer=answer), tempfile.TemporaryDirectory() as d:
+                fake = os.path.join(d, "python3")
+                with open(fake, "w") as f:
+                    f.write("#!/bin/sh\n%s\nexec sleep 30\n" % answer)
+                os.chmod(fake, 0o755)
+                with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 1.0):
+                    start = time.monotonic()
+                    self.assertEqual(P._child_listener_seen(lambda: []), expected)
+                    self.assertLess(time.monotonic() - start, 1.8, "one deadline, never a second wait")
 
     @unittest.skipUnless(sys.platform == "darwin", "the child check runs on macOS")
     def test_a_process_holding_more_than_1024_files_still_sees_its_child(self):
@@ -657,6 +660,7 @@ class RestrictedTable(unittest.TestCase):
         finally:
             child.stdin.close()
             child.wait(timeout=5)
+            child.stdout.close()
 
 
 class SharedCases(unittest.TestCase):
