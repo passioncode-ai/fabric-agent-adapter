@@ -101,6 +101,9 @@ prior art of its own:
   calling other agents, stops for a person, learning loops, the loop guard.
 - [agents-that-answer-people.md](references/agents-that-answer-people.md): what an agent that
   answers people carries from its first release, each part with the check that proves it.
+- [communication-agent-template.md](references/communication-agent-template.md): the template prompt
+  for an agent that talks with people on a channel (support, sales and leads, community, inbox, reviews): the measured
+  inbound pipeline, business patterns, knowledge, the learning loop and acceptance.
 
 ## Step 2: the project skeleton
 
