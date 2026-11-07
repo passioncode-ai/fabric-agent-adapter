@@ -9,9 +9,9 @@
     for `X | None` in its signatures (the kit's floor is Python 3.9, where `typing.get_type_hints`
     cannot read `X | None`), in `classify` / `classify_sid` asking for this process's own uid or
     SID before the system's (a client running as root or SYSTEM owns root's listener), and in
-    two Linux and selection rules: on Linux `server_end` reads the listener row on the
-    connection's local address (state 0A, as the contract's HA-2 source table names it; a
-    connection not accept()ed yet is printed with uid 0 and inode 0), `peer` reads a client
+    two Linux and selection rules: on Linux `server_end` reads an accepted connection's own row
+    and, for one not accept()ed yet (printed with uid 0 and inode 0), the listener row on its
+    local address (state 0A; Observatory's 1.2.0 reading), `peer` reads a client
     row with inode 0 (a closed client) as unknown, and several rows of one owner are that owner.
     A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
     created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
@@ -670,10 +670,12 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = Fa
         return Owner(UNKNOWN, None, None, how, "no-row")
     if len(found) > 1:
         return Owner(UNKNOWN, None, None, how, "several-rows")
-    if how == "proc" and server:
-        # Linux: a server end is told by the listener on its local address, the one row the contract's HA-2 source
-        # table names there (state 0A). A connection the server has not accept()ed yet is printed with uid 0 and
-        # inode 0, and an accepted one inherits its listener's uid, so the listener row answers both.
+    if how == "proc" and server and found[0].uid is None:
+        # Linux: a connection the server has not accept()ed yet is printed with uid 0 and inode 0; it belongs to the
+        # listener on its local address (the exact address, else the wildcard), and dies with it
+        # (inet_csk_listen_stop), so that listener answers. An accepted connection's own row carries the uid of the
+        # process that accepted it (sock_graft): it answers itself, so a listener swapped after another account
+        # accepted the client cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e).
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
     if how == "proc" and found[0].uid is None:
         # A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.

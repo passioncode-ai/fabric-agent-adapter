@@ -359,10 +359,11 @@ async function ownerOf(local, remote, opts = {}) {
   const found = find(table.rows, local, remote);
   if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: 'no-row' });
   if (found.length > 1) return owner(UNKNOWN, { method: table.how, reason: 'several-rows' });
-  if (table.how === 'proc' && opts.server) {
-    // Linux: a server end is told by the listener on its local address, the one row the contract's HA-2 source table
-    // names there (state 0A). A connection not yet accept()ed is printed with uid 0 and inode 0; an accepted one
-    // inherits its listener's uid, so the listener row answers both.
+  if (table.how === 'proc' && opts.server && found[0].uid === null) {
+    // Linux: a connection not yet accept()ed is printed with uid 0 and inode 0; it belongs to the listener on its local
+    // address and dies with it, so that listener answers. An accepted connection's own row carries the uid of the
+    // process that accepted it: it answers itself, so a listener swapped after another account accepted the client
+    // cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e).
     return oneOwner(listenersOf(table.rows, found[0].local), table.how, opts, 'not-accepted');
   }
   // A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.

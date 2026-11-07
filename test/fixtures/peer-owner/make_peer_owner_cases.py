@@ -39,6 +39,14 @@ CLOSED_CLIENT = _HEAD + "".join((
     F._proc(3, "0100007F:C351", "00000000:0000", "0A", F.OWN_UID, 5004),
 ))
 
+# A client another account accepted while our service was down, the listener since swapped back to ours: the accepted
+# row (inode set) carries the other account's uid, and that answers, never the listener (board thread ced00f6e).
+SWAPPED_LISTENER = _HEAD + "".join((
+    F._proc(0, "0100007F:B8CF", "00000000:0000", "0A", F.OWN_UID, 6001),
+    F._proc(1, "0100007F:B8CF", "0100007F:C351", "01", F.OTHER_UID, 6002),
+    F._proc(2, "0100007F:C351", "0100007F:B8CF", "01", F.OWN_UID, 6003),
+))
+
 # A connection not accept()ed yet whose listener is gone: unknown, not-accepted.
 NO_LISTENER = _HEAD + F._proc(0, "0100007F:B8CF", "0100007F:C351", "01", 0, 0)
 
@@ -91,6 +99,7 @@ cases = {
         "procTwoListenersOneOwner": {"kind": "proc4", "text": _two_listeners([F.OWN_UID, F.OWN_UID])},
         "procClosedClient": {"kind": "proc4", "text": CLOSED_CLIENT},
         "procNoListener": {"kind": "proc4", "text": NO_LISTENER},
+        "procSwappedListener": {"kind": "proc4", "text": SWAPPED_LISTENER},
         "procTwoListenersTwoOwners": {"kind": "proc4", "text": _two_listeners([F.OWN_UID, F.OTHER_UID])},
         "proc6Multi": {"kind": "proc6", "text": F.PROC_NET_TCP6_MULTI},
         "windowsMulti": {"kind": "windows", "text": win(WINDOWS_ROWS, {})},
@@ -144,6 +153,8 @@ cases = {
         {"table": "procTwoListenersOneOwner", "ask": "listener", "port": F.SERVER_PORT, "want": {"kind": "this-account"}},
         {"table": "procClosedClient", "ask": "peerAt", "server": SERVER, "client": OWN,
          "want": {"kind": "unknown", "reason": "closed"}},
+        {"table": "procSwappedListener", "ask": "serverEnd", "server": SERVER, "client": OWN,
+         "want": {"kind": "another-account", "uid": F.OTHER_UID}},
         {"table": "procNoListener", "ask": "serverEnd", "server": SERVER, "client": OWN,
          "want": {"kind": "unknown", "reason": "not-accepted"}},
         {"table": "procTwoListenersTwoOwners", "ask": "listener", "port": F.SERVER_PORT,

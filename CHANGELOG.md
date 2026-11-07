@@ -57,12 +57,12 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   that refreshes vendored copies file by file takes each module's `kit.json` closure, or the import fails.
 - A socket table over 4 MiB cannot be read (about 6,800 TCP sockets for the Python reader on macOS, 617 bytes each in
   `pcblist_n`; about 19,000 for `netstat -anv`, the Node reader there; about 28,000 in Linux's `/proc/net/tcp`), so every loopback send fails closed as `foreign-user` on such a host.
-- On Linux the server end of a connection is told by the listener row on its local address (state 0A; the exact
-  address, else the wildcard), never by the connection's own row, which `/proc` prints with uid 0 and inode 0 until
-  the server accept()s it (as the contract's pending CT-254 reads HA-2); a client row with inode 0 (a closed client)
-  reads `unknown`. Several listening rows of one owner (SO_REUSEPORT workers, an IPv4 and an IPv6 socket of one
-  process) read as that owner; rows of two owners stay `unknown`. Observatory's own `peer_owner.py` takes the same
-  reading in its 1.2.0.
+- On Linux the server end of an accepted connection is told by its own row (the uid of the process that accepted it),
+  and of one not accept()ed yet, which `/proc` prints with uid 0 and inode 0, by the listener row on its local address
+  (state 0A; the exact address, else the wildcard), as Observatory's `peer_owner.py` 1.2.0 reads it; the contract's
+  CT-254 is settling HA-2's Linux row (FAA-258). A client row with inode 0 (a closed client) reads `unknown`. Several
+  listening rows of one owner (SO_REUSEPORT workers, an IPv4 and an IPv6 socket of one process) read as that owner;
+  rows of two owners stay `unknown`.
 - A client running as root or SYSTEM reads root's or SYSTEM's listener as its own account's (launchd's pid 1 stays
   `system`): the vendored module put the system rule first, which would have refused a root container's own sidecar.
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process

@@ -39,6 +39,10 @@
    "kind": "proc4",
    "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000     0        0 0 1 0000000000000000 20 4 30 10 -1\n"
   },
+  "procSwappedListener": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 6001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   502        0 6002 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 6003 1 0000000000000000 20 4 30 10 -1\n"
+  },
   "procTwoListenersTwoOwners": {
    "kind": "proc4",
    "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 4001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   502        0 4002 1 0000000000000000 20 4 30 10 -1\n"
@@ -434,6 +438,22 @@
    "want": {
     "kind": "unknown",
     "reason": "closed"
+   }
+  },
+  {
+   "table": "procSwappedListener",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "another-account",
+    "uid": 502
    }
   },
   {
