@@ -208,10 +208,10 @@ EOF
 kill %1
 ```
 
-Verified 2026-11-07 from the published npm package 0.75.0 (`npm pack` into a throwaway folder, `KIT`
+Verified 2026-11-07 from the published npm package 0.76.0 (`npm pack` into a throwaway folder, `KIT`
 pointing at its skill) with Claude Code 2.1.299: the probe reported 44 rules, 0 FAIL, `listener.owner` PASS;
 the CLI connected to the sample over streamable HTTP, called `sample.echo` and printed `ping`
-([record](docs/evidence/runs/2026-11-07-0.75.0-quick-start.md)). The probe prints one line per rule
+([record](docs/evidence/runs/2026-11-07-0.76.0-quick-start.md)). The probe prints one line per rule
 (`PASS`, `FAIL` or `NOT_RUN` with its evidence) and exits 1 on any `FAIL`; run it against your
 own service by its id once its installer has written the descriptor.
 `FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py` repeats the connection check
