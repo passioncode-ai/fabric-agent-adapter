@@ -94,15 +94,18 @@ async function serviceTarget(spec, dir) {
   const header = auth.header || 'Authorization';
   const value = (auth.scheme || 'Bearer') === 'Bearer' ? `Bearer ${token}` : token;
   const remote = d.placement === 'remote';
-  // A local origin is asked only on a connection whose server end is this OS account's process (DEC-0154 HA-2):
-  // fabric-http (beside this file in the kit) checks it before the login code's token is sent, and refuses with kind
-  // foreign-user. A copy of this file alone cannot tell the owner, so it sends nothing to a local origin.
+  // Only an https origin goes through fetch. Every other one, a local origin above all, is asked only on a connection
+  // whose server end is this OS account's process (DEC-0154 HA-2): fabric-http (beside this file in the kit) checks it
+  // before the token is sent, refuses with kind foreign-user, and refuses plain http to another host. The path follows
+  // the URL, never the descriptor's placement (0.74.0 unit reading 7: a "remote" descriptor naming 127.0.0.1 sent its
+  // token unchecked). A copy of this file alone cannot tell the owner, so it sends nothing to such an origin.
+  const viaKit = !/^https:\/\//i.test(origin);
   let kitRequest = null;
-  if (!remote) {
+  if (viaKit) {
     kitRequest = (await import('./fabric-http.mjs').catch(() => null))?.request;
     if (!kitRequest) throw new Error('fabric-http.mjs and fabric-peer-owner.mjs are not beside this file: the local listener\'s owner cannot be told, so no token is sent (DEC-0154 HA-2)');
   }
-  const call = remote
+  const call = !viaKit
     ? async (method, url, headers) => { const r = await fetch(url, { method, headers }); return { status: r.status, ok: r.ok, json: () => r.json() }; }
     : async (method, url, headers) => {
       const r = await kitRequest(method, url, { headers, retries: 0, deadlineS: 10 });

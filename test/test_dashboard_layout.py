@@ -119,6 +119,50 @@ class WithoutPlaywright(unittest.TestCase):
             server.server_close()
         self.assertEqual(minted, [])
 
+    def test_a_remote_descriptor_naming_loopback_sends_its_token_only_through_the_check(self):
+        """0.74.0 unit reading 7: the path follows the URL, not the descriptor's placement. A copy of the probe alone
+        with a "remote" descriptor whose origin is http://127.0.0.1 sends nothing, the token least of all."""
+        seen = []
+
+        class Service(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                return
+
+            def do_GET(self):
+                seen.append(self.headers.get("Authorization"))
+                self.send_response(500)
+                self.end_headers()
+
+            do_POST = do_GET
+
+        port = free_port()
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", port), Service)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            with tempfile.TemporaryDirectory() as empty:
+                base = Path(empty).resolve()
+                (base / "token").write_text("example-token\n")
+                (base / "services").mkdir()
+                (base / "services" / "example-agent.default.json").write_text(json.dumps(
+                    {"id": "example-agent", "instance": "default", "placement": "remote",
+                     "origin": "http://127.0.0.1:%d" % port, "auth": {"tokenFile": str(base / "token")}}))
+                stub = base / "node_modules" / "playwright"
+                stub.mkdir(parents=True)
+                (stub / "package.json").write_text('{"name":"playwright","version":"0.0.0-stub","main":"index.js"}')
+                (stub / "index.js").write_text("module.exports = { webkit: { launch: async () => ({ close: async () => {}, "
+                                               "newPage: async () => { throw new Error('stub'); } }) } };")
+                script = base / PROBE.name
+                shutil.copy(PROBE, script)
+                done = subprocess.run([NODE, str(script), "--service", "example-agent", "--services-dir",
+                                       str(base / "services"), "--playwright", str(base), "--json"],
+                                      capture_output=True, text=True, timeout=60, cwd=str(base),
+                                      env=dict(os.environ, FABRIC_PLAYWRIGHT="", NODE_PATH=""))
+                self.assertIn("HA-2", done.stdout + done.stderr)
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertEqual(seen, [])
+
     def test_usage_errors_exit_2(self):
         self.assertEqual(subprocess.run([NODE, str(PROBE)], capture_output=True).returncode, 2)
         self.assertEqual(subprocess.run([NODE, str(PROBE), "x", "--widths", "10"], capture_output=True).returncode, 2)

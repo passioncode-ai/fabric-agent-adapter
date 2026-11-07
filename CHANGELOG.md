@@ -29,7 +29,7 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   - `fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL: `HttpError` kind `foreign-user`, never
     retried; the Node twin sends such a request through `node:http` on a checked connection instead of `fetch`.
   - `check_dashboard_layout.mjs` before it asks a local service for a login code (a copy of that file alone, without
-    the kit beside it, sends nothing to a local origin).
+    the kit beside it, sends nothing to an origin that is not `https://`).
   - the launchd installers' poll: a listener of another account is never a successful install; the error names
     `foreign-user`.
 
@@ -74,7 +74,9 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   `system`): the vendored module put the system rule first, which would have refused a root container's own sidecar.
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process
   cannot read): nothing is sent. Fail closed, as HA-2 asks.
-- A copy of `check_dashboard_layout.mjs` alone refuses a local `--service`; run it from the kit's folder.
+- A copy of `check_dashboard_layout.mjs` alone refuses a `--service` whose origin is not `https://`; run it from the
+  kit's folder. Which way a request goes follows its origin, not the descriptor's `placement`: a descriptor that says
+  `remote` with an `http://` origin is asked through the checked transport too.
 - A service's own `<tool> mcp-register` now establishes that the listener is this OS account's before it writes the
   token (`references/surfaces-and-auth.md`: `fabric_peer_owner.server_end` on a connection it opens and sends nothing
   on, as `listener.owner` does; `foreign-user` writes nothing). The kit ships no `mcp-register` helper: one written for
@@ -105,7 +107,7 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   FAA-254 (working-with-fabric's "Fabric is up"), FAA-255 (the delegation key set read over loopback), FAA-256 (the Node
   check's cost on Windows), FAA-257 (the OpenRouter connector reports a refused loopback gateway as no answer), FAA-258 (re-pinning
   to CT-254 once it is tagged and reconciling with Observatory's `peer_owner.py` 1.2.0), FAA-259 (the Python
-  `fetch_well_known` telling `foreign-user` from `down`).
+  `fetch_well_known` telling `foreign-user` from `down`), FAA-260 (the readings' smaller follow-ups).
 
 ## 0.73.0 (2026-11-07)
 
