@@ -139,7 +139,7 @@ FAC-SEM-162 to 165 (rule `channel-agent.declaration`).
 | `stateDir` | the decisions (`decisions.jsonl`), the handoff outbox (`handoffs.jsonl`) and the usage ledger (`usage.jsonl`) |
 | `model`, `fallback` | two models of different vendors; a lane that reads what customers write runs on an open-vendor model (DEC-0083) |
 | `keyEnv` | the environment variable that holds the agent's own OpenRouter key; never a value in the file |
-| `ceilingUsd`, `window` | the spend ceiling per UTC `day` or `month` |
+| `ceilingUsd`, `window` | the spend ceiling per UTC `day` or `month` (`month` under the communication agent template, under the key's monthly limit) |
 | `prices` or `catalog` | USD per token per model. The example's prices are placeholders, not OpenRouter's: take them from `GET https://openrouter.ai/api/v1/models` (a saved catalog file named in `catalog` is read with `prices_from_catalog`). A model without a price is never called |
 | `maxTokens`, `maxChars` | the output budget per call and the reply's length limit |
 

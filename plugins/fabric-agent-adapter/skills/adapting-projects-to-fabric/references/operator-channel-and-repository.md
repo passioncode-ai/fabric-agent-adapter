@@ -15,7 +15,7 @@ steps:
 1. create a bot with @BotFather (for an agent that answers people on Telegram, a bot of its own, never
    the bot that answers people: the contract's channel-agent.md);
 2. put its token into the operator's secret store (Project Observatory where it is installed) under
-   the name the agent reads (for example `EXAMPLE_AGENT_TELEGRAM_BOT_TOKEN`), never into a chat, a
+   the name the agent reads (for example `EXAMPLE_AGENT_OPERATOR_BOT_TOKEN`), never into a chat, a
    file or the bundle;
 3. run the agent's link command;
 4. type the code it shows in the chat with the bot.

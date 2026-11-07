@@ -51,6 +51,15 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
                 events.make_event("1", "2026-11-07T00:00:00Z", kind, "info", "x")
         self.assertNotIn("handedOff", flat(TEMPLATE))
 
+    def test_the_changelog_counts_the_adversarial_batches_the_template_lists(self):
+        import re
+        body = flat(TEMPLATE)
+        listed = body.split("The adversarial batches, each with its expected behaviour, all passing: ", 1)[1]
+        listed = listed.split(" - Clarifying questions", 1)[0]
+        said = re.search(r"the acceptance with (\d+) adversarial batches",
+                         " ".join((ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split()))
+        self.assertEqual(int(said.group(1)), len(listed.split("; ")))
+
 
 if __name__ == "__main__":
     unittest.main()

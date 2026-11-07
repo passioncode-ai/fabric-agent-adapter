@@ -15,7 +15,7 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   suspected, then the pre-send gates with a checker of another vendor. It also carries the business patterns, the
   knowledge and data connections (the handoff queue's «a person answered» signal, the account state and version facts
   as tools of every turn, retrieval over the whole conversation), leads handed to a sales agent of their own that owns
-  the CRM, the learning loop, the model lanes, the Fabric integration and the acceptance with 15 adversarial batches, and maps its sections to the parts of an organization agent template (fabric-workspace
+  the CRM, the learning loop, the model lanes, the Fabric integration and the acceptance with 17 adversarial batches, and maps its sections to the parts of an organization agent template (fabric-workspace
   `knowledge/system/templates.md`, S2). `SKILL.md` links it beside `agents-that-answer-people.md`.
 - A scenario eval (`a-channel-agent-starts-from-the-communication-template`) and a trigger query for it (measured with a
   real client: creating-fabric-agents 28 of 31, the new query routed right;

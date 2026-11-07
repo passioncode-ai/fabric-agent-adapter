@@ -130,8 +130,9 @@ brief disagree, ask the owner before you build.
    substantive. For the others the same call writes the reply the channel allows: in a private chat
    or mail one or two sentences in the person's language, greeting back if they greeted, asking what the matter is
    (what happens, where, on which device), which counts as the ticket's one clarifying question (the ticket is then `awaiting_customer` and ends
-   `customer_silent` if nobody writes back; adopting the template starts a new series for turns and outcome shares,
-   said in the first daily report); in a group no reply
+   `customer_silent` if nobody writes back; adopting the template starts a new series for turns and outcome shares
+   (customer_silent up, no_reply_owed down),
+   said in the owner's daily report, never inside support.quality_daily's closed value); in a group no reply
    to chatter; on a store review a short public reply with no question; a closing gets a short closing or no message. Measured: sending a vague ask to this reply scored 4.5 of 7 against 6.75
    for answering its general part.
 2. Analyse, plan and draft in ONE call (the planning model, thinking low) with the whole context: the channel, who
@@ -145,10 +146,11 @@ brief disagree, ask the owner before you build.
      support-agent recipe's check_reply, Python, can run on it).
    Its `given` is the ids of the knowledge items placed in this call's prompt, never the plan's own `evidence`; a plan
    whose `evidence` names an id outside that set is held as a suspected injection. check_reply runs on a draft that states facts: each tool result of this turn goes into its `given` and `sources`
-   under an id of its own in the citation's grammar (letters, digits, dot, dash, underscore; for example `tool.order`),
+   under an id of its own in the citation's grammar (an ASCII letter or digit first, then ASCII letters, digits, dot, dash or
+   underscore, at most 64 characters; for example `tool.order`),
    so a draft can cite an account state as [KB:tool.order]. Knowledge ids follow the same grammar (map one that does
-   not, such as an id with a colon). A draft with no fact to cite (the
-   off-topic decline of rule 4, a triage reply) goes through the other gates of step 5, not check_reply.
+   not, such as an id with a colon). Which texts skip check_reply is decided by the route, never by the
+   draft's markers (step 5).
    On a partly covered question the draft answers what the knowledge covers, specifically, then says what it does not.
    Measured: this call's draft equals a single answering call on plain questions (6.88 against 6.85 of 7) and leads on
    behaviour cases (6.89 against 6.53 for one call of the same model and 6.00 for the cheaper drafter in use); a separate
@@ -168,8 +170,9 @@ brief disagree, ask the owner before you build.
    something: only when the system backs it), links, handles, numbers and amounts only from the material, language and
    script, length, the dash, no repeat of the previous reply; then a checker of another vendor than the model that
    drafted this turn (its fallback included) that sees the material before the instructions. check_reply runs on the
-   final text first, on every turn that went through step 2 except an off-topic plan (the route decides the skip, never
-   the draft's markers). A turn that went through step 2 whose plan has no injection verdict, or whose call failed, is
+   final text first, on every turn that went through step 2, except these routes, whose text takes the other gates: an
+   off-topic plan (rule 4), a plan whose only actions are ask_clarification or handoff, and a triage reply (the route
+   decides the skip, never the draft's markers). A turn that went through step 2 whose plan has no injection verdict, or whose call failed, is
    held, never sent on a guess. A refusal: one repair naming the reason, then one research turn on the
    research lane (section 7) under a time cap (never for money), then an honest holding line where the channel's
    `holding_reply` allows one (in a group only when the answer is due within its window; never as a store review's
@@ -177,8 +180,8 @@ brief disagree, ask the owner before you build.
 
 ## 4. Business patterns (one channel may carry several)
 
-- Support: answer from the knowledge; hand-offs counted by cause (policy, inability, infrastructure; an infrastructure hold is written to the ticket as a
-  hold, not as a `handoff.reason`, which takes only policy or inability, and is counted in the agent's own report); the person's
+- Support: answer from the knowledge; hand-offs counted by cause (policy, inability, infrastructure; an infrastructure hold is written to the ticket as
+  outcome `question_open` with step `question` or `agent`, with no `handoff` member, which takes only policy or inability, and is counted in the agent's own report); the person's
   queue has an SLA and a pre-agreed safe default; a closed gap re-answers the held ticket once. Count the shares of
   clarifying questions (a greeting reply counted apart) and of "write there" referrals: owners judged 26% clarifications and 33% referrals too high; an
   answer in substance beats a pointer.
@@ -225,7 +228,8 @@ brief disagree, ask the owner before you build.
   support.handed_off, support.diagnosed (a second look's cause), knowledge.learned / knowledge.retracted,
   support.tickets_daily. A question the knowledge lacks goes to the gap queue, restated without personal data.
 - Usage on the service's usage report: cost per provider and model, unknown cost null, every limit in its budgets;
-  cost per lane (triage, plan-and-draft, final pass) goes on the agent's own page or its daily report, as the
+  cost per lane (triage, plan-and-draft, final pass) goes on the agent's own page or the owner's daily report (never inside support.quality_daily's
+  closed value), as the
   contract's usage schema has no lane field.
 - Product analytics events keep their history: never rename one; a new meaning is a new event.
 
@@ -269,7 +273,9 @@ brief disagree, ask the owner before you build.
   it (check its input_modalities), not a description another model wrote; audio goes the same way to an open-vendor
   model that reads audio, or is transcribed by an open-vendor route where none does. That client writes its receipts
   to the same usage ledger and checks the same monthly stop before each call, at a worst case per picture or minute of
-  audio, so no model call is outside the limit; every lane's client writes to that one ledger under one monthly ceiling.
+  audio, so no model call is outside the limit; every text lane shares one kit Client (two clients on one ledger each
+  hold only their own calls in flight), and the media client reserves its worst case under that ceiling or keeps a
+  sub-ceiling of its own.
 - The steps are the rule; each step's model is chosen on the project's own replay set (a cheaper plan-and-draft model
   stays where it wins there). A switch must win on the project's own set.
 - Every lane has a fallback of another vendor; fallback recoveries are counted. Expect the plan-and-draft call to hold
@@ -295,10 +301,12 @@ brief disagree, ask the owner before you build.
 - Two keys before live sending: the channel set to live and an environment switch; a demo sender that cannot send.
 - Telegram: through the sending service the estate names for it (rule 9); bind the support account to its own agents (others are refused).
   A bot on its own token sends directly. Where the transport owner holds sends (an account session, a Business
-  connection), with replies on, an answer to a person who wrote within 24 hours goes at once, while a first message to someone who did not
+  connection), its own approval rules decide (the standard's section 9); in one estate's sending service, with replies
+  on, an answer to a person who wrote within 24 hours goes at once, while a first message to someone who did not
   write, an edit or a late answer waits for the operator (the ticket is `awaiting_approval` and ends `expired` if
   nobody approves it by its final limit); the operator channel gets a bot of its own, never the bot that answers
-  people (channel-agent.md); tell the agent's own messages from inbound ones by the transport: a bot by
+  people (channel-agent.md), and the answering bot keeps its own allowlist of the operator's numeric id, bound by a
+  link code in its private chat, so the operator's word still reaches it (CA-8); tell the agent's own messages from inbound ones by the transport: a bot by
   the sender, an account session or the sending service by each message's `out` field.
 
 ## 9. Acceptance (the agent is done when all of these pass on the build the channel runs)
@@ -318,9 +326,10 @@ brief disagree, ask the owner before you build.
 - The first week's support.quality_daily reported per channel, with these targets (a metric not measured is null and
   named; helped binds as a gate only once the judge is calibrated, until then it is reported): helped yes at least
   60% and no at most 15%; every rubric check at least 90% (each binds, like helped, only once people agree with it
-  at least 80% of the time; until then it is reported); reply coverage 100% (over inbound messages in chat and mail, over owed questions in community and reviews); turn
-  errors 0; repeat-ask under 3%; agent-repeat 0; first-reply p90 of
-  30 s in private chat, the channel's declared first_reply_limit in a group (the standard's 1 h), 4 h by mail, 24 h
+  at least 80% of the time; until then it is reported); reply coverage 100% (over inbound messages in chat and mail, over owed questions in community and reviews;
+  a message no reply is owed to, such as a closing, a prefilter verdict or the staff's own, leaves the count); turn
+  errors 0; repeat-ask under 3%; agent-repeat 0; first-reply p90 (from the
+  batch's first message, the batching wait included) of 30 s in private chat, the channel's declared first_reply_limit in a group (the standard's 1 h), 4 h by mail, 24 h
   for a store review.
 ```
 
