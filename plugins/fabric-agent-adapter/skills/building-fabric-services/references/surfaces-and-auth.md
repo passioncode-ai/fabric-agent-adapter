@@ -27,8 +27,10 @@
   (`auth.delegation-declared`). The kits verify the tokens: put `delegation_gate` /
   `delegationGate` in front of the tools (see [the delegation reference](delegation.md)).
 - Register it into a client config with the service's own command
-  (`<tool> mcp-register`), which writes `{"type":"http","url":"http://127.0.0.1:<port>/mcp","headers":{...}}`
-  atomically, aborts if the file changed meanwhile, and keeps one 0600 backup. The token
+  (`<tool> mcp-register`), which first establishes that the port's listener is this OS account's (the contract's
+  DEC-0154 HA-2: `fabric_peer_owner.server_end` on a connection of its own, as `check_service.py`'s `listener.owner`
+  does; otherwise `foreign-user` and nothing is written), then writes
+  `{"type":"http","url":"http://127.0.0.1:<port>/mcp","headers":{...}}` atomically, aborts if the file changed meanwhile, and keeps one 0600 backup. The token
   goes in `headers`, never in the URL: every log that records a URL prints its query
   string. An HTTP registration starts nothing per session: every client session talks to the
   one resident service (LC-19). A stdio server, by contrast, is a process per session; keep
@@ -85,7 +87,7 @@ forbids, so it reads the card only and never calls an interface: an API-key sche
 - Created once with `ensure_token` at first start, after the instance lock.
 - Stored at the descriptor's `auth.tokenFile`, 0600, owner-checked, never a symlink.
 - Compared in constant time (`token_matches`).
-- Rotation is an operator act: write a new file, restart, re-run `mcp-register`.
+- Rotation is an operator act: write a new file, restart, re-run `mcp-register` (which checks the listener's owner again).
 - Same-user processes can read it. The protocol defends against web pages and
   mistakes, not against hostile code running as the operator; say so in SECURITY.md.
 

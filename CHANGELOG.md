@@ -38,6 +38,8 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 - `check_service.py` prints one more line for a local service (`listener.owner`), and a local service whose port is
   held by another OS account's or root's process, or by one whose owner cannot be told (a sandbox without `sysctl` or
   `netstat`, a socket launchd holds for a socket-activated job), now fails (exit 1) where 0.73.0 read its answer.
+  A socket-activated job's listening socket belongs to whoever created it: a systemd user unit's to this account, a
+  system unit's and launchd's to root (pid 1), so such a service binds its own listener or runs as a user unit.
 - `fetch_well_known` (re-exported by `fabric_service`) answers `None` for a listener of another account, and
   `launchd_install` / `launchdInstall` now raises, naming `foreign-user`, where 0.73.0 returned success when another
   account's copy of the service answered on the port.
@@ -83,7 +85,8 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   `SECURITY.md` names the socket-table reads and the programs the kit now starts. Owed, each its own row: FAA-251 (the
   link gate), FAA-252 (a running board session's reason), FAA-253 (the systemd and Task Scheduler installers' poll),
   FAA-254 (working-with-fabric's "Fabric is up"), FAA-255 (the delegation key set read over loopback), FAA-256 (the Node
-  check's cost on Windows), FAA-257 (the OpenRouter connector reports a refused loopback gateway as no answer).
+  check's cost on Windows), FAA-257 (the OpenRouter connector reports a refused loopback gateway as no answer), FAA-258 (re-pinning
+  to CT-254 once it is tagged and reconciling with Observatory's `peer_owner.py` 1.2.0).
 
 ## 0.73.0 (2026-11-07)
 

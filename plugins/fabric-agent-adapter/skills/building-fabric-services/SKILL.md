@@ -71,7 +71,7 @@ Answer before writing code, and record the answers in the project README:
 
 | Caller | Surface | Why |
 |---|---|---|
-| Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session (stdio-per-session once left twenty stray servers) |
+| Another agent on this machine | MCP `2026-07-28`, `streamable-http`, at `/mcp` on the service origin, token in a header | one process serves every session; the token goes only to this account's listener (HA-2) |
 | The operator or a script | a CLI: `<tool> service status\|start\|stop\|restart`, `<tool> dashboard` (opens only in Fabric Dashboards, below), `<tool> doctor --json` | every verb delegates to launchd and the well-known document, never to its own process table |
 | A remote agent | A2A `1.0` over HTTPS, or MCP behind an authenticated gateway | loopback reachability is not authorization |
 | An A2A peer on this computer | `surfaces.a2a` names a public Agent Card, served without the token; its interface URLs are loopback (DEC-0122); the kits read it, serving one is FAA-10 | the card carries no credential, process member or required Fabric extension |
@@ -421,7 +421,7 @@ this estate needs.
 
 - `lsof` shows `*:<port>` or `0.0.0.0` → the bind is wrong even if the Host check works.
 - HTTP 200 alone accepts any program on the port: compare `service.id` and `service.instance`, read only from
-  this OS account's listener. A `listener.owner` FAIL (`foreign-user`): never hand that port the token; report it.
+  this OS account's listener. On `listener.owner` FAIL (`foreign-user`) send that port nothing.
 - `launchctl bootstrap` right after `bootout` fails with I/O error 5: wait for the unload, then retry.
 - Under launchd `PATH` is bare. Pin the interpreter by absolute path; set `PATH`
   explicitly in the plist; never copy the whole shell environment into it.
