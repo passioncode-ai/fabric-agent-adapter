@@ -243,7 +243,10 @@ test('a service that never answers with its identity is reported, and so is a wr
 
 test('FAA-226: a listener of another OS account is never a successful install (DEC-0154 HA-2)', async (t) => {
   const s = setup(t);
-  const foreign = async () => ({ foreignUser: 'foreign-user: the server on port 1 belongs to another-account; nothing was sent' });
+  const { ForeignUserAnswer } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const foreign = async () => new ForeignUserAnswer('foreign-user: the server on port 1 belongs to another-account; nothing was sent');
+  // a service's own JSON with a foreignUser key is a document, never a refusal
+  await install(s, fakeLaunchd(), '1', { fetchWellKnown: async () => ({ foreignUser: 'x', service: { id: 'example-agent', instance: 'default' } }) });
   await assert.rejects(install(s, fakeLaunchd(), '1', { fetchWellKnown: foreign, timeout: 0.05, sleep: (ms) => new Promise((r) => setTimeout(r, Math.min(ms, 10))) }),
     /is not this service's: foreign-user: .*another-account.*DEC-0154 HA-2/);
 });

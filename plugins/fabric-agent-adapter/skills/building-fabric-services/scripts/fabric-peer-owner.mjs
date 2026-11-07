@@ -442,7 +442,13 @@ export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, exp
     socket.once('connect', async () => {
       clearTimeout(timer);
       socket.pause();
-      const who = await serverEnd(socket, ask);
+      let who;
+      try {
+        who = await serverEnd(socket, ask);
+      } catch (err) {
+        // A reader that throws (an injected one; the readers themselves answer unknown) fails closed.
+        who = owner(UNKNOWN, { method: method(), reason: `check: ${err?.name ?? 'Error'}` });
+      }
       const refused = refusal(who, port, expectPid);
       if (refused) {
         socket.destroy();

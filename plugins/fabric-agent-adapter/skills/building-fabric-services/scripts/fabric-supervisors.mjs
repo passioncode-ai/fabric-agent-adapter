@@ -318,8 +318,13 @@ export function launchdOverride(label, { run = defaultRun, platform = process.pl
   return null;
 }
 
+// A refused listener, as the installer's poll sees it: never a document, whatever keys a service's JSON carries.
+export class ForeignUserAnswer {
+  constructor(reason) { this.reason = reason; }
+}
+
 // The well-known answer at a loopback origin, read only on a connection whose server end is this OS account's process
-// (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, { foreignUser } when the listener is another
+// (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, a ForeignUserAnswer when the listener is another
 // account's or its owner cannot be told.
 export async function wellKnownOf(origin) {
   const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
@@ -345,7 +350,7 @@ export async function wellKnownOf(origin) {
       res.on('error', () => resolve(null));
     });
     req.on('timeout', () => req.destroy());
-    req.on('error', (err) => resolve(err instanceof ListenerRefused ? { foreignUser: `foreign-user: ${err.message}` } : null));
+    req.on('error', (err) => resolve(err instanceof ListenerRefused ? new ForeignUserAnswer(`foreign-user: ${err.message}`) : null));
     req.end();
   }).finally(() => agent.destroy());
 }
@@ -387,7 +392,7 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   let foreign = null;
   while (Date.now() < deadline) {
     const doc = await fetchWellKnown(origin);
-    foreign = doc?.foreignUser ?? null;
+    foreign = doc instanceof ForeignUserAnswer ? doc.reason : null;
     if (!foreign && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
     await sleep(500);
   }

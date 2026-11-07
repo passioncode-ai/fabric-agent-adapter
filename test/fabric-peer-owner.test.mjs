@@ -150,16 +150,23 @@ test('a checked socket refuses another account\'s server before a byte is writte
 
 test('this account\'s server gets the request on the checked socket', async (t) => {
   const { server, received, port } = await recorder();
+  const connections = [];
+  server.on('connection', (s) => connections.push(s.remotePort));
   t.after(() => server.close());
   const socket = await po.checkedSocket(port);
+  const checkedPort = socket.localPort;
+  // No `agent` option: with `agent: false` Node ignores createConnection and dials a second, unchecked connection
+  // (0.74.0 unit reading 2).
   const status = await new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port, path: '/', agent: false, createConnection: () => socket,
-      headers: { Authorization: 'Bearer synthetic' } }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+    const req = http.request({ host: '127.0.0.1', port, path: '/', createConnection: () => socket,
+      headers: { Authorization: 'Bearer synthetic', Connection: 'close' } }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
     req.on('error', reject);
     req.end();
   });
   assert.equal(status, 204);
   assert.deepEqual(received, ['Bearer synthetic']);
+  assert.deepEqual(connections, [checkedPort], 'one connection, the checked one, carried the bearer');
+  socket.destroy();
 });
 
 test('both ends of a real pair and the listener are this account', { skip: !['darwin', 'linux'].includes(process.platform) }, async (t) => {
