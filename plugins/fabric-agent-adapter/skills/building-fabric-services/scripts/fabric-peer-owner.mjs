@@ -367,18 +367,32 @@ export async function resolve(row, how, { run = runProgram, ownUid: mine, ownSid
 // -- the questions ----------------------------------------------------------------------------------------------------
 
 // The live connected rows with exactly this local and remote address: one, or the caller cannot tell.
+// A row printed twice is one socket: Linux resumes a /proc read that sockets came and went under by position, and can
+// print the same row again (0.74.0 seam reading 6); rows equal in every field count once.
 export function find(rows, local, remote) {
-  return rows.filter((r) => !r.listening && !r.timeWait && same(r.local, local) && same(r.remote, remote));
+  const seen = new Set();
+  return rows.filter((r) => {
+    if (r.listening || r.timeWait || !same(r.local, local) || !same(r.remote, remote)) return false;
+    const key = JSON.stringify(r);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function ownerOf(local, remote, opts = {}, server = false) {
   let table;
-  try {
-    table = await (opts.read ?? readTable)(opts);
-  } catch (err) {
-    return owner(UNKNOWN, { method: method(), reason: err instanceof TableUnreadable ? err.message : `table: ${err.name}` });
+  let found;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      table = await (opts.read ?? readTable)(opts);
+    } catch (err) {
+      return owner(UNKNOWN, { method: method(), reason: err instanceof TableUnreadable ? err.message : `table: ${err.name}` });
+    }
+    found = find(table.rows, local, remote);
+    // A /proc read under churn can skip a row or print one twice; one more read before answering unknown.
+    if (table.how !== 'proc' || found.length === 1) break;
   }
-  const found = find(table.rows, local, remote);
   if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: 'no-row' });
   if (found.length > 1) return owner(UNKNOWN, { method: table.how, reason: 'several-rows' });
   if (table.how === 'proc' && server && found[0].uid === null) {

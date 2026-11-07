@@ -43,6 +43,14 @@
    "kind": "proc4",
    "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 6001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   502        0 6002 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 6003 1 0000000000000000 20 4 30 10 -1\n"
   },
+  "procPrintedTwice": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 7001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   501        0 7002 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 7003 1 0000000000000000 20 4 30 10 -1\n   3: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   501        0 7002 1 0000000000000000 20 4 30 10 -1\n   4: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 7003 1 0000000000000000 20 4 30 10 -1\n"
+  },
+  "procTwoOwnersOneTuple": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 7101 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   501        0 7102 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   502        0 7104 1 0000000000000000 20 4 30 10 -1\n"
+  },
   "procTwoListenersTwoOwners": {
    "kind": "proc4",
    "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 4001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   502        0 4002 1 0000000000000000 20 4 30 10 -1\n"
@@ -470,6 +478,54 @@
    "want": {
     "kind": "unknown",
     "reason": "not-accepted"
+   }
+  },
+  {
+   "table": "procPrintedTwice",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "this-account",
+    "uid": 501
+   }
+  },
+  {
+   "table": "procPrintedTwice",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "this-account",
+    "uid": 501
+   }
+  },
+  {
+   "table": "procTwoOwnersOneTuple",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "unknown",
+    "reason": "several-rows"
    }
   },
   {

@@ -65,6 +65,11 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   CT-254 is settling HA-2's Linux row (FAA-258). A client row with inode 0 (a closed client) reads `unknown`. Several
   listening rows of one owner (SO_REUSEPORT workers, an IPv4 and an IPv6 socket of one process) read as that owner;
   rows of two owners stay `unknown`.
+- A `/proc` read that sockets came and went under can print a row twice or skip one (Linux resumes it by position):
+  rows equal in every field count once, and a `/proc` question that finds no row or several reads the table once
+  more before it answers `unknown`. Without it a busy Linux host refused its own service now and then.
+- The Python module imports `ctypes` only where it reads with it, so a CPython built without libffi still imports
+  every kit module; the owner check then reads `netstat` on macOS and fails closed on Windows.
 - A client running as root or SYSTEM reads root's or SYSTEM's listener as its own account's (launchd's pid 1 stays
   `system`): the vendored module put the system rule first, which would have refused a root container's own sidecar.
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process

@@ -206,6 +206,19 @@ class Selection(unittest.TestCase):
             owner = P.peer(FakeSocket(SERVER, ("127.0.0.1", 59999)))
         self.assertEqual((owner.kind, owner.reason), (P.UNKNOWN, "no-row"))
 
+    def test_a_proc_read_that_missed_the_row_is_read_once_more(self):
+        """0.74.0 seam reading 6: a /proc read under churn can skip a row; one more read before answering unknown.
+        netstat and sysctl reads are taken as they come."""
+        empty = F._PROC_HEADER
+        whole = F._PROC_HEADER + F._proc(0, "0100007F:B8CF", "0100007F:C351", "01", F.OWN_UID, 8001)
+        reads = [(P.parse_proc_net_tcp(text, family=socket.AF_INET, byteorder="little"), "proc") for text in (empty, whole)]
+        with mock.patch.object(P, "read_table", side_effect=reads) as read:
+            owner = P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER))
+        self.assertEqual((owner.kind, read.call_count), (P.THIS_ACCOUNT, 2))
+        with mock.patch.object(P, "read_table", return_value=([], "netstat")) as read:
+            self.assertEqual(P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)).reason, "no-row")
+        self.assertEqual(read.call_count, 1)
+
     def test_unreadable_table_is_unknown_with_a_reason(self):
         with mock.patch.object(P, "read_table", side_effect=P.TableUnreadable("netstat: exit 1")):
             owner = P.peer(FakeSocket(SERVER, F.FOREIGN_CLIENT))
@@ -387,6 +400,15 @@ class SelfContained(unittest.TestCase):
         stdlib = set(getattr(sys, "stdlib_module_names", ())) or {
             "ctypes", "http", "ipaddress", "os", "socket", "struct", "subprocess", "sys", "threading", "time", "typing"}
         self.assertTrue(names <= stdlib, names - stdlib)
+
+    def test_the_kit_imports_without_ctypes(self):
+        """0.74.0 seam reading 6: a CPython built without libffi still imports every kit module that reaches this one;
+        the owner check then reads netstat on macOS, or fails closed."""
+        import subprocess
+        code = ("import sys; sys.modules['_ctypes'] = None; sys.path.insert(0, sys.argv[1]); "
+                "import fabric_peer_owner, fabric_service, fabric_http, fabric_hub; print('ok')")
+        done = subprocess.run([sys.executable, "-I", "-c", code, str(SCRIPTS)], capture_output=True, text=True, timeout=60)
+        self.assertEqual(done.stdout.strip(), "ok", done.stderr)
 
     def test_the_uid_is_read_in_one_function(self):
         # The engine's OS boundary (tests/test_osprivacy.py, STANDALONE_UID) lets this vendorable file

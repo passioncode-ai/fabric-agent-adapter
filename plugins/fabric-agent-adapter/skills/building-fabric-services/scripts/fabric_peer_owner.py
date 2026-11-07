@@ -12,7 +12,10 @@
     two Linux and selection rules: on Linux `server_end` reads an accepted connection's own row
     and, for one not accept()ed yet (printed with uid 0 and inode 0), the listener row on its
     local address (state 0A; Observatory's 1.2.0 reading), `peer` reads a client
-    row with inode 0 (a closed client) as unknown, and several rows of one owner are that owner.
+    row with inode 0 (a closed client) as unknown, and several rows of one owner are that owner;
+    a row printed twice by a `/proc` read under churn counts once, and a `/proc` question that
+    finds no row or several reads the table once more; ctypes is imported where it is used, so a
+    Python without it reads netstat on macOS and imports the module everywhere.
     A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
     created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
@@ -85,8 +88,6 @@ name, never sends anything, and never needs a privilege. It reports the process 
 """
 from __future__ import annotations
 
-import ctypes
-import ctypes.util
 import http.client
 import ipaddress
 import os
@@ -428,6 +429,11 @@ def _run(argv: list[str]) -> str:
 
 def _sysctl_blob(name: bytes = b"net.inet.tcp.pcblist_n") -> bytes:
     try:
+        import ctypes
+        import ctypes.util
+    except ImportError:                                              # a CPython built without libffi: netstat reads
+        raise TableUnreadable("sysctl: no ctypes") from None
+    try:
         libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
     except OSError as exc:
         raise TableUnreadable(f"sysctl: libc: {type(exc).__name__}") from None
@@ -549,7 +555,11 @@ def resolve(row: Row, how: str) -> Owner:
 # -- Windows ----------------------------------------------------------------------------------------------------------
 
 def _windows_table() -> list[Row]:  # pragma: no cover - exercised on Windows only
-    from ctypes import wintypes
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        raise TableUnreadable("iphlpapi: no ctypes") from None
     iphlpapi = ctypes.WinDLL("iphlpapi")
     fn = iphlpapi.GetExtendedTcpTable
     fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD), wintypes.BOOL, wintypes.ULONG,
@@ -580,7 +590,11 @@ _SYSTEM_SIDS = frozenset({"S-1-5-18", "S-1-5-19", "S-1-5-20"})
 
 def _windows_sid(pid: Optional[int]) -> str:  # pragma: no cover - exercised on Windows only
     """The account SID of a process (None: this one). Raises OSError when it cannot be read."""
-    from ctypes import wintypes
+    try:
+        import ctypes
+        from ctypes import wintypes
+    except ImportError:
+        raise OSError("no ctypes") from None
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
     advapi32 = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
@@ -656,17 +670,24 @@ def _windows_owner(pid: Optional[int], how: str) -> Owner:  # pragma: no cover -
 
 def find(rows: list[Row], local: tuple[str, int], remote: tuple[str, int]) -> list[Row]:
     """The live connected rows with exactly this local and remote address: one, or the caller
-    cannot tell. A TIME_WAIT row is a connection already closed and is left out."""
-    return [row for row in rows
-            if not row.listening and not row.time_wait and row.local == local and row.remote == remote]
+    cannot tell. A TIME_WAIT row is a connection already closed and is left out. A row printed twice is one
+    socket: Linux resumes a `/proc` read that sockets came and went under by position, and can print the same
+    row again (0.74.0 seam reading 6); rows equal in every field count once."""
+    return list(dict.fromkeys(row for row in rows
+                              if not row.listening and not row.time_wait and row.local == local
+                              and row.remote == remote))
 
 
 def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = False) -> Owner:
-    try:
-        rows, how = read_table()
-    except TableUnreadable as exc:
-        return Owner(UNKNOWN, None, None, method(), str(exc))
-    found = find(rows, local, remote)
+    for _ in range(2):
+        try:
+            rows, how = read_table()
+        except TableUnreadable as exc:
+            return Owner(UNKNOWN, None, None, method(), str(exc))
+        found = find(rows, local, remote)
+        if how != "proc" or len(found) == 1:
+            break
+        # A /proc read under churn can skip a row or print one twice; one more read before answering unknown.
     if not found:
         return Owner(UNKNOWN, None, None, how, "no-row")
     if len(found) > 1:

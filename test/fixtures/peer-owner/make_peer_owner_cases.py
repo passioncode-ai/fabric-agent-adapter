@@ -47,6 +47,22 @@ SWAPPED_LISTENER = _HEAD + "".join((
     F._proc(2, "0100007F:C351", "0100007F:B8CF", "01", F.OWN_UID, 6003),
 ))
 
+# A /proc read under churn that printed the accepted server row and the client row twice (Linux resumes a seq_file read
+# by position; 0.74.0 seam reading 6): one socket each, so this account's, never several-rows. The same 4-tuple with two
+# different owners stays unknown.
+PRINTED_TWICE = _HEAD + "".join((
+    F._proc(0, "0100007F:B8CF", "00000000:0000", "0A", F.OWN_UID, 7001),
+    F._proc(1, "0100007F:B8CF", "0100007F:C351", "01", F.OWN_UID, 7002),
+    F._proc(2, "0100007F:C351", "0100007F:B8CF", "01", F.OWN_UID, 7003),
+    F._proc(3, "0100007F:B8CF", "0100007F:C351", "01", F.OWN_UID, 7002),
+    F._proc(4, "0100007F:C351", "0100007F:B8CF", "01", F.OWN_UID, 7003),
+))
+TWO_OWNERS_ONE_TUPLE = _HEAD + "".join((
+    F._proc(0, "0100007F:B8CF", "00000000:0000", "0A", F.OWN_UID, 7101),
+    F._proc(1, "0100007F:B8CF", "0100007F:C351", "01", F.OWN_UID, 7102),
+    F._proc(2, "0100007F:B8CF", "0100007F:C351", "01", F.OTHER_UID, 7104),
+))
+
 # A connection not accept()ed yet whose listener is gone: unknown, not-accepted.
 NO_LISTENER = _HEAD + F._proc(0, "0100007F:B8CF", "0100007F:C351", "01", 0, 0)
 
@@ -100,6 +116,8 @@ cases = {
         "procClosedClient": {"kind": "proc4", "text": CLOSED_CLIENT},
         "procNoListener": {"kind": "proc4", "text": NO_LISTENER},
         "procSwappedListener": {"kind": "proc4", "text": SWAPPED_LISTENER},
+        "procPrintedTwice": {"kind": "proc4", "text": PRINTED_TWICE},
+        "procTwoOwnersOneTuple": {"kind": "proc4", "text": TWO_OWNERS_ONE_TUPLE},
         "procTwoListenersTwoOwners": {"kind": "proc4", "text": _two_listeners([F.OWN_UID, F.OTHER_UID])},
         "proc6Multi": {"kind": "proc6", "text": F.PROC_NET_TCP6_MULTI},
         "windowsMulti": {"kind": "windows", "text": win(WINDOWS_ROWS, {})},
@@ -157,6 +175,12 @@ cases = {
          "want": {"kind": "another-account", "uid": F.OTHER_UID}},
         {"table": "procNoListener", "ask": "serverEnd", "server": SERVER, "client": OWN,
          "want": {"kind": "unknown", "reason": "not-accepted"}},
+        {"table": "procPrintedTwice", "ask": "serverEnd", "server": SERVER, "client": OWN,
+         "want": {"kind": "this-account", "uid": F.OWN_UID}},
+        {"table": "procPrintedTwice", "ask": "peerAt", "server": SERVER, "client": OWN,
+         "want": {"kind": "this-account", "uid": F.OWN_UID}},
+        {"table": "procTwoOwnersOneTuple", "ask": "serverEnd", "server": SERVER, "client": OWN,
+         "want": {"kind": "unknown", "reason": "several-rows"}},
         {"table": "procTwoListenersTwoOwners", "ask": "listener", "port": F.SERVER_PORT,
          "want": {"kind": "unknown", "reason": "several-rows"}},
         {"table": "windowsMulti", "ask": "listener", "port": F.SERVER_PORT,

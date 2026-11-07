@@ -222,6 +222,20 @@ test('a caller option named server never turns peerAt into a server-end reading 
   assert.deepEqual([who.kind, who.reason], [po.UNKNOWN, 'closed']);
 });
 
+test('a /proc read that missed the row is read once more; netstat is taken as it comes (0.74.0 seam reading 6)', async () => {
+  const empty = { rows: [], how: 'proc' };
+  const whole = parsed(CASES.tables.procPrintedTwice);
+  const c = CASES.cases.find((x) => x.table === 'procPrintedTwice' && x.ask === 'serverEnd');
+  let reads = 0;
+  const once = { ...opts(CASES.tables.procPrintedTwice), read: async () => (reads++ === 0 ? empty : whole) };
+  const who = await po.serverEnd(fakeSocket(c.client, c.server), once);
+  assert.deepEqual([who.kind, reads], [po.THIS_ACCOUNT, 2]);
+  let netstatReads = 0;
+  const netstat = { ...opts(CASES.tables.netstatMulti), read: async () => { netstatReads += 1; return { rows: [], how: 'netstat' }; } };
+  assert.equal((await po.serverEnd(fakeSocket(c.client, c.server), netstat)).reason, 'no-row');
+  assert.equal(netstatReads, 1);
+});
+
 test('a real own listener reads this-account on Windows too', { skip: process.platform !== 'win32' }, async (t) => {
   const server = net.createServer(() => {});
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
