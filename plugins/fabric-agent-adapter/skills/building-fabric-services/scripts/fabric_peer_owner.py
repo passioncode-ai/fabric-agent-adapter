@@ -7,8 +7,10 @@
     frozen dataclasses: a dataclass with postponed annotations needs its module in sys.modules,
     and a service may load a kit file by its path without one), and in writing `Optional[X]`
     for `X | None` in its signatures (the kit's floor is Python 3.9, where `typing.get_type_hints`
-    cannot read `X | None`), and in `classify` / `classify_sid` asking for this process's own
-    uid or SID before the system's (a client running as root or SYSTEM owns root's listener). Standard library only, no import of another kit module.
+    cannot read `X | None`), in `classify` / `classify_sid` asking for this process's own uid or
+    SID before the system's (a client running as root or SYSTEM owns root's listener), and in
+    two Linux and selection rules: a /proc row with inode 0 (not accept()ed yet) takes its
+    listener's owner, never its printed uid 0, and several rows of one owner are that owner. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
     its Node twin is `fabric-peer-owner.mjs` (netstat, /proc and PowerShell, no ctypes).
 
@@ -204,8 +206,6 @@ def classify(uid: Optional[int], pid: Optional[int], *, method: str, own_uid: Op
         return Owner(THIS_ACCOUNT, uid, pid, method)
     if uid == 0 or pid == 1:
         return Owner(SYSTEM, uid, pid, method)
-    if own_uid is not None and uid == own_uid:
-        return Owner(THIS_ACCOUNT, uid, pid, method)
     return Owner(ANOTHER_ACCOUNT, uid, pid, method)
 
 
@@ -262,7 +262,10 @@ def parse_ps_uid(text: str) -> Optional[int]:
 
 def parse_proc_net_tcp(text: str, *, family: int, byteorder: Optional[str] = None) -> list[Row]:
     """`/proc/net/tcp` (family AF_INET) or `/proc/net/tcp6` (AF_INET6). The kernel prints each
-    32-bit word of an address in host byte order and each port in network order, in hex."""
+    32-bit word of an address in host byte order and each port in network order, in hex. A
+    connected row with inode 0 has no socket yet (a connection the server has not accept()ed,
+    or one already closed): the kernel prints uid 0 for it, so its uid is not read (None), and
+    `_owner_of` takes its listener's owner instead (the kit's addition, 0.74.0 unit reading 3)."""
     order = byteorder or sys.byteorder
     rows: list[Row] = []
     for line in text.splitlines()[1:]:
@@ -275,7 +278,10 @@ def parse_proc_net_tcp(text: str, *, family: int, byteorder: Optional[str] = Non
             uid = int(tok[7])
         except ValueError:
             continue
-        rows.append(Row(local, remote, tok[3].upper() == "0A", uid, None, tok[3].upper() == "06"))
+        listening, time_wait = tok[3].upper() == "0A", tok[3].upper() == "06"
+        if not listening and tok[9] == "0":
+            uid = None
+        rows.append(Row(local, remote, listening, uid, None, time_wait))
     return rows
 
 
@@ -660,7 +666,31 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int]) -> Owner:
         return Owner(UNKNOWN, None, None, how, "no-row")
     if len(found) > 1:
         return Owner(UNKNOWN, None, None, how, "several-rows")
+    if how == "proc" and found[0].uid is None:
+        # A connection the server has not accept()ed yet belongs to the socket that listens on its local address.
+        return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
     return resolve(found[0], how)
+
+
+def _listeners_of(rows: list[Row], local: tuple[str, int]) -> list[Row]:
+    """The listeners that took a connection to `local`: on its exact address, else the wildcard."""
+    for host in (local[0], "*"):
+        hits = [row for row in rows if row.listening and row.local == (host, local[1])]
+        if hits:
+            return hits
+    return []
+
+
+def _one_owner(found: list[Row], how: str, none_reason: Optional[str] = None) -> Owner:
+    """The owner of the rows a question selected: one row, or several of one owner (SO_REUSEPORT workers, an IPv4 and
+    an IPv6 socket of one process). Several owners cannot be told apart: unknown (several-rows)."""
+    if not found:
+        return Owner(UNKNOWN, None, None, how, none_reason) if none_reason else Owner(NONE, None, None, how)
+    keys = {(row.uid, row.pid) for row in found}
+    uids = {row.uid for row in found}
+    if len(keys) == 1 or (None not in uids and len(uids) == 1):
+        return resolve(found[0], how)
+    return Owner(UNKNOWN, None, None, how, "several-rows")
 
 
 def peer_at(server: tuple, client: tuple) -> Owner:
@@ -709,7 +739,7 @@ def pick_listener(rows: list[Row], port: int) -> list[Row]:
 
 def listener(port: int) -> Owner:
     """Who listens on 127.0.0.1:<port>, or on 0.0.0.0 or ::1, which take the same connections.
-    `none` when nothing does, `unknown` (`several-rows`) when two sockets do. Cached for
+    `none` when nothing does, `unknown` (`several-rows`) when sockets of two owners do. Cached for
     LISTENER_TTL seconds."""
     now = time.monotonic()
     hit = _LISTENERS.get(port)
@@ -720,13 +750,7 @@ def listener(port: int) -> Owner:
     except TableUnreadable as exc:
         owner = Owner(UNKNOWN, None, None, method(), str(exc))
     else:
-        found = pick_listener(rows, port)
-        if not found:
-            owner = Owner(NONE, None, None, how)
-        elif len(found) > 1:
-            owner = Owner(UNKNOWN, None, None, how, "several-rows")
-        else:
-            owner = resolve(found[0], how)
+        owner = _one_owner(pick_listener(rows, port), how)
     _LISTENERS[port] = (now, owner)
     return owner
 

@@ -36,7 +36,7 @@ test('every shared case reads the owner the Python twin reads', async () => {
   for (const [i, c] of CASES.cases.entries()) {
     if (!(c.twins ?? ['python', 'node']).includes('node')) continue;
     const table = CASES.tables[c.table];
-    let o = opts(table);
+    let o = { ...opts(table), ...(c.ownUid !== undefined ? { ownUid: c.ownUid } : {}) };
     try {
       parsed(table);
     } catch (err) {
@@ -182,6 +182,19 @@ test('both ends of a real pair and the listener are this account', { skip: !['da
     assert.deepEqual([who.kind, who.uid, who.method], [po.THIS_ACCOUNT, process.getuid(), want]);
   }
   if (process.platform === 'darwin') assert.equal((await po.peer(accepted[0])).pid, process.pid);
+});
+
+test('a connection not yet accepted reads its listener\'s owner (0.74.0 unit reading 3)', { skip: !['darwin', 'linux'].includes(process.platform) }, async (t) => {
+  // A listening socket nobody calls accept() on: Linux prints such a connection's server end with uid 0, inode 0.
+  const { spawn } = await import('node:child_process');
+  const holder = spawn('python3', ['-c', "import socket,time\ns=socket.socket()\ns.bind(('127.0.0.1',0))\ns.listen(8)\n"
+    + "print(s.getsockname()[1],flush=True)\ntime.sleep(60)"], { stdio: ['ignore', 'pipe', 'inherit'] });
+  t.after(() => holder.kill());
+  const port = await new Promise((r) => holder.stdout.once('data', (d) => r(Number(String(d).trim()))));
+  for (let i = 0; i < 5; i += 1) {
+    const socket = await po.checkedSocket(port);
+    socket.destroy();
+  }
 });
 
 test('a real own listener reads this-account on Windows too', { skip: process.platform !== 'win32' }, async (t) => {

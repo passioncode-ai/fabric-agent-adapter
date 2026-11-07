@@ -192,8 +192,11 @@ class Probe:
         where = "127.0.0.1:%d" % self.port
         try:
             sock = socket.create_connection(("127.0.0.1", self.port), timeout=5)
-        except OSError:
+        except ConnectionRefusedError:
             self.add("listener.owner", "NOT_RUN", "nothing listens on %s (down)" % where)
+            return True
+        except OSError as exc:  # a full backlog, a timeout: the well-known rule reports what answers, each call checked
+            self.add("listener.owner", "NOT_RUN", "could not connect to %s to tell its owner (%s)" % (where, type(exc).__name__))
             return True
         try:
             owner = po.server_end(sock)

@@ -188,7 +188,8 @@ function procAddress(text, family, order) {
 }
 
 // `/proc/net/tcp` (family 4) or `/proc/net/tcp6` (6). The kernel prints each 32-bit word of an address in host byte
-// order and each port in network order, in hex.
+// order and each port in network order, in hex. A connected row with inode 0 has no socket yet (not accept()ed, or
+// already closed) and the kernel prints uid 0 for it: its uid is not read (null), and ownerOf takes its listener's.
 export function parseProcNetTcp(text, { family, byteorder = os.endianness() === 'LE' ? 'little' : 'big' } = {}) {
   const rows = [];
   for (const line of String(text).split(/\r?\n/).slice(1)) {
@@ -204,7 +205,8 @@ export function parseProcNetTcp(text, { family, byteorder = os.endianness() === 
     }
     if (!/^[0-9]+$/.test(tok[7])) continue;
     const st = tok[3].toUpperCase();
-    rows.push({ local, remote, listening: st === '0A', uid: Number(tok[7]), pid: null, timeWait: st === '06' });
+    const listening = st === '0A';
+    rows.push({ local, remote, listening, uid: !listening && tok[9] === '0' ? null : Number(tok[7]), pid: null, timeWait: st === '06' });
   }
   return rows;
 }
@@ -357,7 +359,30 @@ async function ownerOf(local, remote, opts = {}) {
   const found = find(table.rows, local, remote);
   if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: 'no-row' });
   if (found.length > 1) return owner(UNKNOWN, { method: table.how, reason: 'several-rows' });
+  if (table.how === 'proc' && found[0].uid === null) {
+    // A connection the server has not accept()ed yet belongs to the socket that listens on its local address.
+    return oneOwner(listenersOf(table.rows, found[0].local), table.how, opts, 'not-accepted');
+  }
   return resolve(found[0], table.how, opts);
+}
+
+// The listeners that took a connection to `local`: on its exact address, else the wildcard.
+function listenersOf(rows, local) {
+  for (const host of [local[0], '*']) {
+    const hits = rows.filter((r) => r.listening && r.local[0] === host && r.local[1] === local[1]);
+    if (hits.length) return hits;
+  }
+  return [];
+}
+
+// The owner of the rows a question selected: one row, or several of one owner (SO_REUSEPORT workers, an IPv4 and an
+// IPv6 socket of one process). Several owners cannot be told apart: unknown (several-rows).
+async function oneOwner(found, how, opts, noneReason = null) {
+  if (found.length === 0) return noneReason ? owner(UNKNOWN, { method: how, reason: noneReason }) : owner(NONE, { method: how });
+  const keys = new Set(found.map((r) => `${r.uid}/${r.pid}`));
+  const uids = new Set(found.map((r) => r.uid));
+  if (keys.size === 1 || (!uids.has(null) && !uids.has(undefined) && uids.size === 1)) return resolve(found[0], how, opts);
+  return owner(UNKNOWN, { method: how, reason: 'several-rows' });
 }
 
 // The owner of the CLIENT socket of the connection between `server` and `client` ([host, port] each), as a server sees
@@ -392,8 +417,8 @@ export function pickListener(rows, port) {
   return [];
 }
 
-// Who listens on 127.0.0.1:<port>, or on 0.0.0.0 or ::1. none when nothing does, unknown (several-rows) when two sockets
-// do. Cached for LISTENER_TTL_MS (never when `read`, `run`, `ownUid` or `ownSid` is given). `read` answers
+// Who listens on 127.0.0.1:<port>, or on 0.0.0.0 or ::1. none when nothing does, unknown (several-rows) when sockets of
+// two owners do. Cached for LISTENER_TTL_MS (never when `read`, `run`, `ownUid` or `ownSid` is given). `read` answers
 // { rows, how } as readTable does; `run`, `ownUid` and `ownSid` go to resolve.
 export async function listener(port, opts = {}) {
   const { read, now = () => performance.now() } = opts;
@@ -413,10 +438,7 @@ export async function listener(port, opts = {}) {
     if (!injected) listeners.set(port, [at, who]);
     return who;
   }
-  let who;
-  if (found.length === 0) who = owner(NONE, { method: how });
-  else if (found.length > 1) who = owner(UNKNOWN, { method: how, reason: 'several-rows' });
-  else who = await resolve(found[0], how, opts);
+  const who = await oneOwner(found, how, opts);
   if (!injected) listeners.set(port, [at, who]);
   return who;
 }

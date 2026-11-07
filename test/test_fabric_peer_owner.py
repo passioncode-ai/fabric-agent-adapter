@@ -325,6 +325,23 @@ class Live(unittest.TestCase):
             for s in (client, accepted, listener):
                 s.close()
 
+    def test_a_connection_not_yet_accepted_reads_its_listeners_owner(self):
+        """0.74.0 unit reading 3: Linux prints a connection the server has not accept()ed with uid 0 and inode 0; it
+        reads as its listener's owner (this account here), never as root's."""
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(8)
+        clients = []
+        try:
+            for _ in range(5):
+                client = socket.create_connection(listener.getsockname())
+                clients.append(client)
+                owner = P.server_end(client)  # never accepted
+                self.assertEqual(owner.kind, P.THIS_ACCOUNT, owner)
+        finally:
+            for s in clients + [listener]:
+                s.close()
+
     @unittest.skipUnless(sys.platform == "darwin", "launchd's socket-activated listeners are macOS's")
     def test_a_real_listener_of_another_account_is_not_this_one(self):
         """The contract's conformance row asks for a listener of a second OS account; every Mac has one: launchd (pid 1,
@@ -450,7 +467,8 @@ class SharedCases(unittest.TestCase):
             if "python" not in case.get("twins", ["python", "node"]):
                 continue
             table = self.CASES["tables"][case["table"]]
-            with self.subTest(i=i, table=case["table"], ask=case["ask"]):
+            with self.subTest(i=i, table=case["table"], ask=case["ask"]), \
+                    mock.patch.object(P.os, "getuid", return_value=case.get("ownUid", self.CASES["ownUid"]), create=True):
                 P._LISTENERS.clear()
                 try:
                     read = mock.patch.object(P, "read_table", return_value=self.rows(table))

@@ -16,6 +16,22 @@ sys.path.insert(0, str(ROOT / "test"))
 F = importlib.import_module("peer_owner_fixtures")
 
 SERVER = ["127.0.0.1", F.SERVER_PORT]
+
+# /proc rows of a connection the server has not accept()ed yet: Linux prints its server end with uid 0 and inode 0
+# (0.74.0 unit reading 3, measured on Linux 6.8). 47311 is B8CF, 50001 C351.
+_HEAD = F._PROC_HEADER
+
+
+def _unaccepted(listener_uid):
+    return _HEAD + "".join((
+        F._proc(0, "0100007F:B8CF", "00000000:0000", "0A", listener_uid, 3001),
+        F._proc(1, "0100007F:B8CF", "0100007F:C351", "01", 0, 0),
+        F._proc(2, "0100007F:C351", "0100007F:B8CF", "01", F.OWN_UID, 3003),
+    ))
+
+
+def _two_listeners(uids):
+    return _HEAD + "".join(F._proc(i, "0100007F:B8CF", "00000000:0000", "0A", uid, 4001 + i) for i, uid in enumerate(uids))
 OWN = list(F.OWN_CLIENT)
 FOREIGN = list(F.FOREIGN_CLIENT)
 
@@ -57,6 +73,10 @@ cases = {
         "netstatTimeWait": {"kind": "netstat", "text": F.NETSTAT_TIME_WAIT},
         "netstatNoProcess": {"kind": "netstat", "text": F.NETSTAT_NO_PROCESS},
         "procMulti": {"kind": "proc4", "text": F.PROC_NET_TCP_MULTI},
+        "procUnacceptedOwn": {"kind": "proc4", "text": _unaccepted(F.OWN_UID)},
+        "procUnacceptedOther": {"kind": "proc4", "text": _unaccepted(F.OTHER_UID)},
+        "procTwoListenersOneOwner": {"kind": "proc4", "text": _two_listeners([F.OWN_UID, F.OWN_UID])},
+        "procTwoListenersTwoOwners": {"kind": "proc4", "text": _two_listeners([F.OWN_UID, F.OTHER_UID])},
         "proc6Multi": {"kind": "proc6", "text": F.PROC_NET_TCP6_MULTI},
         "windowsMulti": {"kind": "windows", "text": win(WINDOWS_ROWS, {})},
         "windowsGerman": {"kind": "windows", "text": win(WINDOWS_ROWS, GERMAN)},
@@ -98,6 +118,17 @@ cases = {
         {"table": "proc6Multi", "ask": "peerAt", "server": ["::1", F.SERVER_PORT], "client": ["::1", 50002],
          "want": {"kind": "another-account", "uid": F.OTHER_UID}},
         {"table": "proc6Multi", "ask": "listener", "port": F.SERVER_PORT, "want": {"kind": "this-account"}},
+        {"table": "procUnacceptedOwn", "ask": "serverEnd", "server": SERVER, "client": OWN,
+         "want": {"kind": "this-account", "uid": F.OWN_UID}},
+        {"table": "procUnacceptedOther", "ask": "serverEnd", "server": SERVER, "client": OWN,
+         "want": {"kind": "another-account", "uid": F.OTHER_UID}},
+        {"table": "procUnacceptedOther", "ask": "serverEnd", "server": SERVER, "client": OWN, "ownUid": 0,
+         "want": {"kind": "another-account", "uid": F.OTHER_UID}},
+        {"table": "procUnacceptedOwn", "ask": "serverEnd", "server": SERVER, "client": OWN, "ownUid": 0,
+         "want": {"kind": "another-account", "uid": F.OWN_UID}},
+        {"table": "procTwoListenersOneOwner", "ask": "listener", "port": F.SERVER_PORT, "want": {"kind": "this-account"}},
+        {"table": "procTwoListenersTwoOwners", "ask": "listener", "port": F.SERVER_PORT,
+         "want": {"kind": "unknown", "reason": "several-rows"}},
         {"table": "windowsMulti", "ask": "listener", "port": F.SERVER_PORT,
          "want": {"kind": "this-account", "pid": F.SERVER_PID}, "twins": ["node"]},
         {"table": "windowsMulti", "ask": "serverEnd", "server": SERVER, "client": OWN,

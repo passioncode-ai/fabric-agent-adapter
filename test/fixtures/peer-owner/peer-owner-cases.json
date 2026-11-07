@@ -19,6 +19,22 @@
    "kind": "proc4",
    "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 1001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   501        0 1002 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 1003 1 0000000000000000 20 4 30 10 -1\n   3: 0100007F:B8CF 0100007F:C352 01 00000000:00000000 00:00000000 00000000   501        0 1004 1 0000000000000000 20 4 30 10 -1\n   4: 0100007F:C352 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   502        0 1005 1 0000000000000000 20 4 30 10 -1\n   5: 0100007F:1F55 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1006 1 0000000000000000 20 4 30 10 -1\n"
   },
+  "procUnacceptedOwn": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 3001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000     0        0 0 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 3003 1 0000000000000000 20 4 30 10 -1\n"
+  },
+  "procUnacceptedOther": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   502        0 3001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000     0        0 0 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 3003 1 0000000000000000 20 4 30 10 -1\n"
+  },
+  "procTwoListenersOneOwner": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 4001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 4002 1 0000000000000000 20 4 30 10 -1\n"
+  },
+  "procTwoListenersTwoOwners": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 4001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   502        0 4002 1 0000000000000000 20 4 30 10 -1\n"
+  },
   "proc6Multi": {
    "kind": "proc6",
    "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 00000000000000000000000001000000:B8CF 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 2001 1 0000000000000000 20 4 30 10 -1\n   1: 00000000000000000000000001000000:B8CF 00000000000000000000000001000000:C352 01 00000000:00000000 00:00000000 00000000   501        0 2002 1 0000000000000000 20 4 30 10 -1\n   2: 00000000000000000000000001000000:C352 00000000000000000000000001000000:B8CF 01 00000000:00000000 00:00000000 00000000   502        0 2003 1 0000000000000000 20 4 30 10 -1\n"
@@ -320,6 +336,89 @@
    "port": 47311,
    "want": {
     "kind": "this-account"
+   }
+  },
+  {
+   "table": "procUnacceptedOwn",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "this-account",
+    "uid": 501
+   }
+  },
+  {
+   "table": "procUnacceptedOther",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "another-account",
+    "uid": 502
+   }
+  },
+  {
+   "table": "procUnacceptedOther",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "ownUid": 0,
+   "want": {
+    "kind": "another-account",
+    "uid": 502
+   }
+  },
+  {
+   "table": "procUnacceptedOwn",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "ownUid": 0,
+   "want": {
+    "kind": "another-account",
+    "uid": 501
+   }
+  },
+  {
+   "table": "procTwoListenersOneOwner",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "this-account"
+   }
+  },
+  {
+   "table": "procTwoListenersTwoOwners",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "unknown",
+    "reason": "several-rows"
    }
   },
   {
