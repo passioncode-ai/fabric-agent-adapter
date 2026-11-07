@@ -25,9 +25,9 @@ repositories and not reproducible from this one, never a forecast for yours.
 
 The prompt carries the parts of an organization agent template (fabric-workspace `knowledge/system/templates.md`, S2,
 readable by the organization's members) that one file can: role and duties (sections 1 and 4), connections and data (5), access levels
-and data rooms (0), the contract, its pin and its doors (8), placement (0 and 8), checks (9) and learning (6). The operating rules A1 to A12, the manifest,
+and data rooms (0), the contract, its pin and its doors (8), placement (0 and 8), checks (9) and learning (6). S2's operating rules A1 to A12, the manifest,
 assembly.md and the template's own CHANGELOG.md come with the folder; until the template format is a schema (S2, «Open for
-wave 2»; FAA-265), it lives here as one reference, and the operating rules apply by reference.
+wave 2»; FAA-265), it lives here as one reference, and S2's operating rules apply by reference.
 
 
 1. Fill in the brief (section 0 of the prompt). Every `<...>` is a decision of the agent's owner; a field you cannot fill
@@ -54,7 +54,7 @@ brief disagree, ask the owner before you build.
 - Data the agent reads per turn: <account state, orders, plan, CRM record> and from which tool
 - Voice: <the brand voice pack, terminology, banned words>; the address form per language
 - Spend: <the model key's monthly limit; default USD 100 a month for a new agent, more only for agents the operator
-  names; the code stops a little under the key's limit>. Size it: substantive turns a month times the cost per turn
+  names (an organization's instance follows its grant, and its owner names a higher limit); the code stops a little under the key's limit>. Size it: substantive turns a month times the cost per turn
   (section 7), plus the judge, second looks, research turns and replays; above the default, ask the operator for a
   named higher limit before launch; the judge and the replays get their own budgets in the declaration (section 8)
 - Owner and escalation: <who answers the agent's questions; who receives the daily report>
@@ -314,6 +314,7 @@ brief disagree, ask the owner before you build.
 - A spend policy in the repository before the first model call; the code's monthly stop under the key's limit (the
   kit's OpenRouter client with window="month"; its default window is a day).
 - Two keys before live sending: the channel set to live and an environment switch; a demo sender that cannot send.
+  The owner's switch of a channel to live is S2's A8 human gate for that channel's replies; each reply after it is not.
 - Telegram: through the sending service the estate names for it (rule 9); bind the support account to its own agents (others are refused).
   A bot on its own token sends directly. Where the transport owner holds sends (an account session, a Business
   connection), its own approval rules decide (the standard's section 9); in one estate's sending service, with replies

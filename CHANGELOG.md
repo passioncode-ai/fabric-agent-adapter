@@ -16,7 +16,7 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   knowledge and data connections (the handoff queue's «a person answered» signal, the account state and version facts
   as tools of every turn, retrieval over the whole conversation), leads handed to a sales agent of their own that owns
   the CRM, the learning loop, the model lanes, the Fabric integration and the acceptance with 17 adversarial batches, and maps its sections to the parts of an organization agent template one file can carry (fabric-workspace
-  `knowledge/system/templates.md`, S2; the operating rules A1 to A12 apply by reference until the folder, FAA-265). `SKILL.md` links it beside `agents-that-answer-people.md`.
+  `knowledge/system/templates.md`, S2; S2's operating rules A1 to A12 apply by reference until the folder, FAA-265). `SKILL.md` links it beside `agents-that-answer-people.md`.
 - A scenario eval (`a-channel-agent-starts-from-the-communication-template`) and a trigger query for it (measured with a
   real client: creating-fabric-agents 28 of 31, the new query routed right;
   [record](docs/evidence/evals/2026-11-07-trigger-run.md)), and `test/test_communication_template_prose.py`,
@@ -37,7 +37,10 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   turn listing its message ids (it said every message is a turn). The support-agent recipe's README names what goes in
   `check_reply`'s `given`: the ids placed in the prompt, never the plan's own list, with tool results as entries of their own.
 - The operator channel's first step (`operator-channel-and-repository.md`, in adapting-projects-to-fabric and
-  creating-fabric-agents) says an agent that answers people on Telegram gives the operator channel a bot of its own.
+  creating-fabric-agents) says an agent that answers people on Telegram gives the operator channel a bot of its own,
+  and its example slot is now `EXAMPLE_AGENT_OPERATOR_BOT_TOKEN`.
+- The support-agent recipe's `channel-agent.example.json` final text reads as the standard's final reply (6.6: «we
+  could not confirm this»), not as an answer.
 - `docs/backlog.md`: FAA-263 (SKILL.md word headroom), FAA-264 (the readings' follow-ups that block nothing) and
   FAA-265 (organization agent templates as folders, W0-Q8).
 - building-fabric-services `references/usage.md`: the every-limit example calls `usage_report` over the ledger's
@@ -51,6 +54,7 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   kit's OpenRouter client with `window="month"` (the default window is a day).
 - Adopting the template starts a new series for `nobodyDropped.turns` (batched turns) and the outcome shares
   (`customer_silent` up, `no_reply_owed` down); say so in the owner's report, never inside `support.quality_daily`.
+- A declaration copied from the 0.74.0 support-agent example replaces its `texts.final`, which claimed an answer.
 
 ## 0.74.0 (2026-11-07)
 
