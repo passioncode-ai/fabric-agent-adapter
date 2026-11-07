@@ -15,7 +15,10 @@
     row with inode 0 (a closed client) as unknown, and several rows of one owner are that owner;
     a row printed twice by a `/proc` read under churn counts once, and a `/proc` question that
     finds no row or several reads the table once more; ctypes is imported where it is used, so a
-    Python without it reads netstat on macOS and imports the module everywhere.
+    Python without it reads netstat on macOS and imports the module everywhere. Since kit.2 (FAA-267), on
+    macOS: the sysctl calibration also requires a child process's listener, an empty netstat reads as
+    `TABLE_RESTRICTED`, and a caller may vouch for a listener with a pid it started (`pid_listens`,
+    `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`).
     A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
     created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;

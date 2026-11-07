@@ -50,8 +50,9 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
   service's: table-restricted: ...` where it read `<origin> is not this service's: foreign-user: ...`: match the
   reason as a substring, not the start of the message.
 - New optional arguments: `vouch_pid` on `CheckedHTTPConnection`, `vouchPid` on `checkedSocket`, `CheckedAgent` and
-  `wellKnownOf`. New names in both peer-owner twins: `TABLE_RESTRICTED` (the reason to match on), `pid_listens` /
-  `pidListens` and `parse_lsof_listeners` / `parseLsofListeners`; the facades export `launchd_pid` (`fabric_service`) and
+  `wellKnownOf`. The vouch is consulted only on macOS when the owner reads `table-restricted`; it never overrides
+  another account's listener or another unknown reason. New names in both peer-owner twins: `TABLE_RESTRICTED` (the
+  reason to match on), `LSOF`, `pid_listens` / `pidListens` and `parse_lsof_listeners` / `parseLsofListeners`; the facades export `launchd_pid` (`fabric_service`) and
   `launchdPid` (`fabric-service.mjs`).
 - A service that vendored the 0.74.0 or 0.75.0 kit keeps refusing its own install on macOS 27.2 until its copies are
   refreshed (`fabric_kit.py status` names them older).
