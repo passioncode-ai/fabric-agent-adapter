@@ -614,7 +614,7 @@ def _plugin_problems(root: Path) -> List[str]:
             if any(isinstance(a, str) and _secrets.secret_argument(a) for a in argv) or (isinstance(entry.get("url"), str) and _secrets.secret_url(entry["url"])):
                 problems.append("LC-21: plugin %s's MCP server %s carries a credential in its argv or URL" % (name, server))
             env = entry.get("env") if isinstance(entry.get("env"), dict) else {}
-            if any(isinstance(v, str) and _secrets.secret_value(v) for v in env.values()):
+            if any(isinstance(v, str) and _secrets.secret_argument(v) for v in env.values()):  # path-aware (FAA-266)
                 problems.append("LC-21: plugin %s's MCP server %s writes a credential value in env; reference it instead" % (name, server))
     return problems
 

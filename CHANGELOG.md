@@ -13,7 +13,7 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
   requires a child process's listener; an empty netstat answers `unknown` with reason `table-restricted`, never another
   account's. `CheckedHTTPConnection(vouch_pid=...)` and the Node `checkedSocket({vouchPid})` accept a listener on the
   port that `lsof -p` shows belongs to that pid of this account; `launchd_install` and `launchdInstall` vouch with their
-  own job's pid (`launchd_pid`, `launchdPid`), and a refusal that remains starts with `table-restricted`: the Python
+  own job's pid (`launchd_pid`, `launchdPid`, read only after a `table-restricted` answer), and a refusal that remains starts with `table-restricted`: the Python
   installer names the way round it (Apple's `/usr/bin/python3`), the Node one asks for a runtime that sees the table
   (no Node was measured). `lsof` is asked for IPv4 alone, so a v6-only wildcard never vouches for a `127.0.0.1`
   connection, and a vouch is an integer pid. The calibration child is bounded by the table timeout and a child that
@@ -23,7 +23,8 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
   ([record](docs/reports/2026-11-07-faa-267/README.md)).
 - **A path in a plist's or a supervisor file's environment is no credential** (FAA-266): `PYTHONPATH` holding a
   release folder under Application Support was refused as a key; environment values are now read by the path-aware
-  detector (`secret_argument`, `secretArgument`), which still refuses a key.
+  detector (`secret_argument`, `secretArgument`), which still refuses a key. `adapt_project.py`'s LC-21 check reads a
+  plugin MCP server's `env` the same way.
 
 ### Known limits
 

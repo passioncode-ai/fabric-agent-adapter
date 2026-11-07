@@ -314,6 +314,7 @@ from fabric_supervisors import (  # noqa: F401
     _launchctl,
     _domain,
     launchd_loaded,
+    launchd_pid,
     fetch_well_known,
     _OVERRIDE_ROW,
     launchd_override,

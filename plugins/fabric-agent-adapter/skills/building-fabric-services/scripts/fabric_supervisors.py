@@ -410,9 +410,11 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     else:
         raise ServiceError("launchctl bootstrap failed: %s" % last)
     deadline = time.time() + timeout
-    foreign = None
+    foreign = vouch = None
     while time.time() < deadline:
-        doc, foreign = _read_well_known(origin, vouch_pid=launchd_pid(label))
+        doc, foreign = _read_well_known(origin, vouch_pid=vouch)
+        if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
+            vouch = launchd_pid(label)  # only a restricted table needs the job's pid (FAA-267)
         if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
             return doc
         time.sleep(0.5)

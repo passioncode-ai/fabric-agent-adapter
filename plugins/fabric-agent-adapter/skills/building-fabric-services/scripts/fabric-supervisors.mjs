@@ -400,9 +400,11 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   }
   const deadline = Date.now() + timeout * 1000;
   let foreign = null;
+  let vouchPid = null;
   while (Date.now() < deadline) {
-    const doc = await fetchWellKnown(origin, { vouchPid: launchdPid(label, opts) });
+    const doc = await fetchWellKnown(origin, { vouchPid });
     foreign = doc instanceof ForeignUserAnswer ? doc.reason : null;
+    if (foreign?.startsWith(TABLE_RESTRICTED)) vouchPid = launchdPid(label, opts); // only a restricted table needs it (FAA-267)
     if (!foreign && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
     await sleep(500);
   }

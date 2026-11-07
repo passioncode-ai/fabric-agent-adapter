@@ -383,9 +383,13 @@ test('the install vouches with its own job\'s pid, which a restricted table need
   const s = setup(t);
   const fake = fakeLaunchd();
   const seen = [];
-  const doc = await install(s, fake, '1', { fetchWellKnown: async (origin, opts) => { seen.push(opts?.vouchPid); return { service: { id: 'example-agent', instance: 'default' } }; } });
+  const doc = await install(s, fake, '1', { fetchWellKnown: async (origin, opts) => {
+    seen.push(opts?.vouchPid);
+    return seen.length === 1 ? new ForeignUserAnswer('table-restricted: netstat printed nothing to this process')
+      : { service: { id: 'example-agent', instance: 'default' } };
+  } });
   assert.equal(doc.service.id, 'example-agent');
-  assert.deepEqual(seen, [4242]);
+  assert.deepEqual(seen, [null, 4242], 'only a restricted answer makes the job\'s pid vouch');
   assert.equal(k.launchdPid(s.name, { run: fake.run, platform: 'darwin', uid: UID }), 4242);
   assert.equal(k.launchdPid('ai.passioncode.test.absent', { run: fake.run, platform: 'darwin', uid: UID }), null);
 });

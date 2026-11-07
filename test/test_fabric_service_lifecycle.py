@@ -191,13 +191,24 @@ class LaunchdInstallTests(unittest.TestCase):
         body = fs.launchd_plist(self.label, ["/bin/echo", "1"], working_directory=Path(self.temp.name),
                                 stdout_path=Path(self.temp.name) / "service.log")
         restricted = (None, sup._po.TABLE_RESTRICTED + ": netstat printed nothing to this process")
-        with FakeLaunchd(), mock.patch.object(sup, "_read_well_known", return_value=restricted) as read:
+        with FakeLaunchd(), mock.patch.object(sup, "_read_well_known", return_value=restricted) as read, \
+                mock.patch.object(sup, "launchd_pid", return_value=4242) as job:
             with self.assertRaises(fs.ServiceError) as caught:
                 fs.launchd_install(self.label, self.plist, body, origin=self.web.origin, service_id="example-agent",
                                    timeout=1)
         self.assertIn("could not be proved this service's: table-restricted: ", str(caught.exception))
         self.assertIn("Apple's /usr/bin/python3", str(caught.exception))
-        self.assertIn("vouch_pid", read.call_args.kwargs)
+        vouches = [c.kwargs["vouch_pid"] for c in read.call_args_list]
+        self.assertIsNone(vouches[0], "a first read needs no pid")
+        self.assertEqual(set(vouches[1:]), {4242}, "after a restricted answer the job's pid vouches")
+        self.assertTrue(job.called)
+        self.assertIs(fs.launchd_pid, sup.launchd_pid, "the facade carries it, as the Node one carries launchdPid")
+
+    def test_faa267_a_readable_table_asks_launchctl_for_no_pid(self):
+        sup = sys.modules["fabric_supervisors"]
+        with FakeLaunchd(), mock.patch.object(sup, "launchd_pid") as job:
+            self.install()
+        job.assert_not_called()
 
     def test_lc14_first_install_enables_and_starts(self):
         with FakeLaunchd() as fake:

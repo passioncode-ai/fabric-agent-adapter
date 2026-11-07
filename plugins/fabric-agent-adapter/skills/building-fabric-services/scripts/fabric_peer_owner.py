@@ -905,7 +905,7 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
     def connect(self) -> None:
         super().connect()
         owner = server_end(self.sock)
-        if (owner.kind == UNKNOWN and (owner.reason or "").startswith(TABLE_RESTRICTED) and self.vouch_pid
+        if (owner.kind == UNKNOWN and (owner.reason or "").startswith(TABLE_RESTRICTED) and getattr(self, "vouch_pid", None)
                 and pid_listens(self.vouch_pid, self.port)):
             # The table hides other processes (FAA-267); the process this caller started holds the listener.
             owner = Owner(THIS_ACCOUNT, _posix_uid(), self.vouch_pid, "lsof-pid")
