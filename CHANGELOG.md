@@ -90,6 +90,9 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 - The Python `fetch_well_known` answers `None` both when nothing listens and for a `foreign-user` listener; a status
   command that must report `foreign-user` (the order `down`, `foreign-user`, `foreign`, then `status`) asks
   `fabric_peer_owner.server_end` itself, or uses the Node `wellKnownOf`, which answers `ForeignUserAnswer` (FAA-259).
+- The Python `launchd_install` polls through the module's `_read_well_known`, no longer through `fetch_well_known`:
+  a test that faked the poll by patching `fabric_supervisors.fetch_well_known` now makes real connections and times out
+  (the Node `launchdInstall` still takes an injected `fetchWellKnown`; FAA-259 gives Python the same).
 
 ### Changed
 

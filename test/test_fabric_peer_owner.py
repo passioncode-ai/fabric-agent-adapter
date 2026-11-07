@@ -317,6 +317,25 @@ class OwnConnection(unittest.TestCase):
         self.assertEqual(self.received, ["Bearer synthetic"])
 
 
+@unittest.skipUnless(sys.platform == "win32", "the Windows socket table")
+class LiveWindows(unittest.TestCase):
+    """0.74.0 seam reading 8: the iphlpapi table and the token SID on a real pair (the Windows CI job runs this file)."""
+
+    def test_both_ends_of_a_real_pair_and_the_listener_are_this_account(self):
+        listener = socket.socket()
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        client = socket.create_connection(listener.getsockname())
+        accepted, _ = listener.accept()
+        try:
+            self.assertEqual(P.method(), "iphlpapi")
+            for owner in (P.peer(accepted), P.server_end(client), P.listener(listener.getsockname()[1])):
+                self.assertEqual((owner.kind, owner.pid, owner.method), (P.THIS_ACCOUNT, os.getpid(), "iphlpapi"))
+        finally:
+            for s in (accepted, client, listener):
+                s.close()
+
+
 @unittest.skipUnless(sys.platform == "darwin" or sys.platform.startswith("linux"), "a POSIX socket table")
 class Live(unittest.TestCase):
     """A real loopback pair in this process: both ends are this account's, on the primary method."""

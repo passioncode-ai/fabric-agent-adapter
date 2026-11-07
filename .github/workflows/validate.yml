@@ -184,6 +184,11 @@ jobs:
       - name: The source check on Windows (FAA-188)
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_source_check.py" -v
+      - name: The listener's owner on Windows (FAA-226, DEC-0154 HA-2)
+        if: ${{ !cancelled() }}
+        run: |
+          python -m unittest discover -s test -p "test_fabric_peer_owner.py" -v
+          python -m unittest discover -s test -p "test_check_service_listener.py" -v
       - name: The whole Node suite on Windows (FAA-72)
         if: ${{ !cancelled() }}
         run: node --test "test/*.test.mjs"
