@@ -2,7 +2,8 @@
 
 ## 0.77.0 (2026-11-07)
 
-The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabric-events.mjs`; guidance in all four skills.
+The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabric-events.mjs`, `fabric_peer_owner`
+and `fabric_supervisors` (docstrings and the calibration child); guidance in all four skills.
 
 ### Added
 
@@ -19,6 +20,11 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabr
 - **`warn` is a level** (FAA-276): `make_event`, `makeEvent` and so `JsonlEventLog.append` take `warn`, the dashboard
   chip's name, and store it as the feed's `warning`; any other level outside `info`, `notice`, `warning`, `error` is
   refused as before. A host agent that vendored 0.76.0 found a failed action's event write refused at `warn`.
+- **The calibration child is waited on without a ceiling and within its deadline** (FAA-273 items 11 and 13): the
+  Python owner check waits for the child's port with `selectors` (no FD_SETSIZE limit, so a process holding more than
+  1024 files still calibrates on sysctl) and reads it with `os.read` under the same deadline, so a partial line from an
+  interpreter that then waits no longer holds the process's first owner check (and its lock) past `TIMEOUT_SECONDS`.
+- `board.md` and `connectors.md` say a `table-restricted` refusal does not clear by retrying (FAA-273 item 18).
 
 ## 0.76.0 (2026-11-07)
 

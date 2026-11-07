@@ -18,7 +18,7 @@
     Python without it reads netstat on macOS and imports the module everywhere. Since kit.2 (FAA-267), on
     macOS: the sysctl calibration also requires a child process's listener, an empty netstat reads as
     `TABLE_RESTRICTED`, and a caller may vouch for a listener with a pid it started (`pid_listens`,
-    `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`).
+    `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`, `own_connection(vouch_pid=...)`).
     A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
     created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
@@ -500,6 +500,28 @@ _CHILD_LISTENER = ("import socket,sys\ns=socket.socket();s.bind(('127.0.0.1',0))
                    "print(s.getsockname()[1],flush=True);sys.stdin.read()")
 
 
+def _child_line(child: "subprocess.Popen[bytes]", deadline: float) -> Optional[bytes]:
+    """The child's first line, or None when no newline came by `deadline`. It waits with `selectors` (kqueue on
+    macOS: no FD_SETSIZE ceiling at fd 1024, which `select.select` refuses) and reads what is there, so a partial line
+    from an interpreter that then waits cannot hold the caller past the deadline (FAA-273 items 11 and 13)."""
+    import selectors  # POSIX: this reader runs on macOS alone
+    got = b""
+    try:
+        with selectors.DefaultSelector() as sel:
+            sel.register(child.stdout, selectors.EVENT_READ)
+            while b"\n" not in got and len(got) < 64:
+                left = deadline - time.monotonic()
+                if left <= 0 or not sel.select(left):
+                    return None
+                chunk = os.read(child.stdout.fileno(), 64)
+                if not chunk:
+                    return None
+                got += chunk
+    except (OSError, ValueError):
+        return None
+    return got.split(b"\n", 1)[0] if b"\n" in got else None
+
+
 def _child_listener_seen(rows_of) -> Optional[bool]:
     """Whether the table shows a listener of a child process of this one: False when it does not (the table shows
     this process alone, FAA-267), None when no child could be started or did not answer within TIMEOUT_SECONDS (a
@@ -512,16 +534,14 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
     except OSError:
         return None
     try:
-        import select  # POSIX: this reader runs on macOS alone
-        if not select.select([child.stdout], [], [], TIMEOUT_SECONDS)[0]:
+        line = _child_line(child, time.monotonic() + TIMEOUT_SECONDS)
+        if line is None or not line.strip().isdigit():
             return None
-        line = child.stdout.readline().strip()
-        if not line.isdigit():
-            return None
-        port = int(line)
-        return any(r.listening and r.local == ("127.0.0.1", port) and r.pid == child.pid for r in rows_of())
-    except (TableUnreadable, OSError, struct.error, ValueError):
-        return False
+        port = int(line.strip())
+        try:
+            return any(r.listening and r.local == ("127.0.0.1", port) and r.pid == child.pid for r in rows_of())
+        except (TableUnreadable, OSError, struct.error, ValueError):
+            return False
     finally:
         try:
             child.stdin.close()

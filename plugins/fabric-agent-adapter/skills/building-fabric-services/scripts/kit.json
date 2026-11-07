@@ -38,7 +38,7 @@
    "file": "fabric_peer_owner.py",
    "layer": "L0",
    "imports": [],
-   "sha256": "628c8e56eb067ecb7c343a606f8c75661257d7f349c47d9628449850d41d1f78"
+   "sha256": "8650bfa1ea6dbec6ded0897fe7fa7efd5fbe9904d0437690126d51207dc9d63f"
   },
   {
    "module": "fabric_crypto",
@@ -338,7 +338,7 @@
     "fabric_peer_owner",
     "fabric_secrets"
    ],
-   "sha256": "1ebf842de248ff0f154939ae6c9d5d0229b3358aecaefea07a80ed1b8755ac70"
+   "sha256": "1d920062f8c9806f68f27c84035d17e3860558ac4ccb5dbe83cc7a776cef706a"
   },
   {
    "module": "fabric_service",
@@ -6159,7 +6159,7 @@
    "fabric_time.py": "588f383da4ac6a243ea95b6ffc3a0aa99ca94245732dc4937734f190b7af4ae9",
    "fabric_identifiers.py": "0fd814d521ac3aa39907458265870753046a73f48af3d8581ab864b93b211607",
    "fabric_secrets.py": "53c5df8d6f2c87433c288853bfaad9a43f544789bdf1e39bda8d3ff14485c89d",
-   "fabric_peer_owner.py": "628c8e56eb067ecb7c343a606f8c75661257d7f349c47d9628449850d41d1f78",
+   "fabric_peer_owner.py": "8650bfa1ea6dbec6ded0897fe7fa7efd5fbe9904d0437690126d51207dc9d63f",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
    "fabric_base.py": "f62bcc2ed9912660fa875d27a09f60867260cc4925f79873501fd9620be59611",
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",
@@ -6185,7 +6185,7 @@
    "fabric_auth.py": "74ccc10239b65a3567cec5213a7b344cbd88d6eee1fd1c5f7be1d6daf985993c",
    "fabric_events.py": "9dcf32864e138c61c39afecdd4ba14ff40cb0bb26e24008c82e36809c1f52835",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
-   "fabric_supervisors.py": "1ebf842de248ff0f154939ae6c9d5d0229b3358aecaefea07a80ed1b8755ac70",
+   "fabric_supervisors.py": "1d920062f8c9806f68f27c84035d17e3860558ac4ccb5dbe83cc7a776cef706a",
    "fabric_service.py": "73082f69844739708732f6331742e00f17d27385d3c3efa3331a1fd61b523595",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
