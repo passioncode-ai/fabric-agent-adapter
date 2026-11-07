@@ -40,7 +40,7 @@ outage during the repair is a plain hand-off), and research and the hold stay th
 - **Every inbound message belongs to one turn with a trace id** (A1 counts each message as a turn; a burst the
   communication agent template batches is one turn listing its message ids, so `turns` counts batched turns while
   `replyCoverage` stays over inbound messages in chat and mail, over owed questions in community and reviews: each message of a turn whose reply was accepted counts as covered, and a message no
-  reply is owed to, such as a closing or a prefilter verdict, leaves the count); the id is on the turn row, on each model call of that turn,
+  reply is owed to, such as a closing, an automated sender, spam or the staff's own, leaves the count); the id is on the turn row, on each model call of that turn,
   on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance, not covered,
   handed off, small talk, limit, error), the hand-off reason and category, the latency, the knowledge revision the
   answer used, and whether the channel accepted the reply. Conversation text stays inside the agent, redacted, for at

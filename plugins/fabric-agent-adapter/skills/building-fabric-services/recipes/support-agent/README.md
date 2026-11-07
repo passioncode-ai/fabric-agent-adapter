@@ -7,8 +7,9 @@ the draft carries a `[KB:<id>]` marker for each knowledge id the plan used, and 
 question, prompt_ids, max_chars=..., sources=...)` on it for the code checks. `prompt_ids` are the ids of the items
 placed in the plan's prompt, never the plan's own list (an id the plan names outside them is held as a suspected
 injection); each tool result of the turn enters both under an id of its own (`tool.order`; the citation takes letters,
-digits, dot, dash and underscore, no colon; knowledge ids too, so map one that does not). A draft with no fact to cite
-(a decline, a triage reply) skips `check_reply`. The final pass keeps the markers. Repair of a plan draft, and the
+digits, dot, dash and underscore, no colon; knowledge ids too, so map one that does not). Every template turn that went through the plan runs
+`check_reply` on its final text, except an off-topic plan, a plan whose only actions are ask_clarification or handoff,
+and a triage reply: the route decides, never the draft's markers. The final pass keeps the markers. Repair of a plan draft, and the
 checker of another vendor, stay the agent's own (agents-that-answer-people.md): the recipe's `repair=` reruns only its
 own `answer()` draft, and it has no checker. Built only on the service
 kit: `fabric_openrouter` for the model, `fabric_usage` for receipts, `fabric_paths` for private, atomic state.

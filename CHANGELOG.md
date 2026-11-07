@@ -45,6 +45,8 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
 - An answering agent that adopts the template moves every route that reads people's text to an open-vendor model,
   fallbacks included (template rule 6); one that does not adopt it keeps what DEC-0083 asks. Its monthly stop uses the
   kit's OpenRouter client with `window="month"` (the default window is a day).
+- Adopting the template starts a new series for `nobodyDropped.turns` (batched turns) and the outcome shares
+  (`customer_silent` up, `no_reply_owed` down); say so in the owner's report, never inside `support.quality_daily`.
 
 ## 0.74.0 (2026-11-07)
 

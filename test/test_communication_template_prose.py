@@ -51,6 +51,16 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
                 events.make_event("1", "2026-11-07T00:00:00Z", kind, "info", "x")
         self.assertNotIn("handedOff", flat(TEMPLATE))
 
+    def test_the_recipe_readme_skips_check_reply_by_the_templates_routes(self):
+        readme = flat("building-fabric-services/recipes/support-agent/README.md")
+        for phrase in ("an off-topic plan", "a plan whose only actions are ask_clarification or handoff",
+                       "a triage reply", "never the draft's markers"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, readme)
+                self.assertIn(phrase, flat(TEMPLATE))
+        self.assertNotIn("no fact to cite", readme)
+        self.assertNotIn("no fact to cite", flat(TEMPLATE))
+
     def test_the_changelog_counts_the_adversarial_batches_the_template_lists(self):
         import re
         body = flat(TEMPLATE)
