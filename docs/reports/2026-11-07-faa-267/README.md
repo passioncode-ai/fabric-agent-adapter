@@ -29,16 +29,22 @@ numbers and messages are as relayed.
 The relayed note that the reason read `foreign-user: ... (table-restricted: ...)` is why 0.76.0 makes the installer's
 refusal start with `table-restricted` itself.
 
+## The released form on macOS 27.2
+
+The same host agent installed the released kit (`v0.76.0`, `feefe522`) with `fabric_kit.py install` (the changed
+modules: peer_owner, service, supervisors), rebuilt its service from a clean release and installed it with
+`launchd_install` under Homebrew Python 3.15: ready, no false HA-2 refusal (`no-row`), `degraded` empty (relayed
+2026-11-07 19:54 UTC, board thread `eefa7959`, finding `f18994d1`).
+
 ## What was not measured
 
 - A Homebrew Node on macOS 27.2 (the Node twin always reads `netstat`; it is ad-hoc-signed too).
-- The release's final form: the lsof call asks for IPv4 alone (`-i4TCP`) and a calibration child that does not answer
-  within the timeout proves nothing; both are covered by unit tests on an unrestricted host (Darwin 25.6), not by a
-  rerun on macOS 27.2.
-- That the installer reads the job's pid only after a `table-restricted` answer (`ccbe22b0`): the measured build read
-  it on every poll. Unit tests cover the new order.
-- The cost of the calibration child per process. Its time was read only on an unrestricted Mac under load, with no
-  record kept, so no figure is given here.
+- The released form's parts one by one on macOS 27.2 (the IPv4-only lsof, the bounded calibration child, the pid read
+  only after a `table-restricted` answer): the install above passed with all of them, but no rerun named which path
+  (sysctl or netstat, vouched or not) answered; unit tests on an unrestricted host (Darwin 25.6) cover each.
+- The cost of the calibration child on macOS 27.2. On an unrestricted Mac (Darwin 25.6, load average 60 to 100) the
+  0.76.0 readings measured the first owner check per Python process at 48 to 97 ms under Homebrew 3.14 and 128 to
+  198 ms under Apple's 3.9, against about 28 ms for 0.75.0; later checks 7 to 11 ms (FAA-273 item 17).
 
 ## FAA-266: the environment value check, measured on this repository
 
