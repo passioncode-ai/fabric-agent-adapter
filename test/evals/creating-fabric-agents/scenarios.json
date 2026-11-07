@@ -153,7 +153,7 @@
       "expected": [
         "asks the grill's 'Where does it run, for whom?' row: a personal cloud machine joined to the estate with an enroll token read from stdin or a 0600 file, and one instance per context (personal, org:<id>) with its own secrets, spend and journal",
         "asks 'Which models?': per lane a primary and a fallback of another vendor, an open-vendor model on the lane that reads customer messages (reads: user-content), a model whose catalog input_modalities include image for screenshots, declared as classes",
-        "asks 'Who pays?': one OpenRouter key per agent and context with its own ceiling, read from the environment, checked before each call; the person's personal key never pays for an organization",
+        "asks 'Who pays?': one OpenRouter key per agent and context with its own ceiling (USD 100 a month by default), read from the environment, checked before each call; the person's personal key never pays for an organization",
         "asks 'How does it learn?': decisions with reasons, one trace per turn, failures turned into planted fixtures before fixes, learnings proposed and not self-approved",
         "names which capabilities need the person's machine and what they answer when it is off",
         "reads references/where-agents-run.md, models-and-providers.md, orchestration-and-learning.md and practices.md before scaffolding"
@@ -192,7 +192,7 @@
       "trap": "the agent scaffolds a reply bot with one model, no turn record and no daily report, hands off on the first refusal and counts hand-offs as answers, leaving the measurement and the hold for later",
       "request": "Build example-agent: it answers customers' questions in a support chat and by mail, using the product's knowledge base.",
       "expected": [
-        "loads references/agents-that-answer-people.md and builds its parts into the first release, not later",
+        "starts from references/communication-agent-template.md and loads references/agents-that-answer-people.md, building its parts into the first release, not later",
         "records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0, its value valid against the contract's support-quality-daily.schema.json and a judge's calibration carried only once its readers adopted DEC-0144",
         "declares lanes with a fallback of another vendor than its primary, a checker of another vendor than the writer and a judge of another vendor than both, counts what the fallback recovered, and changes the writer model or reasoning budget only after an offline replay",
         "puts deterministic false-state gates before the model checker, gives the checker the material before the instructions, takes numbers and account state from tools, and re-reads the conversation's live tail before sending",

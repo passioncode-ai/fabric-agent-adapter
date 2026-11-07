@@ -1,7 +1,9 @@
 # Recipe: the draft-and-check step of a support agent
 
 A service answers one inbound question from its own knowledge file, or hands it to a person. It is a step of an
-agent that answers people, not that agent: see the paragraph after the table. Built only on the service
+agent that answers people, not that agent: see the paragraph after the table. Under the creating-fabric-agents
+template (`communication-agent-template.md`) the plan-and-draft call writes the draft; this recipe then supplies the
+code checks, the checker and the one repair, and its `model` is not a separate cheap drafter. Built only on the service
 kit: `fabric_openrouter` for the model, `fabric_usage` for receipts, `fabric_paths` for private, atomic state.
 Tests: `test/test_support_agent_recipe.py` (a fake model; no network, no key).
 
