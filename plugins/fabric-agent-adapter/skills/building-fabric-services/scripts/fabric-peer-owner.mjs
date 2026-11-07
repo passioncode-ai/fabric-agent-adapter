@@ -386,6 +386,8 @@ async function ownerOf(local, remote, opts = {}, server = false) {
     // address and dies with it, so that listener answers. An accepted connection's own row carries the uid of the
     // process that accepted it: it answers itself, so a listener swapped after another account accepted the client
     // cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e; the contract's pending CT-254, FAA-258).
+    // A server row its owner already closed (an orphan) also has inode 0 and reads so: no process holds it, so nothing
+    // sent to it reaches anyone (0.74.0 unit reading 6).
     return oneOwner(listenersOf(table.rows, found[0].local), table.how, opts, 'not-accepted');
   }
   // A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.

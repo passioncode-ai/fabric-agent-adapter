@@ -678,6 +678,8 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = Fa
         # process that accepted it (sock_graft): it answers itself, so a listener swapped after another account
         # accepted the client cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e; the contract's
         # pending CT-254, FAA-258).
+        # A server row its owner already closed (an orphan) also has inode 0 and reads so: no process holds it, so
+        # nothing sent to it reaches anyone (0.74.0 unit reading 6).
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
     if how == "proc" and found[0].uid is None:
         # A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.
