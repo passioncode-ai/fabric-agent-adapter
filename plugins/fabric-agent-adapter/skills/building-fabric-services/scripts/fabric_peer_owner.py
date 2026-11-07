@@ -3,10 +3,11 @@
     peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
     DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py` at
     commit f86f0622 (passioncode-ai/project-observatory-dashboard, the same licence). It differs
-    from that file in this paragraph and in `Owner` and `Row`, NamedTuples here where it has
+    from that file in this paragraph, in `Owner` and `Row` (NamedTuples here where it has
     frozen dataclasses: a dataclass with postponed annotations needs its module in sys.modules,
-    and a service may load a kit file by its path without one. Standard library only, no import
-    of another kit module.
+    and a service may load a kit file by its path without one), and in writing `Optional[X]`
+    for `X | None` in its signatures (the kit's floor is Python 3.9, where `typing.get_type_hints`
+    cannot read `X | None`). Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
     its Node twin is `fabric-peer-owner.mjs` (netstat, /proc and tasklist, no ctypes).
 
@@ -88,7 +89,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import NamedTuple
+from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
 PEER_OWNER_VERSION = "1.1.0"
@@ -118,27 +119,28 @@ SERVER_UNVERIFIED = "server-unverified"
 SERVER_NOT_THIS_WORKSPACE = "server-not-this-workspace"
 
 
-class Owner(NamedTuple):
+# The fields carry real types, not postponed strings: a NamedTuple's generated __new__ resolves its annotations in a
+# namespace without builtins, where `int | None` as a string is unresolvable (and a TypeError on Python 3.9).
+_OwnerFields = NamedTuple("_OwnerFields", [("kind", str), ("uid", Optional[int]), ("pid", Optional[int]),
+                                           ("method", str), ("reason", Optional[str])])
+_OwnerFields.__new__.__defaults__ = (None, None, "none", None)
+_RowFields = NamedTuple("_RowFields", [("local", Tuple[str, int]), ("remote", Tuple[str, int]), ("listening", bool),
+                                       ("uid", Optional[int]), ("pid", Optional[int]), ("time_wait", bool)])
+_RowFields.__new__.__defaults__ = (None, None, False)
+
+
+class Owner(_OwnerFields):
     """Who owns one end of a connection, or a listener. `reason` says why when `kind` is unknown."""
-    kind: str
-    uid: int | None = None
-    pid: int | None = None
-    method: str = "none"
-    reason: str | None = None
+    __slots__ = ()
 
     def as_dict(self) -> dict:
         return dict(self._asdict())
 
 
-class Row(NamedTuple):
+class Row(_RowFields):
     """One TCP socket of the host's table. `uid` is None where the table carries no owner
     (netstat, Windows): it is resolved from `pid` only for the row a question selects."""
-    local: tuple[str, int]
-    remote: tuple[str, int]
-    listening: bool
-    uid: int | None = None
-    pid: int | None = None
-    time_wait: bool = False
+    __slots__ = ()
 
 
 class TableUnreadable(Exception):
@@ -148,7 +150,7 @@ class TableUnreadable(Exception):
 class ListenerRefused(Exception):
     """`own_connection` refused the server end; nothing was sent on the connection."""
 
-    def __init__(self, code: str, message: str, owner: Owner | None = None) -> None:
+    def __init__(self, code: str, message: str, owner: Optional[Owner] = None) -> None:
         super().__init__(message)
         self.code = code
         self.owner = owner
@@ -183,14 +185,14 @@ def _address(addr) -> tuple[str, int]:
 
 # -- classification ---------------------------------------------------------------------------------------------------
 
-def _posix_uid() -> int | None:
+def _posix_uid() -> Optional[int]:
     """This process's uid, or None where the OS has none (Windows compares SIDs instead). The one
     place this module reads it: this file is vendored without its project's OS layer, so the uid
     is read here, once, on the POSIX paths only (an engine boundary test names this function)."""
     return os.getuid() if hasattr(os, "getuid") else None
 
 
-def classify(uid: int | None, pid: int | None, *, method: str, own_uid: int | None = None) -> Owner:
+def classify(uid: Optional[int], pid: Optional[int], *, method: str, own_uid: Optional[int] = None) -> Owner:
     """`system` for uid 0 or pid 1, `this-account` for this process's uid, else `another-account`."""
     if uid is None:
         return Owner(UNKNOWN, None, pid, method, "no-owner")
@@ -236,7 +238,7 @@ def parse_netstat(text: str) -> list[Row]:
     return rows
 
 
-def _netstat_address(text: str) -> tuple[str, int] | None:
+def _netstat_address(text: str) -> Optional[tuple[str, int]]:
     """`127.0.0.1.47311`, `::1.47070`, `*.47555`, `*.*`: the port after the last dot. A long IPv6
     address is cut short by netstat, which only ever matters off loopback."""
     if "." not in text:
@@ -248,13 +250,13 @@ def _netstat_address(text: str) -> tuple[str, int] | None:
         return None
 
 
-def parse_ps_uid(text: str) -> int | None:
+def parse_ps_uid(text: str) -> Optional[int]:
     """`ps -o uid= -p PID`: one number, or nothing when the process is gone."""
     text = text.strip()
     return int(text) if text.isdigit() else None
 
 
-def parse_proc_net_tcp(text: str, *, family: int, byteorder: str | None = None) -> list[Row]:
+def parse_proc_net_tcp(text: str, *, family: int, byteorder: Optional[str] = None) -> list[Row]:
     """`/proc/net/tcp` (family AF_INET) or `/proc/net/tcp6` (AF_INET6). The kernel prints each
     32-bit word of an address in host byte order and each port in network order, in hex."""
     order = byteorder or sys.byteorder
@@ -316,7 +318,7 @@ def parse_pcblist_n(blob: bytes) -> list[Row]:
     pcbs: dict[bytes, tuple] = {}
     owners: dict[bytes, tuple[int, int]] = {}
     states: dict[bytes, int] = {}
-    current: bytes | None = None                                    # the inpcb the records that follow belong to
+    current: Optional[bytes] = None                                    # the inpcb the records that follow belong to
     while off + 8 <= len(blob):
         length, kind = struct.unpack_from("<II", blob, off)
         if length < 8:
@@ -561,7 +563,7 @@ def _windows_table() -> list[Row]:  # pragma: no cover - exercised on Windows on
 _SYSTEM_SIDS = frozenset({"S-1-5-18", "S-1-5-19", "S-1-5-20"})
 
 
-def _windows_sid(pid: int | None) -> str:  # pragma: no cover - exercised on Windows only
+def _windows_sid(pid: Optional[int]) -> str:  # pragma: no cover - exercised on Windows only
     """The account SID of a process (None: this one). Raises OSError when it cannot be read."""
     from ctypes import wintypes
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -607,7 +609,7 @@ def _windows_sid(pid: int | None) -> str:  # pragma: no cover - exercised on Win
             kernel32.CloseHandle(process)
 
 
-def classify_sid(sid: str | None, pid: int | None, *, own_sid: str, method: str = "iphlpapi") -> Owner:
+def classify_sid(sid: Optional[str], pid: Optional[int], *, own_sid: str, method: str = "iphlpapi") -> Owner:
     """Windows: the System process and the system's own accounts are `system`, this process's
     SID `this-account`, any other SID `another-account`, an unreadable one `unknown`."""
     if pid in (0, 4):
@@ -621,7 +623,7 @@ def classify_sid(sid: str | None, pid: int | None, *, own_sid: str, method: str 
     return Owner(ANOTHER_ACCOUNT, None, pid, method)
 
 
-def _windows_owner(pid: int | None, how: str) -> Owner:  # pragma: no cover - exercised on Windows only
+def _windows_owner(pid: Optional[int], how: str) -> Owner:  # pragma: no cover - exercised on Windows only
     try:
         own = _windows_sid(None)
     except OSError as exc:
@@ -725,7 +727,7 @@ def listener(port: int) -> Owner:
     return owner
 
 
-def refusal(owner: Owner, port: int, expect_pid: int | None = None) -> tuple[str, str] | None:
+def refusal(owner: Owner, port: int, expect_pid: Optional[int] = None) -> Optional[tuple[str, str]]:
     """(code, why) when a client must not send on a connection whose server end is `owner`."""
     if owner.kind in (ANOTHER_ACCOUNT, SYSTEM):
         return SERVER_NOT_OWN, f"the server on port {port} belongs to {owner.kind}"
@@ -744,7 +746,7 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
     different listener; so the check is in `connect()`, not once in `own_connection`. A refused
     connect closes the socket and raises ListenerRefused before any byte of a request is sent."""
 
-    def __init__(self, host: str, port: int, *, expect_pid: int | None = None, timeout: float = 10.0) -> None:
+    def __init__(self, host: str, port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0) -> None:
         super().__init__(host, port, timeout=timeout)
         self.expect_pid = expect_pid
 
@@ -760,7 +762,7 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
             raise ListenerRefused(refused[0], f"{refused[1]}; nothing was sent", owner)
 
 
-def own_connection(port: int, *, expect_pid: int | None = None, timeout: float = 10.0,
+def own_connection(port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0,
                    host: str = "127.0.0.1") -> CheckedHTTPConnection:
     """A `CheckedHTTPConnection` to `host:port`, connected, whose server end is this account's
     (and, with `expect_pid`, that process's). The check runs on the very connection the caller

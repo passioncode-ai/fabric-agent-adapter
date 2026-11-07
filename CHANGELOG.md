@@ -14,7 +14,7 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
   account's process, root's, SYSTEM's, or one whose owner cannot be told (`foreign-user`):
   - a new layer-L0 module, `fabric_peer_owner` / `fabric-peer-owner.mjs`. The Python file is Project Observatory's
     `peer_owner.py` 1.1.0, vendored by commit (`f86f0622`, the same licence), with `Owner` and `Row` as NamedTuples so
-    the module loads by its path; it reads macOS through `sysctl net.inet.tcp.pcblist_n` (calibrated on a connected pair
+    the module loads by its path and `Optional[X]` in its signatures for the Python 3.9 floor; it reads macOS through `sysctl net.inet.tcp.pcblist_n` (calibrated on a connected pair
     of its own, else `netstat -anv`), Linux through `/proc/net/tcp` and `/proc/net/tcp6`, Windows through
     `GetExtendedTcpTable` and the owner's SID. The Node twin reads `netstat -anv` and `ps` on macOS, the same `/proc`
     files on Linux, `netstat -ano` and `tasklist` on Windows; `checkedSocket` and `CheckedAgent` check a connection
