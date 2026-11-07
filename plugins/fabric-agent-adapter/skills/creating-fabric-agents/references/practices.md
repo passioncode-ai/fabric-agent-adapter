@@ -163,4 +163,4 @@ draft-and-check step owns.
   `texts.final` take that form, and a final text is never `not_used` beside a holding reply with replies on: a holding
   reply owes a final one, the contract's FAC-SEM-164); `recommendation` appears only with `answered_signal: "none"`; what each channel
   counts (`channels[].items_seen_unit`) is one of `mails`, `updates`, `messages` or `reviews`. Example: the recipe's
-  `channel-agent.example.json`. The contract publishes its schema at the pin (`service-channel-agent-extension.schema.json`); `check_service.py` does not read the declaration yet (FAA-197).
+  `channel-agent.example.json`. The contract publishes its schema at the pin (`service-channel-agent-extension.schema.json`); `check_service.py` checks a declared one against FAC-SEM-162 to 165 (rule `channel-agent.declaration`).
