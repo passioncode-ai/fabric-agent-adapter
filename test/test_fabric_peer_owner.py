@@ -567,10 +567,10 @@ class RestrictedTable(unittest.TestCase):
             with open(fake, "w") as f:
                 f.write("#!/bin/sh\nprintf '> '\nexec sleep 30\n")
             os.chmod(fake, 0o755)
-            with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 0.3):
+            with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 1.0):
                 start = time.monotonic()
                 self.assertIsNone(P._child_listener_seen(lambda: []))
-                self.assertLess(time.monotonic() - start, 5)
+                self.assertLess(time.monotonic() - start, 1.8, "one deadline, never a second wait")
 
     @unittest.skipUnless(sys.platform == "darwin", "the child check runs on macOS")
     def test_a_process_holding_more_than_1024_files_still_sees_its_child(self):

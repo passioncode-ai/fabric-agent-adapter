@@ -275,6 +275,7 @@ from fabric_auth import (  # noqa: F401
 from fabric_events import (  # noqa: F401
     EVENTS_DEFAULT_LIMIT,
     EVENTS_MAX_LIMIT,
+    LEVEL_ALIASES,
     LEVELS,
     _KIND,
     _TRACE_ID,

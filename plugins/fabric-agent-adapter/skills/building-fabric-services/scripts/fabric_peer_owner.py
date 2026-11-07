@@ -1,6 +1,6 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.1.0+kit.2: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
+    peer_owner 1.1.0+kit.3: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
     DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py` at
     commit f86f0622 (passioncode-ai/project-observatory-dashboard, the same licence). It differs
     from that file in this paragraph, in `Owner` and `Row` (NamedTuples here where it has
@@ -18,7 +18,8 @@
     Python without it reads netstat on macOS and imports the module everywhere. Since kit.2 (FAA-267), on
     macOS: the sysctl calibration also requires a child process's listener, an empty netstat reads as
     `TABLE_RESTRICTED`, and a caller may vouch for a listener with a pid it started (`pid_listens`,
-    `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`, `own_connection(vouch_pid=...)`).
+    `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`, `own_connection(vouch_pid=...)`); since kit.3
+    the child's port is waited on with `selectors` and read under one deadline (FAA-273).
     A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
     created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
@@ -109,7 +110,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.1.0+kit.2"  # Observatory's 1.1.0 with the kit's differences above
+PEER_OWNER_VERSION = "1.1.0+kit.3"  # Observatory's 1.1.0 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
@@ -533,6 +534,7 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except OSError:
         return None
+    line = None
     try:
         line = _child_line(child, time.monotonic() + TIMEOUT_SECONDS)
         if line is None or not line.strip().isdigit():
@@ -545,6 +547,8 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
     finally:
         try:
             child.stdin.close()
+            if line is None:  # no answer by the deadline: no second wait for a child that may never read its stdin
+                child.kill()
             child.wait(timeout=TIMEOUT_SECONDS)
         except (OSError, subprocess.TimeoutExpired):
             child.kill()

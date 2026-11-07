@@ -217,7 +217,7 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
    claims, and a new one without `source.repository` (a rewrite warns). A preview or branch
    copy is a second **instance**, never a second id: one more service the operator sees. Verify a release with its
    own doctor or self-check before it replaces `default`; a temporary instance is uninstalled
-   (`launchd_uninstall`, `remove_descriptor`) once its check is done.
+   (`launchd_uninstall`, `remove_descriptor`) once its check is done, never left running.
 2. `launchd_plist(...)` then `launchd_install(...)`: writes and lints the plist,
    `bootout` and waits for the unload, `bootstrap` with retries on the transient I/O
    error, then polls the well-known document until **this** identity answers on this OS account's listener (HA-2).

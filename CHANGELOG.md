@@ -1,9 +1,10 @@
 # Changelog
 
-## 0.77.0 (2026-11-07)
+## 0.77.0 (2026-11-08)
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabric-events.mjs`, `fabric_peer_owner`
-and `fabric_supervisors` (docstrings and the calibration child); guidance in all four skills.
+(peer_owner `1.1.0+kit.3`) and `fabric-peer-owner.mjs` (the version line), `fabric_supervisors` (a docstring), and the
+facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_ALIASES`); guidance in all four skills.
 
 ### Added
 
