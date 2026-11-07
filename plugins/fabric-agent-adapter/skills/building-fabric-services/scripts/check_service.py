@@ -186,12 +186,19 @@ class Probe:
     # the listener's owner (DEC-0154 HA-2) -------------------------------
     def listener_rule(self) -> bool:
         """`down`, then `foreign-user`, then everything the listener answers: a local service is read only when this OS
-        account's process holds its port. False when the port must not be read (`foreign-user`)."""
-        owner = po.listener(self.port)
+        account's process holds its port. The owner is the server end of a connection of the probe's own, on which
+        nothing is sent (HA-2's source: the client's own connection; two sockets of one account on one port, as
+        SO_REUSEPORT workers hold, read as that account). False when the port must not be read (`foreign-user`)."""
         where = "127.0.0.1:%d" % self.port
-        if owner.kind == po.NONE:
+        try:
+            sock = socket.create_connection(("127.0.0.1", self.port), timeout=5)
+        except OSError:
             self.add("listener.owner", "NOT_RUN", "nothing listens on %s (down)" % where)
             return True
+        try:
+            owner = po.server_end(sock)
+        finally:
+            sock.close()
         if owner.kind == po.THIS_ACCOUNT:
             self.add("listener.owner", "PASS", "%s is held by this OS account's process (pid %s, read by %s)"
                      % (where, owner.pid if owner.pid is not None else "not shown", owner.method))

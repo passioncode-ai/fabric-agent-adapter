@@ -98,6 +98,10 @@ test('classification and refusals', () => {
   assert.equal(po.classify(501, 1, { method: 'x', ownUid: 501 }).kind, po.SYSTEM);
   assert.equal(po.classify(501, 9, { method: 'x', ownUid: 501 }).kind, po.THIS_ACCOUNT);
   assert.equal(po.classify(502, 9, { method: 'x', ownUid: 501 }).kind, po.ANOTHER_ACCOUNT);
+  // a client running as root owns root's listener; launchd's pid 1 stays system (0.74.0 seam reading 2)
+  assert.equal(po.classify(0, 300, { method: 'x', ownUid: 0 }).kind, po.THIS_ACCOUNT);
+  assert.equal(po.classify(0, 1, { method: 'x', ownUid: 0 }).kind, po.SYSTEM);
+  assert.equal(po.classifySid('S-1-5-18', 50, { ownSid: 'S-1-5-18' }).kind, po.THIS_ACCOUNT);
   const own = 'S-1-5-21-1-2-3-1001';
   assert.equal(po.classifySid(own, 50, { ownSid: own }).kind, po.THIS_ACCOUNT);
   assert.equal(po.classifySid('S-1-5-21-1-2-3-1002', 50, { ownSid: own }).kind, po.ANOTHER_ACCOUNT);

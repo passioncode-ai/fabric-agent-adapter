@@ -109,8 +109,9 @@ function ownUid() {
 export function classify(uid, pid, { method, ownUid: own } = {}) {
   if (uid === null || uid === undefined) return owner(UNKNOWN, { pid, method, reason: 'no-owner' });
   const mine = own === undefined || own === null ? ownUid() : own;
+  // this process's own uid first: a client running as root owns root's listener (pid 1, launchd, stays system)
+  if (mine !== null && uid === mine && pid !== 1) return owner(THIS_ACCOUNT, { uid, pid, method });
   if (uid === 0 || pid === 1) return owner(SYSTEM, { uid, pid, method });
-  if (mine !== null && uid === mine) return owner(THIS_ACCOUNT, { uid, pid, method });
   return owner(ANOTHER_ACCOUNT, { uid, pid, method });
 }
 
@@ -123,8 +124,8 @@ const SID = /^S-1-[0-9]+(-[0-9]+)+$/;
 export function classifySid(sid, pid, { ownSid, method = 'netstat-windows' } = {}) {
   if (pid === 0 || pid === 4) return owner(SYSTEM, { pid, method });
   if (typeof sid !== 'string' || !SID.test(sid)) return owner(UNKNOWN, { pid, method, reason: 'process-not-readable' });
-  if (SYSTEM_SIDS.has(sid)) return owner(SYSTEM, { pid, method });
   if (typeof ownSid === 'string' && SID.test(ownSid) && sid === ownSid) return owner(THIS_ACCOUNT, { pid, method });
+  if (SYSTEM_SIDS.has(sid)) return owner(SYSTEM, { pid, method });
   return owner(ANOTHER_ACCOUNT, { pid, method });
 }
 

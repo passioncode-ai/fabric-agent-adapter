@@ -129,6 +129,15 @@ class Classification(unittest.TestCase):
         self.assertEqual(P.classify(501, 9, method="x", own_uid=501).kind, P.THIS_ACCOUNT)
         self.assertEqual(P.classify(502, 9, method="x", own_uid=501).kind, P.ANOTHER_ACCOUNT)
 
+    def test_a_client_running_as_root_or_system_owns_roots_listener(self):
+        """0.74.0 seam reading 2: a kit client running as root (a container's default) reads root's listener as its
+        own account's; launchd's pid 1 stays system, and a user client still reads root as system."""
+        self.assertEqual(P.classify(0, 300, method="x", own_uid=0).kind, P.THIS_ACCOUNT)
+        self.assertEqual(P.classify(0, 1, method="x", own_uid=0).kind, P.SYSTEM)
+        self.assertEqual(P.classify(0, 300, method="x", own_uid=501).kind, P.SYSTEM)
+        self.assertEqual(P.classify_sid("S-1-5-18", 50, own_sid="S-1-5-18").kind, P.THIS_ACCOUNT)
+        self.assertEqual(P.classify_sid("S-1-5-18", 50, own_sid="S-1-5-21-1-2-3-1001").kind, P.SYSTEM)
+
     def test_windows_sids(self):
         own = "S-1-5-21-1-2-3-1001"
         self.assertEqual(P.classify_sid(own, 50, own_sid=own).kind, P.THIS_ACCOUNT)

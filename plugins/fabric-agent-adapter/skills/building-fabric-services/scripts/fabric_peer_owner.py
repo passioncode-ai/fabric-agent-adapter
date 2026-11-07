@@ -7,7 +7,8 @@
     frozen dataclasses: a dataclass with postponed annotations needs its module in sys.modules,
     and a service may load a kit file by its path without one), and in writing `Optional[X]`
     for `X | None` in its signatures (the kit's floor is Python 3.9, where `typing.get_type_hints`
-    cannot read `X | None`). Standard library only, no import of another kit module.
+    cannot read `X | None`), and in `classify` / `classify_sid` asking for this process's own
+    uid or SID before the system's (a client running as root or SYSTEM owns root's listener). Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
     its Node twin is `fabric-peer-owner.mjs` (netstat, /proc and PowerShell, no ctypes).
 
@@ -193,11 +194,14 @@ def _posix_uid() -> Optional[int]:
 
 
 def classify(uid: Optional[int], pid: Optional[int], *, method: str, own_uid: Optional[int] = None) -> Owner:
-    """`system` for uid 0 or pid 1, `this-account` for this process's uid, else `another-account`."""
+    """`this-account` for this process's uid, `system` for uid 0 or pid 1, else `another-account`. A client that runs
+    as root itself reads root's listener as its own account's (the kit's order; the vendored file put uid 0 first)."""
     if uid is None:
         return Owner(UNKNOWN, None, pid, method, "no-owner")
     if own_uid is None:
         own_uid = _posix_uid()
+    if own_uid is not None and uid == own_uid and pid != 1:
+        return Owner(THIS_ACCOUNT, uid, pid, method)
     if uid == 0 or pid == 1:
         return Owner(SYSTEM, uid, pid, method)
     if own_uid is not None and uid == own_uid:
@@ -616,10 +620,10 @@ def classify_sid(sid: Optional[str], pid: Optional[int], *, own_sid: str, method
         return Owner(SYSTEM, None, pid, method)
     if sid is None:
         return Owner(UNKNOWN, None, pid, method, "process-not-readable")
+    if sid == own_sid:
+        return Owner(THIS_ACCOUNT, None, pid, method)  # before the system SIDs: a client running as SYSTEM
     if sid in _SYSTEM_SIDS:
         return Owner(SYSTEM, None, pid, method)
-    if sid == own_sid:
-        return Owner(THIS_ACCOUNT, None, pid, method)
     return Owner(ANOTHER_ACCOUNT, None, pid, method)
 
 

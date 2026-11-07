@@ -62,7 +62,7 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none`: a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
 | `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed`, `personal` or `processor-hosted` (an organization's cloud a processor runs under a processing agreement, DEC-0099); `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
 
-A local descriptor MAY say where a collector on the same machine reads its daily operations digests, under
+A local descriptor MAY say where a collector in the same OS account reads its daily operations digests, under
 `https://fabric.passioncode.ai/agent-contract/extensions/ops-digest/0.1` (`fabric-ops-digest/0.1`, DEC-0153, OD-9,
 FAC-SEM-168): 1 to 8 `{dir, source}`, `dir` a folder inside `paths.data`. A remote descriptor carries none, and the key
 is read nowhere else. The kits know the revision and neither write nor check the declaration yet (FAA-206).

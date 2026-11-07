@@ -65,25 +65,47 @@ class Served(unittest.TestCase):
                       po.Owner(po.UNKNOWN, None, None, "x", "no-row")):
             with self.subTest(kind=owner.kind):
                 self.probe.results.clear()
-                with mock.patch.object(po, "listener", return_value=owner):
+                with mock.patch.object(po, "server_end", return_value=owner):
                     self.assertFalse(self.probe.listener_rule())
                 got = self.verdict()
                 self.assertEqual(got["verdict"], "FAIL")
                 self.assertTrue(got["evidence"].startswith("foreign-user: 127.0.0.1:%d" % self.port), got["evidence"])
 
     def test_nothing_listening_is_not_run_and_the_well_known_rule_reports_down(self):
-        with mock.patch.object(po, "listener", return_value=po.Owner(po.NONE, method="x")):
-            self.assertTrue(self.probe.listener_rule())
+        self.server.shutdown()
+        self.server.server_close()
+        self.assertTrue(self.probe.listener_rule())
         self.assertEqual(self.verdict()["verdict"], "NOT_RUN")
 
     def test_a_foreign_user_port_is_never_read(self):
         """run() stops after the FAIL: no rule reads the port, so the server sees no request and no token."""
-        with mock.patch.object(po, "listener", return_value=po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "x")), \
+        with mock.patch.object(po, "server_end", return_value=po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "x")), \
                 mock.patch.object(cs.Probe, "descriptor_rules", lambda self: None), \
                 mock.patch.object(cs.Probe, "lifecycle_rules", lambda self: None):
             results = self.probe.run()
         self.assertEqual([r["rule"] for r in results], ["listener.owner"])
         self.assertEqual(self.seen, [])
+
+    def test_two_sockets_of_this_account_on_one_port_pass(self):
+        """0.74.0 seam reading 2: SO_REUSEPORT workers of one account are two listeners on one port; the rule reads its
+        own connection's server end, so they pass where a look at the port alone read 'several-rows'."""
+        import socket
+        if not hasattr(socket, "SO_REUSEPORT"):
+            self.skipTest("no SO_REUSEPORT here")
+        socks = []
+        try:
+            for _ in range(2):
+                s = socket.socket()
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                s.bind(("127.0.0.1", socks[0].getsockname()[1] if socks else 0))
+                s.listen(4)
+                socks.append(s)
+            self.probe.port = socks[0].getsockname()[1]
+            self.assertTrue(self.probe.listener_rule())
+            self.assertEqual(self.verdict()["verdict"], "PASS")
+        finally:
+            for s in socks:
+                s.close()
 
     def test_a_listener_swapped_after_the_rule_is_refused_on_the_connection(self):
         """The rule reads the port's listener; every request checks its own connection again (CheckedHTTPConnection),

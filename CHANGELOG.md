@@ -19,7 +19,8 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
     `GetExtendedTcpTable` and the owner's SID. The Node twin reads `netstat -anv` and `ps` on macOS, the same `/proc`
     files on Linux, `netstat -ano`, `whoami /user` and a PowerShell `GetOwnerSid` (SIDs, never names) on Windows; `checkedSocket` and `CheckedAgent` check a connection
     before a byte is written. Both twins answer the same questions over `test/fixtures/peer-owner/peer-owner-cases.json`.
-  - `check_service.py`: a first rule for a local placement, `listener.owner`: `PASS` for this OS account's process,
+  - `check_service.py`: a first rule for a local placement, `listener.owner`, read from the server end of a connection
+    of the probe's own on which nothing is sent: `PASS` for this OS account's process,
     `FAIL` `foreign-user` (then no rule reads the port and no token is sent), `NOT_RUN` when nothing listens. Every
     local request goes on a checked connection.
   - the hub client (`fabric_hub.post_mcp`, `postMcp`): `HubError` code `foreign-user`, retryable, before the bearer; the
@@ -45,8 +46,13 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 - `fabric_http`, `fabric-http.mjs` and the hub client refuse a loopback listener of root or a service account too (a
   rootful container proxy in front of a local model gateway, for one): use a rootless runtime or a forwarder of your own
   account. The Python `fabric_http` no longer sends a loopback URL through a proxy from the environment (`http_proxy`).
-- `check_service.py` imports `fabric_peer_owner`: a project that copies the probe without the kit's installer copies
-  `fabric_peer_owner.py` beside it.
+- `fabric_peer_owner` is now imported by `check_service.py`, `fabric_hub`, `fabric_http`, `fabric_supervisors` and the
+  Node `fabric-hub.mjs`, `fabric-http.mjs` and `fabric-supervisors.mjs` (which imported no kit module before): a project
+  that refreshes vendored copies file by file takes each module's `kit.json` closure, or the import fails.
+- A socket table over 4 MiB (several thousand TCP sockets; about 617 bytes each in macOS's `pcblist_n`, 150 in Linux's
+  `/proc/net/tcp`) cannot be read, so every loopback send fails closed as `foreign-user` on such a host.
+- A client running as root or SYSTEM reads root's or SYSTEM's listener as its own account's (launchd's pid 1 stays
+  `system`): the vendored module put the system rule first, which would have refused a root container's own sidecar.
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process
   cannot read): nothing is sent. Fail closed, as HA-2 asks.
 - A copy of `check_dashboard_layout.mjs` alone refuses a local `--service`; run it from the kit's folder.
