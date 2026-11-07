@@ -1,7 +1,8 @@
 # Agents that answer people: what they carry from the first release
 
 **Load this when the agent you are building answers people**: private chats, mail, store reviews, group chats, any
-channel where a person asks and the agent writes back. An agent on such a channel also follows the channel-agent
+channel where a person asks and the agent writes back. Build it from the template prompt,
+[communication-agent-template.md](communication-agent-template.md); this page holds the parts and their checks. An agent on such a channel also follows the channel-agent
 standard: [practices](practices.md#agents-on-a-channel-people-write-to). Every item below is a part of the agent, built and tested in its
 first release, not a later improvement. Each comes from the sources below: what the quality standard requires (A1,
 A5), and what an audit of five production agents found working or failing (P1 to P8). The practices are field
@@ -36,7 +37,10 @@ outage during the repair is a plain hand-off), and research and the hold stay th
 
 ## The record and the daily report
 
-- **Every inbound message is a turn with a trace id** (A1): the id is on the turn row, on each model call of that turn,
+- **Every inbound message belongs to one turn with a trace id** (A1 counts each message as a turn; a burst the
+  communication agent template batches is one turn listing its message ids, so `turns` counts batched turns while
+  `replyCoverage` stays over inbound messages in chat and mail, over owed questions in community and reviews: each message of a turn whose reply was accepted counts as covered, and a message no
+  reply is owed to, such as a closing, an automated sender, spam or the staff's own, leaves the count); the id is on the turn row, on each model call of that turn,
   on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance, not covered,
   handed off, small talk, limit, error), the hand-off reason and category, the latency, the knowledge revision the
   answer used, and whether the channel accepted the reply. Conversation text stays inside the agent, redacted, for at

@@ -16,7 +16,10 @@ SCENARIO = "an-agent-that-answers-people"
 # retention, and the CHANGELOG entry are pinned whole (whitespace normalized), so removing any clause of one fails here;
 # a deliberate change edits these in the same commit.
 PARTS = (
-    'Every inbound message is a turn with a trace id** (A1): the id is on the turn row, on each model call of that '
+    'Every inbound message belongs to one turn with a trace id** (A1 counts each message as a turn; a burst the '
+    'communication agent template batches is one turn listing its message ids, so `turns` counts batched turns while '
+    '`replyCoverage` stays over inbound messages in chat and mail, over owed questions in community and reviews: each message of a turn whose reply was accepted counts as covered, and a message no '
+    'reply is owed to, such as a closing, an automated sender, spam or the staff\'s own, leaves the count); the id is on the turn row, on each model call of that '
     'turn, on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance,'
     ' not covered, handed off, small talk, limit, error), the hand-off reason and category, the latency, the '
     'knowledge revision the answer used, and whether the channel accepted the reply. Conversation text stays inside'
@@ -115,8 +118,9 @@ CHECKLIST = (
     'A reader that adds an event kind re-reads its feed once',
 )
 EXPECTED = (
-    'loads references/agents-that-answer-people.md and builds its parts into the first release, not later',
-    'records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one '
+    'starts from references/communication-agent-template.md and loads references/agents-that-answer-people.md,'
+    ' building its parts into the first release, not later',
+    'records every inbound message in one turn with a trace id and an outcome from the fixed list, and publishes one '
     'support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0, '
     "its value valid against the contract's support-quality-daily.schema.json and a judge's calibration carried "
     'only once its readers adopted DEC-0144',
@@ -136,7 +140,7 @@ EXPECTED = (
 )
 STEP_0_ROW = (
     '| **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it '
-    'carries from its first release the turn record and the daily `support.quality_daily` report, the lane table '
+    'starts from references/communication-agent-template.md and carries from its first release the turn record and the daily `support.quality_daily` report, the lane table '
     'with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, '
     'false-state gates and a checker that sees the material first, numbers and account state from tools, the live '
     'tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never '

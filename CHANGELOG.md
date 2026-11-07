@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.75.0 (2026-11-07)
+
+Guidance only: no kit module, probe rule or hook changes; the contract pin stays `18f8d487`.
+
+### Added
+
+- **The Fabric communication agent template** (FAA-262, the operator's decision of 2026-11-07):
+  `creating-fabric-agents/references/communication-agent-template.md`, a prompt a coding agent builds a channel agent
+  from (support, sales and leads, community, inbox, store reviews, an internal assistant). It carries the inbound
+  pipeline as one estate measured it on 56 real questions and 19 written batches: a code prefilter, a triage at low
+  thinking that answers only a batch with no ask, one call that analyses, plans and drafts (with the injection check
+  and the product-only scope), the actions, a final pass only when an action returned new facts or an injection is
+  suspected, then the pre-send gates with a checker of another vendor. It also carries the business patterns, the
+  knowledge and data connections (the handoff queue's «a person answered» signal, the account state and version facts
+  as tools of every turn, retrieval over the whole conversation), leads handed to a sales agent of their own that owns
+  the CRM, the learning loop, the model lanes, the Fabric integration and the acceptance with 18 adversarial batches, and maps its sections to the parts of an organization agent template one file can carry (fabric-workspace
+  `knowledge/system/templates.md`, S2; S2's operating rules A1 to A12 apply by reference until the folder, FAA-265). `SKILL.md` links it beside `agents-that-answer-people.md`.
+- A scenario eval (`a-channel-agent-starts-from-the-communication-template`) and a trigger query for it (measured with a
+  real client: creating-fabric-agents 28 of 31, the new query routed right;
+  [record](docs/evidence/evals/2026-11-07-trigger-run.md)), and `test/test_communication_template_prose.py`,
+  which pins the template phrases that scenario grades and checks every event kind it names against the kit's writer.
+
+### Changed
+
+- `references/models-and-providers.md`: a new agent's model key gets USD 100 a month unless the operator names a higher
+  one, and the agent's own stop sits a little under the key's limit (the operator's decision of 2026-11-07).
+  It also names the template's open-vendor rule (every route of a lane reading people's words, fallbacks included) as
+  narrower than DEC-0083, and excepts a channel agent's batch triage from the volume row.
+- The template is linked from the creating-fabric-agents grill row «Does it answer people?» (the row «Who pays?» names
+  the USD 100 default), `agents-that-answer-people.md` and `practices.md`, and named in building-fabric-services
+  `SKILL.md` and the support-agent recipe's README, which now says how the recipe serves the template: the plan's draft carries `[KB:<id>]`
+  markers and the agent runs `check_reply` on it; the checker of another vendor stays the agent's own.
+
+- `agents-that-answer-people.md` A1: every inbound message belongs to one turn; a burst the template batches is one
+  turn listing its message ids (it said every message is a turn). The support-agent recipe's README names what goes in
+  `check_reply`'s `given`: the ids placed in the prompt, never the plan's own list, with tool results as entries of their own.
+- The operator channel's first step (`operator-channel-and-repository.md`, in adapting-projects-to-fabric and
+  creating-fabric-agents) says an agent that answers people on Telegram gives the operator channel a bot of its own,
+  and its example slot is now `EXAMPLE_AGENT_OPERATOR_BOT_TOKEN`.
+- The support-agent recipe's `channel-agent.example.json` final text reads as the standard's final reply (6.6: «we
+  could not confirm this»), not as an answer.
+- `docs/backlog.md`: FAA-263 (SKILL.md word headroom), FAA-264 (the readings' follow-ups that block nothing) and
+  FAA-265 (organization agent templates as folders, W0-Q8).
+- building-fabric-services `references/usage.md`: the every-limit example calls `usage_report` over the ledger's
+  receipts, since the Python `ledger.report` takes no `budgets` (it showed a call that raised `TypeError` since 0.19.0);
+  `test/test_usage_reference_snippet.py` runs it.
+
+### Upgrading
+
+- An answering agent that adopts the template moves every route that reads people's text to an open-vendor model,
+  fallbacks included (template rule 6); one that does not adopt it keeps what DEC-0083 asks. Its monthly stop uses the
+  kit's OpenRouter client with `window="month"` (the default window is a day).
+- Adopting the template starts a new series for `nobodyDropped.turns` (batched turns) and the outcome shares
+  (`customer_silent` up, `no_reply_owed` down); say so in the owner's report, never inside `support.quality_daily`.
+- A declaration copied from the 0.74.0 support-agent example replaces its `texts.final`, which claimed an answer.
+- An agent whose operator channel shares its answering bot moves the operator channel to a bot of its own (a new token
+  slot and link code), and binds the operator's id on the answering bot by its own link code (CA-8).
+
 ## 0.74.0 (2026-11-07)
 
 The contract pin moves to `18f8d487` (`v0.1.0+2026-11-07.1`) from `eac1a594` (`v0.1.0+2026-11-06.1`); between them

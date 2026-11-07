@@ -66,10 +66,12 @@ left out.
 it, and the host only shows it.
 
 **Every limit (DEC-0027).** Pass `budgets` to list every spending limit the service applies,
-enforced or not, so the spend view shows all of them; the operator asked for that on 2026-10-07:
+enforced or not, so the spend view shows all of them; the operator asked for that on 2026-10-07. In Python
+`ledger.report` takes no `budgets`, so call `usage_report` over the ledger's receipts (Node's `ledger.report` passes
+them through):
 
 ```python
-ledger.report(service_id=ID, budget={"period": "month", "limitUsd": 100}, budgets=[
+fabric_usage.usage_report(ledger.receipts(), service_id=ID, instance=INSTANCE, budget={"period": "month", "limitUsd": 100}, budgets=[
     {"id": "machine.monthly", "scope": "machine", "kind": "monthly", "period": "month", "limitUsd": 100, "enforced": True},
     {"id": "project.demo.daily", "scope": "project", "subject": "demo", "kind": "daily", "windowSeconds": 86400,
      "limitUsd": 5, "spentUsd": 0.31, "enforced": True},

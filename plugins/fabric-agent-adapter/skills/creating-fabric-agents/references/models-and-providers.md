@@ -47,9 +47,11 @@ below are dollars per million tokens, input / output, read 2026-11-06; reasoning
 | Data, documents, audio and video input | `google/gemini-3.1-pro-preview` (2 / 12) or `google/gemini-4-argon` (2 / 10); both read every input | `xiaomi/mimo-v2.6-pro` (0.435 / 0.87; audio and video) |
 | User requests and user content | an open-vendor model, e.g. `moonshotai/kimi-k3.1-pro` where a decision or a reply needs intelligence, `z-ai/glm-5.3` or `deepseek/deepseek-v4.1-flash` at volume | another open vendor; a closed vendor is never the only route (DEC-0083), and we recommend it neither draft a reply to a person nor check such a lane, where its refusals turn into silence |
 | Strong, cheap reasoning over text at volume | `z-ai/glm-5.3` (0.07 / 1.40; text only) | `deepseek/deepseek-v4.1-flash` |
-| Volume: classification, extraction, triage, screenshots, periodic jobs | `deepseek/deepseek-v4.1-flash` (0.051 / 0.567; text, image); always the newest `-flash`, never `-pro` | `qwen/qwen3.8-flash`; `z-ai/glm-5.3-flash` only with a generous budget, its reasoning cannot be turned off |
+| Volume: classification, extraction, triage, screenshots, periodic jobs (a channel agent's batch triage runs on the planning model instead: communication-agent-template.md, section 3) | `deepseek/deepseek-v4.1-flash` (0.051 / 0.567; text, image); always the newest `-flash`, never `-pro` | `qwen/qwen3.8-flash`; `z-ai/glm-5.3-flash` only with a generous budget, its reasoning cannot be turned off |
 
-Which vendor is open is the catalogue's fact (`open-vendor` class, FAC-SEM-112), not this table's: check it there.
+Which vendor is open is the catalogue's fact (`open-vendor` class, FAC-SEM-112), not this table's: check it there. A communication agent built from
+[communication-agent-template.md](communication-agent-template.md) keeps every route of such a lane open-vendor,
+fallbacks included (its rule 6), which is narrower than the floor above.
 A frontier-class model costs several times a light one per turn: put it where decisions are made and volume is
 moderate, and keep volume on the light models.
 
@@ -91,6 +93,10 @@ change an embedding model without re-indexing every stored vector (search silent
 
 - **Each agent spends its own key, with its own ceiling.** The key is minted for that agent (and that project) by the
   estate's key manager, with a monthly limit; it is never pasted by a person into a file, a prompt or a command line.
+  A new agent's own key (the operator's) gets USD 100 a month unless the operator names a higher one for that agent
+  (an organization's key follows its grant), and the agent's own
+  stop sits a little under the key's limit, so the provider never refuses first (the kit's OpenRouter client counts a
+  month with window="month"; its default window is a day).
   Read it from the environment the service manager or the session gives the agent (Fabric Switchboard hands an agent
   the key of the project it starts in).
 - **An organization's instance spends the organization's key** under its grant; a personal key never pays for an
