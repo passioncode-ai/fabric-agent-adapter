@@ -9,7 +9,7 @@ import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabri
 import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
-import { ListenerRefused, checkedSocket } from './fabric-peer-owner.mjs';
+import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';
 import http from 'node:http';
 
 export const DEFAULT_EXIT_TIMEOUT = 15;
@@ -321,7 +321,7 @@ export function launchdOverride(label, { run = defaultRun, platform = process.pl
 // The well-known answer at a loopback origin, read only on a connection whose server end is this OS account's process
 // (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, { foreignUser } when the listener is another
 // account's or its owner cannot be told.
-async function wellKnownOf(origin) {
+export async function wellKnownOf(origin) {
   const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
   if (!m) {
     try {
@@ -331,15 +331,12 @@ async function wellKnownOf(origin) {
       return null;
     }
   }
-  let socket;
-  try {
-    socket = await checkedSocket(Number(m[1]), { timeoutMs: 2000 });
-  } catch (err) {
-    return err instanceof ListenerRefused ? { foreignUser: `foreign-user: ${err.message}` } : null;
-  }
+  // A CheckedAgent without keep-alive: the request goes on the very socket it checked, and the socket closes after the
+  // answer, so a poll leaves no connection open behind it.
+  const agent = new CheckedAgent({ keepAlive: false });
   return new Promise((resolve) => {
-    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/.well-known/fabric-service', agent: false,
-      createConnection: () => socket, timeout: 2000 }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/.well-known/fabric-service', agent,
+      timeout: 2000 }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => {
@@ -348,9 +345,9 @@ async function wellKnownOf(origin) {
       res.on('error', () => resolve(null));
     });
     req.on('timeout', () => req.destroy());
-    req.on('error', () => resolve(null));
+    req.on('error', (err) => resolve(err instanceof ListenerRefused ? { foreignUser: `foreign-user: ${err.message}` } : null));
     req.end();
-  });
+  }).finally(() => agent.destroy());
 }
 
 /**

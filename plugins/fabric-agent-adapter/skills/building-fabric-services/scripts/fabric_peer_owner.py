@@ -9,7 +9,7 @@
     for `X | None` in its signatures (the kit's floor is Python 3.9, where `typing.get_type_hints`
     cannot read `X | None`). Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
-    its Node twin is `fabric-peer-owner.mjs` (netstat, /proc and tasklist, no ctypes).
+    its Node twin is `fabric-peer-owner.mjs` (netstat, /proc and PowerShell, no ctypes).
 
 WHY. Loopback is one per machine, not one per OS account. On a host with several accounts,
 every account's processes reach every service any account listens with on 127.0.0.1, and a

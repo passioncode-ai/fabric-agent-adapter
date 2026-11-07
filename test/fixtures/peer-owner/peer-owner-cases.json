@@ -1,7 +1,7 @@
 {
  "about": "FAA-226: socket tables and the owner each question reads, for fabric_peer_owner.py and fabric-peer-owner.mjs. Written by make_peer_owner_cases.py; regenerate, never edit.",
  "ownUid": 501,
- "ownUser": "example-pc\\owner",
+ "whoami": "\"example-pc\\����\",\"S-1-5-21-1004336348-1177238915-682003330-1001\"\r\n",
  "tables": {
   "netstatMulti": {
    "kind": "netstat",
@@ -41,12 +41,12 @@
   "4500": "  501\n",
   "9999": ""
  },
- "tasklist": {
-  "4100": "\"python.exe\",\"4100\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\owner\",\"0:00:01\",\"N/A\"\r\n",
-  "4300": "\"example.exe\",\"4300\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\Owner\",\"0:00:01\",\"N/A\"\r\n",
-  "4400": "\"example-agent.exe\",\"4400\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\owner\",\"0:00:01\",\"N/A\"\r\n",
-  "5200": "\"curl.exe\",\"5200\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"N/A\",\"0:00:01\",\"N/A\"\r\n",
-  "6200": "\"curl.exe\",\"6200\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\other\",\"0:00:01\",\"N/A\"\r\n"
+ "ownerSid": {
+  "4100": "S-1-5-21-1004336348-1177238915-682003330-1001\r\n",
+  "4300": "S-1-5-21-1004336348-1177238915-682003330-1001\r\n",
+  "4400": "S-1-5-21-1004336348-1177238915-682003330-1001\r\n",
+  "5200": "",
+  "6200": "S-1-5-21-1004336348-1177238915-682003330-1002\r\n"
  },
  "normHost": [
   [
@@ -92,6 +92,10 @@
   [
    "example.test",
    "example.test"
+  ],
+  [
+   "::ffff:0.0.0.0",
+   "*"
   ]
  ],
  "cases": [

@@ -409,28 +409,27 @@ this estate needs.
 - **A desktop app with no supervisor** (DEC-0069): its descriptor says `manager: "person"` with `lifecycle.app`, no
   origin, `installedBy {by: "person", role, tool}`, `source.repository` (the lifecycle reference, *An app's own
   descriptor and the node*).
-- **No Python:** use the Node kit; run the probe from any machine that has Python and
-  can reach the port, or mark the probe `NOT_RUN` with the reason.
+- **No Python:** use the Node kit; run the probe where Python reaches the port, or mark it `NOT_RUN`
+  with the reason.
 - **Neither kit fits the framework:** implement the four routes and the lock by hand
   against [the protocol reference](references/protocol.md); the probe is the judge.
 - **No contract checkout:** the protocol reference is pinned to the extension commit
   in this skill's metadata; do not reconstruct fields from memory.
-- **Fabric Dashboards not installed:** nothing changes; the service is complete
-  without a host; the descriptor waits for one.
+- **Fabric Dashboards not installed:** nothing changes; the descriptor waits for a host.
 
 ## Gotchas
 
 - `lsof` shows `*:<port>` or `0.0.0.0` → the bind is wrong even if the Host check works.
-- A health probe that only checks HTTP 200 accepts any program on the port: compare
-  `service.id` and `service.instance`.
+- HTTP 200 alone accepts any program on the port: compare `service.id` and `service.instance`, read only from
+  this OS account's listener. A `listener.owner` FAIL (`foreign-user`): never hand that port the token; report it.
 - `launchctl bootstrap` right after `bootout` fails with I/O error 5: wait for the unload, then retry.
 - Under launchd `PATH` is bare. Pin the interpreter by absolute path; set `PATH`
   explicitly in the plist; never copy the whole shell environment into it.
 - A plist pointing at a worktree or checkout breaks when it moves: point it at a release.
 - `http.server.HTTPServer` resolves its FQDN between `bind()` and `listen()`: with a slow
   resolver (a macOS CI runner, a Mac offline) the port is bound but silent. Use `fs.LoopbackHTTPServer`.
-- `logging.basicConfig` called twice: the second is a no-op, the server's log file
-  stays empty. Configure logging once, in the entry point.
+- `logging.basicConfig` called twice: the second is a no-op and the log stays empty. Configure logging once, in
+  the entry point.
 - Hand-made `.plist.bak` files in `~/Library/LaunchAgents` are never cleaned up; keep
   backups elsewhere.
 

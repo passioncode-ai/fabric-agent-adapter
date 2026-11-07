@@ -37,6 +37,7 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 | The body is read to one byte past `max_bytes`; over it is an error | 8 MiB | a runaway answer never fills memory |
 | Redirects are answered, never followed | | a redirect must not carry the `Authorization` header to another host |
 | Plain `http://` is refused unless the host is loopback or `insecure=True`; credentials in a URL are refused | | a token never crosses a network in clear, nor sits in a URL |
+| Plain `http://` to a loopback host goes on a connection whose server end is this OS account's process, told from the socket table before a byte is sent and never through a proxy from the environment (`fabric_peer_owner`); another account's listener, root's, or one whose owner cannot be told is kind `foreign-user`, nothing sent, never retried. The Node twin sends such a request through `node:http` on a checked connection, not `fetch` | | DEC-0154 HA-2: loopback is one per computer, not one per OS account |
 | Header names must be tokens; a value with a line break or NUL is refused | | header injection |
 | A JSON body is written as `JSON.stringify` writes it: a lone surrogate escaped, NaN and Infinity refused | | both twins send the same bytes |
 | Whatever the transport throws is a connection error, in both languages; a timeout is a timeout | | |
@@ -44,7 +45,7 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 | `Response.json()` reads as `JSON.parse` does: a byte order mark skipped, `NaN` and `Infinity` refused | | |
 
 Every answer comes back as a `Response`, whatever its status; `HttpError` means no usable answer came, with `kind`
-`connection`, `timeout`, `too-large` or `refused`, the status when there was one, and the URL redacted to scheme,
+`connection`, `timeout`, `too-large`, `refused` or `foreign-user`, the status when there was one, and the URL redacted to scheme,
 host, port and path (`redact_url`); a URL that is not http or https keeps only its scheme (`htps:<redacted>`, and `ssh:<redacted>`
 for `ssh://h:99999/r` too), and an http, https, ws, wss or ftp URL that does not parse (Node reads it with `new URL`;
 Python reads its own special-scheme form and prints what it finds, never the user information), or a value with no

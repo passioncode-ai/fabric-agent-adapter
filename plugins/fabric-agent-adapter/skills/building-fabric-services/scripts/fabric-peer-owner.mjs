@@ -24,12 +24,16 @@
 //
 // HOW, ON EACH OS. Node has no ctypes, so it reads what the Python twin keeps as its fallback or reads the same files:
 // - macOS: `/usr/sbin/netstat -anv -p tcp`, its process:pid column, then `ps -o uid= -p PID` for the one row a
-//   question selects (Observatory measured about 20 ms over 846 sockets; it names root's listeners too).
+//   question selects (Observatory measured about 20 ms over 846 sockets; it names root's listeners too). The uid is
+//   read a few milliseconds after the pid: a pid reused in between would be misread, a window the Python twin's sysctl
+//   reader does not have (it reads both from one record).
 // - Linux: `/proc/net/tcp` and `/proc/net/tcp6`, whose uid column every account may read.
 // - Windows: `netstat -ano -p TCP` and `-p TCPv6` for the owning pid (a row whose peer port is 0 listens; a connected
 //   row of pid 0 is TIME_WAIT, the idle process's, never an answer; the state column is localized and not read), then
-//   `tasklist /v /fo csv /nh /fi "PID eq N"` for its account, compared with `whoami` without case. A process tasklist
-//   cannot read (`N/A`) is unknown.
+//   the owner's SID from PowerShell (`Win32_Process`'s `GetOwnerSid`), compared with this user's from
+//   `whoami /user /fo csv /nh`. SIDs, never names: a name in the console's code page can decode to the same string for
+//   two accounts. A process whose SID cannot be read (another account's, usually, without the right to open it) is
+//   unknown.
 // Every read is bounded (MAX_TABLE_BYTES, a timeout per program) and never cached across connections; only listener
 // is cached, for LISTENER_TTL_MS. A TIME_WAIT row is never an answer; two live rows with the same addresses are
 // unknown (several-rows), never a guess. It never reads a byte from the socket it is asked about and needs no
@@ -87,7 +91,8 @@ export function normHost(host) {
   if (mapped) {
     const hi = parseInt(mapped[1], 16);
     const lo = parseInt(mapped[2], 16);
-    return [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+    const v4 = [hi >> 8, hi & 255, lo >> 8, lo & 255].join('.');
+    return v4 === '0.0.0.0' ? '*' : v4;
   }
   return text;
 }
@@ -109,16 +114,17 @@ export function classify(uid, pid, { method, ownUid: own } = {}) {
   return owner(ANOTHER_ACCOUNT, { uid, pid, method });
 }
 
-// Windows: pid 0 and 4 and the system's own accounts are system, this user's name this-account, a name tasklist could
-// not read unknown, any other name another-account. Names compare without case (tasklist and whoami differ in it).
-const WINDOWS_SYSTEM_NAMES = new Set(['nt authority\\system', 'nt authority\\local service', 'nt authority\\network service']);
+// Windows, as the Python twin's classify_sid: the System process (pid 0 and 4) and the system's own accounts
+// (LocalSystem, LocalService, NetworkService) are system, this process's SID this-account, any other SID
+// another-account, a SID that could not be read unknown.
+const SYSTEM_SIDS = new Set(['S-1-5-18', 'S-1-5-19', 'S-1-5-20']);
+const SID = /^S-1-[0-9]+(-[0-9]+)+$/;
 
-export function classifyWindowsUser(user, pid, { ownUser, method = 'netstat-windows' } = {}) {
+export function classifySid(sid, pid, { ownSid, method = 'netstat-windows' } = {}) {
   if (pid === 0 || pid === 4) return owner(SYSTEM, { pid, method });
-  const name = typeof user === 'string' ? user.trim().toLowerCase() : '';
-  if (!name || name === 'n/a') return owner(UNKNOWN, { pid, method, reason: 'process-not-readable' });
-  if (WINDOWS_SYSTEM_NAMES.has(name)) return owner(SYSTEM, { pid, method });
-  if (typeof ownUser === 'string' && name === ownUser.trim().toLowerCase()) return owner(THIS_ACCOUNT, { pid, method });
+  if (typeof sid !== 'string' || !SID.test(sid)) return owner(UNKNOWN, { pid, method, reason: 'process-not-readable' });
+  if (SYSTEM_SIDS.has(sid)) return owner(SYSTEM, { pid, method });
+  if (typeof ownSid === 'string' && SID.test(ownSid) && sid === ownSid) return owner(THIS_ACCOUNT, { pid, method });
   return owner(ANOTHER_ACCOUNT, { pid, method });
 }
 
@@ -225,18 +231,23 @@ export function parseWindowsNetstat(text) {
   return rows;
 }
 
-// tasklist's CSV quotes every field.
-function csvFields(line) {
-  return [...line.matchAll(/"((?:[^"]|"")*)"/g)].map((m) => m[1].replace(/""/g, '"'));
+// `whoami /user /fo csv /nh`: `"<domain>\\<name>","S-1-5-..."`. The name is read in the console's code page and never
+// used; the SID is ASCII. Null when no SID is there.
+export function parseWhoamiSid(text) {
+  const m = /"(S-1-[0-9]+(?:-[0-9]+)+)"\s*$/m.exec(String(text));
+  return m ? m[1] : null;
 }
 
-// `tasklist /v /fo csv /nh /fi "PID eq N"`: the user name column (the seventh) of the row whose pid is N, or null.
-export function parseTasklistUser(text, pid) {
-  for (const line of String(text).split(/\r?\n/)) {
-    const f = csvFields(line.trim());
-    if (f.length >= 7 && f[1] === String(pid)) return f[6];
-  }
-  return null;
+// What the owner-SID script prints: one SID, or nothing when the process is gone or cannot be opened.
+export function parseOwnerSid(text) {
+  const t = String(text).trim();
+  return SID.test(t) ? t : null;
+}
+
+// The PowerShell that prints a process's owner SID (pid an integer, checked by the caller).
+export function ownerSidScript(pid) {
+  return `$p = Get-CimInstance -ClassName Win32_Process -Filter 'ProcessId=${Number(pid)}'; `
+    + 'if ($p) { $r = Invoke-CimMethod -InputObject $p -MethodName GetOwnerSid; if ($r.ReturnValue -eq 0) { $r.Sid } }';
 }
 
 // -- readers: the live table on this host ------------------------------------------------------------------------------
@@ -288,29 +299,33 @@ export async function readTable({ run = runProgram } = {}) {
   throw new TableUnreadable('unsupported-platform');
 }
 
-let windowsUser = null;
+let windowsSid = null;
 
-async function windowsOwner(pid, how, run, ownUser) {
-  if (pid === 0 || pid === 4) return classifyWindowsUser(null, pid, { method: how });
+async function windowsOwner(pid, how, run, ownSid) {
+  if (pid === 0 || pid === 4) return classifySid(null, pid, { method: how });
+  if (!Number.isInteger(pid) || pid < 0) return owner(UNKNOWN, { pid, method: how, reason: 'no-pid' });
   try {
-    if (ownUser === undefined) ownUser = windowsUser ??= (await runProgram('whoami', [], WINDOWS_TIMEOUT_MS)).trim();
+    if (ownSid === undefined) {
+      if (run === runProgram) ownSid = windowsSid ??= parseWhoamiSid(await run('whoami', ['/user', '/fo', 'csv', '/nh'], WINDOWS_TIMEOUT_MS));
+      else ownSid = parseWhoamiSid(await run('whoami', ['/user', '/fo', 'csv', '/nh'], WINDOWS_TIMEOUT_MS));
+    }
   } catch (err) {
-    return owner(UNKNOWN, { pid, method: how, reason: `own-user: ${err.message}` });
+    return owner(UNKNOWN, { pid, method: how, reason: `own-sid: ${err.message}` });
   }
-  let user = null;
+  if (!ownSid) return owner(UNKNOWN, { pid, method: how, reason: 'own-sid: unreadable' });
+  let sid = null;
   try {
-    user = parseTasklistUser(await run('tasklist', ['/v', '/fo', 'csv', '/nh', '/fi', `PID eq ${pid}`], WINDOWS_TIMEOUT_MS), pid);
+    sid = parseOwnerSid(await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ownerSidScript(pid)], WINDOWS_TIMEOUT_MS));
   } catch {
-    user = null;
+    sid = null;
   }
-  if (user === null) return owner(UNKNOWN, { pid, method: how, reason: 'process-gone' });
-  return classifyWindowsUser(user, pid, { ownUser, method: how });
+  return classifySid(sid, pid, { ownSid, method: how });
 }
 
-// The owner of one selected row: its uid when the table carried one, else the pid's. `run`, `ownUid` and `ownUser`
+// The owner of one selected row: its uid when the table carried one, else the pid's. `run`, `ownUid` and `ownSid`
 // (Windows) are the tests' fixtures; by default the programs themselves and this process's own.
-export async function resolve(row, how, { run = runProgram, ownUid: mine, ownUser } = {}) {
-  if (how === 'netstat-windows') return windowsOwner(row.pid, how, run, ownUser);
+export async function resolve(row, how, { run = runProgram, ownUid: mine, ownSid } = {}) {
+  if (how === 'netstat-windows') return windowsOwner(row.pid, how, run, ownSid);
   if (row.uid !== null && row.uid !== undefined) return classify(row.uid, row.pid, { method: how, ownUid: mine });
   if (row.pid === null || row.pid <= 0) return owner(UNKNOWN, { pid: row.pid, method: how, reason: 'no-pid' });
   if (row.pid === 1) return owner(SYSTEM, { pid: 1, method: how });
@@ -377,12 +392,13 @@ export function pickListener(rows, port) {
 }
 
 // Who listens on 127.0.0.1:<port>, or on 0.0.0.0 or ::1. none when nothing does, unknown (several-rows) when two sockets
-// do. Cached for LISTENER_TTL_MS (a `read` given in opts is never cached). `read` answers { rows, how } as readTable
-// does; `run`, `ownUid` and `ownUser` go to resolve.
+// do. Cached for LISTENER_TTL_MS (never when `read`, `run`, `ownUid` or `ownSid` is given). `read` answers
+// { rows, how } as readTable does; `run`, `ownUid` and `ownSid` go to resolve.
 export async function listener(port, opts = {}) {
   const { read, now = () => performance.now() } = opts;
+  const injected = Boolean(read || opts.run || opts.ownUid !== undefined || opts.ownSid !== undefined);
   const at = now();
-  const hit = read ? undefined : listeners.get(port);
+  const hit = injected ? undefined : listeners.get(port);
   if (hit && at - hit[0] < LISTENER_TTL_MS) return hit[1];
   let found;
   let how;
@@ -393,14 +409,14 @@ export async function listener(port, opts = {}) {
     found = pickListener(table.rows, port);
   } catch (err) {
     const who = owner(UNKNOWN, { method: method(), reason: err instanceof TableUnreadable ? err.message : `table: ${err.name}` });
-    if (!read) listeners.set(port, [at, who]);
+    if (!injected) listeners.set(port, [at, who]);
     return who;
   }
   let who;
   if (found.length === 0) who = owner(NONE, { method: how });
   else if (found.length > 1) who = owner(UNKNOWN, { method: how, reason: 'several-rows' });
   else who = await resolve(found[0], how, opts);
-  if (!read) listeners.set(port, [at, who]);
+  if (!injected) listeners.set(port, [at, who]);
   return who;
 }
 

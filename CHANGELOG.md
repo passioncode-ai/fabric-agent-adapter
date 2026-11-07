@@ -17,7 +17,7 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
     the module loads by its path and `Optional[X]` in its signatures for the Python 3.9 floor; it reads macOS through `sysctl net.inet.tcp.pcblist_n` (calibrated on a connected pair
     of its own, else `netstat -anv`), Linux through `/proc/net/tcp` and `/proc/net/tcp6`, Windows through
     `GetExtendedTcpTable` and the owner's SID. The Node twin reads `netstat -anv` and `ps` on macOS, the same `/proc`
-    files on Linux, `netstat -ano` and `tasklist` on Windows; `checkedSocket` and `CheckedAgent` check a connection
+    files on Linux, `netstat -ano`, `whoami /user` and a PowerShell `GetOwnerSid` (SIDs, never names) on Windows; `checkedSocket` and `CheckedAgent` check a connection
     before a byte is written. Both twins answer the same questions over `test/fixtures/peer-owner/peer-owner-cases.json`.
   - `check_service.py`: a first rule for a local placement, `listener.owner`: `PASS` for this OS account's process,
     `FAIL` `foreign-user` (then no rule reads the port and no token is sent), `NOT_RUN` when nothing listens. Every
@@ -35,7 +35,13 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 ### Upgrading
 
 - `check_service.py` prints one more line for a local service (`listener.owner`), and a local service whose port is
-  held by another OS account's or root's process now fails (exit 1) where 0.73.0 read its answer.
+  held by another OS account's or root's process, or by one whose owner cannot be told (a sandbox without `sysctl` or
+  `netstat`, a socket launchd holds for a socket-activated job), now fails (exit 1) where 0.73.0 read its answer.
+- `fetch_well_known` (re-exported by `fabric_service`) answers `None` for a listener of another account, and
+  `launchd_install` / `launchdInstall` now raises, naming `foreign-user`, where 0.73.0 returned success when another
+  account's copy of the service answered on the port.
+- The Node `fabric-http.mjs` sends a plain `http://` loopback request through `node:http` on a checked connection, not
+  `fetch`: a caller or test that stubs the global `fetch` for a loopback URL is no longer reached (pass `transport`).
 - The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process
   cannot read): nothing is sent. Fail closed, as HA-2 asks.
 - A copy of `check_dashboard_layout.mjs` alone refuses a local `--service`; run it from the kit's folder.
@@ -45,6 +51,12 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 - `references/protocol.md` gains "The listener's owner (DEC-0154 HA-2)"; `references/board.md`, `references/lifecycle.md`,
   `references/kit-modules.md` and `SKILL.md` name the check.
 - The test fake hub keeps HTTP/1.1 connections, as Fabric's own hub does.
+- `dashboard-links.md` (all three copies) opens a raw loopback address in a browser only after the listener is this OS
+  account's (the pinned PL-3); the link gate enforcing it is FAA-251. `connectors.md` names the loopback owner check
+  and the kind `foreign-user`; the skill card's Network row names the socket table the kit now reads; `SKILL.md` and
+  `references/lifecycle.md` read a service's identity only from this account's listener, with a scenario eval for a
+  port another account holds. Owed, each its own row: FAA-251 (the link gate), FAA-252 (a running board session's
+  reason), FAA-253 (the systemd and Task Scheduler installers' poll), FAA-254 (working-with-fabric's "Fabric is up").
 
 ## 0.73.0 (2026-11-07)
 

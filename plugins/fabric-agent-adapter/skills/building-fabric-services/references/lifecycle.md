@@ -48,7 +48,8 @@ refuses a port another instance declares), the service's directories, and comman
 carry a credential. Only `doctor` and `update` are commands a host may run.
 
 **Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
-authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's.
+authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's,
+on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers).
 `status` is `starting`, `ready`, `degraded` or `stopping`; `degraded` is always present, and an empty list asserts
 full health. A process that cannot serve does not answer, and a host derives `down`. An install or upgrade polls
 that document until `service.id` matches (at most 40 s) before it calls the service started.

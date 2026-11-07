@@ -16,16 +16,17 @@ function parsed(table) {
   return { rows: po.parseProcNetTcp(table.text, { family: table.kind === 'proc4' ? 4 : 6, byteorder: 'little' }), how: 'proc' };
 }
 
-// What `ps -o uid= -p PID` and `tasklist ... /fi "PID eq N"` print for the fixtures' pids.
+// What `ps -o uid= -p PID`, `whoami /user /fo csv /nh` and the owner-SID PowerShell print for the fixtures' pids.
 async function fixtureRun(file, args) {
-  const pid = file.endsWith('ps') ? args[args.length - 1] : /PID eq ([0-9]+)/.exec(args.join(' '))?.[1];
-  const table = file.endsWith('ps') ? CASES.ps : CASES.tasklist;
+  if (file === 'whoami') return CASES.whoami;
+  const pid = file.endsWith('ps') ? args[args.length - 1] : /ProcessId=([0-9]+)/.exec(args.join(' '))?.[1];
+  const table = file.endsWith('ps') ? CASES.ps : CASES.ownerSid;
   if (table[pid] === undefined) throw new po.TableUnreadable(`${file}: exit 1`);
   return table[pid];
 }
 
 function opts(table) {
-  return { read: async () => parsed(table), run: fixtureRun, ownUid: CASES.ownUid, ownUser: CASES.ownUser };
+  return { read: async () => parsed(table), run: fixtureRun, ownUid: CASES.ownUid };
 }
 
 const fakeSocket = (client, server) => ({ localAddress: client[0], localPort: client[1], remoteAddress: server[0], remotePort: server[1] });
@@ -66,9 +67,12 @@ test('the parsers', () => {
   const win = po.parseWindowsNetstat(CASES.tables.windowsGerman.text);
   assert.equal(win.length, 10);
   assert.deepEqual(win.filter((r) => r.timeWait).map((r) => r.local), [['127.0.0.1', 50003]]);
-  assert.equal(po.parseTasklistUser(CASES.tasklist['6200'], 6200), 'EXAMPLE-PC\\other');
-  assert.equal(po.parseTasklistUser(CASES.tasklist['6200'], 6201), null);
-  assert.equal(po.parseTasklistUser('INFO: No tasks are running which match the specified criteria.\r\n', 7), null);
+  assert.equal(po.parseWhoamiSid(CASES.whoami), 'S-1-5-21-1004336348-1177238915-682003330-1001');
+  assert.equal(po.parseWhoamiSid('INFO: something else\r\n'), null);
+  assert.equal(po.parseOwnerSid(CASES.ownerSid['6200']), 'S-1-5-21-1004336348-1177238915-682003330-1002');
+  assert.equal(po.parseOwnerSid(''), null);
+  assert.equal(po.parseOwnerSid('Access denied'), null);
+  assert.match(po.ownerSidScript(4100), /ProcessId=4100'/);
 });
 
 test('two live rows, two listeners, a gone process and an unreadable table are unknown', async () => {
@@ -94,8 +98,19 @@ test('classification and refusals', () => {
   assert.equal(po.classify(501, 1, { method: 'x', ownUid: 501 }).kind, po.SYSTEM);
   assert.equal(po.classify(501, 9, { method: 'x', ownUid: 501 }).kind, po.THIS_ACCOUNT);
   assert.equal(po.classify(502, 9, { method: 'x', ownUid: 501 }).kind, po.ANOTHER_ACCOUNT);
-  assert.equal(po.classifyWindowsUser('NT AUTHORITY\\SYSTEM', 700, { ownUser: 'pc\\me' }).kind, po.SYSTEM);
-  assert.equal(po.classifyWindowsUser('PC\\Me', 700, { ownUser: 'pc\\me' }).kind, po.THIS_ACCOUNT);
+  const own = 'S-1-5-21-1-2-3-1001';
+  assert.equal(po.classifySid(own, 50, { ownSid: own }).kind, po.THIS_ACCOUNT);
+  assert.equal(po.classifySid('S-1-5-21-1-2-3-1002', 50, { ownSid: own }).kind, po.ANOTHER_ACCOUNT);
+  assert.equal(po.classifySid('S-1-5-18', 50, { ownSid: own }).kind, po.SYSTEM);
+  assert.equal(po.classifySid(null, 4, { ownSid: own }).kind, po.SYSTEM);
+  assert.equal(po.classifySid(null, 50, { ownSid: own }).reason, 'process-not-readable');
+  // Two Cyrillic names in cp866 ('иван', 'олег') decode to one string as UTF-8. Only SIDs are compared, so a name
+  // never stands for an account, and a garbled one never reads as this account.
+  const ivan = Buffer.from([0xA8, 0xA2, 0xA0, 0xAD]).toString('utf8');
+  const oleg = Buffer.from([0xAE, 0xAB, 0xA5, 0xA3]).toString('utf8');
+  assert.equal(ivan, oleg);
+  assert.equal(po.classifySid(ivan, 50, { ownSid: oleg }).kind, po.UNKNOWN);
+  assert.equal(po.classifySid(own, 50, { ownSid: ivan }).kind, po.ANOTHER_ACCOUNT);
   assert.equal(po.refusal(po.owner(po.ANOTHER_ACCOUNT), 1)[0], po.SERVER_NOT_OWN);
   assert.equal(po.refusal(po.owner(po.SYSTEM), 1)[0], po.SERVER_NOT_OWN);
   assert.equal(po.refusal(po.owner(po.UNKNOWN, { reason: 'no-row' }), 1)[0], po.SERVER_UNVERIFIED);
@@ -117,7 +132,7 @@ test('a checked socket refuses another account\'s server before a byte is writte
   t.after(() => server.close());
   const refused = [
     // The live table, read as if this process were another account: its own server reads another-account.
-    [{ ownUid: 424242, ownUser: 'example-pc\\nobody' }, po.SERVER_NOT_OWN],
+    [{ ownUid: 424242, ownSid: 'S-1-5-21-9-9-9-424242' }, po.SERVER_NOT_OWN],
     // Every row owned by uid 0: the server reads system.
     [{ read: async () => ({ rows: (await po.readTable()).rows.map((r) => ({ ...r, uid: 0 })), how: 'proc' }) }, po.SERVER_NOT_OWN],
     // A table that cannot be read: unknown, fail closed.
@@ -171,7 +186,7 @@ test('the hub client sends no bearer to a door another account holds, and does t
   const { server, received, port } = await recorder();
   t.after(() => server.close());
   const origin = `http://127.0.0.1:${port}`;
-  for (const ask of [{ ownUid: 424242, ownUser: 'example-pc\\nobody' }, { read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }]) {
+  for (const ask of [{ ownUid: 424242, ownSid: 'S-1-5-21-9-9-9-424242' }, { read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }]) {
     const agent = new po.CheckedAgent({ ask });
     t.after(() => agent.destroy());
     await assert.rejects(postMcp(origin, { jsonrpc: '2.0', id: 1, method: 'ping' }, 'synthetic', { agent }),

@@ -351,3 +351,20 @@ test('the override reader answers as the Python one does', () => {
   assert.equal(read(fakeLaunchd({ overrides: { [`${name}.other`]: 'disabled' } })), null, 'another label is not this one');
   assert.equal(read(fakeLaunchd({ printDisabledFails: true })), 'unknown');
 });
+
+test('FAA-226: the installer reads the well-known answer on the one connection it checked, then closes it', async (t) => {
+  const { wellKnownOf } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const http = await import('node:http');
+  const opened = [];
+  const closed = [];
+  const server = http.createServer((req, res) => res.end(JSON.stringify({ service: { id: 'example-agent', instance: 'default' } })));
+  server.keepAliveTimeout = 60000; // a server that keeps idle connections open, as a stdlib Python one does
+  server.on('connection', (socket) => { opened.push(socket.remotePort); socket.on('close', () => closed.push(socket.remotePort)); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const doc = await wellKnownOf(`http://127.0.0.1:${server.address().port}`);
+  assert.equal(doc.service.id, 'example-agent');
+  for (let i = 0; i < 100 && closed.length < opened.length; i += 1) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(opened.length, 1, 'one connection: the checked one carries the request');
+  assert.deepEqual(closed, opened, 'and it is closed after the answer');
+});

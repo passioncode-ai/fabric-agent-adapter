@@ -221,14 +221,17 @@ The kit's module is `fabric_peer_owner` / `fabric-peer-owner.mjs` (layer L0, [ki
 (`CheckedHTTPConnection`; Node `checkedSocket`, `CheckedAgent`). Python reads macOS through `sysctl
 net.inet.tcp.pcblist_n` (calibrated on a connected pair of its own, else `netstat -anv`), Linux through `/proc/net/tcp`
 and `/proc/net/tcp6`, Windows through `GetExtendedTcpTable` and the owner's token SID; Node reads `netstat -anv` and `ps`
-on macOS, the same `/proc` files on Linux, and `netstat -ano` with `tasklist` on Windows. Fail closed: everything but
+on macOS, the same `/proc` files on Linux, and `netstat -ano` with the owner SID from PowerShell `GetOwnerSid` against `whoami /user` on Windows (SIDs, never names). Fail closed: everything but
 `this-account` refuses, `unknown` included.
 
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, first for
 a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`),
 `fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user`, never retried),
-`check_dashboard_layout.mjs` before a local login code, and the installers' poll (a listener of another account is never
-a successful install). A service's own loopback server refusing another account's peer (HA-3) is FAA-227, and the port
+`check_dashboard_layout.mjs` before a local login code, and the launchd installers' poll (a listener of another account
+is never a successful install; the systemd and Task Scheduler installers do not poll yet, FAA-253). A running board
+session reports a door another account holds as `board.down` with reason `unreachable` until FAA-252. On macOS the Node
+twin reads the pid from `netstat` and the uid from `ps` a few milliseconds apart, so a pid reused in between would be
+misread; the Python twin's `sysctl` reader takes both from one record. A service's own loopback server refusing another account's peer (HA-3) is FAA-227, and the port
 claim file (HA-1) waits on the contract's CT-228.
 
 ## Semantic rules a host applies

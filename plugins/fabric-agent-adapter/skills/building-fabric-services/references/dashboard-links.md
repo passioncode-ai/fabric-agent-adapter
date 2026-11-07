@@ -62,8 +62,11 @@ the fabric-dashboards MCP (`list_services`, never guessed) and hand over the
 `open_link` its `link` tool returns for the page's path; to open it, call the
 host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`,
 `xdg-open`, `start <url>`, `webbrowser.open` or `shell.openExternal` on this
-agent's pages. A browser only when `host_status` confirms `not_installed`; an
-installed host that failed to open is reported, not replaced by HTTP. Links
+agent's pages. A browser only when `host_status` confirms `not_installed`, and
+a raw `http://127.0.0.1:<port>` address only after the listener on that port is
+this OS account's (DEC-0154 PL-3 and HA-2, `fabric_peer_owner.listener`): a
+`foreign-user` listener is reported, never opened. An installed host that failed
+to open is reported, not replaced by HTTP. Links
 carry no token or login code. Every completion and notification action passes
 the Fabric Agent Adapter's link gate before delivery: `check_dashboard_link.py`
 in its `building-fabric-services/scripts`, run from that skill's directory;

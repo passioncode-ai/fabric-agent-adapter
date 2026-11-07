@@ -2,7 +2,7 @@
 """Write `peer-owner-cases.json`: the socket tables and questions both twins of fabric_peer_owner answer (FAA-226).
 
 The macOS netstat and Linux /proc tables come from `test/peer_owner_fixtures.py` (Project Observatory's fixtures,
-vendored by commit); the Windows `netstat -ano` and `tasklist` texts are written here, with their state column
+vendored by commit); the Windows `netstat -ano`, `whoami /user` and owner-SID texts are written here, with their state column
 localized in one table to show it is not read. Every expectation is stated by hand, never computed by the code under
 test. Run from the repository root: `python3 test/fixtures/peer-owner/make_peer_owner_cases.py`.
 """
@@ -42,15 +42,16 @@ WINDOWS_ROWS = [
 GERMAN = {"LISTENING": "ABHÖREN", "ESTABLISHED": "HERGESTELLT", "TIME_WAIT": "WARTEND"}
 
 
-def tasklist(name, pid, user):
-    return '"%s","%d","Console","1","12,345 K","Running","%s","0:00:01","N/A"\r\n' % (name, pid, user)
+OWN_SID = "S-1-5-21-1004336348-1177238915-682003330-1001"
+OTHER_SID = "S-1-5-21-1004336348-1177238915-682003330-1002"
 
 
 cases = {
     "about": "FAA-226: socket tables and the owner each question reads, for fabric_peer_owner.py and "
              "fabric-peer-owner.mjs. Written by make_peer_owner_cases.py; regenerate, never edit.",
     "ownUid": F.OWN_UID,
-    "ownUser": "example-pc\\owner",
+    # whoami /user /fo csv /nh, its name in the console's code page as a UTF-8 reader sees it (never compared)
+    "whoami": '"example-pc\\\ufffd\ufffd\ufffd\ufffd","%s"\r\n' % OWN_SID,
     "tables": {
         "netstatMulti": {"kind": "netstat", "text": F.NETSTAT_MULTI_ACCOUNT},
         "netstatTimeWait": {"kind": "netstat", "text": F.NETSTAT_TIME_WAIT},
@@ -61,16 +62,12 @@ cases = {
         "windowsGerman": {"kind": "windows", "text": win(WINDOWS_ROWS, GERMAN)},
     },
     "ps": {str(pid): text for pid, text in F.PS_UID.items()},
-    "tasklist": {
-        "4100": tasklist("python.exe", 4100, "EXAMPLE-PC\\owner"),
-        "4300": tasklist("example.exe", 4300, "EXAMPLE-PC\\Owner"),
-        "4400": tasklist("example-agent.exe", 4400, "EXAMPLE-PC\\owner"),
-        "5200": tasklist("curl.exe", 5200, "N/A"),
-        "6200": tasklist("curl.exe", 6200, "EXAMPLE-PC\\other"),
-    },
+    # what the owner-SID PowerShell prints per pid: a SID, or nothing for a process it cannot open
+    "ownerSid": {"4100": OWN_SID + "\r\n", "4300": OWN_SID + "\r\n", "4400": OWN_SID + "\r\n", "5200": "",
+                 "6200": OTHER_SID + "\r\n"},
     "normHost": [["::ffff:127.0.0.1", "127.0.0.1"], ["0.0.0.0", "*"], ["::", "*"], ["localhost", "127.0.0.1"],
                  ["*", "*"], ["::1", "::1"], ["0:0:0:0:0:0:0:1", "::1"], ["[::1]", "[::1]"], ["fe80::1%en0", "fe80::1"],
-                 ["127.0.0.1", "127.0.0.1"], ["example.test", "example.test"]],
+                 ["127.0.0.1", "127.0.0.1"], ["example.test", "example.test"], ["::ffff:0.0.0.0", "*"]],
     "cases": [
         {"table": "netstatMulti", "ask": "listener", "port": F.SERVER_PORT,
          "want": {"kind": "this-account", "pid": F.SERVER_PID}},

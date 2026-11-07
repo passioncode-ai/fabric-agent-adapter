@@ -130,7 +130,7 @@ test('FAA-226: a loopback server of another account gets nothing, kind foreign-u
   t.after(() => server.close());
   const url = `http://127.0.0.1:${server.address().port}/ok`;
   let calls = 0;
-  for (const ask of [{ ownUid: 424242, ownUser: 'example-pc\\nobody' }, { read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }]) {
+  for (const ask of [{ ownUid: 424242, ownSid: 'S-1-5-21-9-9-9-424242' }, { read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }]) {
     const agent = new po.CheckedAgent({ ask });
     const transport = (a) => { calls += 1; return fh.checkedLoopbackTransport({ ...a, agent }); };
     await assert.rejects(fh.request('GET', url, { headers: { Authorization: 'Bearer synthetic' }, transport, retries: 2 }),

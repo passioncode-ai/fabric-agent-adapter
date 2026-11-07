@@ -224,6 +224,36 @@ class DefaultTransport(unittest.TestCase):
         self.assertEqual(len(Handler.seen), before)
         self.assertEqual(fh.request("GET", self.base + "/ok", deadline_s=10).status, 200)  # the real owner: this account
 
+    def test_a_loopback_url_never_goes_through_a_proxy_from_the_environment(self):
+        """FAA-226 unit reading 1: with http_proxy set, a loopback request went to the proxy, and the owner check read
+        the proxy's socket, not the URL's port. A loopback URL now goes straight to its port."""
+        from unittest import mock
+        seen = []
+
+        class Proxy(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                seen.append(self.requestline)
+                self.send_response(200)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        proxy = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Proxy)
+        threading.Thread(target=proxy.serve_forever, daemon=True).start()
+        try:
+            env = {"http_proxy": "http://127.0.0.1:%d" % proxy.server_address[1], "no_proxy": "", "NO_PROXY": ""}
+            before = len(Handler.seen)
+            with mock.patch.dict("os.environ", env):
+                answer = fh.request("GET", self.base + "/ok", headers={"Authorization": "Bearer synthetic"}, deadline_s=10)
+            self.assertEqual(answer.status, 200)
+            self.assertEqual(seen, [])
+            self.assertEqual(Handler.seen[before:], ["/ok"])
+        finally:
+            proxy.shutdown()
+            proxy.server_close()
+
     def test_a_url_ending_in_a_line_break_is_sent_as_in_0_55_0(self):
         # 0.56.0 product r17, unit r17: urllib trims the ends of what it sends; the request reaches /ok.
         self.assertEqual(fh.request("GET", self.base + "/ok\n", deadline_s=10).status, 200)

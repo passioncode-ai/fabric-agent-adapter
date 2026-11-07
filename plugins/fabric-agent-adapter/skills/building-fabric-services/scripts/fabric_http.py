@@ -358,7 +358,9 @@ class _CheckedHTTPConnection(http.client.HTTPConnection):
             raise _po.ListenerRefused(refused[0], "%s; nothing was sent" % refused[1], owner)
 
 
-def _opener(watchdog: _Watchdog) -> urllib.request.OpenerDirector:
+def _opener(watchdog: _Watchdog, direct: bool = False) -> urllib.request.OpenerDirector:
+    """`direct`: a loopback URL never goes through a proxy from the environment (`http_proxy`), so the connection the
+    owner check reads is the one to the URL's own port (DEC-0154 HA-2), and a bearer never reaches a proxy."""
     class Http(urllib.request.HTTPHandler):
         def http_open(self, req):
             local = _is_loopback((urllib.parse.urlsplit(req.full_url).hostname or "").lower())
@@ -367,6 +369,8 @@ def _opener(watchdog: _Watchdog) -> urllib.request.OpenerDirector:
     class Https(urllib.request.HTTPSHandler):
         def https_open(self, req):
             return self.do_open(_watched(http.client.HTTPSConnection, watchdog), req, context=self._context)
+    if direct:
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect, Http, Https)
     return urllib.request.build_opener(_NoRedirect, Http, Https)
 
 
@@ -394,7 +398,8 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
 def _send(req: urllib.request.Request, timeout_s: float, max_bytes: int, end: float,
           watchdog: _Watchdog) -> Tuple[int, Dict[str, str], bytes]:
     try:
-        resp = _opener(watchdog).open(req, timeout=timeout_s)
+        resp = _opener(watchdog, direct=_is_loopback((urllib.parse.urlsplit(req.full_url).hostname or "").lower())).open(
+            req, timeout=timeout_s)
     except urllib.error.HTTPError as answer:  # a status outside 2xx is an answer, not a failure of the transport
         resp = answer
     except urllib.error.URLError as exc:
