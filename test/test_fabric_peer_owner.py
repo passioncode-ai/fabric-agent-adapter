@@ -325,6 +325,19 @@ class Live(unittest.TestCase):
             for s in (client, accepted, listener):
                 s.close()
 
+    @unittest.skipUnless(sys.platform == "darwin", "launchd's socket-activated listeners are macOS's")
+    def test_a_real_listener_of_another_account_is_not_this_one(self):
+        """The contract's conformance row asks for a listener of a second OS account; every Mac has one: launchd (pid 1,
+        root) holds socket-activated ports. The first such listener on 127.0.0.1 reads system, and a refusal."""
+        rows, how = P.read_table()
+        held = sorted(r.local[1] for r in rows if r.listening and r.local[0] == "127.0.0.1" and r.pid == 1)
+        if not held:
+            self.skipTest("no launchd-held loopback listener on this Mac")
+        P._LISTENERS.clear()
+        owner = P.listener(held[0])
+        self.assertEqual(owner.kind, P.SYSTEM)
+        self.assertEqual(P.refusal(owner, held[0])[0], P.SERVER_NOT_OWN)
+
     @unittest.skipUnless(sys.platform == "darwin", "the fallback is macOS's")
     def test_the_netstat_fallback_agrees(self):
         listener = socket.socket()

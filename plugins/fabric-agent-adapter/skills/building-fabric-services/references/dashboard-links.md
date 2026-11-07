@@ -64,7 +64,7 @@ host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`,
 `xdg-open`, `start <url>`, `webbrowser.open` or `shell.openExternal` on this
 agent's pages. A browser only when `host_status` confirms `not_installed`, and
 a raw `http://127.0.0.1:<port>` address only after the listener on that port is
-this OS account's (DEC-0154 PL-3 and HA-2, `fabric_peer_owner.listener`): a
+this OS account's (DEC-0154 PL-3 and HA-2; the adapter's `building-fabric-services/scripts/fabric_peer_owner.py`, `listener(port)`): a
 `foreign-user` listener is reported, never opened. An installed host that failed
 to open is reported, not replaced by HTTP. Links
 carry no token or login code. Every completion and notification action passes
