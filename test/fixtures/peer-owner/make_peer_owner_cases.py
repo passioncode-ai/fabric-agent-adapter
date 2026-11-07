@@ -30,6 +30,19 @@ def _unaccepted(listener_uid):
     ))
 
 
+# A closed client whose row has inode 0, from a port an own listener holds on [::] (V6ONLY): the server asking `peer`
+# must never read it as that listener's owner (0.74.0 unit reading 4). 50001 is C351; ::0 is all zero.
+CLOSED_CLIENT = _HEAD + "".join((
+    F._proc(0, "0100007F:B8CF", "00000000:0000", "0A", F.OWN_UID, 5001),
+    F._proc(1, "0100007F:B8CF", "0100007F:C351", "01", F.OWN_UID, 5002),
+    F._proc(2, "0100007F:C351", "0100007F:B8CF", "08", 0, 0),
+    F._proc(3, "0100007F:C351", "00000000:0000", "0A", F.OWN_UID, 5004),
+))
+
+# A connection not accept()ed yet whose listener is gone: unknown, not-accepted.
+NO_LISTENER = _HEAD + F._proc(0, "0100007F:B8CF", "0100007F:C351", "01", 0, 0)
+
+
 def _two_listeners(uids):
     return _HEAD + "".join(F._proc(i, "0100007F:B8CF", "00000000:0000", "0A", uid, 4001 + i) for i, uid in enumerate(uids))
 OWN = list(F.OWN_CLIENT)
@@ -76,6 +89,8 @@ cases = {
         "procUnacceptedOwn": {"kind": "proc4", "text": _unaccepted(F.OWN_UID)},
         "procUnacceptedOther": {"kind": "proc4", "text": _unaccepted(F.OTHER_UID)},
         "procTwoListenersOneOwner": {"kind": "proc4", "text": _two_listeners([F.OWN_UID, F.OWN_UID])},
+        "procClosedClient": {"kind": "proc4", "text": CLOSED_CLIENT},
+        "procNoListener": {"kind": "proc4", "text": NO_LISTENER},
         "procTwoListenersTwoOwners": {"kind": "proc4", "text": _two_listeners([F.OWN_UID, F.OTHER_UID])},
         "proc6Multi": {"kind": "proc6", "text": F.PROC_NET_TCP6_MULTI},
         "windowsMulti": {"kind": "windows", "text": win(WINDOWS_ROWS, {})},
@@ -127,6 +142,10 @@ cases = {
         {"table": "procUnacceptedOwn", "ask": "serverEnd", "server": SERVER, "client": OWN, "ownUid": 0,
          "want": {"kind": "another-account", "uid": F.OWN_UID}},
         {"table": "procTwoListenersOneOwner", "ask": "listener", "port": F.SERVER_PORT, "want": {"kind": "this-account"}},
+        {"table": "procClosedClient", "ask": "peerAt", "server": SERVER, "client": OWN,
+         "want": {"kind": "unknown", "reason": "closed"}},
+        {"table": "procNoListener", "ask": "serverEnd", "server": SERVER, "client": OWN,
+         "want": {"kind": "unknown", "reason": "not-accepted"}},
         {"table": "procTwoListenersTwoOwners", "ask": "listener", "port": F.SERVER_PORT,
          "want": {"kind": "unknown", "reason": "several-rows"}},
         {"table": "windowsMulti", "ask": "listener", "port": F.SERVER_PORT,

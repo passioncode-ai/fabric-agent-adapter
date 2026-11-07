@@ -107,6 +107,17 @@ class Served(unittest.TestCase):
             for s in socks:
                 s.close()
 
+    def test_a_connect_that_times_out_is_not_run_and_the_port_rules_go_on(self):
+        """A timeout or a full backlog is not `down`: NOT_RUN naming the error; the well-known rules then read the port,
+        each on a checked connection."""
+        rules = importlib.import_module("check_service_rules")
+        with mock.patch.object(rules.socket, "create_connection", side_effect=TimeoutError()):
+            self.assertTrue(self.probe.listener_rule())
+        got = self.verdict()
+        self.assertEqual(got["verdict"], "NOT_RUN")
+        self.assertIn("could not connect", got["evidence"])
+        self.assertIn("TimeoutError", got["evidence"])
+
     def test_a_listener_swapped_after_the_rule_is_refused_on_the_connection(self):
         """The rule reads the port's listener; every request checks its own connection again (CheckedHTTPConnection),
         and a refusal there is a ConnectionError naming foreign-user, with nothing sent."""

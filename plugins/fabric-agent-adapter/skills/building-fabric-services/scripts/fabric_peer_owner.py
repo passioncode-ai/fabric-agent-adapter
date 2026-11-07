@@ -11,8 +11,10 @@
     SID before the system's (a client running as root or SYSTEM owns root's listener), and in
     two Linux and selection rules: on Linux `server_end` reads the listener row on the
     connection's local address (state 0A, as the contract's HA-2 source table names it; a
-    connection not accept()ed yet is printed with uid 0 and inode 0), and several rows of one
-    owner are that owner. Standard library only, no import of another kit module.
+    connection not accept()ed yet is printed with uid 0 and inode 0), `peer` reads a client
+    row with inode 0 (a closed client) as unknown, and several rows of one owner are that owner.
+    A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
+    created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
     its Node twin is `fabric-peer-owner.mjs` (netstat, /proc and PowerShell, no ctypes).
 
@@ -668,11 +670,14 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = Fa
         return Owner(UNKNOWN, None, None, how, "no-row")
     if len(found) > 1:
         return Owner(UNKNOWN, None, None, how, "several-rows")
-    if how == "proc" and (server or found[0].uid is None):
+    if how == "proc" and server:
         # Linux: a server end is told by the listener on its local address, the one row the contract's HA-2 source
         # table names there (state 0A). A connection the server has not accept()ed yet is printed with uid 0 and
         # inode 0, and an accepted one inherits its listener's uid, so the listener row answers both.
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
+    if how == "proc" and found[0].uid is None:
+        # A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.
+        return Owner(UNKNOWN, None, None, how, "closed")
     return resolve(found[0], how)
 
 

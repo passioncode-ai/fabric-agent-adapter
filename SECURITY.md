@@ -42,7 +42,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   `/proc/net/tcp` and `/proc/net/tcp6`; Windows `GetExtendedTcpTable` and the process
   token (Python), or `netstat -ano`, `whoami /user` and one PowerShell `GetOwnerSid` query
   per new connection (Node). A token-free loopback door is not yet protected against
-  another account's process (HA-3, FAA-227).
+  another account's process (HA-3, FAA-227). On Linux `/proc` names a socket's creator and
+  no pid, so a listening socket root created and handed to another account (systemd
+  socket activation with `User=`) reads as root's: a client running as root sends to it.
 - The working-with-fabric PostToolUse hook (FAA-206) reads only the release call Claude Code gives it on stdin (the
   tool's name, its input, which can carry the agent's note, and Fabric's answer), in memory: it writes, logs and sends
   nothing and prints one fixed line or nothing.

@@ -359,12 +359,14 @@ async function ownerOf(local, remote, opts = {}) {
   const found = find(table.rows, local, remote);
   if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: 'no-row' });
   if (found.length > 1) return owner(UNKNOWN, { method: table.how, reason: 'several-rows' });
-  if (table.how === 'proc' && (opts.server || found[0].uid === null)) {
+  if (table.how === 'proc' && opts.server) {
     // Linux: a server end is told by the listener on its local address, the one row the contract's HA-2 source table
     // names there (state 0A). A connection not yet accept()ed is printed with uid 0 and inode 0; an accepted one
     // inherits its listener's uid, so the listener row answers both.
     return oneOwner(listenersOf(table.rows, found[0].local), table.how, opts, 'not-accepted');
   }
+  // A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.
+  if (table.how === 'proc' && found[0].uid === null) return owner(UNKNOWN, { method: table.how, reason: 'closed' });
   return resolve(found[0], table.how, opts);
 }
 
