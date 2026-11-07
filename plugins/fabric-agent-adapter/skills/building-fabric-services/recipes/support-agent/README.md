@@ -116,8 +116,8 @@ on (FAC-SEM-164); `recommendation` only with `answered_signal: "none"`, the id o
 board thread where the queue's owner was told; a channel's `items_seen_unit` one of `mails`, `updates`, `messages`,
 `reviews`; durations in ISO 8601; the knowledge file as a source with its
 maximum age. `test/test_channel_agent_example.py` holds the example to that form; the contract publishes its schema
-at the pin (`service-channel-agent-extension.schema.json`); `check_service.py` does not read the declaration yet
-(FAA-197).
+at the pin (`service-channel-agent-extension.schema.json`); `check_service.py` checks a declared one against
+FAC-SEM-162 to 165 (rule `channel-agent.declaration`).
 
 ## Configure
 

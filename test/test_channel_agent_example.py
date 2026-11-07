@@ -1,8 +1,8 @@
 """FAA-197: the support-agent recipe's channel-agent declaration is in the form of the channel-agent standard's 13.6 at
 its round 4 (2026-11-04): a required member is never null (`{"none": "not_yet", "until": ...}` or
 `{"none": "not_used"}`), null only where nothing is decided, `recommendation` only with `answered_signal: "none"`, and
-durations in ISO 8601. These checks are the test's own reading of the standard; `check_service.py` takes the contract's
-schema once it is published."""
+durations in ISO 8601. These checks are the test's own, older reading of the standard; the contract's own rules hold the example
+in test_check_service_channel_agent.py (`check_service.py` rule `channel-agent.declaration`, since 0.73.0)."""
 from __future__ import annotations
 
 import copy

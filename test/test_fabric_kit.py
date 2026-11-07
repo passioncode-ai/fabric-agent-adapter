@@ -28,7 +28,7 @@ MAX_LINES = 1000
 #: Modules over MAX_LINES. FAA-65 split every one; an entry may only be added with a backlog row that splits it.
 OVERSIZE = set()
 #: Scripts beside the kit that are programs or tools, not library modules a service copies.
-NOT_KIT = {"check_service.py", "check_service_rules.py", "sample_service.py", "dashboard_kit.py", "check_dashboard_link.py", "fabric_kit.py",
+NOT_KIT = {"check_service.py", "check_service_rules.py", "check_service_channel_agent.py", "check_service_channel_agent_schema.py", "sample_service.py", "dashboard_kit.py", "check_dashboard_link.py", "fabric_kit.py",
            "sample-remote-service.mjs", "check_dashboard_layout.mjs"}
 #: The core's home modules, and the local definitions that keep their own on purpose.
 CORE_PY = ("fabric_jsvalue.py", "fabric_time.py", "fabric_crypto.py")

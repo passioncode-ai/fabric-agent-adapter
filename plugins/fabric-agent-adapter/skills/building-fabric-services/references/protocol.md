@@ -148,8 +148,9 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   `https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1` (`channel-agent-standard/1`, DEC-0150,
   FAC-SEM-162 to 165) only for a service with no manifest; one with a manifest declares it under its manifest's
   `provider.extensions` alone (CA-1). A well-known answer lists `channel-agent-standard/1` in its `protocols` only once
-  its readers have re-pinned to this revision of the contract (channel-agent.md). The kits know the revision (`PROTOCOL_REVISIONS`) and do not build or check the
-  declaration yet (FAA-197).
+  its readers have re-pinned to this revision of the contract (channel-agent.md). The kits know the revision (`PROTOCOL_REVISIONS`) and do not build the declaration;
+  `check_service.py` checks it (`channel-agent.declaration`, [interop.md](interop.md#what-the-probe-checks)). Fabric
+  Dashboards' sample service keeps its own copy of the protocol table, which no test here holds equal to the kits'.
 - `surfaces.mcp.auth`: `descriptor` (default), `own` (DEC-0024) or `delegation` (DEC-0039, DL-16):
   the MCP surface takes only the estate's delegation tokens, and the top-level
   `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's

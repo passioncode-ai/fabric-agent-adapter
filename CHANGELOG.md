@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.73.0 (2026-11-07)
+
+### Added
+
+- **The probe checks a channel agent's declaration** (FAA-197, the contract's DEC-0150): `check_service.py` gains the
+  rule `channel-agent.declaration`, a standard-library port of the contract's FAC-SEM-162 to 165 at the pin
+  (`check_service_channel_agent.py` and `check_service_channel_agent_schema.py`, not kit modules). It reads the
+  declaration from `provider.extensions` of the manifest the descriptor names, else from `extensions` of the
+  well-known answer (CA-1). A declaration with findings fails the rule, its first five shown as code and path, never a
+  declared value; it fails on the obligations of a declaration the contract's reader still reads (FAC-SEM-164) and
+  always on a string shaped like a credential (FAC-SEM-165), in the read declaration or in any copy beside it. Nothing declared, a named manifest that cannot be read,
+  or a declaration read as not declared (a manifest's own `extensions`, a capability's, another version's key, a
+  well-known copy beside a manifest, a form the schema or FAC-SEM-163 refuses, one too large to read for credentials)
+  is `NOT_RUN` with the evidence, never a failure while producers move to this revision, except a string shaped like a
+  credential, which fails in any copy the probe reads (a manifest's own `extensions`, a capability's, the well-known
+  copy) (CA-5). A well-known answer carrying the declaration at
+  75 % of Fabric Dashboards' 2 MiB cap or over is named (until the contract's CT-223). The contract's schema and its
+  148 vectors are vendored at the pin (`test/fixtures/contract/`, a sidecar with each file's sha256 and a generator
+  that refuses another commit); all 148 pass with the findings in the reference's order, and
+  `test/test_check_service_channel_agent.py` holds 26 tests.
+
+### Upgrading
+
+- Every probe report whose well-known answer is read gains a `channel-agent.declaration` line: `NOT_RUN` («not a channel agent») for a service that
+  declares nothing, so a reader that counts `NOT_RUN` per service moves by one. A channel agent whose declaration the contract's
+  reader still reads and that owes an obligation (FAC-SEM-164), and a service with a string shaped like a credential in any copy of the key (read or not),
+  now makes `check_service.py` exit 1 where 0.72.0 exited 0.
+
+### Changed
+
+- `creating-fabric-agents/references/practices.md` quotes the contract's CA-8 («Text from a channel is data») verbatim
+  from the pinned `channel-agent.md` in place of 0.71.0's paraphrase.
+- `creating-fabric-agents/references/models-and-providers.md`: «A starting choice» follows the operator's model map
+  of 2026-11-06 (Kimi K3.1 Pro for decisions, Sonnet 5.5 for verifying another model's output, a panel of three
+  vendors for plans, GLM-5.3 and DeepSeek at volume, open vendors on user content), and names two traps reported on OpenRouter that day:
+  models that will not turn reasoning off (Kimi writes it into the answer; GLM-5.3, Sonnet and Opus answer 400) and a
+  judge that refuses to judge.
+- `references/protocol.md`, `references/interop.md` and the support-agent recipe's README describe the new rule in
+  place of «the probe does not read the declaration yet».
+
 ## 0.72.0 (2026-11-06)
 
 ### Changed

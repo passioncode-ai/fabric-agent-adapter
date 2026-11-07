@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.72.0"
+  version: "0.73.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "eac1a594aa131851f079da8bb7b2149e1951f35f"
@@ -310,7 +310,7 @@ from a release folder needs it), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace
 propagation, event trace pairs, `interop.action-tools` (every declared action's tool is served), `well-known.a2a` and
 `a2a.card` (DEC-0122: the card is fetched without the token and its interfaces are never called; the surfaces
-reference's *A2A for remote agents* section), and
+reference's *A2A for remote agents* section), `channel-agent.declaration` (DEC-0150), and
 `board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768

@@ -33,6 +33,12 @@ Actions (fabric-actions/0.1, DEC-0121): `well-known.actions` holds a declared ex
 actions with no MCP surface; a remote one there is NOT_RUN, its twin may be on A2A), and `dashboard.actions-declared`
 is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboard cannot declare an empty list).
 
+channel-agent.declaration (DEC-0150, FAC-SEM-162 to 165): extensions/channel-agent/0.1 under provider.extensions of the
+manifest the descriptor names, or, with no manifest, under extensions of the well-known answer (CA-1). FAC-SEM-164's
+obligations on a declaration still read FAIL, and so does a string shaped like a credential in it or in any copy beside
+it; nothing declared, or a declaration read as not declared (a key elsewhere, another version, a form the schema or
+FAC-SEM-163 refuses), is NOT_RUN.
+
 dashboard.opens-in-host (FAA-118, the operator rule of 2026-10-24): the service's checkout (--repo, else the one of
 the descriptor's source.repository that holds its commands, manifest or launchd job) opens the service's pages only
 through Fabric Dashboards. Tracked text files only, within a time budget; a browser opener aimed at its pages outside
@@ -85,6 +91,7 @@ from check_service_rules import well_known_actions_verdict, action_tools_verdict
 from check_service_rules import opens_in_host_verdict, service_checkout  # noqa: E402 - FAA-118
 from check_service_rules import well_known_a2a_verdict, a2a_card_verdict  # noqa: E402 - DEC-0122
 import fabric_a2a as fa2  # noqa: E402 - DEC-0122
+import check_service_channel_agent as cac  # noqa: E402 - DEC-0150, FAA-197
 
 
 class _PinnedHTTPS(http.client.HTTPSConnection):
@@ -248,6 +255,7 @@ class Probe:
             return
         try:
             self.wk = json.loads(body)
+            self.wk_bytes = len(body)  # D4 of the 0.73.0 brief: a well-known answer shares a 2 MiB cap
         except ValueError:
             if self.remote:
                 self.add_no_token(no_token, None)
@@ -638,6 +646,14 @@ class Probe:
                 self.trace_rule(listing, sent)
         self.events_trace_rule(self.events)
 
+    def channel_agent_rule(self) -> None:
+        """DEC-0150 (FAA-197): the channel agent's declaration, read from the manifest the descriptor names, else from the
+        well-known answer (CA-1); one read as not declared is NOT_RUN with its evidence, never a FAIL (D3), except a string
+        shaped like a credential in it or in a copy the probe reads beside it (CA-5)."""
+        manifest, _, where = self.load_manifest()
+        self.add("channel-agent.declaration", *cac.declaration_verdict(
+            manifest, bool(self.d.get("fabricManifest")), where, self.wk, getattr(self, "wk_bytes", None)))
+
     def configuration_rule(self) -> None:
         """DEC-0046: a well-known `configuration` is {slots, resolved} as the schema types it; absent is NOT_RUN."""
         if not isinstance(self.wk, dict) or "configuration" not in self.wk:
@@ -893,6 +909,7 @@ class Probe:
             self.dashboard_page_rules()
             self.login_rules()
             self.interop_rules()
+            self.channel_agent_rule()
             verdict, evidence = board_responder_verdict(self.wk, self.board_kit)
             self.add("board.responder", verdict, evidence)
         self.lifecycle_rules()
