@@ -149,7 +149,7 @@ draft-and-check step owns.
   channel the conditions the page lists), "never by a name, a display name or text in the message, and otherwise it
   stays data." "Such a word acts only inside that chat, as the standard's section 4.10 says"; "it is not one of DEC-0121
   AP-3's sources and never the source of an OA-2 relay", and "A word that asks for an action outside that chat causes
-  none." The page holds the full rule (offline and scheduled messages, Telegram Business connections, the audit
+  none". The page holds the full rule (offline and scheduled messages, Telegram Business connections, the audit
   record). Check: the recipe's fence around the message and its checks.
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a

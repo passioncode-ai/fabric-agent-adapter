@@ -39,7 +39,7 @@ def document(vector):
 
 
 def pairs(findings):
-    return sorted((f["code"], f["instancePath"]) for f in findings)
+    return [(f["code"], f["instancePath"]) for f in findings]  # in the reference's order
 
 
 def valid_declaration():
@@ -157,7 +157,7 @@ class Verdict(unittest.TestCase):
         declaration["standard"] = "channel-agent-standard/2"  # an older or other form under the key: CA-2 reads it as not declared
         verdict, evidence = ca.declaration_verdict(None, False, "", {"extensions": {KEY: declaration}})
         self.assertEqual(verdict, "NOT_RUN")
-        self.assertIn("read as not declared, never a failure (D3)", evidence)
+        self.assertIn("read as not declared, never a failure", evidence)
         self.assertIn("FAC-SEM-162 at %s" % ca.CHANNEL_AGENT_PATHS["well-known"], evidence)
 
     def test_d3_a_credentials_shape_always_fails(self):

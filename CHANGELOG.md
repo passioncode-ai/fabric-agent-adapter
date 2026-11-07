@@ -12,12 +12,18 @@
   declared value; it fails on the obligations of a declaration the contract's reader still reads (FAC-SEM-164) and
   always on a string shaped like a credential (FAC-SEM-165). Nothing declared, a named manifest that cannot be read,
   or a declaration read as not declared (a manifest's own `extensions`, a capability's, another version's key, a
-  well-known copy beside a manifest, a form the schema or FAC-SEM-163 refuses) is `NOT_RUN` with the evidence, never a
-  failure while producers move to this revision. A well-known answer carrying the declaration at
+  well-known copy beside a manifest, a form the schema or FAC-SEM-163 refuses, one too large to read for credentials)
+  is `NOT_RUN` with the evidence, never a failure while producers move to this revision. A well-known answer carrying the declaration at
   75 % of Fabric Dashboards' 2 MiB cap or over is named (until the contract's CT-223). The contract's schema and its
   148 vectors are vendored at the pin (`test/fixtures/contract/`, a sidecar with each file's sha256 and a generator
   that refuses another commit); all 148 pass with the findings in the reference's order, and
   `test/test_check_service_channel_agent.py` holds 25 tests.
+
+### Upgrading
+
+- Every probe report gains a `channel-agent.declaration` line: `NOT_RUN` («not a channel agent») for a service that
+  declares nothing. A channel agent whose declaration has findings the rule fails now makes `check_service.py` exit 1
+  where 0.72.0 exited 0.
 
 ### Changed
 

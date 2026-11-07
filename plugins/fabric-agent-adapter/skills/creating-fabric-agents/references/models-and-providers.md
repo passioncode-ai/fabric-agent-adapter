@@ -43,12 +43,13 @@ below are dollars per million tokens, input / output, read 2026-11-06; reasoning
 |---|---|---|
 | Decisions: plan, orchestrate, call tools, converse, transform, hard classification, images and video, generated code | `moonshotai/kimi-k3.1-pro` (2 / 10; text, image, video) | internal lanes `anthropic/claude-sonnet-5.5`; lanes reading user content `xiaomi/mimo-v2.6-pro` or `z-ai/glm-5.3` |
 | Verification of another model's output on internal lanes (a plan, code, a synthesis, an extraction, a step before it acts) | `anthropic/claude-sonnet-5.5` (2 / 10; text, image, file) | `z-ai/glm-5.3` or `deepseek/deepseek-v4.1-flash` |
-| Plan and strategy validation | a panel of three vendors, e.g. `kimi-k3.1-pro`, `google/gemini-4-argon` and `anthropic/claude-opus-5.5` (4 / 20); the author never judges | the two left |
-| Data, documents, audio and video input | `google/gemini-3.1-pro-preview` or `google/gemini-4-argon` (2 / 10; every input) | `xiaomi/mimo-v2.6-pro` (0.435 / 0.87; audio and video) |
-| User requests and user content | an open-vendor model: `kimi-k3.1-pro` where a decision or a reply needs intelligence, `z-ai/glm-5.3` or `deepseek/deepseek-v4.1-flash` at volume | another open vendor; a closed vendor is never the only route, never drafts a reply to a person and never checks such a lane |
+| Plan and strategy validation | a panel of three vendors, e.g. `moonshotai/kimi-k3.1-pro`, `google/gemini-4-argon` and `anthropic/claude-opus-5.5` (4 / 20); the author never judges | the two left |
+| Data, documents, audio and video input | `google/gemini-3.1-pro-preview` (2 / 12) or `google/gemini-4-argon` (2 / 10); both read every input | `xiaomi/mimo-v2.6-pro` (0.435 / 0.87; audio and video) |
+| User requests and user content | an open-vendor model, e.g. `moonshotai/kimi-k3.1-pro` where a decision or a reply needs intelligence, `z-ai/glm-5.3` or `deepseek/deepseek-v4.1-flash` at volume | another open vendor; a closed vendor is never the only route (DEC-0083), and we recommend it neither draft a reply to a person nor check such a lane, where its refusals turn into silence |
 | Strong, cheap reasoning over text at volume | `z-ai/glm-5.3` (0.07 / 1.40; text only) | `deepseek/deepseek-v4.1-flash` |
 | Volume: classification, extraction, triage, screenshots, periodic jobs | `deepseek/deepseek-v4.1-flash` (0.051 / 0.567; text, image); always the newest `-flash`, never `-pro` | `qwen/qwen3.8-flash`; `z-ai/glm-5.3-flash` only with a generous budget, its reasoning cannot be turned off |
 
+Which vendor is open is the catalogue's fact (`open-vendor` class, FAC-SEM-112), not this table's: check it there.
 A frontier-class model costs several times a light one per turn: put it where decisions are made and volume is
 moderate, and keep volume on the light models.
 

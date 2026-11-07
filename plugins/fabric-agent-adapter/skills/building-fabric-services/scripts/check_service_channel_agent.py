@@ -812,15 +812,17 @@ def declaration_verdict(manifest: Optional[Dict[str, Any]], manifest_named: bool
     declared = isinstance(doc, dict) and KEY in (_extensions_at(doc, site) or {})
     where = "the manifest's provider.extensions" if site == "manifest" else "the well-known answer's extensions"
     if declared and own:
-        if not channel_agent_view(doc, site)["declared"] and not any(f["code"] == "FAC-SEM-165" for f in own):
+        shaped = any(f["code"] == "FAC-SEM-165" and "shaped like a credential" in f["message"] for f in own)
+        if not channel_agent_view(doc, site)["declared"] and not shaped:
             # D3: what the contract's reader reads as not declared (an older form, a repeat, a dangling reference) is
-            # reported while producers move to this revision; a credential's shape (FAC-SEM-165) always fails.
-            return "NOT_RUN", "read as not declared, never a failure (D3): %d finding(s) on the declaration in %s: %s%s" % (
+            # reported while producers move to this revision; a credential's shape (FAC-SEM-165) always fails, while a
+            # declaration too large to read for credentials is read as not declared.
+            return "NOT_RUN", "read as not declared, never a failure while producers move to this revision: %d finding(s) on the declaration in %s: %s%s" % (
                 len(own), where, _shown(own), tail)
         return "FAIL", "%d finding(s) on the declaration in %s: %s%s" % (len(own), where, _shown(own), tail)
     if declared:
         projects = schema_view(doc, site).get("projects") or []
         return "PASS", "declared in %s: channel-agent-standard/1, %d project(s), no finding%s" % (where, len(projects), tail)
     if notes:
-        return "NOT_RUN", "read as not declared, never a failure (D3)%s" % tail
+        return "NOT_RUN", "read as not declared, never a failure while producers move to this revision%s" % tail
     return "NOT_RUN", "declares no %s in %s: not a channel agent" % (KEY, where)
