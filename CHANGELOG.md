@@ -22,11 +22,14 @@ The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `
   agent's Mac (macOS 27.2) with a pre-release build: the install passes, a root listener on another port is still
   refused, the method is netstat under Homebrew Python and sysctl under Apple's; the final form was not rerun there
   ([record](docs/reports/2026-11-07-faa-267/README.md)).
-- **A path in a plist's or a supervisor file's environment is no credential** (FAA-266): `PYTHONPATH` holding a
-  release folder under Application Support was refused as a key. An environment value that reads as a path (it starts
-  with `/`, `~`, `.` or a drive, has two separators and a lower-case word between them) is now read by the path-aware
-  detector (`secret_argument`, `secretArgument`); any other value keeps the strict `secret_value`, so a base64 key whose
-  `/` splits it is still refused. `adapt_project.py`'s LC-21 check reads a plugin MCP server's `env` the same way.
+- **A release folder in a plist's or a supervisor file's environment is no credential** (FAA-266): `PYTHONPATH`
+  holding a release folder under Application Support was refused as a key. An environment value that reads as a path
+  (it starts with `/`, `~`, `.` or a drive, has at least two separators and one all-lower-case part such as
+  `example-agent`) is now read by the path-aware detector (`secret_argument`, `secretArgument`); any other value keeps
+  the strict `secret_value`, so a base64 key whose `/` splits it is still refused: of 60,000 random keys 20 pass,
+  against 13 for the strict detector alone ([record](docs/reports/2026-11-07-faa-267/README.md)). `adapt_project.py`'s LC-21 check reads a plugin MCP
+  server's `env` the same way. A path whose part after a space has no all-lower-case folder and holds a digit
+  run (`.../Application Support/ExampleAgent/Releases/2026-11-07`) is still refused, as in 0.75.0 (FAA-273).
 
 ### Known limits
 
