@@ -224,6 +224,14 @@ and `/proc/net/tcp6`, Windows through `GetExtendedTcpTable` and the owner's toke
 on macOS, the same `/proc` files on Linux, and `netstat -ano` with the owner SID from PowerShell `GetOwnerSid` against `whoami /user` on Windows (SIDs, never names). Fail closed: everything but
 `this-account` refuses, `unknown` included.
 
+macOS 27.2 shows an ad-hoc-signed interpreter (a Homebrew Python, a Homebrew Node) only its own sockets: sysctl lists this
+process alone and netstat prints nothing. The Python calibration therefore also asks for a child process's listener,
+and an empty netstat is `unknown` with reason `table-restricted` (never another account's). A caller that started the
+server itself may vouch with that pid: `lsof -p <pid>` asks the process, which the restriction leaves readable, and a
+listener of this account's pid on the port counts as this account's (`CheckedHTTPConnection(vouch_pid=...)`, Node
+`checkedSocket({vouchPid})`). The launchd installers vouch with their own job's pid; elsewhere a restricted table
+refuses, and Apple's `/usr/bin/python3` sees the whole table (FAA-267).
+
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
 a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`),
 `fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user`, never retried),

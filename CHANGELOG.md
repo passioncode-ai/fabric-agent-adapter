@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.76.0 (2026-11-07)
+
+The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `fabric-peer-owner.mjs` (peer_owner
+`1.1.0+kit.2`), `fabric_supervisors` and `fabric-supervisors.mjs`, and `fabric-service.mjs` (one more export).
+
+### Fixed
+
+- **A restricted socket table is `table-restricted`, never another account's** (FAA-267). macOS 27.2 shows an
+  ad-hoc-signed interpreter (a Homebrew Python) only its own sockets through sysctl and nothing through netstat, so
+  `launchd_install` refused a service it had just started (`foreign-user`, `no-row`). The sysctl calibration now also
+  requires a child process's listener; an empty netstat answers `unknown` with reason `table-restricted`, and a refusal
+  on it starts with `table-restricted`. `CheckedHTTPConnection(vouch_pid=...)` and the Node `checkedSocket({vouchPid})`
+  accept a listener on the port that `lsof -p` shows belongs to that pid of this account; `launchd_install` and
+  `launchdInstall` vouch with their own job's pid (`launchd_pid`, `launchdPid`) and, when the listener still cannot be
+  proved, name the way round it (Apple's `/usr/bin/python3`). Measured on a host agent's Mac (macOS 27.2): the install
+  passes, a root listener on another port is still refused, the method is netstat under Homebrew Python and sysctl
+  under Apple's.
+- **A path in a plist's or a supervisor file's environment is no credential** (FAA-266): `PYTHONPATH` holding a
+  release folder under Application Support was refused as a key; environment values are now read by the path-aware
+  detector (`secret_argument`, `secretArgument`), which still refuses a key.
+
 ## 0.75.0 (2026-11-07)
 
 Guidance only: no kit module, probe rule or hook changes; the contract pin stays `18f8d487`.

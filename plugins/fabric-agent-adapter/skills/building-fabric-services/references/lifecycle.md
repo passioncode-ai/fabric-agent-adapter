@@ -97,7 +97,9 @@ systemd and Task Scheduler do not poll yet, FAA-253).
    until `launchctl print gui/<uid>/<label>` fails, `bootstrap` with up to five retries,
    then poll the well-known document until it answers with this `id.instance` on a listener of this OS account
    (DEC-0154 HA-2: another account's listener, or one whose owner cannot be told, is `foreign-user` and never a
-   successful install; the error names it).
+   successful install; the error names it). Where the socket table hides other processes (macOS 27.2 under an
+   ad-hoc-signed interpreter), the installer vouches with its own job's pid from `launchctl print`; a listener it
+   cannot prove reads `table-restricted` and the error names the way round it (FAA-267).
 4. Upgrade = new release, rewrite the plist with the new path, `launchd_install`
    again, then `prune_releases(releases_dir, current=<new release>)`: the running release
    and the one before it stay for rollback, older ones go (LC-11, LC-15).

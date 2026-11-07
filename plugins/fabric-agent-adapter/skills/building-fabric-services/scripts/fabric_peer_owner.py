@@ -1,6 +1,6 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.1.0+kit.1: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
+    peer_owner 1.1.0+kit.2: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
     DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py` at
     commit f86f0622 (passioncode-ai/project-observatory-dashboard, the same licence). It differs
     from that file in this paragraph, in `Owner` and `Row` (NamedTuples here where it has
@@ -64,8 +64,8 @@ addresses are `unknown` (`several-rows`), never a guess.
   accept) and the listener and both ends of the pair must read back with their exact addresses,
   this process's uid and its pid. A layout that fails calibration is not used again in that
   process.
-- macOS 27.2 restricts both tables for an ad-hoc-signed interpreter (a Homebrew Python, measured on 2026-11-07 by the
-  studio agent): sysctl lists only this process's own sockets and netstat prints nothing. The calibration therefore
+- macOS 27.2 restricts both tables for an ad-hoc-signed interpreter (a Homebrew Python, measured on 2026-11-07 on a
+  host agent's Mac): sysctl lists only this process's own sockets and netstat prints nothing. The calibration therefore
   also requires a child process's listener, and an empty netstat is `unknown` with reason `table-restricted`, never
   another account's (FAA-267). A caller that started the server itself (an installer and its launchd job) may vouch
   with that pid: `lsof -p PID` asks the process, which the restriction leaves readable, and `CheckedHTTPConnection`
@@ -106,7 +106,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.1.0+kit.1"  # Observatory's 1.1.0 with the kit's differences above
+PEER_OWNER_VERSION = "1.1.0+kit.2"  # Observatory's 1.1.0 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
