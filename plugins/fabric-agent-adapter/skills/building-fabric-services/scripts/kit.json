@@ -542,7 +542,7 @@
    "file": "fabric-peer-owner.mjs",
    "layer": "L0",
    "imports": [],
-   "sha256": "3a913d57e0f2bc306ad2ba1907d49fa58d3cceff0694730dec65fdcf8afbf16c"
+   "sha256": "996148fa18cc8803356e0c74498fe38469a4a0294d7ff4b1bc76e7fe34ac4954"
   },
   {
    "module": "fabric-crypto",
@@ -5927,7 +5927,7 @@
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
    "fabric-identifiers.mjs": "a18c2a501a4aa170bfd3d99e571ad6b7662649b4d3b9d2a540c002ea42811bbf",
    "fabric-secrets.mjs": "5822a7e25ecf2e87b5bab4f99c1074af7379d8b49e2784283b5d7d8c25022cde",
-   "fabric-peer-owner.mjs": "3a913d57e0f2bc306ad2ba1907d49fa58d3cceff0694730dec65fdcf8afbf16c",
+   "fabric-peer-owner.mjs": "996148fa18cc8803356e0c74498fe38469a4a0294d7ff4b1bc76e7fe34ac4954",
    "fabric-crypto.mjs": "038e03689701e3c9721a1e7f8e0a4d02a52d6a5d1661b0dc84035edc3ebbfcf6",
    "fabric-base.mjs": "7804b2df7715dbbf9702a9b61b6b8cef2110f9a52b04cabd8fb0a66458d87512",
    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",

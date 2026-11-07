@@ -52,6 +52,11 @@ test('every shared case reads the owner the Python twin reads', async () => {
   assert.ok(ran >= 28, `ran ${ran}`);
 });
 
+test('both twins report one version', () => {
+  const py = fs.readFileSync(new URL('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_peer_owner.py', import.meta.url), 'utf8');
+  assert.equal(po.PEER_OWNER_VERSION, /^PEER_OWNER_VERSION = "([^"]+)"/m.exec(py)[1]);
+});
+
 test('addresses have the same spelling in both twins', () => {
   for (const [raw, want] of CASES.normHost) assert.equal(po.normHost(raw), want, raw);
 });
