@@ -79,7 +79,7 @@ import fabric_connections as fcn  # noqa: E402
 from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
-from check_service_rules import ForeignUser, listener_owner_verdict  # noqa: E402 - DEC-0154 HA-2 (FAA-226)
+from check_service_rules import ForeignUser, PORT_RULES_UNREAD, listener_owner_verdict  # noqa: E402 - DEC-0154 HA-2
 
 Result = Dict[str, str]
 
@@ -919,10 +919,15 @@ class Probe:
         if not self.port:
             return self.results
         if not self.remote and not self.listener_rule():
+            self.add("port.rules", "NOT_RUN", "not read: " + PORT_RULES_UNREAD + ", because the listener is not this OS "
+                     "account's (listener.owner FAIL, DEC-0154 HA-2)")
             self.lifecycle_rules()
             return self.results
         self.well_known_rules()
-        if self.wk is not None:
+        if self.wk is None:
+            self.add("port.rules", "NOT_RUN", "not read: " + PORT_RULES_UNREAD + ", because the well-known document "
+                     "gave no answer")
+        else:
             self.network_rules()
             self.auth_rules()
             self.usage_rules()

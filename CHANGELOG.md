@@ -38,6 +38,8 @@ issued under it stay valid; a new scaffold writes `18f8d487`.
 - `check_service.py` prints one more line for a local service (`listener.owner`), and a local service whose port is
   held by another OS account's or root's process, or by one whose owner cannot be told (a sandbox without `sysctl` or
   `netstat`, a socket launchd holds for a socket-activated job), now fails (exit 1) where 0.73.0 read its answer.
+  When the port's rules cannot be read (that FAIL, or a well-known document that gives no answer), one `port.rules`
+  `NOT_RUN` line names them, where 0.73.0 left them out of the report.
   A socket-activated job's listening socket belongs to whoever created it: a systemd user unit's to this account, a
   system unit's and launchd's to root (pid 1), so such a service binds its own listener or runs as a user unit.
 - `fetch_well_known` (re-exported by `fabric_service`) answers `None` for a listener of another account, and

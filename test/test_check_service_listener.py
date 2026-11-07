@@ -83,7 +83,9 @@ class Served(unittest.TestCase):
                 mock.patch.object(cs.Probe, "descriptor_rules", lambda self: None), \
                 mock.patch.object(cs.Probe, "lifecycle_rules", lambda self: None):
             results = self.probe.run()
-        self.assertEqual([r["rule"] for r in results], ["listener.owner"])
+        self.assertEqual([r["rule"] for r in results], ["listener.owner", "port.rules"])
+        self.assertEqual(results[1]["verdict"], "NOT_RUN")
+        self.assertIn("listener.owner FAIL", results[1]["evidence"])
         self.assertEqual(self.seen, [])
 
     def test_two_sockets_of_this_account_on_one_port_pass(self):

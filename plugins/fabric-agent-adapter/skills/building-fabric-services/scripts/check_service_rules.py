@@ -24,6 +24,12 @@ import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
 import socket  # noqa: E402
 
 
+# The rules that ask the service's port, named on one NOT_RUN line when none of them can be read (0.74.0 product
+# reading 8): a probe names what it could not check.
+PORT_RULES_UNREAD = ("the well-known shape and identity, the network, auth, usage, A2A, dashboard, login, interop, "
+                     "channel-agent and board rules")
+
+
 class ForeignUser(ConnectionError):
     """DEC-0154 HA-2: the server end of a local connection is not this OS account's process (`foreign-user`); nothing
     was sent on it. A ConnectionError, so every rule that reads the port reports it as no answer."""

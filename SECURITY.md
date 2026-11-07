@@ -45,7 +45,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   another account's process (HA-3, FAA-227). An MCP client (Claude Code, Codex) sends the
   token it was registered with on every later connection without this check (the contract's
   residue "a coding agent's bearer"): when the port may have changed hands, rotate the token
-  and re-run `mcp-register`, which checks the listener again. On Linux `/proc` names a socket's creator and
+  and re-run `mcp-register` (one written as `references/surfaces-and-auth.md` says checks the
+  listener first; the kit ships none). On Linux `/proc` names a socket's creator and
   no pid, so a listening socket root created and handed to another account (systemd
   socket activation with `User=`) reads as root's: a client running as root sends to it.
 - The working-with-fabric PostToolUse hook (FAA-206) reads only the release call Claude Code gives it on stdin (the
