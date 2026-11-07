@@ -202,6 +202,26 @@ test('a connection not yet accepted reads its listener\'s owner (0.74.0 unit rea
   }
 });
 
+test('a connection past the first page of /proc/net/tcp is found (0.74.0 seam reading 5, Node 18)', { skip: !['darwin', 'linux'].includes(process.platform) }, async (t) => {
+  // Node 18's readFile returned only the first ~4 KB of a /proc file: every socket past the 26th or so read no-row.
+  const server = net.createServer(() => {});
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const clients = [];
+  t.after(() => { for (const c of clients) c.destroy(); server.close(); });
+  for (let i = 0; i < 60; i += 1) {
+    clients.push(await new Promise((r) => { const s = net.connect(server.address().port, '127.0.0.1', () => r(s)); }));
+  }
+  const who = await po.serverEnd(clients[clients.length - 1]);
+  assert.deepEqual([who.kind, who.uid], [po.THIS_ACCOUNT, process.getuid()]);
+});
+
+test('a caller option named server never turns peerAt into a server-end reading (0.74.0 seam reading 5)', async () => {
+  const c = CASES.cases.find((x) => x.table === 'procClosedClient' && x.ask === 'peerAt');
+  assert.ok(c, 'the shared cases hold a closed client');
+  const who = await po.peerAt(c.server, c.client, { ...opts(CASES.tables.procClosedClient), server: {} });
+  assert.deepEqual([who.kind, who.reason], [po.UNKNOWN, 'closed']);
+});
+
 test('a real own listener reads this-account on Windows too', { skip: process.platform !== 'win32' }, async (t) => {
   const server = net.createServer(() => {});
   await new Promise((r) => server.listen(0, '127.0.0.1', r));

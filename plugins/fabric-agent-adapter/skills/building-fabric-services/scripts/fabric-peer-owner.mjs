@@ -1,5 +1,5 @@
 // Which OS account owns each end of a loopback TCP connection (DEC-0154 HA-2, FAA-226, layer L0); the twin of
-// fabric_peer_owner.py, which is Project Observatory's peer_owner 1.1.0 vendored by commit. Node 20+, no dependency;
+// fabric_peer_owner.py, which is Project Observatory's peer_owner 1.1.0 vendored by commit. Node 18+, no dependency;
 // nothing here imports another kit module.
 //
 // WHY. Loopback is one per computer, not one per OS account: every account's processes reach every listener on
@@ -40,7 +40,7 @@
 // privilege. The parsers are pure functions over captured text (test/fixtures/peer-owner/).
 
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
@@ -276,6 +276,28 @@ export function method() {
   return 'none';
 }
 
+// A /proc file read to its end. Node 18's readFile stops after the first page of a file that reports size 0, about
+// 4 KB, so every socket past the 26th or so read as no-row (0.74.0 seam reading 5); read until EOF, one byte past the
+// cap at most.
+async function readProc(name) {
+  const fh = await open(name, 'r');
+  const chunks = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const buf = Buffer.alloc(65536);
+      const { bytesRead } = await fh.read(buf, 0, buf.length, null);
+      if (!bytesRead) break;
+      chunks.push(buf.subarray(0, bytesRead));
+      total += bytesRead;
+      if (total > MAX_TABLE_BYTES) break;
+    }
+  } finally {
+    await fh.close();
+  }
+  return Buffer.concat(chunks);
+}
+
 export async function readTable({ run = runProgram } = {}) {
   const how = method();
   if (how === 'netstat') return { rows: parseNetstat(await run(NETSTAT, ['-anv', '-p', 'tcp'])), how };
@@ -284,7 +306,7 @@ export async function readTable({ run = runProgram } = {}) {
     for (const [name, family] of [['/proc/net/tcp', 4], ['/proc/net/tcp6', 6]]) {
       let raw;
       try {
-        raw = await readFile(name);
+        raw = await readProc(name);
       } catch (err) {
         if (err.code === 'ENOENT') continue; // no IPv6 on this kernel
         throw new TableUnreadable(`proc: ${err.code ?? 'error'}`);
@@ -349,7 +371,7 @@ export function find(rows, local, remote) {
   return rows.filter((r) => !r.listening && !r.timeWait && same(r.local, local) && same(r.remote, remote));
 }
 
-async function ownerOf(local, remote, opts = {}) {
+async function ownerOf(local, remote, opts = {}, server = false) {
   let table;
   try {
     table = await (opts.read ?? readTable)(opts);
@@ -359,11 +381,11 @@ async function ownerOf(local, remote, opts = {}) {
   const found = find(table.rows, local, remote);
   if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: 'no-row' });
   if (found.length > 1) return owner(UNKNOWN, { method: table.how, reason: 'several-rows' });
-  if (table.how === 'proc' && opts.server && found[0].uid === null) {
+  if (table.how === 'proc' && server && found[0].uid === null) {
     // Linux: a connection not yet accept()ed is printed with uid 0 and inode 0; it belongs to the listener on its local
     // address and dies with it, so that listener answers. An accepted connection's own row carries the uid of the
     // process that accepted it: it answers itself, so a listener swapped after another account accepted the client
-    // cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e).
+    // cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e; the contract's pending CT-254, FAA-258).
     return oneOwner(listenersOf(table.rows, found[0].local), table.how, opts, 'not-accepted');
   }
   // A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.
@@ -404,10 +426,11 @@ export function peer(socket, opts) {
 
 // For a client's connected socket: who accepted it. The row whose local address is the server's and whose remote
 // address is this socket's own, the server process's accepted socket, so a listener swapped after listen cannot pass
-// for the one that answers.
+// for the one that answers. On Linux a connection not yet accept()ed has no owner of its own (inode 0): its listener
+// answers (the contract's pending CT-254, FAA-258).
 export function serverEnd(socket, opts) {
   if (!socket.remoteAddress || !socket.localAddress) return Promise.resolve(owner(UNKNOWN, { reason: 'socket: not connected' }));
-  return ownerOf(address(socket.remoteAddress, socket.remotePort), address(socket.localAddress, socket.localPort), { ...opts, server: true });
+  return ownerOf(address(socket.remoteAddress, socket.remotePort), address(socket.localAddress, socket.localPort), opts, true);
 }
 
 const LISTEN_ORDER = ['127.0.0.1', '*', '::1'];

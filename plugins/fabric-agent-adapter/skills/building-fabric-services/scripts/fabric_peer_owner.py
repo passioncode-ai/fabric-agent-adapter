@@ -268,8 +268,9 @@ def parse_proc_net_tcp(text: str, *, family: int, byteorder: Optional[str] = Non
     """`/proc/net/tcp` (family AF_INET) or `/proc/net/tcp6` (AF_INET6). The kernel prints each
     32-bit word of an address in host byte order and each port in network order, in hex. A
     connected row with inode 0 has no socket yet (a connection the server has not accept()ed,
-    or one already closed): the kernel prints uid 0 for it, so its uid is not read (None), and
-    `_owner_of` takes its listener's owner instead (the kit's addition, 0.74.0 unit reading 3)."""
+    or one already closed): the kernel prints uid 0 for it, so its uid is not read (None);
+    `_owner_of` reads a server end not yet accepted as its listener's and a closed client as
+    unknown (the kit's addition, 0.74.0 unit readings 3 and 4)."""
     order = byteorder or sys.byteorder
     rows: list[Row] = []
     for line in text.splitlines()[1:]:
@@ -675,7 +676,8 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = Fa
         # listener on its local address (the exact address, else the wildcard), and dies with it
         # (inet_csk_listen_stop), so that listener answers. An accepted connection's own row carries the uid of the
         # process that accepted it (sock_graft): it answers itself, so a listener swapped after another account
-        # accepted the client cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e).
+        # accepted the client cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e; the contract's
+        # pending CT-254, FAA-258).
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
     if how == "proc" and found[0].uid is None:
         # A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.
@@ -723,7 +725,9 @@ def peer(sock: socket.socket) -> Owner:
 def server_end(sock: socket.socket) -> Owner:
     """For a client's connected socket: who accepted it. The row whose local address is the
     server's and whose remote address is this socket's own, which is the server process's
-    accepted socket, so a listener swapped after `listen` cannot pass for the one that answers."""
+    accepted socket, so a listener swapped after `listen` cannot pass for the one that answers.
+    On Linux a connection not yet accept()ed has no owner of its own (inode 0): its listener
+    answers (the contract's pending CT-254, FAA-258)."""
     try:
         own, server = sock.getsockname(), sock.getpeername()
     except OSError as exc:
