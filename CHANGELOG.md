@@ -14,7 +14,8 @@
   or a declaration read as not declared (a manifest's own `extensions`, a capability's, another version's key, a
   well-known copy beside a manifest, a form the schema or FAC-SEM-163 refuses, one too large to read for credentials)
   is `NOT_RUN` with the evidence, never a failure while producers move to this revision, except a string shaped like a
-  credential, which fails wherever the key sits (CA-5). A well-known answer carrying the declaration at
+  credential, which fails in any copy the probe reads (a manifest's own `extensions`, a capability's, the well-known
+  copy) (CA-5). A well-known answer carrying the declaration at
   75 % of Fabric Dashboards' 2 MiB cap or over is named (until the contract's CT-223). The contract's schema and its
   148 vectors are vendored at the pin (`test/fixtures/contract/`, a sidecar with each file's sha256 and a generator
   that refuses another commit); all 148 pass with the findings in the reference's order, and
