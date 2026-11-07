@@ -8,6 +8,12 @@
            --board-kit PATH                       (board.responder: the service's own fabric_board.py or fabric-board.mjs)
            --repo PATH                            (dashboard.opens-in-host: the service's checkout)
 
+A local placement is read only when this OS account's process holds its port (DEC-0154 HA-2): `listener.owner`
+comes first, from the computer's socket table (fabric_peer_owner). Nothing listening is NOT_RUN (`down`, and
+`well-known.answers` fails as before); another OS account's, root's or SYSTEM's listener, or one whose owner cannot be
+told, FAILs as `foreign-user`, and then no rule reads the port and no credential is sent. Every local connection, a
+reconnect included, is checked again before a byte goes out on it.
+
 A remote placement (DEC-0019 — an online agent or dashboard at an https origin) is probed over
 TLS with the certificate verified: the well-known document must refuse a request without the
 token (401 with none of the service's data: an empty body, or an identity proxy's page, DEC-0109), the guards must refuse a foreign Host/Origin and cross-site requests,
@@ -72,6 +78,7 @@ import fabric_service as fs  # noqa: E402
 import fabric_connections as fcn  # noqa: E402
 from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
+import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
 
 Result = Dict[str, str]
 
@@ -105,6 +112,11 @@ class _PinnedHTTPS(http.client.HTTPSConnection):
     def connect(self) -> None:
         raw = socket.create_connection(self._dial, timeout=self.timeout)
         self.sock = self._ctx.wrap_socket(raw, server_hostname=self.host)
+
+
+class ForeignUser(ConnectionError):
+    """DEC-0154 HA-2: the server end of a local connection is not this OS account's process (`foreign-user`); nothing
+    was sent on it. A ConnectionError, so every rule that reads the port reports it as no answer."""
 
 
 class Probe:
@@ -153,13 +165,16 @@ class Probe:
                 conn = http.client.HTTPSConnection(self.host_name, self.port, context=context, timeout=8)
             base = {"Host": self.netloc}
         else:
-            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+            # DEC-0154 HA-2: every local connection, a reconnect included, is checked before a byte is sent on it.
+            conn = po.CheckedHTTPConnection("127.0.0.1", self.port, timeout=5)
             base = {"Host": "127.0.0.1:%d" % self.port}
         base.update(headers or {})
         try:
             conn.request(method, path, body=body, headers=base)
             resp = conn.getresponse()
             return resp.status, merge_headers(resp.getheaders()), resp.read()
+        except po.ListenerRefused as exc:
+            raise ForeignUser("foreign-user: %s" % exc) from None
         finally:
             conn.close()
 
@@ -167,6 +182,25 @@ class Probe:
         # The header and form the descriptor declares, never an assumed `Authorization: Bearer` (FAC-SEM-036).
         name, value = fs.token_header(self.d.get("auth"), self.token or "")
         return {name: value}
+
+    # the listener's owner (DEC-0154 HA-2) -------------------------------
+    def listener_rule(self) -> bool:
+        """`down`, then `foreign-user`, then everything the listener answers: a local service is read only when this OS
+        account's process holds its port. False when the port must not be read (`foreign-user`)."""
+        owner = po.listener(self.port)
+        where = "127.0.0.1:%d" % self.port
+        if owner.kind == po.NONE:
+            self.add("listener.owner", "NOT_RUN", "nothing listens on %s (down)" % where)
+            return True
+        if owner.kind == po.THIS_ACCOUNT:
+            self.add("listener.owner", "PASS", "%s is held by this OS account's process (pid %s, read by %s)"
+                     % (where, owner.pid if owner.pid is not None else "not shown", owner.method))
+            return True
+        why = {po.ANOTHER_ACCOUNT: "another OS account's process", po.SYSTEM: "a system account's process"}.get(
+            owner.kind, "a process whose owner cannot be told (%s)" % owner.reason)
+        self.add("listener.owner", "FAIL", "foreign-user: %s is held by %s (read by %s); no credential was sent and "
+                 "nothing it answers is read as this service's" % (where, why, owner.method))
+        return False
 
     # descriptor ------------------------------------------------------------
     def descriptor_rules(self) -> None:
@@ -898,6 +932,9 @@ class Probe:
                      "an app's descriptor says it is installed, never that it runs; its live origin is in its own liveness file (DEC-0069)")
             return self.results
         if not self.port:
+            return self.results
+        if not self.remote and not self.listener_rule():
+            self.lifecycle_rules()
             return self.results
         self.well_known_rules()
         if self.wk is not None:

@@ -6,7 +6,9 @@
 //    $XDG_DATA_HOME/passioncode-fabric) the way Fabric's own locateHub does: a small regular file, never a link or a
 //    FIFO; protocol fabric-hub/0.1; origin exactly http://127.0.0.1:<port>; MCP at /mcp; a door token file inside the
 //    registry root; a pid that is alive. The port does not prove who holds it, so a binding credential is sent only
-//    after this check passes, done again before each send.
+//    after this check passes, done again before each send. The pid is never the proof (DEC-0154 HA-2): every
+//    connection to the door is checked from the socket table before a byte goes out (fabric-peer-owner.mjs), and a
+//    listener of another OS account, or one whose owner cannot be told, is HubError foreign-user with nothing sent.
 // 2. Ask once, keep the credential in a file: requestBoardAccess() asks for the board.respond grant through the door;
 //    pollAccess() writes the credential, shown once, to a 0600 file and answers without it. Tokens live in files and
 //    headers only — never argv, a URL, a log line or an error text.
@@ -25,6 +27,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { atomicWrite, ensurePrivateDir, readToken } from './fabric-service.mjs';
 import { hubKeyCertified } from './fabric-estate.mjs';
+import { ListenerRefused, checkedSocket } from './fabric-peer-owner.mjs';
 
 export const HUB_PROTOCOL = 'fabric-hub/0.1';
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
@@ -158,7 +161,8 @@ export function readCredential(file) {
 /**
  * One MCP request to <origin>/mcp with a bearer in the header; only http://127.0.0.1:<port>, no proxy. Answers
  * {status, headers, body} (body parsed JSON or null; an SSE answer read to its first data: line). A refused connection
- * is HubError hub-unavailable (retryable).
+ * is HubError hub-unavailable (retryable); a listener that is not this OS account's process is HubError foreign-user
+ * (retryable) before the bearer is sent (DEC-0154 HA-2): the connection is checked from the socket table first.
  */
 export function postMcp(origin, body, bearer, { session, timeout = 15000, method = 'POST', protocolVersion } = {}) {
   const m = LOOPBACK_ORIGIN.exec(origin);
@@ -168,8 +172,14 @@ export function postMcp(origin, body, bearer, { session, timeout = 15000, method
   if (session) headers['mcp-session-id'] = session;
   if (protocolVersion) headers['mcp-protocol-version'] = protocolVersion;
   if (payload) headers['content-length'] = String(payload.length);
-  return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/mcp', method, headers, timeout, agent: false }, (res) => {
+  return checkedSocket(Number(m[1]), { timeoutMs: timeout }).catch((e) => {
+    if (e instanceof ListenerRefused) {
+      throw new HubError('foreign-user', `The hub's port is not held by this OS account's process (${e.owner?.kind ?? e.code}); nothing was sent.`, true);
+    }
+    throw new HubError('hub-unavailable', `Fabric's hub did not answer (${e.code ?? e.message}).`, true);
+  }).then((socket) => new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/mcp', method, headers, timeout, agent: false,
+      createConnection: () => socket }, (res) => {
       const chunks = [];
       let size = 0;
       res.on('data', (c) => {
@@ -195,7 +205,7 @@ export function postMcp(origin, body, bearer, { session, timeout = 15000, method
     req.on('error', (e) => reject(new HubError('hub-unavailable', `Fabric's hub did not answer (${e.code ?? e.message}).`, true)));
     if (payload) req.write(payload);
     req.end();
-  });
+  }));
 }
 
 /** A tools/call answer as an object: structuredContent, else the first text content parsed. */

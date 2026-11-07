@@ -1,0 +1,485 @@
+{
+ "about": "FAA-226: socket tables and the owner each question reads, for fabric_peer_owner.py and fabric-peer-owner.mjs. Written by make_peer_owner_cases.py; regenerate, never edit.",
+ "ownUid": 501,
+ "ownUser": "example-pc\\owner",
+ "tables": {
+  "netstatMulti": {
+   "kind": "netstat",
+   "text": "Active Internet connections (including servers)\nProto Recv-Q Send-Q  Local Address                                 Foreign Address                               (state)          rxbytes      txbytes  rhiwat  shiwat          process:pid    state  options           gencnt    flags   flags1 usecnt rtncnt fltrs\ntcp4       0      0  127.0.0.1.47311        *.*                    LISTEN                0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.47311        127.0.0.1.50001        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50001        127.0.0.1.47311        ESTABLISHED           0            0  408064  146988      Example App:4300  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp6       0      0  ::1.47070              *.*                    LISTEN                0            0  408064  146988    example-agent:4400  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  192.0.2.10.50100       198.51.100.7.443       ESTABLISHED           0            0  408064  146988             curl:4500  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.47311        127.0.0.1.50002        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50002        127.0.0.1.47311        ESTABLISHED           0            0  408064  146988             curl:5200  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.8021         *.*                    LISTEN                0            0  408064  146988             launchd:1  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  *.47555                *.*                    LISTEN                0            0  408064  146988    example-daemon:300  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\n"
+  },
+  "netstatTimeWait": {
+   "kind": "netstat",
+   "text": "Active Internet connections (including servers)\nProto Recv-Q Send-Q  Local Address                                 Foreign Address                               (state)          rxbytes      txbytes  rhiwat  shiwat          process:pid    state  options           gencnt    flags   flags1 usecnt rtncnt fltrs\ntcp4       0      0  127.0.0.1.47311        *.*                    LISTEN                0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.47311        127.0.0.1.50001        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50001        127.0.0.1.47311        ESTABLISHED           0            0  408064  146988      Example App:4300  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp6       0      0  ::1.47070              *.*                    LISTEN                0            0  408064  146988    example-agent:4400  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  192.0.2.10.50100       198.51.100.7.443       ESTABLISHED           0            0  408064  146988             curl:4500  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.47311        127.0.0.1.50002        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50002        127.0.0.1.47311        ESTABLISHED           0            0  408064  146988             curl:5200  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.8021         *.*                    LISTEN                0            0  408064  146988             launchd:1  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  *.47555                *.*                    LISTEN                0            0  408064  146988    example-daemon:300  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50001        127.0.0.1.47311        TIME_WAIT             0            0  408064  146988                    :0  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\n"
+  },
+  "netstatNoProcess": {
+   "kind": "netstat",
+   "text": "Active Internet connections (including servers)\nProto Recv-Q Send-Q  Local Address          Foreign Address        (state)\ntcp4       0      0  127.0.0.1.47311        *.*                    LISTEN\n"
+  },
+  "procMulti": {
+   "kind": "proc4",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:B8CF 00000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 1001 1 0000000000000000 20 4 30 10 -1\n   1: 0100007F:B8CF 0100007F:C351 01 00000000:00000000 00:00000000 00000000   501        0 1002 1 0000000000000000 20 4 30 10 -1\n   2: 0100007F:C351 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   501        0 1003 1 0000000000000000 20 4 30 10 -1\n   3: 0100007F:B8CF 0100007F:C352 01 00000000:00000000 00:00000000 00000000   501        0 1004 1 0000000000000000 20 4 30 10 -1\n   4: 0100007F:C352 0100007F:B8CF 01 00000000:00000000 00:00000000 00000000   502        0 1005 1 0000000000000000 20 4 30 10 -1\n   5: 0100007F:1F55 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 1006 1 0000000000000000 20 4 30 10 -1\n"
+  },
+  "proc6Multi": {
+   "kind": "proc6",
+   "text": "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 00000000000000000000000001000000:B8CF 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000   501        0 2001 1 0000000000000000 20 4 30 10 -1\n   1: 00000000000000000000000001000000:B8CF 00000000000000000000000001000000:C352 01 00000000:00000000 00:00000000 00000000   501        0 2002 1 0000000000000000 20 4 30 10 -1\n   2: 00000000000000000000000001000000:C352 00000000000000000000000001000000:B8CF 01 00000000:00000000 00:00000000 00000000   502        0 2003 1 0000000000000000 20 4 30 10 -1\n"
+  },
+  "windowsMulti": {
+   "kind": "windows",
+   "text": "\nActive Connections\n\n  Proto  Local Address          Foreign Address        State           PID\n  TCP    127.0.0.1:47311        0.0.0.0:0              LISTENING       4100\n  TCP    127.0.0.1:47311        127.0.0.1:50001        ESTABLISHED     4100\n  TCP    127.0.0.1:50001        127.0.0.1:47311        ESTABLISHED     4300\n  TCP    127.0.0.1:47311        127.0.0.1:50002        ESTABLISHED     4100\n  TCP    127.0.0.1:50002        127.0.0.1:47311        ESTABLISHED     5200\n  TCP    127.0.0.1:47311        127.0.0.1:50004        ESTABLISHED     4100\n  TCP    127.0.0.1:50004        127.0.0.1:47311        ESTABLISHED     6200\n  TCP    127.0.0.1:50003        127.0.0.1:47311        TIME_WAIT       0\n  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING       4\n  TCP    [::1]:47070            [::]:0                 LISTENING       4400\n"
+  },
+  "windowsGerman": {
+   "kind": "windows",
+   "text": "\nActive Connections\n\n  Proto  Local Address          Foreign Address        State           PID\n  TCP    127.0.0.1:47311        0.0.0.0:0              ABHÖREN         4100\n  TCP    127.0.0.1:47311        127.0.0.1:50001        HERGESTELLT     4100\n  TCP    127.0.0.1:50001        127.0.0.1:47311        HERGESTELLT     4300\n  TCP    127.0.0.1:47311        127.0.0.1:50002        HERGESTELLT     4100\n  TCP    127.0.0.1:50002        127.0.0.1:47311        HERGESTELLT     5200\n  TCP    127.0.0.1:47311        127.0.0.1:50004        HERGESTELLT     4100\n  TCP    127.0.0.1:50004        127.0.0.1:47311        HERGESTELLT     6200\n  TCP    127.0.0.1:50003        127.0.0.1:47311        WARTEND         0\n  TCP    0.0.0.0:445            0.0.0.0:0              ABHÖREN         4\n  TCP    [::1]:47070            [::]:0                 ABHÖREN         4400\n"
+  }
+ },
+ "ps": {
+  "4100": "  501\n",
+  "4300": "  501\n",
+  "4400": "  501\n",
+  "5200": "  502\n",
+  "300": "    0\n",
+  "4500": "  501\n",
+  "9999": ""
+ },
+ "tasklist": {
+  "4100": "\"python.exe\",\"4100\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\owner\",\"0:00:01\",\"N/A\"\r\n",
+  "4300": "\"example.exe\",\"4300\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\Owner\",\"0:00:01\",\"N/A\"\r\n",
+  "4400": "\"example-agent.exe\",\"4400\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\owner\",\"0:00:01\",\"N/A\"\r\n",
+  "5200": "\"curl.exe\",\"5200\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"N/A\",\"0:00:01\",\"N/A\"\r\n",
+  "6200": "\"curl.exe\",\"6200\",\"Console\",\"1\",\"12,345 K\",\"Running\",\"EXAMPLE-PC\\other\",\"0:00:01\",\"N/A\"\r\n"
+ },
+ "normHost": [
+  [
+   "::ffff:127.0.0.1",
+   "127.0.0.1"
+  ],
+  [
+   "0.0.0.0",
+   "*"
+  ],
+  [
+   "::",
+   "*"
+  ],
+  [
+   "localhost",
+   "127.0.0.1"
+  ],
+  [
+   "*",
+   "*"
+  ],
+  [
+   "::1",
+   "::1"
+  ],
+  [
+   "0:0:0:0:0:0:0:1",
+   "::1"
+  ],
+  [
+   "[::1]",
+   "[::1]"
+  ],
+  [
+   "fe80::1%en0",
+   "fe80::1"
+  ],
+  [
+   "127.0.0.1",
+   "127.0.0.1"
+  ],
+  [
+   "example.test",
+   "example.test"
+  ]
+ ],
+ "cases": [
+  {
+   "table": "netstatMulti",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "listener",
+   "port": 8021,
+   "want": {
+    "kind": "system",
+    "pid": 1
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "listener",
+   "port": 47555,
+   "want": {
+    "kind": "system",
+    "pid": 300
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "listener",
+   "port": 47070,
+   "want": {
+    "kind": "this-account",
+    "pid": 4400
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "listener",
+   "port": 1,
+   "want": {
+    "kind": "none"
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50002
+   ],
+   "want": {
+    "kind": "another-account",
+    "uid": 502,
+    "pid": 5200
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "this-account",
+    "pid": 4300
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50002
+   ],
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "peerAt",
+   "server": [
+    "::ffff:127.0.0.1",
+    47311
+   ],
+   "client": [
+    "::ffff:127.0.0.1",
+    50002
+   ],
+   "want": {
+    "kind": "another-account"
+   }
+  },
+  {
+   "table": "netstatMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    59999
+   ],
+   "want": {
+    "kind": "unknown",
+    "reason": "no-row"
+   }
+  },
+  {
+   "table": "netstatTimeWait",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "this-account",
+    "pid": 4300
+   }
+  },
+  {
+   "table": "netstatNoProcess",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "unknown",
+    "reason": "netstat-format: no process:pid column"
+   }
+  },
+  {
+   "table": "procMulti",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "this-account",
+    "uid": 501
+   }
+  },
+  {
+   "table": "procMulti",
+   "ask": "listener",
+   "port": 8021,
+   "want": {
+    "kind": "system",
+    "uid": 0
+   }
+  },
+  {
+   "table": "procMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50002
+   ],
+   "want": {
+    "kind": "another-account",
+    "uid": 502
+   }
+  },
+  {
+   "table": "procMulti",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50002
+   ],
+   "want": {
+    "kind": "this-account",
+    "uid": 501
+   }
+  },
+  {
+   "table": "proc6Multi",
+   "ask": "peerAt",
+   "server": [
+    "::1",
+    47311
+   ],
+   "client": [
+    "::1",
+    50002
+   ],
+   "want": {
+    "kind": "another-account",
+    "uid": 502
+   }
+  },
+  {
+   "table": "proc6Multi",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "this-account"
+   }
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "want": {
+    "kind": "this-account",
+    "pid": 4300
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50002
+   ],
+   "want": {
+    "kind": "unknown",
+    "pid": 5200,
+    "reason": "process-not-readable"
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50004
+   ],
+   "want": {
+    "kind": "another-account",
+    "pid": 6200
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50003
+   ],
+   "want": {
+    "kind": "unknown",
+    "reason": "no-row"
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "listener",
+   "port": 445,
+   "want": {
+    "kind": "system",
+    "pid": 4
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsMulti",
+   "ask": "listener",
+   "port": 47070,
+   "want": {
+    "kind": "this-account",
+    "pid": 4400
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsGerman",
+   "ask": "listener",
+   "port": 47311,
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
+   },
+   "twins": [
+    "node"
+   ]
+  },
+  {
+   "table": "windowsGerman",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50003
+   ],
+   "want": {
+    "kind": "unknown",
+    "reason": "no-row"
+   },
+   "twins": [
+    "node"
+   ]
+  }
+ ]
+}
