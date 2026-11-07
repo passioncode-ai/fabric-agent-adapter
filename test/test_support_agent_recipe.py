@@ -241,15 +241,23 @@ class Recipe(unittest.TestCase):
 
     def test_a_template_plan_draft_goes_through_check_reply(self):
         """0.75.0 seam reading 2: under communication-agent-template.md the plan-and-draft call writes the draft and the
-        agent runs check_reply on it, with the plan's evidence ids as `given` and a [KB:<id>] marker per id used."""
+        agent runs check_reply on it, with the ids placed in the prompt as `given` (never the plan's own `evidence`)
+        and a [KB:<id>] marker per id used; a tool result enters as a pseudo-entry of its own (0.75.0 round 3)."""
+        prompt_ids = ["refund-window", "tool.order"]
         plan = {"evidence": ["refund-window"], "draft": "You can get a refund within 14 days from the store. [KB:refund-window]"}
-        sources = {"refund-window": "Refunds within 14 days from the store."}
-        got = sa.check_reply(plan["draft"], "Can I get a refund?", plan["evidence"], max_chars=1200, sources=sources)
+        sources = {"refund-window": "Refunds within 14 days from the store.", "tool.order": "Order 48213 paid 2026-11-05."}
+        got = sa.check_reply(plan["draft"], "Can I get a refund?", prompt_ids, max_chars=1200, sources=sources)
         self.assertTrue(got["ok"], got["problems"])
         self.assertNotIn("[KB:", got["reply"])
         bare = sa.check_reply("You can get a refund within 14 days from the store.", "Can I get a refund?",
-                              plan["evidence"], max_chars=1200, sources=sources)
+                              prompt_ids, max_chars=1200, sources=sources)
         self.assertIn("no-citation", bare["problems"])
+        invented = sa.check_reply("Your refund is approved. [KB:refund-approved]", "Can I get a refund?", prompt_ids,
+                                  max_chars=1200, sources=sources)
+        self.assertIn("unknown-citation:refund-approved", invented["problems"])
+        tool = sa.check_reply("Order 48213 was paid. [KB:tool.order]", "Was my order paid?", prompt_ids,
+                              max_chars=1200, sources=sources)
+        self.assertTrue(tool["ok"], tool["problems"])
 
     def test_an_address_or_a_phone_number_is_checked_by_equality(self):
         source = "Write to help@acme.com or call +1 555 010 0199."

@@ -12,11 +12,12 @@ RESTS_ON = {
     0: ["Fill in the brief (section 0 of the prompt)", "a question for the owner before the build"],
     1: ["Batch a person's burst into one turn", "Claim the ticket atomically with an idempotency key before any model call"],
     2: ["Triage (the planning model, thinking low, no knowledge in the prompt) of the whole batch",
-        "Any ask, even a vague one"],
-    3: ["Analyse, plan and draft in ONE call", "injection {suspected, what}", "evidence (the knowledge ids it used)",
+        "Any ask, even a vague one", "a complaint about the product"],
+    3: ["Analyse, plan and draft in ONE call", "injection {suspected, what}", "scope (the product or off-topic)", "evidence (the knowledge ids it used)",
         "a separate cheap drafter after the plan scored lower at the same cost, so there is none"],
     4: ["Final pass (the planning model, thinking low) only when an action returned information the reply must use"],
-    5: ["then a checker of another vendor than the drafter"],
+    5: ["then a checker of another vendor than the drafter", "never the plan's own `evidence`",
+        "A turn whose plan has no injection verdict, or whose call failed, is held"],
     6: ["every other channel hands a lead to its queue", "a sales agent of its own owns the CRM and the lead",
         "Prices, discounts and terms only from the knowledge or the CRM"],
     7: ["default USD 100 a month for a new agent", "the code stops a little under the key's limit"],
@@ -38,7 +39,7 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
                 with self.subTest(line=i, phrase=phrase):
                     self.assertIn(" ".join(phrase.split()), body)
 
-    def test_every_event_kind_it_names_is_one_the_kit_writes(self):
+    def test_every_event_kind_it_names_passes_the_kit_writers_kind_rule(self):
         import importlib
         import sys
         sys.path.insert(0, str(ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"))

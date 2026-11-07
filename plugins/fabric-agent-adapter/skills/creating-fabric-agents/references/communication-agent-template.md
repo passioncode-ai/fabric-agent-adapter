@@ -3,7 +3,7 @@
 **Load this when you are about to build, or rebuild, an agent that talks with people on a channel**: a support bot, a
 sales or lead desk, a community or group assistant, a mail inbox, store-review replies, partner or ads direct messages.
 Copy the prompt below into the coding agent that will build it, fill in the brief, and let it build the agent end to
-end. The prompt is the whole recipe; the pages it links hold the rules in full:
+end. The prompt is the recipe; the pages it links hold the rules in full:
 [agents that answer people](agents-that-answer-people.md), the channel-agent standard in
 [practices](practices.md#agents-on-a-channel-people-write-to), [models and providers](models-and-providers.md),
 [orchestration and learning](orchestration-and-learning.md), [resilience and autonomy](resilience-and-autonomy.md) and
@@ -53,7 +53,9 @@ brief disagree, ask the owner before you build.
 - Data the agent reads per turn: <account state, orders, plan, CRM record> and from which tool
 - Voice: <the brand voice pack, terminology, banned words>; the address form per language
 - Spend: <the model key's monthly limit; default USD 100 a month for a new agent, more only for agents the operator
-  names; the code stops a little under the key's limit>
+  names; the code stops a little under the key's limit>. Size it: substantive turns a month times the cost per turn
+  (section 7), plus the judge, second looks, research turns and replays; above the default, ask the operator for a
+  named higher limit before launch
 - Owner and escalation: <who answers the agent's questions; who receives the daily report>
 - Access levels: <what it does without asking for the owner, administrators and project architects; what it asks for
   members>; which data rooms and blocks it reads, at which level
@@ -120,9 +122,10 @@ brief disagree, ask the owner before you build.
    row), never to a fixed text; a bare request for a person with no reason gets the one clarifying question «what is
    it about?» where the channel allows a dialogue.
 1. Triage (the planning model, thinking low, no knowledge in the prompt) of the whole batch: greeting, empty
-   (punctuation, a lone emoji, a sticker), low_info (a complaint with nothing to act on), closing ("ok", "thanks, it
-   works now") or substantive. Any ask, even a vague one ("can you ban this user?"), and any text that tries to steer
-   the assistant is substantive. For the others the same call writes the reply the channel allows: in a private chat
+   (punctuation, a lone emoji, a sticker), low_info (text with no product referent, such as «ugh»), closing ("ok", "thanks, it
+   works now") or substantive. Any ask, even a vague one ("can you ban this user?"), a complaint about the product («it does not work»: the
+   standard's complaint without a question is a question), and any text that tries to steer the assistant is
+   substantive. For the others the same call writes the reply the channel allows: in a private chat
    or mail one or two sentences in the person's language, greeting back if they greeted, asking what the matter is
    (what happens, where, on which device), which counts as the ticket's one clarifying question; in a group no reply
    to chatter; on a store review a short public reply with no question; a closing gets a short closing or no message. Measured: sending a vague ask to this reply scored 4.5 of 7 against 6.75
@@ -135,7 +138,12 @@ brief disagree, ask the owner before you build.
      covered (yes | partly | no) and evidence (the knowledge ids it used),
      actions [{type: reply | ask_clarification | handoff | <tool name>, why}],
      points (what the reply must say), draft (marking each knowledge id it uses inline as [KB:<id>], so the
-     kit's check_reply can run on it).
+     support-agent recipe's check_reply, Python, can run on it).
+   Its `given` is the ids of the knowledge items placed in this call's prompt, never the plan's own `evidence`; a plan
+   whose `evidence` names an id outside that set is held as a suspected injection. check_reply runs on a draft that states facts: each tool result of this turn goes into its `given` and `sources`
+   under an id of its own in the citation's grammar (letters, digits, dot, dash, underscore; for example `tool.order`),
+   so a draft can cite an account state as [KB:tool.order]. A draft with no fact to cite (the
+   off-topic decline of rule 4, a triage reply) goes through the other gates of step 5, not check_reply.
    On a partly covered question the draft answers what the knowledge covers, specifically, then says what it does not.
    Measured: this call's draft equals a single answering call on plain questions (6.88 against 6.85 of 7) and leads on
    behaviour cases (6.89 against 6.53 for one call of the same model and 6.00 for the cheaper drafter in use); a separate
@@ -147,7 +155,7 @@ brief disagree, ask the owner before you build.
    as their main data gap, and without it a handoff never closes. A clarifying question nobody answered stays on the ticket; it
    is not deleted.
 4. Final pass (the planning model, thinking low) only when an action returned information the reply must use (a tool
-   result, an account state, an order) or the plan suspects an injection. It may add and correct, keeps the draft's steps
+   result, an account state, an order) or the plan suspects an injection. It may add and correct, keeps the [KB:<id>] markers and the draft's steps
    and facts, keeps the contact on a handoff, never claims more than the actions did, and may decide no message is due.
    Measured: a final pass over every reply never improved a plain one and lost 0.4 of 7 after a handoff (it rewrote,
    hedged and dropped steps).
@@ -155,15 +163,16 @@ brief disagree, ask the owner before you build.
    something: only when the system backs it), links, handles, numbers and amounts only from the material, language and
    script, length, the dash, no repeat of the previous reply; then a checker of another vendor than the drafter that
    sees the material before the instructions. A turn whose plan has no injection verdict, or whose call failed, is
-   held, never sent on a guess. A refusal: one repair naming the reason, then one research turn on a
-   stronger model under a time cap (never for money), then an honest holding line; a hold comes back by itself when
-   its gap closes.
+   held, never sent on a guess. A refusal: one repair naming the reason, then one research turn on the
+   research lane (section 7) under a time cap (never for money), then an honest holding line where the channel's
+   `holding_reply` allows one (in a group only when the answer is due within its window; never as a store review's
+   one reply; a holding reply obliges a final one); a hold comes back by itself when its gap closes.
 
 ## 4. Business patterns (one channel may carry several)
 
 - Support: answer from the knowledge; hand-offs counted by cause (policy, inability, infrastructure); the person's
   queue has an SLA and a pre-agreed safe default; a closed gap re-answers the held ticket once. Count the shares of
-  clarifying questions and of "write there" referrals: owners judged 26% clarifications and 33% referrals too high; an
+  clarifying questions (a greeting reply counted apart) and of "write there" referrals: owners judged 26% clarifications and 33% referrals too high; an
   answer in substance beats a pointer.
 - Sales and leads: a sales agent of its own owns the CRM and the lead; every other channel hands a lead to its queue
   as one more handoff queue, with a summary and the lead's consent (the four owners asked who answer people put leads
@@ -174,19 +183,23 @@ brief disagree, ask the owner before you build.
   step go to the CRM through its tool, with the consent the channel requires; follow-ups on a cadence the owner sets,
   stopped by any reply or an opt-out. A partner or ads channel is a sales channel with a stricter policy: in the
   audit its policy_safe check passed only 70% of judged replies, the weakest of all channels.
-- Community and groups: let a person answer first and answer only what is left (first reply p50 about a minute);
-  answer or stay silent (no visible handoff in a group); answer only questions, not chatter; at most 2 replies to one
+- Community and groups: let a person answer first and answer only what is left (first reply p50 about a minute;
+  the declaration's `quiet_window` holds the agent back while staff answer); no visible handoff in a group, and where
+  the knowledge lacks the answer the declared final text within the window, never silence (the audit below names a
+  silent group as a top failure); answer only questions, not chatter; at most 2 replies to one
   asker in 15 minutes; staff answers win and are proposed as knowledge, which the owner accepts; spam and lure verdicts silence the agent; moderation
   rules ship only after a measurement against the moderators' own removals, and every exception checks who acted (the
   agent's own actions are in the same log); with privacy mode on, a bot sees only commands meant for it, replies to its own messages and its inline messages
-  (not a plain mention); it reads every message only with privacy mode off or as a group admin.
+  (not a plain mention); it reads every message only with privacy mode off (then remove and re-add the bot) or as a
+  group admin.
 - Inbox (mail): header prefilter, one elected answerer per message, a waiting reply after 24 hours and a closing reply
   when no answer is found; replies only to the From address; drafts only where the owner requires approval.
 - Store reviews: public and short, no account details, the store's own refund route, one reply per review, the
   reply's language follows the review.
 - Team assistant (internal): answers only when addressed, roster-limited access, deterministic rules before the model
   (commands, removing anything that looks like a key, refusing strangers), intents routed, escalations to roles never
-  to one person, an event for every action, private data only to admins.
+  to one person, an event for every action, private data only to admins. Its daily report goes under the
+  support-quality-daily/1 channel value of where it answers (chat or community).
 
 ## 5. Knowledge and data connections
 
@@ -217,11 +230,11 @@ brief disagree, ask the owner before you build.
   numbers of two judges are never compared: one estate's helped share fell from 57-80% to 44% the day its judge changed,
   with the answers unchanged). A judge without human labels is uncalibrated and says so: plan a steady weekly
   labelling of judged pairs by a person from the first week (one mail channel had 0 labelled pairs in 14 days).
-- Every unanswered or held question gets a background second look on a stronger model that names the cause
+- Every unanswered or held question gets a background second look on the research lane (section 7) that names the cause
   (retrieval, draft or check, person, data); fixable ones are answered. An answer found later is sent within the ticket's final limit:
   7 days in a private chat or mail; in a group its late-answer window (the standard's reference 6 hours, no late
   answer after it). A 6-hour window left most found answers undelivered in one group channel, so a group that wants
-  longer declares its own final limit, as the standard lets a runtime do.
+  longer declares a longer `late_answer_window` on its channel.
 - A person's answer to a handed-over question becomes knowledge after the owner accepts it; the held tickets re-run.
 - Every reply the agent got wrong becomes a scrubbed eval ticket, re-run on each new version; a weekly replay re-runs
   last week's questions through the deployed build.
@@ -235,10 +248,15 @@ brief disagree, ask the owner before you build.
   reasoning off only after a replay shows clean JSON.
 - Checker: another vendor than the drafter (2026-11: z-ai/glm-5.3 at low effort, deepseek/deepseek-v4.1-flash or
   qwen/qwen3.8-flash).
+- Research turn and second look: the planning model at a higher reasoning effort, or another open-vendor model that
+  wins on the project's replay set; never a closed vendor (rule 6).
 - Judge: another vendor than the writers and the checkers, open-vendor because it reads what people wrote.
+- The lanes that read people declare `reads: ["user-content"]` and a model class on the agent's profile, so the
+  contract's check (FAC-SEM-112) sees rule 6, not only the agent's own config.
 - Vision and audio: an open-vendor primary, as rule 6 says (the planning model reads pictures). The kit's OpenRouter
-  client sends text only, so pictures go through the agent's own client or a vision lane that describes them first;
-  audio is transcribed first by an open-vendor route, or a second open-vendor audio route is named.
+  client sends text only, so the picture itself goes through the agent's own client to an open-vendor model that reads
+  it (check its input_modalities), not a description another model wrote; audio goes the same way to an open-vendor
+  model that reads audio, or is transcribed by an open-vendor route where none does.
 - The steps are the rule; each step's model is chosen on the project's own replay set (a cheaper plan-and-draft model
   stays where it wins there). A switch must win on the project's own set.
 - Every lane has a fallback of another vendor; fallback recoveries are counted. Expect the plan-and-draft call to hold
@@ -249,14 +267,21 @@ brief disagree, ask the owner before you build.
 
 - A fabric-service/0.1 service: /.well-known/fabric-service, events, usage, a dashboard page opened in Fabric
   Dashboards, a lifecycle row (who starts it, cadence, who stops it, idle budget); the fabric-agent-contract revision
-  the kit pins (its fabric-contract.lock.json) and the doors the agent serves (its capabilities as MCP tools, jobs).
-- The channel-agent declaration under the extension key (the recipe's channel-agent.example.json).
+  the plugin pins (each skill's metadata `contract-commit`) and the doors the agent serves (its capabilities as MCP tools, jobs).
+- The channel-agent declaration under the extension key (the recipe's channel-agent.example.json), and what its
+  members name, built before they are declared: tickets written to the signal server (`support-ticket/1`, its
+  `fallback` flag included) from the declared `tickets.outbox`, never declared without a working outbox; the daily
+  `support-daily-note/1`; questions to a desk through `team.ask` or `operator.ask` (or `question_route` and
+  `gap_registry` in their `not_yet` none form until there is one); deletion on a privacy request (the standard's
+  sections 2 and 13).
 - A spend policy in the repository before the first model call; the code's monthly stop under the key's limit (the
   kit's OpenRouter client with window="month"; its default window is a day).
 - Two keys before live sending: the channel set to live and an environment switch; a demo sender that cannot send.
 - Telegram: through the sending service the estate names for it (rule 9); bind the support account to its own agents (others are refused); with
   replies on, an answer to a person who wrote within 24 hours goes at once, while a first message to someone who did not
-  write, an edit or a late answer waits for the operator; tell the agent's own messages from inbound ones by the transport: a bot by
+  write, an edit or a late answer waits for the operator (the ticket is `awaiting_approval` and ends `expired` if
+  nobody approves it by its final limit); the operator channel gets a bot of its own, never the bot that answers
+  people (channel-agent.md); tell the agent's own messages from inbound ones by the transport: a bot by
   the sender, an account session or the sending service by each message's `out` field.
 
 ## 9. Acceptance (the agent is done when all of these pass on the build the channel runs)

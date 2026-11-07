@@ -4,8 +4,12 @@ A service answers one inbound question from its own knowledge file, or hands it 
 agent that answers people, not that agent: see the paragraph after the table. Under the creating-fabric-agents
 template (`communication-agent-template.md`) the plan-and-draft call writes the draft, not this recipe's `answer()`:
 the draft carries a `[KB:<id>]` marker for each knowledge id the plan used, and the agent runs `check_reply(draft,
-question, evidence_ids, max_chars=..., sources=...)` on it for the code checks. The checker of another vendor stays the
-agent's own (agents-that-answer-people.md); this recipe has none. Built only on the service
+question, prompt_ids, max_chars=..., sources=...)` on it for the code checks. `prompt_ids` are the ids of the items
+placed in the plan's prompt, never the plan's own list (an id the plan names outside them is held as a suspected
+injection); each tool result of the turn enters both under an id of its own (`tool.order`; the citation takes letters,
+digits, dot, dash and underscore, no colon). A draft with no fact to cite (a decline, a triage reply) skips
+`check_reply`. The final pass keeps the markers; repair, and the checker of another vendor, stay the agent's own
+(agents-that-answer-people.md); this recipe has none. Built only on the service
 kit: `fabric_openrouter` for the model, `fabric_usage` for receipts, `fabric_paths` for private, atomic state.
 Tests: `test/test_support_agent_recipe.py` (a fake model; no network, no key).
 

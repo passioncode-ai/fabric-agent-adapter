@@ -16,7 +16,8 @@ SCENARIO = "an-agent-that-answers-people"
 # retention, and the CHANGELOG entry are pinned whole (whitespace normalized), so removing any clause of one fails here;
 # a deliberate change edits these in the same commit.
 PARTS = (
-    'Every inbound message is a turn with a trace id** (A1): the id is on the turn row, on each model call of that '
+    'Every inbound message belongs to one turn with a trace id** (A1): a burst batched into one turn (the '
+    'communication agent template) lists its message ids on the turn row; the id is on the turn row, on each model call of that '
     'turn, on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance,'
     ' not covered, handed off, small talk, limit, error), the hand-off reason and category, the latency, the '
     'knowledge revision the answer used, and whether the channel accepted the reply. Conversation text stays inside'
@@ -117,7 +118,7 @@ CHECKLIST = (
 EXPECTED = (
     'starts from references/communication-agent-template.md and loads references/agents-that-answer-people.md,'
     ' building its parts into the first release, not later',
-    'records every inbound message as a turn with a trace id and an outcome from the fixed list, and publishes one '
+    'records every inbound message in one turn with a trace id and an outcome from the fixed list, and publishes one '
     'support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0, '
     "its value valid against the contract's support-quality-daily.schema.json and a judge's calibration carried "
     'only once its readers adopted DEC-0144',

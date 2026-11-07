@@ -37,7 +37,8 @@ outage during the repair is a plain hand-off), and research and the hold stay th
 
 ## The record and the daily report
 
-- **Every inbound message is a turn with a trace id** (A1): the id is on the turn row, on each model call of that turn,
+- **Every inbound message belongs to one turn with a trace id** (A1): a burst batched into one turn (the
+  communication agent template) lists its message ids on the turn row; the id is on the turn row, on each model call of that turn,
   on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance, not covered,
   handed off, small talk, limit, error), the hand-off reason and category, the latency, the knowledge revision the
   answer used, and whether the channel accepted the reply. Conversation text stays inside the agent, redacted, for at
