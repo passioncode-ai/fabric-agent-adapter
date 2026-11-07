@@ -75,8 +75,9 @@ brief disagree, ask the owner before you build.
    that reads people's words without an open-vendor route.
 7. No em dash (U+2014) in any text a person reads; a test fails on it. The person's language in every reply, with no
    paragraph in another language and no fixed text appended in a third.
-8. Secrets only through the estate's vault (Project Observatory): no .env, no key in argv, logs or Git.
-9. Telegram messages go out only through the estate's Telegram gateway service, with its approval rules.
+8. Secrets only through the estate's vault (for example Project Observatory): no .env, no key in argv, logs or Git.
+9. Each channel sends only through the transport the estate names for it (for Telegram, the estate's own sending
+   service where it has one), with its approval rules.
 
 ## 2. The conversation unit
 

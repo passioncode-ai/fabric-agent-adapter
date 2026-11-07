@@ -253,6 +253,20 @@
         "writes the insight/1 lines in insights/ (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else <name>-data/ beside the main checkout), and its lessons to its own retrospective file where Project Observatory is not installed",
         "lists the retro in the resilience-and-autonomy checklist it reports"
       ]
+    },
+    {
+      "id": "a-channel-agent-starts-from-the-communication-template",
+      "request": "Build a Fabric agent that answers our users in a Telegram support chat and qualifies sales leads from the same chat. Where do I start, and how does it handle an incoming message?",
+      "expected": [
+        "loads communication-agent-template.md and fills its brief (section 0) with the owner before the build",
+        "batches a person's burst into one turn and claims the ticket before any model call",
+        "triages the whole batch with the planning model at low thinking: only a batch with no ask gets its reply there",
+        "analyses, plans and drafts in one call (injection check, product-only scope, the knowledge ids it used), with no separate cheap drafter",
+        "runs a final pass only when an action returned new facts or an injection is suspected",
+        "keeps the pre-send gates and a checker of another vendor than the drafter",
+        "qualifies leads into the CRM through its tool, with prices only from the knowledge or the CRM",
+        "gives the agent's model key USD 100 a month by default, its own stop under the key's limit"
+      ]
     }
   ]
 }

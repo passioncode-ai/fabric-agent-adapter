@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.75.0 (2026-11-07)
+
+Guidance only: no kit module, probe rule or hook changes; the contract pin stays `18f8d487`.
+
+### Added
+
+- **The Fabric communication agent template** (FAA-262, the operator's decision of 2026-11-07):
+  `creating-fabric-agents/references/communication-agent-template.md`, a prompt a coding agent builds a channel agent
+  from (support, sales and leads, community, inbox, store reviews, an internal assistant). It carries the inbound
+  pipeline as one estate measured it on 56 real questions and 19 written batches: a code prefilter, a triage at low
+  thinking that answers only a batch with no ask, one call that analyses, plans and drafts (with the injection check
+  and the product-only scope), the actions, a final pass only when an action returned new facts or an injection is
+  suspected, then the pre-send gates with a checker of another vendor. It also carries the business patterns, the
+  knowledge and data connections, the learning loop, the model lanes, the Fabric integration and the acceptance with
+  15 adversarial batches, and maps its sections to the parts of an organization agent template (fabric-workspace
+  `knowledge/system/templates.md`, S2). `SKILL.md` links it beside `agents-that-answer-people.md`.
+- A scenario eval (`a-channel-agent-starts-from-the-communication-template`) and a trigger query for it.
+
+### Changed
+
+- `references/models-and-providers.md`: a new agent's model key gets USD 100 a month unless the operator names a higher
+  one, and the agent's own stop sits a little under the key's limit (the operator's decision of 2026-11-07).
+
 ## 0.74.0 (2026-11-07)
 
 The contract pin moves to `18f8d487` (`v0.1.0+2026-11-07.1`) from `eac1a594` (`v0.1.0+2026-11-06.1`); between them
