@@ -2,7 +2,7 @@
 
 Every declaration of test/fixtures/contract/channel-agent-vectors.json (vendored byte for byte by
 make_channel_agent_vectors.mjs) runs through check_service_channel_agent.channel_agent_rules, and its findings
-{code, instancePath} equal the vector's as a set (the vectors' `about` allows it; duplicates are counted too); a vector
+{code, instancePath} equal the vector's in the reference's order; a vector
 that carries `view` is compared with channel_agent_view. Then the rule check_service.py adds: CA-1's two sites (D1),
 a declaration read as not declared reported but never failed (D3), and the well-known answer's 2 MiB cap (D4)."""
 
@@ -159,6 +159,25 @@ class Verdict(unittest.TestCase):
         self.assertEqual(verdict, "NOT_RUN")
         self.assertIn("read as not declared, never a failure", evidence)
         self.assertIn("FAC-SEM-162 at %s" % ca.CHANNEL_AGENT_PATHS["well-known"], evidence)
+
+    def test_d3_a_credentials_shape_in_any_copy_fails(self):
+        shaped = valid_declaration()
+        shaped["projects"][0]["channels"][0]["texts"]["final"] = {"en": "key " + "s" + "k-or-v1-" + "a1b2c3d4" * 8}
+        cases = [
+            ("a well-known copy beside a valid manifest",
+             (self.manifest(valid_declaration()), True, "", {"extensions": {KEY: shaped}})),
+            ("a well-known copy of a manifest that declares nothing", (self.manifest(), True, "", {"extensions": {KEY: shaped}})),
+            ("a well-known copy of an unreadable manifest", (None, True, "x", {"extensions": {KEY: shaped}})),
+            ("a capability's copy beside a valid declaration",
+             (self.manifest(valid_declaration(), capabilities=[{"extensions": {KEY: shaped}}]), True, "", {})),
+            ("the manifest's own extensions", (self.manifest(extensions={KEY: shaped}), True, "", {})),
+        ]
+        for name, args in cases:
+            with self.subTest(name):
+                verdict, evidence = ca.declaration_verdict(*args)
+                self.assertEqual(verdict, "FAIL")
+                self.assertIn("FAC-SEM-165", evidence)
+                self.assertNotIn("k-or-v1", evidence)
 
     def test_d3_a_credentials_shape_always_fails(self):
         declaration = valid_declaration()

@@ -34,8 +34,10 @@ actions with no MCP surface; a remote one there is NOT_RUN, its twin may be on A
 is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboard cannot declare an empty list).
 
 channel-agent.declaration (DEC-0150, FAC-SEM-162 to 165): extensions/channel-agent/0.1 under provider.extensions of the
-manifest the descriptor names, or, with no manifest, under extensions of the well-known answer (CA-1). Findings on it
-FAIL; nothing declared, or a declaration read as not declared (a key elsewhere, another version), is NOT_RUN.
+manifest the descriptor names, or, with no manifest, under extensions of the well-known answer (CA-1). FAC-SEM-164's
+obligations on a declaration still read FAIL, and so does a string shaped like a credential in it or in any copy beside
+it; nothing declared, or a declaration read as not declared (a key elsewhere, another version, a form the schema or
+FAC-SEM-163 refuses), is NOT_RUN.
 
 dashboard.opens-in-host (FAA-118, the operator rule of 2026-10-24): the service's checkout (--repo, else the one of
 the descriptor's source.repository that holds its commands, manifest or launchd job) opens the service's pages only
