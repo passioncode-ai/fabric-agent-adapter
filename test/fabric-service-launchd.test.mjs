@@ -110,6 +110,12 @@ test('the plist refuses what it cannot carry', () => {
   assert.throws(() => k.launchdPlist('a.b', ['/bin/x'], { stdoutPath: '/l' }), k.ServiceError);
 });
 
+test('a release folder with a space is no credential (FAA-266)', () => {
+  const release = '/Users/example/Library/Application Support/example-agent/releases/e7d6275a8aae';
+  const text = k.launchdPlist('a.b', ['/bin/x'], { workingDirectory: '/', stdoutPath: '/l', environment: { PYTHONPATH: release } });
+  assert.ok(text.includes(`<string>${release}</string>`));
+});
+
 test('the plist escapes markup', () => {
   const text = k.launchdPlist('a.b', ['/bin/echo', 'a<b>&c'], { workingDirectory: '/', stdoutPath: '/l' });
   assert.ok(text.includes('<string>a&lt;b&gt;&amp;c</string>'));
@@ -370,4 +376,15 @@ test('FAA-226: the installer reads the well-known answer on the one connection i
   for (let i = 0; i < 100 && closed.length < opened.length; i += 1) await new Promise((r) => setTimeout(r, 10));
   assert.equal(opened.length, 1, 'one connection: the checked one carries the request');
   assert.deepEqual(closed, opened, 'and it is closed after the answer');
+});
+
+test('the install vouches with its own job\'s pid, which a restricted table needs (FAA-267)', async (t) => {
+  const s = setup(t);
+  const fake = fakeLaunchd();
+  const seen = [];
+  const doc = await install(s, fake, '1', { fetchWellKnown: async (origin, opts) => { seen.push(opts?.vouchPid); return { service: { id: 'example-agent', instance: 'default' } }; } });
+  assert.equal(doc.service.id, 'example-agent');
+  assert.deepEqual(seen, [4242]);
+  assert.equal(k.launchdPid(s.name, { run: fake.run, platform: 'darwin', uid: UID }), 4242);
+  assert.equal(k.launchdPid('ai.passioncode.test.absent', { run: fake.run, platform: 'darwin', uid: UID }), null);
 });

@@ -60,7 +60,7 @@ def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dic
         if fabric_secrets.secret_argument(arg):
             raise ServiceError("an argument carries a credential; a supervisor file never does (read it from the token file or a secret reference)")
     for name, value in (environment or {}).items():
-        if fabric_secrets.credential_name(name) or fabric_secrets.secret_value(str(value)):
+        if fabric_secrets.credential_name(name) or fabric_secrets.secret_argument(str(value)):
             raise ServiceError("environment %s looks like a credential; a supervisor file never carries one" % name)
 
 
@@ -263,7 +263,7 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
     for key, value in env.items():
         if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)\Z", key) and not key.endswith("_FILE"):
             raise ServiceError("Environment variable %s looks like a secret; pass a *_FILE path instead." % key)
-        if fabric_secrets.secret_value(str(value)):
+        if fabric_secrets.secret_argument(str(value)):  # path-aware: a release folder is no key (FAA-266)
             raise ServiceError("Environment %s holds a value shaped like a credential; a plist never carries one." % key)
     for arg in argv:
         if fabric_secrets.secret_argument(arg):
@@ -307,13 +307,30 @@ def launchd_loaded(label: str) -> bool:
     return _launchctl("print", "%s/%s" % (_domain(), label)).returncode == 0
 
 
-def _read_well_known(origin: str, timeout: float = 2.0) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+_PID_ROW = re.compile(r"^\s*pid\s*=\s*(\d+)\s*\Z")
+
+
+def launchd_pid(label: str) -> Optional[int]:
+    """The running pid of this account's launchd job ``label``, or None (not running, or not readable)."""
+    result = _launchctl("print", "%s/%s" % (_domain(), label))
+    if result.returncode != 0:
+        return None
+    for line in (result.stdout or "").splitlines():
+        hit = _PID_ROW.match(line)
+        if hit:
+            return int(hit.group(1))
+    return None
+
+
+def _read_well_known(origin: str, timeout: float = 2.0,
+                     vouch_pid: Optional[int] = None) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """(the well-known answer or None, why the listener was refused or None). A loopback origin is read only on a
     connection whose server end is this OS account's process (DEC-0154 HA-2): another account's, root's, or one whose
-    owner cannot be told is `foreign-user`, never this service's answer."""
+    owner cannot be told is `foreign-user`, never this service's answer. `vouch_pid`, the pid of a launchd job this
+    caller started, proves the listener when the socket table hides other processes (FAA-267)."""
     parts = urllib.parse.urlsplit(origin)
     if parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port:
-        conn = _po.CheckedHTTPConnection("127.0.0.1", parts.port, timeout=timeout)
+        conn = _po.CheckedHTTPConnection("127.0.0.1", parts.port, timeout=timeout, vouch_pid=vouch_pid)
         try:
             conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % parts.port})
             response = conn.getresponse()
@@ -394,7 +411,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     deadline = time.time() + timeout
     foreign = None
     while time.time() < deadline:
-        doc, foreign = _read_well_known(origin)
+        doc, foreign = _read_well_known(origin, vouch_pid=launchd_pid(label))
         if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
             return doc
         time.sleep(0.5)

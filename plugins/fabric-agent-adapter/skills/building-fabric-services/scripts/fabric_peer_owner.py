@@ -64,6 +64,12 @@ addresses are `unknown` (`several-rows`), never a guess.
   accept) and the listener and both ends of the pair must read back with their exact addresses,
   this process's uid and its pid. A layout that fails calibration is not used again in that
   process.
+- macOS 27.2 restricts both tables for an ad-hoc-signed interpreter (a Homebrew Python, measured on 2026-11-07 by the
+  studio agent): sysctl lists only this process's own sockets and netstat prints nothing. The calibration therefore
+  also requires a child process's listener, and an empty netstat is `unknown` with reason `table-restricted`, never
+  another account's (FAA-267). A caller that started the server itself (an installer and its launchd job) may vouch
+  with that pid: `lsof -p PID` asks the process, which the restriction leaves readable, and `CheckedHTTPConnection`
+  accepts its listener on the port as this account's (`vouch_pid`). Apple's own `/usr/bin/python3` sees the tables.
 - macOS, fallback (`netstat`): `/usr/sbin/netstat -anv -p tcp`, its `process:pid` column, then
   `ps -o uid= -p PID` for the owner of the one row a question needs. Measured: about 20 ms over
   846 sockets, and it names the pids of root's listeners, which `lsof` run by an ordinary account
@@ -120,6 +126,11 @@ LISTENER_TTL = 1.0
 
 NETSTAT = "/usr/sbin/netstat"
 PS = "/bin/ps"
+LSOF = "/usr/sbin/lsof"
+
+#: The reason a socket table hides other processes' sockets from this one (FAA-267: macOS 27.2 shows an ad-hoc-signed
+#: interpreter, such as a Homebrew Python, only its own sockets through sysctl and nothing through netstat).
+TABLE_RESTRICTED = "table-restricted"
 
 #: Client codes of `own_connection` (ListenerRefused.code).
 SERVER_NOT_OWN = "server-not-own"
@@ -221,6 +232,8 @@ def parse_netstat(text: str) -> list[Row]:
     `process:pid` column is what is left between the leading and the trailing columns, both
     counted from the header. A header without `process:pid` (an older macOS) is unreadable."""
     lines = text.splitlines()
+    if not any(line.strip() for line in lines):
+        raise TableUnreadable(f"{TABLE_RESTRICTED}: netstat printed nothing to this process")
     header = next((i for i, line in enumerate(lines) if "process:pid" in line and "Proto" in line), None)
     if header is None:
         raise TableUnreadable("netstat-format: no process:pid column")
@@ -257,6 +270,18 @@ def _netstat_address(text: str) -> Optional[tuple[str, int]]:
         return norm_host(host), (0 if port == "*" else int(port))
     except ValueError:
         return None
+
+
+def parse_lsof_listeners(text: str) -> list[tuple[str, int]]:
+    """`lsof -nP -a -p PID -iTCP -sTCP:LISTEN -Fn`: the `n` lines, `127.0.0.1:47480`, `*:47480` or `[::1]:47480`."""
+    found: list[tuple[str, int]] = []
+    for line in text.splitlines():
+        if not line.startswith("n") or ":" not in line:
+            continue
+        host, port = line[1:].rsplit(":", 1)
+        if port.isdigit():
+            found.append((norm_host(host.strip("[]")), int(port)))
+    return found
 
 
 def parse_ps_uid(text: str) -> Optional[int]:
@@ -468,10 +493,41 @@ def calibration_holds(rows: list[Row], server: tuple[str, int], client: tuple[st
     return (one(server, ("*", 0), True) and one(server, client, False) and one(client, server, False))
 
 
+_CHILD_LISTENER = ("import socket,sys\ns=socket.socket();s.bind(('127.0.0.1',0));s.listen(1)\n"
+                   "print(s.getsockname()[1],flush=True);sys.stdin.read()")
+
+
+def _child_listener_seen(rows_of) -> Optional[bool]:
+    """Whether the table shows a listener of a child process of this one: False when it does not (the table shows
+    this process alone, FAA-267), None when no child could be started (the check is then skipped)."""
+    if not sys.executable:
+        return None
+    try:
+        child = subprocess.Popen([sys.executable, "-I", "-c", _CHILD_LISTENER], stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except OSError:
+        return None
+    try:
+        line = child.stdout.readline().strip()
+        if not line.isdigit():
+            return None
+        port = int(line)
+        return any(r.listening and r.local == ("127.0.0.1", port) and r.pid == child.pid for r in rows_of())
+    except (TableUnreadable, OSError, struct.error, ValueError):
+        return False
+    finally:
+        try:
+            child.stdin.close()
+            child.wait(timeout=TIMEOUT_SECONDS)
+        except (OSError, subprocess.TimeoutExpired):
+            child.kill()
+
+
 def _calibrate_sysctl() -> bool:
     """Open a connected pair of this process's own (listen, connect, accept) and read it back
-    (`calibration_holds`). A layout that does not hold is never trusted in this process, and
-    `netstat` answers instead."""
+    (`calibration_holds`), then require a child process's listener in the table too: a table that shows this process
+    alone (FAA-267) would pass the first check and find nobody else. A layout that does not hold is never trusted in
+    this process, and `netstat` answers instead."""
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client = accepted = None
     try:
@@ -480,8 +536,10 @@ def _calibrate_sysctl() -> bool:
         client = socket.create_connection(probe.getsockname(), timeout=TIMEOUT_SECONDS)
         accepted, _ = probe.accept()
         rows = parse_pcblist_n(_sysctl_blob())
-        return calibration_holds(rows, _address(probe.getsockname()), _address(client.getsockname()),
-                                 uid=_posix_uid(), pid=os.getpid())
+        if not calibration_holds(rows, _address(probe.getsockname()), _address(client.getsockname()),
+                                 uid=_posix_uid(), pid=os.getpid()):
+            return False
+        return _child_listener_seen(lambda: parse_pcblist_n(_sysctl_blob())) is not False
     except (TableUnreadable, OSError, struct.error, ValueError):
         return False
     finally:
@@ -805,6 +863,22 @@ def refusal(owner: Owner, port: int, expect_pid: Optional[int] = None) -> Option
     return None
 
 
+def pid_listens(pid: int, port: int) -> bool:
+    """macOS, when the socket table is restricted (FAA-267): whether process `pid`, this account's, listens on
+    127.0.0.1:<port> or the wildcard. `lsof -p` asks the process itself (libproc), which the restriction does not
+    hide. Only a caller that started `pid` itself (a launchd job it installed) may vouch with it."""
+    if sys.platform != "darwin" or pid is None or pid <= 1:
+        return False
+    try:
+        uid = parse_ps_uid(_run([PS, "-o", "uid=", "-p", str(pid)]))
+        if uid is None or uid != _posix_uid():
+            return False
+        out = _run([LSOF, "-nP", "-a", "-p", str(pid), "-iTCP", "-sTCP:LISTEN", "-Fn"])
+    except TableUnreadable:
+        return False
+    return any(host in ("127.0.0.1", "*") and p == port for host, p in parse_lsof_listeners(out))
+
+
 class CheckedHTTPConnection(http.client.HTTPConnection):
     """An `http.client.HTTPConnection` whose every `connect()` checks the server end before
     returning. `http.client` connects again by itself (`auto_open`) when the server answered
@@ -812,9 +886,11 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
     different listener; so the check is in `connect()`, not once in `own_connection`. A refused
     connect closes the socket and raises ListenerRefused before any byte of a request is sent."""
 
-    def __init__(self, host: str, port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0) -> None:
+    def __init__(self, host: str, port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0,
+                 vouch_pid: Optional[int] = None) -> None:
         super().__init__(host, port, timeout=timeout)
         self.expect_pid = expect_pid
+        self.vouch_pid = vouch_pid
 
     def set_tunnel(self, *args, **kwargs):  # noqa: D401 - a tunnel would put a proxy's socket under the check
         raise ListenerRefused(SERVER_UNVERIFIED, "a tunnel would check the proxy, not the server; nothing was sent")
@@ -822,6 +898,10 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
     def connect(self) -> None:
         super().connect()
         owner = server_end(self.sock)
+        if (owner.kind == UNKNOWN and (owner.reason or "").startswith(TABLE_RESTRICTED) and self.vouch_pid
+                and pid_listens(self.vouch_pid, self.port)):
+            # The table hides other processes (FAA-267); the process this caller started holds the listener.
+            owner = Owner(THIS_ACCOUNT, _posix_uid(), self.vouch_pid, "lsof-pid")
         refused = refusal(owner, self.port, self.expect_pid)
         if refused is not None:
             self.close()

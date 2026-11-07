@@ -546,6 +546,19 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(plist["ProcessType"], "Standard", "a Background job is starved under load")
         self.assertEqual(check.priority_problems(plist), [])
 
+    def test_a_release_folder_with_a_space_is_no_credential(self):
+        """FAA-266: a release path under Application Support, with a 12-hex commit, was refused as a key; a key still is."""
+        import plistlib
+        release = "/Users/example/Library/Application Support/example-agent/releases/e7d6275a8aae"
+        plist = plistlib.loads(fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"),
+                                                stdout_path=Path("/tmp/l"), environment={"PYTHONPATH": release}))
+        self.assertEqual(plist["EnvironmentVariables"]["PYTHONPATH"], release)
+        self.assertIn(release, fs.systemd_unit("x.service", ["/bin/x"], working_directory=Path("/tmp"),
+                                               environment={"PYTHONPATH": release}))
+        with self.assertRaises(fs.ServiceError):
+            fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"), stdout_path=Path("/tmp/l"),
+                             environment={"EXAMPLE_MODE": "s" + "k-" + "or-v1-" + "q" * 40})
+
     def test_probe_names_a_background_priority_job(self):
         slow = {"Label": "a.b.c", "RunAtLoad": True, "KeepAlive": True, "ProcessType": "Background", "Nice": 5, "LowPriorityIO": True}
         self.assertEqual(check.priority_problems(slow), ["ProcessType is Background", "Nice is 5", "low-priority I/O"])
