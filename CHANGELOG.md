@@ -29,8 +29,8 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   It also names the template's open-vendor rule (every route of a lane reading people's words, fallbacks included) as
   narrower than DEC-0083, and excepts a channel agent's batch triage from the volume row.
 - The template is linked from the creating-fabric-agents grill row «Does it answer people?» (the row «Who pays?» names
-  the USD 100 default), `agents-that-answer-people.md`, `practices.md`, building-fabric-services `SKILL.md` and the
-  support-agent recipe's README, which now says how the recipe serves the template: the plan's draft carries `[KB:<id>]`
+  the USD 100 default), `agents-that-answer-people.md` and `practices.md`, and named in building-fabric-services
+  `SKILL.md` and the support-agent recipe's README, which now says how the recipe serves the template: the plan's draft carries `[KB:<id>]`
   markers and the agent runs `check_reply` on it; the checker of another vendor stays the agent's own.
 
 - `agents-that-answer-people.md` A1: every inbound message belongs to one turn; a burst the template batches is one
@@ -38,7 +38,11 @@ Guidance only: no kit module, probe rule or hook changes; the contract pin stays
   `check_reply`'s `given`: the ids placed in the prompt, never the plan's own list, with tool results as entries of their own.
 - The operator channel's first step (`operator-channel-and-repository.md`, in adapting-projects-to-fabric and
   creating-fabric-agents) says an agent that answers people on Telegram gives the operator channel a bot of its own.
-- `docs/backlog.md`: FAA-263 (SKILL.md word headroom) and FAA-264 (the readings' follow-ups that block nothing).
+- `docs/backlog.md`: FAA-263 (SKILL.md word headroom), FAA-264 (the readings' follow-ups that block nothing) and
+  FAA-265 (organization agent templates as folders, W0-Q8).
+- building-fabric-services `references/usage.md`: the every-limit example calls `usage_report` over the ledger's
+  receipts, since the Python `ledger.report` takes no `budgets` (it showed a call that raised `TypeError` since 0.19.0);
+  `test/test_usage_reference_snippet.py` runs it.
 
 ### Upgrading
 
