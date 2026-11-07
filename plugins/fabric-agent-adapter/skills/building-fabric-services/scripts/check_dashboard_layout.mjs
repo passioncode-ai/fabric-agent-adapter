@@ -94,7 +94,21 @@ async function serviceTarget(spec, dir) {
   const header = auth.header || 'Authorization';
   const value = (auth.scheme || 'Bearer') === 'Bearer' ? `Bearer ${token}` : token;
   const remote = d.placement === 'remote';
-  const wkRes = await fetch(`${origin}/.well-known/fabric-service`, { headers: remote && token ? { [header]: value } : {} });
+  // A local origin is asked only on a connection whose server end is this OS account's process (DEC-0154 HA-2):
+  // fabric-http (beside this file in the kit) checks it before the login code's token is sent, and refuses with kind
+  // foreign-user. A copy of this file alone cannot tell the owner, so it sends nothing to a local origin.
+  let kitRequest = null;
+  if (!remote) {
+    kitRequest = (await import('./fabric-http.mjs').catch(() => null))?.request;
+    if (!kitRequest) throw new Error('fabric-http.mjs and fabric-peer-owner.mjs are not beside this file: the local listener\'s owner cannot be told, so no token is sent (DEC-0154 HA-2)');
+  }
+  const call = remote
+    ? async (method, url, headers) => { const r = await fetch(url, { method, headers }); return { status: r.status, ok: r.ok, json: () => r.json() }; }
+    : async (method, url, headers) => {
+      const r = await kitRequest(method, url, { headers, retries: 0, deadlineS: 10 });
+      return { status: r.status, ok: r.status >= 200 && r.status < 300, json: async () => r.json() };
+    };
+  const wkRes = await call('GET', `${origin}/.well-known/fabric-service`, remote && token ? { [header]: value } : {});
   if (!wkRes.ok) throw new Error(`well-known document answered HTTP ${wkRes.status}`);
   const wk = await wkRes.json();
   const dashboard = wk.surfaces?.dashboard;
@@ -103,7 +117,7 @@ async function serviceTarget(spec, dir) {
   let url = origin + dashboard.path;
   if (dashboard.login) {
     if (!token) throw new Error(`no readable token file for ${id}.${instance}`);
-    const res = await fetch(`${origin}/fabric/v1/login-code`, { method: 'POST', headers: { [header]: value } });
+    const res = await call('POST', `${origin}/fabric/v1/login-code`, { [header]: value });
     if (!res.ok) throw new Error(`login-code answered HTTP ${res.status}`);
     url = origin + (await res.json()).url;
   }

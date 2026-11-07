@@ -165,3 +165,20 @@ test('a real own listener reads this-account on Windows too', { skip: process.pl
   const who = await po.listener(server.address().port);
   assert.deepEqual([who.kind, who.pid, who.method], [po.THIS_ACCOUNT, process.pid, 'netstat-windows']);
 });
+
+test('the hub client sends no bearer to a door another account holds, and does to its own', async (t) => {
+  const { postMcp, HubError } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs');
+  const { server, received, port } = await recorder();
+  t.after(() => server.close());
+  const origin = `http://127.0.0.1:${port}`;
+  for (const ask of [{ ownUid: 424242, ownUser: 'example-pc\\nobody' }, { read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }]) {
+    const agent = new po.CheckedAgent({ ask });
+    t.after(() => agent.destroy());
+    await assert.rejects(postMcp(origin, { jsonrpc: '2.0', id: 1, method: 'ping' }, 'synthetic', { agent }),
+      (err) => err instanceof HubError && err.code === 'foreign-user' && err.retryable === true);
+  }
+  assert.deepEqual(received, []);
+  const answer = await postMcp(origin, { jsonrpc: '2.0', id: 1, method: 'ping' }, 'synthetic');
+  assert.equal(answer.status, 204);
+  assert.deepEqual(received, ['Bearer synthetic']);
+});

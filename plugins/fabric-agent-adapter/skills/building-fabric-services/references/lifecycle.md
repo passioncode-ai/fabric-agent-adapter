@@ -91,7 +91,9 @@ that document until `service.id` matches (at most 40 s) before it calls the serv
 3. `launchd_install` (Node: `await launchdInstall(...)`, the same steps): write + `plutil -lint`, read `launchctl print-disabled gui/<uid>`,
    `enable` **only when no override is recorded** (a first install), `bootout` and wait
    until `launchctl print gui/<uid>/<label>` fails, `bootstrap` with up to five retries,
-   then poll the well-known document until it answers with this `id.instance`.
+   then poll the well-known document until it answers with this `id.instance` on a listener of this OS account
+   (DEC-0154 HA-2: another account's listener, or one whose owner cannot be told, is `foreign-user` and never a
+   successful install; the error names it).
 4. Upgrade = new release, rewrite the plist with the new path, `launchd_install`
    again, then `prune_releases(releases_dir, current=<new release>)`: the running release
    and the one before it stay for rollback, older ones go (LC-11, LC-15).

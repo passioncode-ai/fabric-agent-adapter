@@ -10,6 +10,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -163,6 +164,21 @@ class JoinTests(HubTestCase):
         self.assertEqual(cm.exception.code, "not_authorized")
         self.assertEqual(cm.exception.data["ask"]["capabilities"], ["board.respond"])
         self.assertIn("board.respond", str(cm.exception))
+
+    def test_the_credential_is_never_sent_to_another_accounts_listener(self):
+        """DEC-0154 HA-2 (FAA-226): a live pid is never the proof; the hub's listener is told from the socket table, and
+        another OS account's, root's or one whose owner cannot be told gets no bearer."""
+        po = importlib.import_module("fabric_peer_owner")
+        for owner in (po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "sysctl"), po.Owner(po.SYSTEM, 0, 1, "sysctl"),
+                      po.Owner(po.UNKNOWN, None, None, "sysctl", "no-row")):
+            with self.subTest(kind=owner.kind), unittest.mock.patch.object(po, "server_end", return_value=owner):
+                with self.assertRaises(fh.HubError) as cm:
+                    self.client.join_board(PROJECT, self.cred)
+                self.assertEqual((cm.exception.code, cm.exception.retryable), ("foreign-user", True))
+                self.assertIn(owner.kind, str(cm.exception))
+        self.assertEqual(self.hub.bindings_seen, [])
+        self.client.join_board(PROJECT, self.cred)  # this account's own hub, read from the real table
+        self.assertEqual(self.hub.bindings_seen, ["fabric.board.join"])
 
     def test_the_credential_is_never_sent_when_the_pid_is_dead(self):
         client = fh.HubClient(self.root, alive=lambda pid: False)

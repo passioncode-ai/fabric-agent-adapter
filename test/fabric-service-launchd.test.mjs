@@ -241,6 +241,13 @@ test('a service that never answers with its identity is reported, and so is a wr
     /did not answer as example-agent\.default/);
 });
 
+test('FAA-226: a listener of another OS account is never a successful install (DEC-0154 HA-2)', async (t) => {
+  const s = setup(t);
+  const foreign = async () => ({ foreignUser: 'foreign-user: the server on port 1 belongs to another-account; nothing was sent' });
+  await assert.rejects(install(s, fakeLaunchd(), '1', { fetchWellKnown: foreign, timeout: 0.05, sleep: (ms) => new Promise((r) => setTimeout(r, Math.min(ms, 10))) }),
+    /is not this service's: foreign-user: .*another-account.*DEC-0154 HA-2/);
+});
+
 test('the default well-known reader polls the real origin', async (t) => {
   const s = setup(t);
   const http = await import('node:http');

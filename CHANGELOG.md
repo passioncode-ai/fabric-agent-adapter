@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.74.0 (2026-11-07)
+
+The contract pin moves to `18f8d487` (`v0.1.0+2026-11-07.1`) from `eac1a594` (`v0.1.0+2026-11-06.1`); between them
+only DEC-0154 (several OS accounts on one computer). `eac1a594` stays in `SUPPORTED_CONTRACT_COMMITS`, so bundles
+issued under it stay valid; a new scaffold writes `18f8d487`.
+
+### Added
+
+- **The listener's owner before a credential** (FAA-226, the contract's DEC-0154 HA-2). Loopback is one per computer,
+  not one per OS account, so every kit client that sends a credential to `http://127.0.0.1:<port>` first tells the
+  owner of the server end of its own connection from the computer's socket table, and sends nothing to another OS
+  account's process, root's, SYSTEM's, or one whose owner cannot be told (`foreign-user`):
+  - a new layer-L0 module, `fabric_peer_owner` / `fabric-peer-owner.mjs`. The Python file is Project Observatory's
+    `peer_owner.py` 1.1.0, vendored by commit (`f86f0622`, the same licence), with `Owner` and `Row` as NamedTuples so
+    the module loads by its path; it reads macOS through `sysctl net.inet.tcp.pcblist_n` (calibrated on a connected pair
+    of its own, else `netstat -anv`), Linux through `/proc/net/tcp` and `/proc/net/tcp6`, Windows through
+    `GetExtendedTcpTable` and the owner's SID. The Node twin reads `netstat -anv` and `ps` on macOS, the same `/proc`
+    files on Linux, `netstat -ano` and `tasklist` on Windows; `checkedSocket` and `CheckedAgent` check a connection
+    before a byte is written. Both twins answer the same questions over `test/fixtures/peer-owner/peer-owner-cases.json`.
+  - `check_service.py`: a first rule for a local placement, `listener.owner`: `PASS` for this OS account's process,
+    `FAIL` `foreign-user` (then no rule reads the port and no token is sent), `NOT_RUN` when nothing listens. Every
+    local request goes on a checked connection.
+  - the hub client (`fabric_hub.post_mcp`, `postMcp`): `HubError` code `foreign-user`, retryable, before the bearer; the
+    live pid in `hub.json` stays a precondition and is never the proof. The Node client keeps a checked connection
+    alive (closed after 2 s idle), so a busy session reads the socket table once per connection.
+  - `fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL: `HttpError` kind `foreign-user`, never
+    retried; the Node twin sends such a request through `node:http` on a checked connection instead of `fetch`.
+  - `check_dashboard_layout.mjs` before it asks a local service for a login code (a copy of that file alone, without
+    the kit beside it, sends nothing to a local origin).
+  - the launchd installers' poll: a listener of another account is never a successful install; the error names
+    `foreign-user`.
+
+### Upgrading
+
+- `check_service.py` prints one more line for a local service (`listener.owner`), and a local service whose port is
+  held by another OS account's or root's process now fails (exit 1) where 0.73.0 read its answer.
+- The hub client and `fabric_http` refuse a loopback listener whose owner cannot be told (a socket table the process
+  cannot read): nothing is sent. Fail closed, as HA-2 asks.
+- A copy of `check_dashboard_layout.mjs` alone refuses a local `--service`; run it from the kit's folder.
+
+### Changed
+
+- `references/protocol.md` gains "The listener's owner (DEC-0154 HA-2)"; `references/board.md`, `references/lifecycle.md`,
+  `references/kit-modules.md` and `SKILL.md` name the check.
+- The test fake hub keeps HTTP/1.1 connections, as Fabric's own hub does.
+
 ## 0.73.0 (2026-11-07)
 
 ### Added

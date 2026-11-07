@@ -14,10 +14,10 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.73.0"
+  version: "0.74.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "eac1a594aa131851f079da8bb7b2149e1951f35f"
+  extension-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
 ---
 
 # Building Fabric services
@@ -220,7 +220,7 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
    (`launchd_uninstall`, `remove_descriptor`) as soon as its check is done, not left running.
 2. `launchd_plist(...)` then `launchd_install(...)`: writes and lints the plist,
    `bootout` and waits for the unload, `bootstrap` with retries on the transient I/O
-   error, then polls the well-known document until it answers with **this** identity.
+   error, then polls the well-known document until **this** identity answers on this OS account's listener (HA-2).
    A label the operator disabled stays disabled: only a first install enables.
 3. Uninstall: `launchd_uninstall` (waits for the unload, removes the plist, resets the
    override; `purge=True` removes data only when the operator asks), `remove_descriptor`.
@@ -292,14 +292,14 @@ directory, restores only on a fresh database and never overwrites. Read
 
 ## Step 6: verify
 
-Run the probe against the live service: it reads the descriptor, then checks every
-rule it can reach and says which it could not:
+Run the probe against the live service; it checks every rule it can reach and names
+those it could not:
 
 ```bash
 python3 <skill-dir>/scripts/check_service.py <id>[.<instance>]
 ```
 
-It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, `descriptor.source-repository`,
+It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, `listener.owner` (HA-2), `descriptor.source-repository`,
 `well-known.connections`, well-known
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,

@@ -35,7 +35,9 @@ operator gives in Fabric (Agents & access): callee `fabric`, capability `board.r
    binding credential, shown once, goes into `credential_file` (0600, atomic) and never into the answer, a log or argv.
    Keep the file in the service's data directory or the operator's vault.
 3. Each connection joins with `fabric.board.join {projectId}` (`join_board` / `joinBoard`). It re-reads `hub.json`,
-   checks the pid it names is alive, and only then sends the credential. A missing grant is `HubError` code
+   checks the pid it names is alive, tells the owner of the door's listener from the socket table (DEC-0154 HA-2:
+   another OS account's process, or one whose owner cannot be told, is `HubError` code `foreign-user`, retryable, with
+   nothing sent), and only then sends the credential. A missing grant is `HubError` code
    `not_authorized` whose `data.ask` holds the arguments to ask with.
 
 ## Wiring it into the service

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import http.server
+import importlib
 import json
 import os
 import pathlib
@@ -23,7 +24,7 @@ TEST = pathlib.Path(__file__).resolve().parent
 SCRIPTS = TEST.parent / "plugins" / "fabric-agent-adapter" / "skills" / "building-fabric-services" / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(TEST))
-import fabric_peer_owner as P  # noqa: E402
+P = importlib.import_module("fabric_peer_owner")
 import peer_owner_fixtures as F  # noqa: E402
 
 SERVER = ("127.0.0.1", F.SERVER_PORT)
@@ -362,6 +363,39 @@ class SelfContained(unittest.TestCase):
         for name in ("listener", "server_end", "peer", "Owner", "own_connection"):
             self.assertTrue(callable(getattr(P, name)), name)
         self.assertEqual(P.KINDS, ("this-account", "another-account", "system", "unknown", "none"))
+
+
+class KitInstaller(unittest.TestCase):
+    """service.md's Install row (DEC-0154): the installer's poll reads a loopback well-known answer only on a connection
+    whose server end is this OS account's; another account's listener is foreign-user, never this service's answer."""
+
+    def test_the_installers_read_of_the_well_known_answer(self):
+        sup = importlib.import_module("fabric_supervisors")
+
+        class WellKnown(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                body = b'{"service": {"id": "example-agent", "instance": "default"}}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), WellKnown)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+        origin = "http://127.0.0.1:%d" % server.server_address[1]
+        try:
+            self.assertEqual(sup.fetch_well_known(origin)["service"]["id"], "example-agent")
+            with mock.patch.object(P, "server_end", return_value=P.Owner(P.ANOTHER_ACCOUNT, 502, 9, "x")):
+                doc, why = sup._read_well_known(origin)
+                self.assertIsNone(sup.fetch_well_known(origin))
+            self.assertIsNone(doc)
+            self.assertRegex(why, r"^foreign-user: the server on port \d+ belongs to another-account")
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 class SharedCases(unittest.TestCase):

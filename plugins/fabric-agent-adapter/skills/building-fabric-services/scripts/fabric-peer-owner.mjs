@@ -14,6 +14,9 @@
 //   await checkedSocket(port, opts)  a connected net.Socket whose server end is this account's, or ListenerRefused
 //                                    (the socket destroyed) before a byte is written; hand it to http.request through
 //                                    `createConnection: () => socket`
+//   new CheckedAgent(opts)           an http.Agent whose every new socket is a checkedSocket: a kept-alive socket is
+//                                    checked once, when it is made, since an established connection's server end
+//                                    cannot change (a reading of the table costs about 35 ms here, Python's sysctl 4)
 //
 // `owner.kind` is this-account, another-account, system (uid 0, pid 1, Windows' pid 0 and 4 and its own accounts),
 // unknown (`reason` says why) or none (listener only: nothing listens). A caller that must not leak treats everything
@@ -34,6 +37,7 @@
 
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 
@@ -433,4 +437,20 @@ export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, exp
       resolveSocket(socket);
     });
   });
+}
+
+// An http.Agent whose every new connection is checked before a byte is written; with keepAlive a socket is checked once,
+// when it is made. A refusal reaches the request as its 'error', a ListenerRefused. Free sockets do not keep the process
+// alive (Node unrefs them).
+export class CheckedAgent extends http.Agent {
+  constructor({ expectPid = null, ask = {}, ...options } = {}) {
+    super(options);
+    this.expectPid = expectPid;
+    this.ask = ask;
+  }
+
+  createConnection(options, callback) {
+    checkedSocket(Number(options.port), { host: options.host ?? '127.0.0.1', timeoutMs: options.timeout ?? 10000,
+      expectPid: this.expectPid, ...this.ask }).then((socket) => callback(null, socket), (err) => callback(err));
+  }
 }

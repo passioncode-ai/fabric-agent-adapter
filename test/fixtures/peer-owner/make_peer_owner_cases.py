@@ -6,13 +6,14 @@ vendored by commit); the Windows `netstat -ano` and `tasklist` texts are written
 localized in one table to show it is not read. Every expectation is stated by hand, never computed by the code under
 test. Run from the repository root: `python3 test/fixtures/peer-owner/make_peer_owner_cases.py`.
 """
+import importlib
 import json
 from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "test"))
-import peer_owner_fixtures as F  # noqa: E402
+F = importlib.import_module("peer_owner_fixtures")
 
 SERVER = ["127.0.0.1", F.SERVER_PORT]
 OWN = list(F.OWN_CLIENT)

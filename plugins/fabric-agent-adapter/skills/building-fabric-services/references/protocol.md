@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `eac1a594aa131851f079da8bb7b2149e1951f35f`
+Pinned to `fabric-agent-contract` commit `18f8d48762edc5bfb1433657cbfe1c16196df1a6`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -36,6 +36,7 @@ this page is the working summary. Extension key:
 - Well-known document
 - Events page
 - Login code and the operator session
+- The listener's owner (DEC-0154 HA-2)
 - Semantic rules a host applies
 
 ## Descriptor: written by the installer
@@ -204,6 +205,31 @@ single use, at most 120 s, recorded as used before it is honoured. `GET` that UR
 The session it starts ends 12 h after its last use, 7 days after sign-in, on logout and when the
 descriptor token rotates (DEC-0039); a service may shorten either bound, never lengthen one. An
 ended session answers `401` on the dashboard page.
+
+## The listener's owner (DEC-0154 HA-2)
+
+Loopback is one per computer, not one per OS account. Before a client sends any credential to
+`http://127.0.0.1:<port>` (a descriptor's token, a delegation token, a login code's request, a session cookie, a door's
+token), and before a host calls a local service healthy, it tells the owner of the server end of its own connection
+from the computer's socket table. A listener of another OS account, of root, SYSTEM or a service account, or one whose
+owner cannot be told, is `foreign-user`: nothing is sent and nothing it answers is read as the service's. The order of
+a local service's states is `down`, `foreign-user`, `foreign` (`FAC-SEM-009`), then the well-known `status`; the
+well-known `process.pid` is never proof (`docs/specification/service.md#ha-2` at the pin).
+
+The kit's module is `fabric_peer_owner` / `fabric-peer-owner.mjs` (layer L0, [kit modules](kit-modules.md)): `listener(port)`,
+`server_end(sock)` / `serverEnd(socket)`, `peer`, and a connection checked before a byte is written
+(`CheckedHTTPConnection`; Node `checkedSocket`, `CheckedAgent`). Python reads macOS through `sysctl
+net.inet.tcp.pcblist_n` (calibrated on a connected pair of its own, else `netstat -anv`), Linux through `/proc/net/tcp`
+and `/proc/net/tcp6`, Windows through `GetExtendedTcpTable` and the owner's token SID; Node reads `netstat -anv` and `ps`
+on macOS, the same `/proc` files on Linux, and `netstat -ano` with `tasklist` on Windows. Fail closed: everything but
+`this-account` refuses, `unknown` included.
+
+Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, first for
+a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`),
+`fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user`, never retried),
+`check_dashboard_layout.mjs` before a local login code, and the installers' poll (a listener of another account is never
+a successful install). A service's own loopback server refusing another account's peer (HA-3) is FAA-227, and the port
+claim file (HA-1) waits on the contract's CT-228.
 
 ## Semantic rules a host applies
 

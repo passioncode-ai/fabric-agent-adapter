@@ -501,6 +501,10 @@ class FakeHub:
         hub = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
+            # Persistent connections, as Fabric's own hub keeps them: a client's checked connection (DEC-0154 HA-2) is
+            # reused across calls instead of read from the socket table again for each.
+            protocol_version = "HTTP/1.1"
+
             def log_message(self, *a: Any) -> None:
                 pass
 

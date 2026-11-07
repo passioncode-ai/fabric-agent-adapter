@@ -121,3 +121,23 @@ test('bodies and transport bugs, as the Python twin', async () => {
   assert.equal(new TextDecoder().decode(seen[0].body), 'ab');
   await run({ method: 'GET', headers: null, steps: [{ status: 200 }] });
 });
+
+test('FAA-226: a loopback server of another account gets nothing, kind foreign-user, not retried', async (t) => {
+  const po = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-peer-owner.mjs');
+  const seen = [];
+  const server = http.createServer((req, res) => { seen.push(req.headers.authorization ?? null); res.end('ok'); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const url = `http://127.0.0.1:${server.address().port}/ok`;
+  let calls = 0;
+  for (const ask of [{ ownUid: 424242, ownUser: 'example-pc\\nobody' }, { read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }]) {
+    const agent = new po.CheckedAgent({ ask });
+    const transport = (a) => { calls += 1; return fh.checkedLoopbackTransport({ ...a, agent }); };
+    await assert.rejects(fh.request('GET', url, { headers: { Authorization: 'Bearer synthetic' }, transport, retries: 2 }),
+      (err) => err instanceof fh.HttpError && err.kind === 'foreign-user' && !err.message.includes('synthetic'));
+  }
+  assert.equal(calls, 2, 'refused at once, never retried');
+  assert.deepEqual(seen, []);
+  assert.equal((await fh.request('GET', url, { headers: { Authorization: 'Bearer synthetic' } })).status, 200);
+  assert.deepEqual(seen, ['Bearer synthetic']);
+});

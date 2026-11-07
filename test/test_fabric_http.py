@@ -165,10 +165,13 @@ class Rules(unittest.TestCase):
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
+    seen = []  # every GET path that reached the server (FAA-226: a refused one never does)
+
     def log_message(self, *args):
         pass
 
     def do_GET(self):
+        Handler.seen.append(self.path)
         if self.path == "/big":
             self.send_response(200)
             self.send_header("Content-Length", "100")
@@ -203,6 +206,23 @@ class DefaultTransport(unittest.TestCase):
     def tearDownClass(cls):
         cls.server.shutdown()
         cls.server.server_close()
+
+    def test_a_loopback_server_of_another_account_gets_nothing(self):
+        """DEC-0154 HA-2 (FAA-226): plain http to loopback tells the server end's owner first; another account's,
+        root's or one that cannot be told is kind foreign-user, never retried, and nothing reaches the server."""
+        from unittest import mock
+        po = fh._po
+        before = len(Handler.seen)
+        for owner in (po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "x"), po.Owner(po.SYSTEM, 0, 1, "x"),
+                      po.Owner(po.UNKNOWN, None, None, "x", "no-row")):
+            with self.subTest(kind=owner.kind), mock.patch.object(po, "server_end", return_value=owner) as checked:
+                with self.assertRaises(fh.HttpError) as cm:
+                    fh.request("GET", self.base + "/ok", headers={"Authorization": "Bearer synthetic"}, deadline_s=10)
+                self.assertEqual(cm.exception.kind, "foreign-user")
+                self.assertNotIn("synthetic", str(cm.exception))
+                self.assertEqual(checked.call_count, 1)  # refused at once, not retried
+        self.assertEqual(len(Handler.seen), before)
+        self.assertEqual(fh.request("GET", self.base + "/ok", deadline_s=10).status, 200)  # the real owner: this account
 
     def test_a_url_ending_in_a_line_break_is_sent_as_in_0_55_0(self):
         # 0.56.0 product r17, unit r17: urllib trims the ends of what it sends; the request reaches /ok.
