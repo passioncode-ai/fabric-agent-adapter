@@ -48,10 +48,12 @@ refuses a port another instance declares), the service's directories, and comman
 carry a credential. Only `doctor` and `update` are commands a host may run.
 
 **Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
-authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's.
+authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's,
+on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers).
 `status` is `starting`, `ready`, `degraded` or `stopping`; `degraded` is always present, and an empty list asserts
 full health. A process that cannot serve does not answer, and a host derives `down`. An install or upgrade polls
-that document until `service.id` matches (at most 40 s) before it calls the service started.
+that document until `service.id` matches (at most 40 s) before it calls the service started (the launchd installers;
+systemd and Task Scheduler do not poll yet, FAA-253).
 
 | Id | Rule | Here | Kit (Python / Node) |
 |---|---|---|---|
@@ -87,11 +89,15 @@ that document until `service.id` matches (at most 40 s) before it calls the serv
 1. Build or unpack the release into `~/.local/share/<id>/releases/<version>-<sha12>/`
    (a venv or `node_modules` inside it). Never edit a release after it is written.
 2. `write_descriptor` (port and id claims are checked here, and a new descriptor without `source.repository` is
-   refused; a rewrite of an installed one warns, FAA-198).
+   refused; a rewrite of an installed one warns, FAA-198). "Port claim" here is the kit's older sense, a port no other
+   descriptor declares; the pinned contract's HA-1 claim file per OS account, and a port free on the whole computer,
+   are not written or checked yet (FAA-225, after the contract's CT-228).
 3. `launchd_install` (Node: `await launchdInstall(...)`, the same steps): write + `plutil -lint`, read `launchctl print-disabled gui/<uid>`,
    `enable` **only when no override is recorded** (a first install), `bootout` and wait
    until `launchctl print gui/<uid>/<label>` fails, `bootstrap` with up to five retries,
-   then poll the well-known document until it answers with this `id.instance`.
+   then poll the well-known document until it answers with this `id.instance` on a listener of this OS account
+   (DEC-0154 HA-2: another account's listener, or one whose owner cannot be told, is `foreign-user` and never a
+   successful install; the error names it).
 4. Upgrade = new release, rewrite the plist with the new path, `launchd_install`
    again, then `prune_releases(releases_dir, current=<new release>)`: the running release
    and the one before it stay for rollback, older ones go (LC-11, LC-15).

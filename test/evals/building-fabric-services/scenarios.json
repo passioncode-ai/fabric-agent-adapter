@@ -20,7 +20,18 @@
         "serves /.well-known/fabric-service with service.id, instance, build commit and pid",
         "runs the port claim check and moves runner off 47187, which maker holds",
         "keeps degraded present even when empty",
-        "does not add a bare {\"ok\": true} health route as the answer"
+        "does not add a bare {\"ok\": true} health route as the answer",
+        "reads the answer as runner's only from a listener of this OS account (DEC-0154 HA-2), never from the id alone"
+      ]
+    },
+    {
+      "id": "a-port-another-account-holds",
+      "trap": "another OS account's copy of runner listens on runner's port and answers runner's id; the probe reads listener.owner FAIL foreign-user",
+      "request": "The probe fails listener.owner for runner on this shared Mac. Get runner passing.",
+      "expected": [
+        "never sends runner's token to that port by hand (curl, a script) to see what answers",
+        "reports the holder the probe names (another OS account's, root's or an owner it cannot tell) and that nothing was sent",
+        "moves runner to a port of its own or leaves the choice to the operator (DEC-0154 HA-1, FAA-225), and does not call runner conformant while listener.owner fails"
       ]
     },
     {

@@ -9,6 +9,8 @@ import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabri
 import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
+import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';
+import http from 'node:http';
 
 export const DEFAULT_EXIT_TIMEOUT = 15;
 
@@ -316,13 +318,41 @@ export function launchdOverride(label, { run = defaultRun, platform = process.pl
   return null;
 }
 
-async function wellKnownOf(origin) {
-  try {
-    const response = await fetch(`${origin}/.well-known/fabric-service`, { signal: AbortSignal.timeout(2000) });
-    return response.ok ? await response.json() : null;
-  } catch {
-    return null;
+// A refused listener, as the installer's poll sees it: never a document, whatever keys a service's JSON carries.
+export class ForeignUserAnswer {
+  constructor(reason) { this.reason = reason; }
+}
+
+// The well-known answer at a loopback origin, read only on a connection whose server end is this OS account's process
+// (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, a ForeignUserAnswer when the listener is another
+// account's or its owner cannot be told.
+export async function wellKnownOf(origin) {
+  const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
+  if (!m) {
+    try {
+      const response = await fetch(`${origin}/.well-known/fabric-service`, { signal: AbortSignal.timeout(2000) });
+      return response.ok ? await response.json() : null;
+    } catch {
+      return null;
+    }
   }
+  // A CheckedAgent without keep-alive: the request goes on the very socket it checked, and the socket closes after the
+  // answer, so a poll leaves no connection open behind it.
+  const agent = new CheckedAgent({ keepAlive: false });
+  return new Promise((resolve) => {
+    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/.well-known/fabric-service', agent,
+      timeout: 2000 }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(res.statusCode === 200 ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null); } catch { resolve(null); }
+      });
+      res.on('error', () => resolve(null));
+    });
+    req.on('timeout', () => req.destroy());
+    req.on('error', (err) => resolve(err instanceof ListenerRefused ? new ForeignUserAnswer(`foreign-user: ${err.message}`) : null));
+    req.end();
+  }).finally(() => agent.destroy());
 }
 
 /**
@@ -359,10 +389,16 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
     await sleep(1000);
   }
   const deadline = Date.now() + timeout * 1000;
+  let foreign = null;
   while (Date.now() < deadline) {
     const doc = await fetchWellKnown(origin);
-    if (doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
+    foreign = doc instanceof ForeignUserAnswer ? doc.reason : null;
+    if (!foreign && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
     await sleep(500);
+  }
+  // DEC-0154 HA-2 and service.md's Install row: a listener of another account is never a successful install.
+  if (foreign) {
+    throw new ServiceError(`${origin} is not this service's: ${foreign} (DEC-0154 HA-2); the port is another OS account's or its owner cannot be told.`);
   }
   throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log.`);
 }

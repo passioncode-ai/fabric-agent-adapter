@@ -9,6 +9,9 @@ hub, and this module does exactly those, standard library only:
    FIFO; protocol `fabric-hub/0.1`; the origin exactly `http://127.0.0.1:<port>`; MCP at `/mcp`; a door token file
    inside the registry root; and a `pid` that is alive. The port does not prove who holds it: while Fabric is down any
    program can listen there, so a binding credential is sent only after this check passes, re-done before each send.
+   The pid is never the proof (DEC-0154 HA-2): every connection to the door is checked from the computer's socket table
+   before a byte goes out, and a listener of another OS account, or one whose owner cannot be told, is
+   `HubError("foreign-user")` with nothing sent (`fabric_peer_owner`).
 2. **Ask once, keep the credential in a file.** `request_board_access()` asks the operator through the door for the
    `board.respond` grant (callee `fabric`, resources `board:<project>/<capability>`); `poll_access()` writes the binding
    credential, shown once, to a 0600 file and returns the status without it. Tokens live in files and headers only:
@@ -21,7 +24,7 @@ hub, and this module does exactly those, standard library only:
 When Fabric is down every call raises `HubError` with `retryable=True`; `Backoff` gives the bounded, jittered wait a
 loop sleeps before trying again (2 s doubling to 5 minutes), so nothing spins.
 
-fabric-hub/0.1 publishes no hub key, so the door is trusted by the pid check alone. If a later `hub.json` names
+fabric-hub/0.1 publishes no hub key; the door is trusted once its listener is this OS account's. If a later `hub.json` names
 `hubKey {kid, x}` and the caller passes an estate record (DEC-0055), `locate_hub(estate=…)` checks it with
 `fabric_estate.hub_key_certified` and refuses with DEC-0060's own detail (`kid-not-certified`, `estate-outside-window`,
 `estate-rolled-back`, `estate-forked`, `estate-unreadable`, `no-clock`)."""
@@ -40,6 +43,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as _fs  # noqa: E402 - beside this file: token files, atomic writes
+import fabric_peer_owner as _po  # noqa: E402 - DEC-0154 HA-2: the hub's listener is this OS account's before a bearer
 
 HUB_PROTOCOL = "fabric-hub/0.1"
 MCP_PROTOCOL_VERSION = "2025-06-18"
@@ -51,7 +55,7 @@ CAPABILITY = re.compile(r"[a-z][a-z0-9._-]{1,127}")
 
 
 class HubError(Exception):
-    """A typed refusal or fault: `code` (`not-running`, `not-a-hub`, `hub-unavailable`, `credential`, `protocol`,
+    """A typed refusal or fault: `code` (`not-running`, `not-a-hub`, `hub-unavailable`, `foreign-user`, `credential`, `protocol`,
     `hub-key-refused`, or the hub tool's own code such as `not_authorized`), a one-sentence `message`, `retryable`, and
     `data` (never a secret). `str()` is the sentence."""
 
@@ -210,7 +214,9 @@ def post_mcp(origin: str, body: Dict[str, Any], bearer: str, session: Optional[s
              method: str = "POST", protocol_version: Optional[str] = None) -> Tuple[int, Dict[str, str], Any]:
     """One MCP request to `<origin>/mcp` with a bearer in the header. Only `http://127.0.0.1:<port>` is accepted; no
     proxy is consulted. Answers (status, lower-cased headers, parsed JSON or None); an SSE answer is read to its first
-    `data:` line. A refused connection is `HubError("hub-unavailable", retryable=True)`."""
+    `data:` line. A refused connection is `HubError("hub-unavailable", retryable=True)`; a listener that is not this OS
+    account's process is `HubError("foreign-user", retryable=True)` before the bearer is sent (DEC-0154 HA-2): Fabric
+    may come back on its port, and every retry checks again."""
     match = LOOPBACK_ORIGIN.fullmatch(origin)
     if not match:
         raise HubError("not-a-hub", "Only the hub's loopback origin is used.")
@@ -220,12 +226,15 @@ def post_mcp(origin: str, body: Dict[str, Any], bearer: str, session: Optional[s
         headers["mcp-session-id"] = session
     if protocol_version:
         headers["mcp-protocol-version"] = protocol_version
-    conn = http.client.HTTPConnection("127.0.0.1", int(match.group(1)), timeout=timeout)
+    conn = _po.CheckedHTTPConnection("127.0.0.1", int(match.group(1)), timeout=timeout)
     try:
         conn.request(method, "/mcp", body=None if method == "DELETE" else json.dumps(body).encode(), headers=headers)
         resp = conn.getresponse()
         raw = resp.read(4 * 1024 * 1024)
         got = {k.lower(): v for k, v in resp.getheaders()}
+    except _po.ListenerRefused as exc:
+        raise HubError("foreign-user", "The hub's port is not held by this OS account's process (%s); nothing was sent."
+                       % (exc.owner.kind if exc.owner else exc.code), True) from None
     except (OSError, http.client.HTTPException) as exc:
         raise HubError("hub-unavailable", "Fabric's hub did not answer (%s)." % exc.__class__.__name__, True) from None
     finally:

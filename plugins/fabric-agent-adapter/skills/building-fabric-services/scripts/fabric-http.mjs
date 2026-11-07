@@ -9,11 +9,16 @@
 // is safe: an idempotent method or an `Idempotency-Key` header; any other request only on 429. The wait before retry n
 // (from 0) is min(maxBackoffS, backoffBaseS * 2**n) * (0.5 + rand()); a `Retry-After` replaces it up to
 // maxRetryAfterS. A wait past the deadline is not taken. Plain http is refused unless the host is loopback or
-// `insecure`. An error names the method and the redacted URL, never a header or a body.
+// `insecure`. An error names the method and the redacted URL, never a header or a body. Before a byte goes to a plain
+// http loopback URL the server end of the connection is told from the socket table (DEC-0154 HA-2, FAA-226): not this
+// OS account's process, or an owner that cannot be told, is an HttpError of kind foreign-user, nothing sent, not retried.
 //
 // The transport is injected in tests: async ({ method, url, headers, body, timeoutS, maxBytes }) =>
 // { status, headers, body: Uint8Array }, throwing on a connection error (a `TimeoutError` name is a timeout) or an
 // HttpError. Node 20 or newer, no dependencies. Part of the service kit (FAA-65, layer L4).
+
+import http from 'node:http';
+import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';
 
 export const RETRY_STATUSES = Object.freeze([408, 425, 429, 500, 502, 503, 504]);
 export const IDEMPOTENT_METHODS = Object.freeze(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
@@ -30,7 +35,7 @@ export class HttpError extends Error {
     this.attempts = attempts;
     this.retryAfterS = retryAfterS;
     this.body = body.slice(0, 2048);
-    this.kind = kind; // http, connection, timeout, too-large, refused
+    this.kind = kind; // http, connection, timeout, too-large, refused, foreign-user
   }
 }
 
@@ -147,8 +152,53 @@ function checkHeaders(headers) {
   return out;
 }
 
-// The default transport: fetch, no redirects followed, the body read to one byte past maxBytes.
+const LOOPBACK_AGENT = new CheckedAgent();
+
+// Plain http to a loopback host (DEC-0154 HA-2): node:http over a connection checked before a byte is written, no
+// redirect followed, the body read to one byte past maxBytes. fetch cannot hand its socket to the check.
+export function checkedLoopbackTransport({ method, url, headers, body, timeoutS, maxBytes, agent = LOOPBACK_AGENT }) {
+  const parts = new URL(url);
+  // A body goes with its Content-Length, as fetch sent it: a server that reads only Content-Length (the kit's
+  // sample_service, the stdlib handlers) would read a chunked body as empty (0.74.0 seam reading 1).
+  const sent = { ...headers };
+  if (body && !Object.keys(sent).some((k) => k.toLowerCase() === 'content-length')) sent['Content-Length'] = String(body.length);
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: parts.hostname.replace(/^\[|\]$/g, ''), port: Number(parts.port || 80),
+      path: parts.pathname + parts.search, method, headers: sent, agent }, (res) => {
+      const chunks = [];
+      let size = 0;
+      res.on('data', (c) => {
+        if (size <= maxBytes) { chunks.push(c); size += c.length; }
+        if (size > maxBytes) res.destroy();
+      });
+      res.on('close', () => {
+        clearTimeout(timer);
+        const all = Buffer.concat(chunks);
+        const got = Object.fromEntries(Object.entries(res.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : String(v)]));
+        if (!res.complete && size <= maxBytes) reject(Object.assign(new Error('the answer broke off'), { name: 'ConnectionError' }));
+        else resolve({ status: res.statusCode, headers: got, body: new Uint8Array(all.subarray(0, maxBytes + 1)) });
+      });
+    });
+    const timer = setTimeout(() => req.destroy(Object.assign(new Error('timed out'), { name: 'TimeoutError' })),
+      Math.max(1, Math.ceil(timeoutS * 1000)));
+    req.on('error', (err) => {
+      clearTimeout(timer);
+      if (err instanceof ListenerRefused) {
+        reject(new HttpError(`${method} ${redactUrl(url)}: foreign-user: ${err.message}`, { url: redactUrl(url), kind: 'foreign-user' }));
+      } else reject(err);
+    });
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+// The default transport: fetch, no redirects followed, the body read to one byte past maxBytes; plain http to a
+// loopback host goes through checkedLoopbackTransport.
 export async function fetchTransport({ method, url, headers, body, timeoutS, maxBytes }) {
+  const target = new URL(url);
+  if (target.protocol === 'http:' && isLoopback(target.hostname)) {
+    return checkedLoopbackTransport({ method, url, headers, body, timeoutS, maxBytes });
+  }
   const res = await fetch(url, { method, headers, body: body ?? undefined, redirect: 'manual',
     signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutS * 1000))) });
   const chunks = [];

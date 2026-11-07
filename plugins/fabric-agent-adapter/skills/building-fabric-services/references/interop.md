@@ -77,7 +77,9 @@ untraced work carries no trace pair.
 **Check with a real client**, never only an SDK: `FABRIC_REAL_CLIENT=1 python3 -m unittest
 test.test_real_client` in the adapter repository, or by hand: a throwaway directory, a
 temporary `--mcp-config` (mode 600, the token in a header) and `--strict-mcp-config`, so
-the operator's own configuration is not touched:
+the operator's own configuration is not touched. Write that config only after `check_service.py <id>` reads
+`listener.owner` PASS: the client cannot tell the port's owner, so the side that hands it the token does (DEC-0154
+HA-2):
 
 ```bash
 claude -p "Reply with the single word OK." --strict-mcp-config --mcp-config "$TMP/mcp.json" \

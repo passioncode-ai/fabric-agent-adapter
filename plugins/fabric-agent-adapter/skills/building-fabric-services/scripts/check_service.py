@@ -8,6 +8,13 @@
            --board-kit PATH                       (board.responder: the service's own fabric_board.py or fabric-board.mjs)
            --repo PATH                            (dashboard.opens-in-host: the service's checkout)
 
+A local placement is read only when this OS account's process holds its port (DEC-0154 HA-2): `listener.owner`
+comes before every rule that reads the port, from the computer's socket table (fabric_peer_owner). Nothing listening is NOT_RUN (`down`, and
+`well-known.answers` fails as before); another OS account's, root's or SYSTEM's listener, or one whose owner cannot be
+told, FAILs as `foreign-user`, and then no rule reads the port and no credential is sent; one `port.rules` NOT_RUN
+line names the rules not read (as it does when the well-known document gives nothing to read). Every local
+connection, a reconnect included, is checked again before a byte goes out on it.
+
 A remote placement (DEC-0019 — an online agent or dashboard at an https origin) is probed over
 TLS with the certificate verified: the well-known document must refuse a request without the
 token (401 with none of the service's data: an empty body, or an identity proxy's page, DEC-0109), the guards must refuse a foreign Host/Origin and cross-site requests,
@@ -72,6 +79,8 @@ import fabric_service as fs  # noqa: E402
 import fabric_connections as fcn  # noqa: E402
 from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
+import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
+from check_service_rules import ForeignUser, PORT_RULES_UNREAD, listener_owner_verdict  # noqa: E402 - DEC-0154 HA-2
 
 Result = Dict[str, str]
 
@@ -153,13 +162,16 @@ class Probe:
                 conn = http.client.HTTPSConnection(self.host_name, self.port, context=context, timeout=8)
             base = {"Host": self.netloc}
         else:
-            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+            # DEC-0154 HA-2: every local connection, a reconnect included, is checked before a byte is sent on it.
+            conn = po.CheckedHTTPConnection("127.0.0.1", self.port, timeout=5)
             base = {"Host": "127.0.0.1:%d" % self.port}
         base.update(headers or {})
         try:
             conn.request(method, path, body=body, headers=base)
             resp = conn.getresponse()
             return resp.status, merge_headers(resp.getheaders()), resp.read()
+        except po.ListenerRefused as exc:
+            raise ForeignUser("foreign-user: %s" % exc) from None
         finally:
             conn.close()
 
@@ -167,6 +179,14 @@ class Probe:
         # The header and form the descriptor declares, never an assumed `Authorization: Bearer` (FAC-SEM-036).
         name, value = fs.token_header(self.d.get("auth"), self.token or "")
         return {name: value}
+
+    # the listener's owner (DEC-0154 HA-2) -------------------------------
+    def listener_rule(self) -> bool:
+        """DEC-0154 HA-2, `down` then `foreign-user` then the answer (check_service_rules.listener_owner_verdict). False
+        when the port must not be read (`foreign-user`)."""
+        verdict, evidence = listener_owner_verdict(self.port)
+        self.add("listener.owner", verdict, evidence)
+        return verdict != "FAIL"
 
     # descriptor ------------------------------------------------------------
     def descriptor_rules(self) -> None:
@@ -200,7 +220,7 @@ class Probe:
         elif "origin" not in self.d:
             unique = "an app's descriptor names no origin, so it claims no port (FAC-SEM-010)"
         else:
-            unique = "port %d is unique" % self.port
+            unique = "no other descriptor here declares port %d (HA-1's claim on the computer is FAA-225)" % self.port
         self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
         # FAA-198: the repository that links the agent to its project; a new install is refused without it, an installed one
         # is named here (NOT_RUN is no pass) until its owner adds it.
@@ -260,6 +280,12 @@ class Probe:
             if self.remote:
                 self.add_no_token(no_token, None)
             self.add("well-known.answers", "FAIL", "body is not JSON")
+            return
+        if not isinstance(self.wk, dict):
+            self.wk = None
+            if self.remote:
+                self.add_no_token(no_token, None)
+            self.add("well-known.answers", "FAIL", "body is not a JSON object")
             return
         if self.remote:
             self.add_no_token(no_token, self.wk)
@@ -899,8 +925,16 @@ class Probe:
             return self.results
         if not self.port:
             return self.results
+        if not self.remote and not self.listener_rule():
+            self.add("port.rules", "NOT_RUN", "not read: " + PORT_RULES_UNREAD + ", because the listener is not this OS "
+                     "account's (listener.owner FAIL, DEC-0154 HA-2)")
+            self.lifecycle_rules()
+            return self.results
         self.well_known_rules()
-        if self.wk is not None:
+        if self.wk is None:
+            self.add("port.rules", "NOT_RUN", "not read: " + PORT_RULES_UNREAD + ", because well-known.answers above "
+                     "got no document to read")
+        else:
             self.network_rules()
             self.auth_rules()
             self.usage_rules()

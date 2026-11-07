@@ -20,6 +20,44 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
 from fabric_secrets import ascii_decoded, repository_name, secret_argument  # noqa: E402
+import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
+import socket  # noqa: E402
+
+
+# The rules that ask the service's port, named on one NOT_RUN line when none of them can be read (0.74.0 product
+# reading 8): a probe names what it could not check.
+PORT_RULES_UNREAD = ("every rule that reads the port (well-known, network, auth, usage, A2A, dashboard, login, "
+                     "interop, channel-agent, board)")
+
+
+class ForeignUser(ConnectionError):
+    """DEC-0154 HA-2: the server end of a local connection is not this OS account's process (`foreign-user`); nothing
+    was sent on it. A ConnectionError, so every rule that reads the port reports it as no answer."""
+
+
+def listener_owner_verdict(port: int) -> Tuple[str, str]:
+    """`listener.owner` for a local service: (verdict, evidence). `down`, then `foreign-user`, then everything the
+    listener answers: a local service is read only when this OS account's process holds its port. The owner is the
+    server end of a connection of the probe's own, on which nothing is sent (HA-2's source: the client's own connection;
+    two sockets of one account on one port, as SO_REUSEPORT workers hold, read as that account)."""
+    where = "127.0.0.1:%d" % port
+    try:
+        sock = socket.create_connection(("127.0.0.1", port), timeout=5)
+    except ConnectionRefusedError:
+        return "NOT_RUN", "nothing listens on %s (down)" % where
+    except OSError as exc:  # a full backlog, a timeout: the well-known rule reports what answers, each call checked
+        return "NOT_RUN", "could not connect to %s to tell its owner (%s)" % (where, type(exc).__name__)
+    try:
+        owner = po.server_end(sock)
+    finally:
+        sock.close()
+    if owner.kind == po.THIS_ACCOUNT:
+        return "PASS", "%s is held by this OS account's process (pid %s, read by %s)" % (
+            where, owner.pid if owner.pid is not None else "not shown", owner.method)
+    why = {po.ANOTHER_ACCOUNT: "another OS account's process", po.SYSTEM: "a system account's process"}.get(
+        owner.kind, "a process whose owner cannot be told (%s)" % owner.reason)
+    return "FAIL", ("foreign-user: %s is held by %s (read by %s); no credential was sent and nothing it answers is read "
+                    "as this service's" % (where, why, owner.method))
 
 _LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
 _SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path

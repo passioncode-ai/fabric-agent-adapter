@@ -3,6 +3,7 @@ removed without touching what the operator turned off; release pruning (LC-15). 
 (FAA-65, layer L3)."""
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import plistlib
@@ -13,14 +14,16 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path, PurePath
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import sys as _sys  # noqa: E402
 from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+import fabric_peer_owner as _po  # noqa: E402 - the listener's owner (DEC-0154 HA-2)
 from fabric_base import (
     DRAIN_SECONDS,
     SUPERVISOR_ENV,
@@ -304,12 +307,34 @@ def launchd_loaded(label: str) -> bool:
     return _launchctl("print", "%s/%s" % (_domain(), label)).returncode == 0
 
 
-def fetch_well_known(origin: str, timeout: float = 2.0) -> Optional[Dict[str, Any]]:
+def _read_well_known(origin: str, timeout: float = 2.0) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """(the well-known answer or None, why the listener was refused or None). A loopback origin is read only on a
+    connection whose server end is this OS account's process (DEC-0154 HA-2): another account's, root's, or one whose
+    owner cannot be told is `foreign-user`, never this service's answer."""
+    parts = urllib.parse.urlsplit(origin)
+    if parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port:
+        conn = _po.CheckedHTTPConnection("127.0.0.1", parts.port, timeout=timeout)
+        try:
+            conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % parts.port})
+            response = conn.getresponse()
+            return (json.loads(response.read().decode()) if response.status == 200 else None), None
+        except _po.ListenerRefused as exc:
+            return None, "foreign-user: %s" % exc
+        except (OSError, ValueError, http.client.HTTPException):
+            return None, None
+        finally:
+            conn.close()
     try:
         with urllib.request.urlopen(origin + "/.well-known/fabric-service", timeout=timeout) as response:
-            return json.loads(response.read().decode())
+            return json.loads(response.read().decode()), None
     except (urllib.error.URLError, OSError, ValueError):
-        return None
+        return None, None
+
+
+def fetch_well_known(origin: str, timeout: float = 2.0) -> Optional[Dict[str, Any]]:
+    """The well-known answer at `origin`, or None: nothing answers, the answer is not JSON, or the listener is not this
+    OS account's process (DEC-0154 HA-2)."""
+    return _read_well_known(origin, timeout)[0]
 
 
 _OVERRIDE_ROW = re.compile(r'^\s*"([^"]+)"\s*=>\s*(\S+)\s*\Z')
@@ -367,11 +392,16 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     else:
         raise ServiceError("launchctl bootstrap failed: %s" % last)
     deadline = time.time() + timeout
+    foreign = None
     while time.time() < deadline:
-        doc = fetch_well_known(origin)
+        doc, foreign = _read_well_known(origin)
         if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
             return doc
         time.sleep(0.5)
+    if foreign:
+        # DEC-0154 HA-2 and service.md's Install row: a listener of another account is never a successful install.
+        raise ServiceError("%s is not this service's: %s (DEC-0154 HA-2); the port is another OS account's or its owner "
+                           "cannot be told." % (origin, foreign))
     raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))
 
 

@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `eac1a594aa131851f079da8bb7b2149e1951f35f`
+Pinned to `fabric-agent-contract` commit `18f8d48762edc5bfb1433657cbfe1c16196df1a6`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -36,6 +36,7 @@ this page is the working summary. Extension key:
 - Well-known document
 - Events page
 - Login code and the operator session
+- The listener's owner (DEC-0154 HA-2)
 - Semantic rules a host applies
 
 ## Descriptor: written by the installer
@@ -48,9 +49,9 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | Field | Rule |
 |---|---|
 | `protocol` | `"fabric-service/0.1"` |
-| `id`, `instance` | `^[a-z][a-z0-9-]{1,62}$`, `^[a-z][a-z0-9-]{0,31}$` (default `default`); the pair is unique per machine |
+| `id`, `instance` | `^[a-z][a-z0-9-]{1,62}$`, `^[a-z][a-z0-9-]{0,31}$` (default `default`); the pair is unique within one OS account's services directory (DEC-0154) |
 | `name`, `summary` | ≤ 80 and ≤ 200 characters |
-| `origin` | `http://127.0.0.1:<port>`; the port is a machine-wide claim. Optional for an app's descriptor only (`manager: "person"`, DEC-0069): its live origin and process id are in the app's own liveness file, and a descriptor without an origin claims no port (`FAC-SEM-010`) |
+| `origin` | `http://127.0.0.1:<port>`; the port is a declaration no other descriptor in this account's directory makes (`FAC-SEM-010`), kept free on the computer by HA-1, whose claim the kit does not write yet (FAA-225). Optional for an app's descriptor only (`manager: "person"`, DEC-0069): its live origin and process id are in the app's own liveness file, and a descriptor without an origin claims no port (`FAC-SEM-010`) |
 | `auth` | `tokenFile` (0600; on Windows a protected ACL: owner and every granting entry the current user, SYSTEM or Administrators: service.md *Windows token files*, DEC-0032, DEC-0033); `header` default `Authorization` with `scheme` `Bearer`; any other header carries the raw token with `scheme: "none"` |
 | `lifecycle` | `manager` `launchd` (then `label` and `plist`), `systemd` (then `unit`, a `systemctl --user` unit), `task-scheduler` (then `task`, a per-user Scheduled Task), `node` (Project Observatory's node supervises it as its child, with no supervisor file, DEC-0061), `person` (an app a person installs and starts, then `app`, the installed app, DEC-0069) or `none`; `unit` and `task` are refused beside any other manager (DEC-0032), `label` and `plist` beside any but `launchd` (DEC-0057), `app` beside any but `person`. Both kits and the probe accept all six; both kits write the unit and the task (`systemd_unit`, `task_xml` / `systemdUnit`, `taskXml`). An app's descriptor says it is installed, never that it runs: the probe checks `app` is still there (`descriptor.app-installed`) and reads no well-known document; a reader that finds the app gone treats the descriptor as stale (`app_descriptor_stale` / `appDescriptorStale`), and an app that writes its own descriptor rewrites it only when `app_descriptor_action` / `appDescriptorAction` says `write` |
 | `paths` | `data` (required), `logs[]`, optional `config`, `cache` |
@@ -61,7 +62,7 @@ File `<id>.<instance>.json`, mode 0600 (on Windows a protected ACL), atomic.
 | `runner` | optional `{kind?, credentialKind}` (DEC-0061): `credentialKind` `subscription`, `key`, `platform-metered` or `none`: a kind, never a credential (`FAC-SEM-086` refuses a credential-shaped value here or in `installedBy`); a subscription names its vendor's runner (`claude-code`, `kimi-code`, `codex`) |
 | `peer` | optional `{endpoint, custody, residency, maxDataClass}` (DEC-0061): the service is offered to others. `endpoint` `https://<dns-name>[:<port>][/<path>]`, never a reserved name (`FAC-SEM-085`); `custody` `organization-managed`, `personal` or `processor-hosted` (an organization's cloud a processor runs under a processing agreement, DEC-0099); `residency` 1–32 ISO 3166-1 alpha-2 codes, `EU` admitted, user-assigned codes refused; `maxDataClass` `public` < `internal` < `confidential` < `restricted`. An offer needs `runner` and never runs on a subscription. A host sends a request from anyone but the operator only when `peer_refusal` / `peerRefusal` answers null (`FAC-SEM-088`); usage rows may take `route: "platform-metered"` |
 
-A local descriptor MAY say where a collector on the same machine reads its daily operations digests, under
+A local descriptor MAY say where a collector in the same OS account reads its daily operations digests, under
 `https://fabric.passioncode.ai/agent-contract/extensions/ops-digest/0.1` (`fabric-ops-digest/0.1`, DEC-0153, OD-9,
 FAC-SEM-168): 1 to 8 `{dir, source}`, `dir` a folder inside `paths.data`. A remote descriptor carries none, and the key
 is read nowhere else. The kits know the revision and neither write nor check the declaration yet (FAA-206).
@@ -204,6 +205,34 @@ single use, at most 120 s, recorded as used before it is honoured. `GET` that UR
 The session it starts ends 12 h after its last use, 7 days after sign-in, on logout and when the
 descriptor token rotates (DEC-0039); a service may shorten either bound, never lengthen one. An
 ended session answers `401` on the dashboard page.
+
+## The listener's owner (DEC-0154 HA-2)
+
+Loopback is one per computer, not one per OS account. Before a client sends any credential to
+`http://127.0.0.1:<port>` (a descriptor's token, a delegation token, a login code's request, a session cookie, a door's
+token), and before a host calls a local service healthy, it tells the owner of the server end of its own connection
+from the computer's socket table. A listener of another OS account, of root, SYSTEM or a service account, or one whose
+owner cannot be told, is `foreign-user`: nothing is sent and nothing it answers is read as the service's. The order of
+a local service's states is `down`, `foreign-user`, `foreign` (`FAC-SEM-009`), then the well-known `status`; the
+well-known `process.pid` is never proof (`docs/specification/service.md#ha-2` at the pin).
+
+The kit's module is `fabric_peer_owner` / `fabric-peer-owner.mjs` (layer L0, [kit modules](kit-modules.md)): `listener(port)`,
+`server_end(sock)` / `serverEnd(socket)`, `peer`, and a connection checked before a byte is written
+(`CheckedHTTPConnection`; Node `checkedSocket`, `CheckedAgent`). Python reads macOS through `sysctl
+net.inet.tcp.pcblist_n` (calibrated on a connected pair of its own, else `netstat -anv`), Linux through `/proc/net/tcp`
+and `/proc/net/tcp6`, Windows through `GetExtendedTcpTable` and the owner's token SID; Node reads `netstat -anv` and `ps`
+on macOS, the same `/proc` files on Linux, and `netstat -ano` with the owner SID from PowerShell `GetOwnerSid` against `whoami /user` on Windows (SIDs, never names). Fail closed: everything but
+`this-account` refuses, `unknown` included.
+
+Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
+a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`),
+`fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user`, never retried),
+`check_dashboard_layout.mjs` before a local login code, and the launchd installers' poll (a listener of another account
+is never a successful install; the systemd and Task Scheduler installers do not poll yet, FAA-253). A running board
+session reports a door another account holds as `board.down` with reason `unreachable` until FAA-252. On macOS the Node
+twin reads the pid from `netstat` and the uid from `ps` a few milliseconds apart, so a pid reused in between would be
+misread; the Python twin's `sysctl` reader takes both from one record. A service's own loopback server refusing another account's peer (HA-3) is FAA-227, and the port
+claim file (HA-1) waits on the contract's CT-228.
 
 ## Semantic rules a host applies
 

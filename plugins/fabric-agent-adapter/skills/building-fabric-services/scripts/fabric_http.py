@@ -19,6 +19,10 @@ Rules (FAA-65 REQ-06):
 - **Secrets.** A plain `http://` URL is refused unless the host is loopback or `insecure=True`: a bearer token never
   crosses a network in clear. An error names the method and the URL without its userinfo, query and fragment
   (`redact_url`); it never carries a request header or a request body.
+- **A loopback server is this account's** (DEC-0154 HA-2, FAA-226). Before a byte goes to a plain `http://` loopback
+  URL, the server end of the connection is told from the computer's socket table (`fabric_peer_owner`): another OS
+  account's, root's or SYSTEM's process, or one whose owner cannot be told, is `HttpError` of kind `foreign-user`,
+  nothing sent and never retried.
 
 The transport is injected in tests: `transport(method, url, headers, body, timeout_s, max_bytes)` returns
 `(status, headers, body_bytes)` or raises `OSError` (a connection error, `TimeoutError` included) or `HttpError`.
@@ -45,6 +49,7 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from fabric_jsvalue import json_stringify  # noqa: E402 - beside this file
+import fabric_peer_owner as _po  # noqa: E402 - beside this file: the listener's owner (DEC-0154 HA-2)
 
 RETRY_STATUSES = (408, 425, 429, 500, 502, 503, 504)
 IDEMPOTENT_METHODS = ("GET", "HEAD", "OPTIONS", "PUT", "DELETE")
@@ -66,7 +71,7 @@ class HttpError(Exception):
         self.attempts = attempts
         self.retry_after_s = retry_after_s
         self.body = bytes(body[:2048])
-        self.kind = kind  # http (an answer), connection, timeout, too-large, refused
+        self.kind = kind  # http (an answer), connection, timeout, too-large, refused, foreign-user
 
 
 class Response:
@@ -340,14 +345,30 @@ def _watched(base: type, watchdog: _Watchdog) -> type:
     return Watched
 
 
-def _opener(watchdog: _Watchdog) -> urllib.request.OpenerDirector:
+class _CheckedHTTPConnection(_po.CheckedHTTPConnection):
+    """Plain http to a loopback host (DEC-0154 HA-2): `fabric_peer_owner.CheckedHTTPConnection`, whose every connect, a
+    reconnect included, tells the server end's owner and refuses (closed, nothing sent) unless it is this OS account's
+    process, built the way urllib builds a connection (`host` as `host:port`, `timeout` by keyword)."""
+
+    def __init__(self, host: str, port: Optional[int] = None, timeout: Any = socket._GLOBAL_DEFAULT_TIMEOUT,
+                 **kwargs: Any) -> None:
+        http.client.HTTPConnection.__init__(self, host, port, timeout=timeout, **kwargs)
+        self.expect_pid = None
+
+
+def _opener(watchdog: _Watchdog, direct: bool = False) -> urllib.request.OpenerDirector:
+    """`direct`: a loopback URL never goes through a proxy from the environment (`http_proxy`), so the connection the
+    owner check reads is the one to the URL's own port (DEC-0154 HA-2), and a bearer never reaches a proxy."""
     class Http(urllib.request.HTTPHandler):
         def http_open(self, req):
-            return self.do_open(_watched(http.client.HTTPConnection, watchdog), req)
+            local = _is_loopback((urllib.parse.urlsplit(req.full_url).hostname or "").lower())
+            return self.do_open(_watched(_CheckedHTTPConnection if local else http.client.HTTPConnection, watchdog), req)
 
     class Https(urllib.request.HTTPSHandler):
         def https_open(self, req):
             return self.do_open(_watched(http.client.HTTPSConnection, watchdog), req, context=self._context)
+    if direct:
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect, Http, Https)
     return urllib.request.build_opener(_NoRedirect, Http, Https)
 
 
@@ -361,6 +382,9 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
     watchdog = _Watchdog(end)
     try:
         return _send(req, timeout_s, max_bytes, end, watchdog)
+    except _po.ListenerRefused as exc:
+        where = "%s %s" % (method, redact_url(url))
+        raise HttpError("%s: foreign-user: %s" % (where, exc), url=redact_url(url), kind="foreign-user") from None
     except (OSError, http.client.HTTPException) as exc:
         if watchdog.fired:
             raise TimeoutError("the answer did not arrive within the deadline")
@@ -372,7 +396,8 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
 def _send(req: urllib.request.Request, timeout_s: float, max_bytes: int, end: float,
           watchdog: _Watchdog) -> Tuple[int, Dict[str, str], bytes]:
     try:
-        resp = _opener(watchdog).open(req, timeout=timeout_s)
+        resp = _opener(watchdog, direct=_is_loopback((urllib.parse.urlsplit(req.full_url).hostname or "").lower())).open(
+            req, timeout=timeout_s)
     except urllib.error.HTTPError as answer:  # a status outside 2xx is an answer, not a failure of the transport
         resp = answer
     except urllib.error.URLError as exc:

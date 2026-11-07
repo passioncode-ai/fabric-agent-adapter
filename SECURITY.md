@@ -32,6 +32,23 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   external APIs the service's author configures, such as OpenRouter, with keys the service
   reads by name at run time; the kit itself calls no outside host on its own. A board
   responder talks only to Fabric's hub on loopback.
+- Before `check_service.py`, the hub client, `fabric_http` (a plain `http://` loopback URL),
+  `check_dashboard_layout.mjs` (a local login code) and the launchd installers' poll send
+  anything to `127.0.0.1:<port>`, they read the computer's socket table to tell which OS
+  account owns the listener (DEC-0154 HA-2, `fabric_peer_owner`), and send nothing to
+  another account's, root's, SYSTEM's or an untellable listener. They read, never change:
+  macOS `sysctl net.inet.tcp.pcblist_n` in the process, or the programs `/usr/sbin/netstat
+  -anv -p tcp` and `/bin/ps -o uid= -p <pid>` (the Node twin always); Linux
+  `/proc/net/tcp` and `/proc/net/tcp6`; Windows `GetExtendedTcpTable` and the process
+  token (Python), or `netstat -ano`, `whoami /user` and one PowerShell `GetOwnerSid` query
+  per new connection (Node). A token-free loopback door is not yet protected against
+  another account's process (HA-3, FAA-227). An MCP client (Claude Code, Codex) sends the
+  token it was registered with on every later connection without this check (the contract's
+  residue "a coding agent's bearer"): when the port may have changed hands, rotate the token
+  and re-run `mcp-register` (one written as `references/surfaces-and-auth.md` says checks the
+  listener first; the kit ships none). On Linux `/proc` names a socket's creator and
+  no pid, so a listening socket root created and handed to another account (systemd
+  socket activation with `User=`) reads as root's: a client running as root sends to it.
 - The working-with-fabric PostToolUse hook (FAA-206) reads only the release call Claude Code gives it on stdin (the
   tool's name, its input, which can carry the agent's note, and Fabric's answer), in memory: it writes, logs and sends
   nothing and prints one fixed line or nothing.

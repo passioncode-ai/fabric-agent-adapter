@@ -6,7 +6,9 @@
 //    $XDG_DATA_HOME/passioncode-fabric) the way Fabric's own locateHub does: a small regular file, never a link or a
 //    FIFO; protocol fabric-hub/0.1; origin exactly http://127.0.0.1:<port>; MCP at /mcp; a door token file inside the
 //    registry root; a pid that is alive. The port does not prove who holds it, so a binding credential is sent only
-//    after this check passes, done again before each send.
+//    after this check passes, done again before each send. The pid is never the proof (DEC-0154 HA-2): every
+//    connection to the door is checked from the socket table before a byte goes out (fabric-peer-owner.mjs), and a
+//    listener of another OS account, or one whose owner cannot be told, is HubError foreign-user with nothing sent.
 // 2. Ask once, keep the credential in a file: requestBoardAccess() asks for the board.respond grant through the door;
 //    pollAccess() writes the credential, shown once, to a 0600 file and answers without it. Tokens live in files and
 //    headers only — never argv, a URL, a log line or an error text.
@@ -25,6 +27,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { atomicWrite, ensurePrivateDir, readToken } from './fabric-service.mjs';
 import { hubKeyCertified } from './fabric-estate.mjs';
+import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';
+
+// DEC-0154 HA-2: every connection to the door is checked before a byte goes out; kept alive, so a busy session reads the
+// socket table once per connection, not once per call. A free socket is closed after 2 s idle, before a server's own
+// keep-alive timeout (5 s in Node) can close it under a request that reuses it.
+const HUB_AGENT = new CheckedAgent({ keepAlive: true, timeout: 2000 });
 
 export const HUB_PROTOCOL = 'fabric-hub/0.1';
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
@@ -158,9 +166,10 @@ export function readCredential(file) {
 /**
  * One MCP request to <origin>/mcp with a bearer in the header; only http://127.0.0.1:<port>, no proxy. Answers
  * {status, headers, body} (body parsed JSON or null; an SSE answer read to its first data: line). A refused connection
- * is HubError hub-unavailable (retryable).
+ * is HubError hub-unavailable (retryable); a listener that is not this OS account's process is HubError foreign-user
+ * (retryable) before the bearer is sent (DEC-0154 HA-2): the connection is checked from the socket table first.
  */
-export function postMcp(origin, body, bearer, { session, timeout = 15000, method = 'POST', protocolVersion } = {}) {
+export function postMcp(origin, body, bearer, { session, timeout = 15000, method = 'POST', protocolVersion, agent = HUB_AGENT } = {}) {
   const m = LOOPBACK_ORIGIN.exec(origin);
   if (!m) return Promise.reject(new HubError('not-a-hub', 'Only the hub\'s loopback origin is used.'));
   const payload = method === 'DELETE' ? null : Buffer.from(JSON.stringify(body));
@@ -169,7 +178,7 @@ export function postMcp(origin, body, bearer, { session, timeout = 15000, method
   if (protocolVersion) headers['mcp-protocol-version'] = protocolVersion;
   if (payload) headers['content-length'] = String(payload.length);
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/mcp', method, headers, timeout, agent: false }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/mcp', method, headers, timeout, agent }, (res) => {
       const chunks = [];
       let size = 0;
       res.on('data', (c) => {
@@ -192,7 +201,9 @@ export function postMcp(origin, body, bearer, { session, timeout = 15000, method
       res.on('error', () => reject(new HubError('hub-unavailable', 'Fabric\'s hub did not answer (the answer broke off).', true)));
     });
     req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.on('error', (e) => reject(new HubError('hub-unavailable', `Fabric's hub did not answer (${e.code ?? e.message}).`, true)));
+    req.on('error', (e) => reject(e instanceof ListenerRefused
+      ? new HubError('foreign-user', `The hub's port is not held by this OS account's process (${e.owner?.kind ?? e.code}); nothing was sent.`, true)
+      : new HubError('hub-unavailable', `Fabric's hub did not answer (${e.code ?? e.message}).`, true)));
     if (payload) req.write(payload);
     req.end();
   });
