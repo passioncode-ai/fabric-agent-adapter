@@ -8,7 +8,7 @@
 
 **Fabric Agent Adapter** makes any agent Fabric-compatible. Fabric is PassionCode.ai's
 product, the CEO AI agent: you talk to Fabric, and it chooses, binds and runs the agents that
-do the work. This adapter is how an agent becomes one Fabric can bind: four Agent Skills,
+do the work. This adapter is how an agent becomes one Fabric can bind: five Agent Skills,
 Python and Node reference kits and a live conformance probe for the
 [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract). It also works
 on its own: the skills, kits and probe need no Fabric install.
@@ -18,7 +18,7 @@ on its own: the skills, kits and probe need no Fabric install.
 [![license](https://img.shields.io/badge/license-AGPL--3.0%20or%20commercial-blue.svg)](LICENSE)
 
 The skills are `adapting-projects-to-fabric`, `creating-fabric-agents`,
-`building-fabric-services` and `working-with-fabric`.
+`building-fabric-services`, `working-with-fabric` and `observing-products`.
 
 `working-with-fabric` is for the other side: a coding agent (Claude Code, Codex, Kimi Code, Kilo, Hermes) opened in
 a terminal that works in a project through Fabric. It finds Fabric (`hub.json`, its `pid`), has the machine's
@@ -57,6 +57,18 @@ for activation, reload and verification limits. The
 [hooks reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/session-hooks.md) lists what
 they need from Fabric; the [board reference](plugins/fabric-agent-adapter/skills/working-with-fabric/references/project-board.md)
 is the board-first workflow.
+
+`observing-products` puts an agent on a standing watch over one product (observer mode). It first writes the
+product's channel inventory, `docs/observer/channels.md`: every channel the product reports through (operations log,
+errors, analytics, funnels, revenue, store, uptime, CI, the Fabric board, support), each with its read route, its
+credential by vault slot name, its baseline and a proven read. Then every interval (30 minutes by default) it reads
+each channel from its cursor, triages what changed (S0 to S3) and fixes it through the project's own delivery route,
+within the authority the project sets (`observe`, `fix`, `ship`). `scripts/observer_inventory.py check` validates the
+inventory and prints connected out of named:
+
+```bash
+python3 plugins/fabric-agent-adapter/skills/observing-products/scripts/observer_inventory.py template --project example-app
+```
 
 `building-fabric-services` makes an agent a long-lived local service with a dashboard
 that is always alive, runs as one copy, keeps its state through a reinstall and appears
@@ -174,6 +186,7 @@ npx skills add passioncode-ai/fabric-agent-adapter --skill adapting-projects-to-
 npx skills add passioncode-ai/fabric-agent-adapter --skill creating-fabric-agents
 npx skills add passioncode-ai/fabric-agent-adapter --skill building-fabric-services
 npx skills add passioncode-ai/fabric-agent-adapter --skill working-with-fabric
+npx skills add passioncode-ai/fabric-agent-adapter --skill observing-products
 ```
 
 ### Configure

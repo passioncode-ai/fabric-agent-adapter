@@ -19,7 +19,7 @@
 Fabric Agent Adapter: makes any agent or existing project Fabric-compatible (a Provider under
 the Fabric Agent Contract): Agent Skills, reference kits and a conformance probe. It is how an
 agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm package (`@passioncode-ai/fabric-agent-adapter`): the skills installer, and since 0.31.0 the `pack`, `sign` and `verify` commands for a `fabric-package/1` folder (contract DEC-0050, DEC-0051; `building-fabric-services/scripts/fabric_package.py`, `fabric-package.mjs`). It
-carries four skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
+carries five skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
 and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service
 that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`; job limits per DEC-0087), and checks the estate record, share grants and the estate ceremonies (`fabric_estate.py`, `fabric_share.py`, `fabric_ceremonies.py` and their Node twins).
@@ -27,7 +27,9 @@ Agents that are not services get a `fabric-provider/0.1` entry from
 `adapting-projects-to-fabric/scripts/fabric_provider.py`; `fabric_source_check.py` beside it finds an agent's instance
 data in its source tree without repeating it (FAA-188). The fourth, `working-with-fabric`, is the
 other side: a coding agent opened outside Fabric working in a project through it (Fabric 0.4.0 REQ-07),
-with the plugin's Claude Code session hooks (`scripts/fabric_session.py`, COM-04).
+with the plugin's Claude Code session hooks (`scripts/fabric_session.py`, COM-04). The fifth, `observing-products`,
+puts an agent on a standing watch over one product (observer mode, FAA-290): the channel inventory
+`docs/observer/channels.md` checked by `scripts/observer_inventory.py`, the cycle, triage and authority levels.
 
 ## Commands
 
@@ -55,7 +57,7 @@ with `--strict-mcp-config` and a temporary config.
 
 ## Where things live
 
-- `plugins/fabric-agent-adapter/`: the plugin, its four skills and `hooks/hooks.json`. `.claude-plugin/marketplace.json`
+- `plugins/fabric-agent-adapter/`: the plugin, its five skills and `hooks/hooks.json`. `.claude-plugin/marketplace.json`
   holds the marketplace entry.
 - The service kit: `building-fabric-services/scripts/`, layered modules in Python and Node twins, listed in dependency
   order in `kit.json` (a module imports only modules listed before it; none over 1000 lines; the core defined once;

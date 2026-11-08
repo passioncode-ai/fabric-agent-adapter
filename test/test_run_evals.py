@@ -63,7 +63,8 @@ class ScoringTests(unittest.TestCase):
 
     def test_the_real_descriptions_are_read_from_each_skill(self):
         skills = run_evals.load_skills()
-        self.assertEqual(set(skills), {"adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents", "working-with-fabric"})
+        self.assertEqual(set(skills), {"adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents", "working-with-fabric",
+                                       "observing-products"})
         for name, description in skills.items():
             self.assertTrue(description.startswith("Use when"), name)
             self.assertLess(len(description), 1024, name)
