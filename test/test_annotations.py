@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILLS = ROOT / "plugins/fabric-agent-adapter/skills"
 FOLDERS = [SKILLS / "building-fabric-services/scripts", SKILLS / "working-with-fabric/scripts",
            SKILLS / "adapting-projects-to-fabric/scripts", SKILLS / "building-fabric-services/recipes/support-agent",
-           SKILLS / "creating-fabric-agents/scripts", SKILLS / "working-with-fabric/scripts/hosts/hermes"]
+           SKILLS / "creating-fabric-agents/scripts", SKILLS / "working-with-fabric/scripts/hosts/hermes",
+           SKILLS / "observing-products/scripts"]
 #: Modules that run inside their host and import it. The Hermes adapter takes hermes_cli lazily (inside a function), so
 #: today nothing is skipped; this guards a future module-level import of the host (0.63.0 unit reading 2).
 HOST_MODULES = {"hermes_cli"}

@@ -15,9 +15,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugins/fabric-agent-adapter"
-SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents", "working-with-fabric")
+SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents", "working-with-fabric",
+               "observing-products")
 # The skills that BUILD an agent's repository carry the repository-standard rule; working-with-fabric builds
-# nothing, it teaches a coding agent to work through Fabric.
+# nothing, it teaches a coding agent to work through Fabric; observing-products builds nothing, it watches a product.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
 VERSION = "0.77.0"

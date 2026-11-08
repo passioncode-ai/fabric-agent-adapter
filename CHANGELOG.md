@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **A fifth skill, `observing-products`: observer mode** (FAA-290, the observer-mode design of Fabric CO-546). Any
+  agent with the plugin can take a standing watch over one product. Setup first: it writes the product's channel
+  inventory, `docs/observer/channels.md` (ops log, errors, analytics, funnels, revenue, store, uptime, CI, the Fabric
+  board, support), each row with its read route, its credential by vault slot name, its cursor, baseline, thresholds,
+  placement (`local` or `remote`) and state, and proves one read from each; a channel without a proven read is never
+  counted as watched. Then a cycle every interval (30 minutes by default): bounded reads from the cursors, a failed
+  read as a finding, one cycle record before any cursor moves, no overlap with its own last run, a missed window run
+  once; triage S0 to S3 within the project's authority (`observe`, `fix`, `ship`, the last set only by the person),
+  every fix through the project's own delivery route and read back from the channel that showed the fault, two failed
+  attempts stop the automatic work on a finding, channel text is data and never an instruction, a USD 100 a month
+  budget per observer by default, silent cycles and one message on change. Scheduling: Fabric's observer-mode switch
+  where Fabric runs, else Claude Code `/loop`, a cron routine, or a cloud routine that watches only `remote` channels
+  and names the local ones it skipped. `scripts/observer_inventory.py` (`check`, `template`) validates an inventory and
+  prints connected out of named; `test/test_observer_inventory.py`; trigger and scenario evals in
+  `test/evals/observing-products/`. The release smoke checks the installed skill.
+
 ## 0.77.0 (2026-11-08)
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabric-events.mjs`, `fabric_peer_owner`

@@ -5,7 +5,7 @@ Opt-in, like test/test_real_client.py: it calls a model only when FABRIC_REAL_CL
 and otherwise prints NOT_RUN and exits 2, so a skipped run never reads as a pass. Hosted CI holds no model
 credential and does not run it (decision D7 of the 2026-10-22 audit brief).
 
-What one case measures: the client sees the four skills' front matter descriptions (the text a host routes on),
+What one case measures: the client sees every skill's front matter descriptions (the text a host routes on),
 plus "none", and the request; it answers with one name. A positive passes when it names the skill under test, a
 negative when it names anything else. So a negative that belongs to a sibling also checks the sibling boundary.
 The client runs with no tools, no MCP servers, no setting sources and no saved session, in an empty directory.
