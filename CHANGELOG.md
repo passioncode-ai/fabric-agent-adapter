@@ -40,8 +40,9 @@ working-with-fabric.
 ### Upgrading
 
 - A service that installs a LaunchDaemon vendors `fabric_supervisors` (or `fabric-supervisors.mjs`) with its facade and
-  `fabric_peer_owner` (or `fabric-peer-owner.mjs`) of 0.76.0 or later, which it imports; a LaunchAgent install is
-  unchanged and needs nothing.
+  `fabric_peer_owner` (or `fabric-peer-owner.mjs`) of 0.76.0 or later, which it imports. A LaunchAgent install behaves
+  as before, but in Node `fabric-supervisors.mjs` 0.78.0 imports `fabric-peer-owner.mjs` 0.76.0 or later in either
+  domain; `fabric_kit.py install` copies both.
 
 ## 0.77.0 (2026-11-08)
 

@@ -351,7 +351,10 @@ function decodeXml(text) {
   return text.replace(/&(?:(amp|lt|gt|quot|apos)|#([0-9]+)|#x([0-9a-fA-F]+));/g, (_, e, d, h) => {
     if (e) return XML_ENTITIES[e];
     const code = d ? Number(d) : parseInt(h, 16);
-    if (!(code >= 0 && code <= 0x10ffff)) throw new RangeError('character reference out of range');
+    // XML 1.0's Char, as expat (Python's plistlib) reads it: a reference outside it makes the file unreadable.
+    const xmlChar = code === 0x9 || code === 0xa || code === 0xd || (code >= 0x20 && code <= 0xd7ff)
+      || (code >= 0xe000 && code <= 0xfffd) || (code >= 0x10000 && code <= 0x10ffff);
+    if (!xmlChar) throw new RangeError('character reference outside XML 1.0');
     return String.fromCodePoint(code);
   });
 }
@@ -369,16 +372,19 @@ function topStrings(text) {
         if (capture) buffer += cdata !== undefined ? cdata : decodeXml(chars);
       } else if (name === 'dict' || name === 'array') {
         if (selfClosing) {
-          if (depth === 1) key = null;
+          if (depth === 1 && key !== null) { delete values[key]; key = null; }
         } else if (closing) {
           depth -= 1;
         } else {
-          if (depth === 1) key = null; // a container is this key's value
+          if (depth === 1 && key !== null) { delete values[key]; key = null; } // a container is this key's value
           depth += 1;
         }
       } else if (name && depth === 1) {
         if (selfClosing) {
-          if (name === 'string' && key !== null) values[key] = '';
+          if (key !== null) {
+            if (name === 'string') values[key] = '';
+            else delete values[key]; // <true/>, <false/>: the last value is not a string
+          }
           key = name === 'key' ? '' : null;
         } else if (!closing && (name === 'key' || name === 'string')) {
           capture = name;
@@ -388,7 +394,8 @@ function topStrings(text) {
           else if (key !== null) { values[key] = buffer; key = null; }
           capture = null;
         } else if (closing) {
-          key = null; // another value (integer, date, data, true, false) closes the key
+          if (key !== null) delete values[key]; // another value (integer, date, data, real) replaces the earlier string
+          key = null;
         }
       }
     }
@@ -634,10 +641,18 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   const named = dom === 'system' ? topUserName(plistText) : null;
   if (dom === 'system' && named) {
     refuseHeldLabel(label, plistPath, run);
-    const installed = topUserName(plistXml(plistPath, run));
+    const installedText = plistXml(plistPath, run);
+    const installedLabel = topKey(installedText, 'Label');
+    if (installedLabel !== null && installedLabel !== label) {
+      throw new ServiceError(`${plistPath} holds launchd label ${installedLabel}, not ${label}: writing over it would leave that job loaded from a plist that no longer describes it. Uninstall it as root first, or write this one at /Library/LaunchDaemons/${label}.plist.`);
+    }
+    const installed = topUserName(installedText);
     if (installed && installed !== named) {
       throw new ServiceError(`${plistPath} is ${installed}'s LaunchDaemon: the system domain is shared by every account of this Mac, so a label is the machine's. Choose a label of your own (for example with the account in it), or uninstall that one as root first.`);
     }
+  }
+  if (dom === 'system' && named && !USER_NAME.test(named)) {
+    throw new ServiceError(`UserName ${named} is not a macOS short name (${USER_NAME.source}): launchd takes the account's short name.`);
   }
   const jobUid = named ? accountUid(named, run) : null;
   if (dom === 'system' && named && jobUid === null) {

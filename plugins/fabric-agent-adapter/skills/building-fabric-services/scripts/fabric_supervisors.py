@@ -336,7 +336,7 @@ def launchd_domain(plist_path: Optional[Path] = None, domain: Optional[str] = No
     if domain not in (None, "gui", "system"):
         raise ServiceError("domain must be gui or system")
     if domain is None and plist_path is not None:
-        folder = str(Path(os.path.abspath(str(plist_path))).parent)
+        folder = re.sub(r"^/{2,}", "/", str(Path(os.path.abspath(str(plist_path))).parent))  # POSIX keeps a leading //
         domain = "system" if folder.lower() == str(SYSTEM_DAEMONS).lower() else "gui"  # APFS ignores case
     if domain == "system":
         if sys.platform != "darwin":
@@ -626,11 +626,19 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         if named:
             _refuse_held_label(label, plist_path)
         if named and plist_path.exists():
+            installed_label = _plist_field(plist_path, "Label")
+            if installed_label is not None and installed_label != label:
+                raise ServiceError("%s holds launchd label %s, not %s: writing over it would leave that job loaded from a "
+                                   "plist that no longer describes it. Uninstall it as root first, or write this one at "
+                                   "%s/%s.plist." % (plist_path, installed_label, label, SYSTEM_DAEMONS, label))
             installed = _plist_field(plist_path, "UserName")
             if installed and installed != named:
                 raise ServiceError("%s is %s's LaunchDaemon: the system domain is shared by every account of this Mac, so "
                                    "a label is the machine's. Choose a label of your own (for example with the account in "
                                    "it), or uninstall that one as root first." % (plist_path, installed))
+        if named and not _USER_NAME.match(named):
+            raise ServiceError("UserName %s is not a macOS short name (%s): launchd takes the account's short name."
+                               % (named, _USER_NAME.pattern))
         job_uid = _account_uid(named) if named else None
         if named and job_uid is None:
             raise ServiceError("UserName %s is no account of this Mac: launchd would not start the job. Name the account "

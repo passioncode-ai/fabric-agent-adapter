@@ -786,6 +786,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
             self.assertIn("macOS only", str(caught.exception))
         if sys.platform == "darwin":
             self.assertEqual(fs.launchd_domain(Path("/library/launchdaemons/x.plist")), "system")
+            self.assertEqual(fs.launchd_domain("//Library/LaunchDaemons/x.plist"), "system", "POSIX keeps //; launchd does not")
 
     @unittest.skipUnless(sys.platform == "darwin", "lsof -p asks a macOS process")
     def test_a_restricted_table_is_proved_by_the_jobs_lsof_or_named(self):
@@ -845,11 +846,38 @@ class LaunchdSystemDomainTests(unittest.TestCase):
         import pwd
         me = pwd.getpwuid(os.getuid())
         real = self.real_account_uid
-        for odd in {me.pw_name.upper(), me.pw_gecos.split(",")[0], "Some Person", "x\x00y", 5, "", "501"} - {me.pw_name}:
+        gecos = me.pw_gecos.split(",")[0]
+        odd_gecos = {gecos} if (" " in gecos or gecos != gecos.lower()) else set()  # a lower-case word may be a short name
+        for odd in ({me.pw_name.upper(), "Some Person", "x\x00y", 5, "", "501"} | odd_gecos) - {me.pw_name}:
             with self.subTest(odd=odd):
                 self.assertIsNone(real(odd))
         if self.sup._USER_NAME.match(me.pw_name):
             self.assertEqual(real(me.pw_name), os.getuid())
+
+    def test_a_same_path_plist_of_another_label_or_a_long_name_is_refused(self):
+        other = plistlib.loads(self.body(user_name="agentuser"))
+        other["Label"] = "other.label"
+        self.plist.write_bytes(plistlib.dumps(other))
+        with FakeLaunchd(), mock.patch.object(self.sup.os, "geteuid", return_value=0), self.assertRaises(fs.ServiceError) as caught:
+            fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                               service_id="example-agent", timeout=1, domain="system")
+        self.assertIn("holds launchd label other.label", str(caught.exception))
+        self.plist.unlink()
+        named = plistlib.loads(self.body(user_name="agentuser"))
+        named["UserName"] = "Agent User"
+        with FakeLaunchd(), mock.patch.object(self.sup.os, "geteuid", return_value=0), self.assertRaises(fs.ServiceError) as caught:
+            fs.launchd_install(self.label, self.plist, plistlib.dumps(named), origin=self.web.origin,
+                               service_id="example-agent", timeout=1, domain="system")
+        self.assertIn("is not a macOS short name", str(caught.exception))
+        self.assertFalse(self.plist.exists())
+
+    def test_a_refusal_after_bootstrap_says_the_job_stays_loaded(self):
+        with FakeLaunchd(), mock.patch.object(self.sup.os, "geteuid", return_value=0), \
+                mock.patch.object(self.sup, "_read_job_well_known", return_value=(None, None)), \
+                mock.patch.object(self.sup.time, "sleep"), self.assertRaises(fs.ServiceError) as caught:
+            fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                               service_id="example-agent", timeout=0.05, domain="system")
+        self.assertIn("the job stays loaded: as root, `launchctl bootout system/%s`" % self.label, str(caught.exception))
 
     def test_the_job_reader_takes_only_a_loopback_origin(self):
         for origin in ("http://localhost:47201", "http://127.0.0.1:0", "http://127.0.0.1:99999"):

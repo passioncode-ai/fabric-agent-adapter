@@ -614,7 +614,7 @@ test('FAA-278: a numeric UserName is no account, as launchd reads it by name', a
   const fake = systemFake();
   const numbered = s.body('1', { userName: 'agentuser' }).replace('<string>agentuser</string>', '<string>501</string>');
   await assert.rejects(k.launchdInstall(s.name, s.plist, numbered, { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent',
-    timeout: 1, run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep }), /is no account of this Mac/);
+    timeout: 1, run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep }), /UserName 501 is not a macOS short name/);
   assert.ok(!fake.calls.some((c) => c[0] === 'id'), 'never asked id for a uid');
   assert.equal(fs.existsSync(s.plist), false, 'nothing written');
 });
@@ -640,18 +640,43 @@ test('FAA-278: a plist is read as launchd reads it: the last of a repeated key, 
   const twice = s.body('1', { userName: 'agentuser' }).replace('\t<string>agentuser</string>\n',
     '\t<string>agentuser</string>\n\t<key>UserName</key>\n\t<string>501</string>\n');
   let fake = systemFake();
-  await assert.rejects(k.launchdInstall(s.name, s.plist, twice, { ...opts, run: fake.run }), /UserName 501 is no account/);
+  await assert.rejects(k.launchdInstall(s.name, s.plist, twice, { ...opts, run: fake.run }), /UserName 501 is not a macOS short name/);
+  // A last value that is not a string replaces the earlier string, as CoreFoundation and plistlib read it.
+  for (const last of ['<integer>1</integer>', '<true/>', '<dict/>', '<array><string>agentuser</string></array>']) {
+    const replaced = s.body('1', { userName: 'agentuser' }).replace('\t<string>agentuser</string>\n',
+      `\t<string>agentuser</string>\n\t<key>UserName</key>\n\t${last}\n`);
+    await assert.rejects(k.launchdInstall(s.name, s.plist, replaced, { ...opts, run: systemFake().run }), /needs UserName/, last);
+    assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  }
   assert.equal(fs.existsSync(s.plist), false, 'nothing written');
   const sibling = path.join(s.dir, 'someone-else.plist');
   fs.writeFileSync(sibling, s.body('1', { userName: 'otheruser' }).replace('<key>Label</key>', '<key>&#76;abel</key>'));
   fake = systemFake();
   await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: fake.run }),
     (err) => err.message.includes(`already held by ${sibling}`));
-  // A reference no code point has makes the file unreadable, as plistlib finds it: no holder, and no RangeError.
-  fs.writeFileSync(sibling, s.body('1', { userName: 'otheruser' }).replace(`<string>${s.name}</string>`, '<string>&#x110000;</string>'));
-  const doc = await k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run,
-    fetchJobWellKnown: async () => ({ service: { id: 'example-agent', instance: 'default' } }) });
-  assert.equal(doc.service.id, 'example-agent');
+  // A reference outside XML 1.0's Char makes the file unreadable, as expat (plistlib) finds it: no holder, no RangeError.
+  // So does a Label whose last value is not a string.
+  for (const odd of [`<string>&#x110000;${s.name}</string>`, `<string>&#xD800;${s.name}</string>`, `<string>${s.name}&#0;</string>`,
+    `<string>${s.name}</string>\n\t<key>Label</key>\n\t<integer>1</integer>`]) {
+    fs.writeFileSync(sibling, s.body('1', { userName: 'otheruser' }).replace(`<string>${s.name}</string>`, odd));
+    const doc = await k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run,
+      fetchJobWellKnown: async () => ({ service: { id: 'example-agent', instance: 'default' } }) });
+    assert.equal(doc.service.id, 'example-agent', odd);
+    fs.rmSync(s.plist);
+  }
+});
+
+test('FAA-278: a same-path plist of another label is refused, and a refusal after bootstrap says the job stays loaded', async (t) => {
+  const s = setup(t);
+  const opts = { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 0.05, platform: 'darwin', uid: UID,
+    domain: 'system', euid: 0, sleep: noSleep };
+  fs.writeFileSync(s.plist, s.body('1', { userName: 'agentuser' }).replace(`<string>${s.name}</string>`, '<string>other.label</string>'));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run }),
+    /holds launchd label other\.label/);
+  fs.rmSync(s.plist);
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run,
+    fetchJobWellKnown: async () => null }),
+  (err) => err.message.includes('did not answer') && err.message.includes(`the job stays loaded: as root, \`launchctl bootout system/${s.name}\``));
 });
 
 test('FAA-278: a binary sibling plist is read through plutil', { skip: process.platform !== 'darwin' && 'plutil is macOS\'s' }, async (t) => {

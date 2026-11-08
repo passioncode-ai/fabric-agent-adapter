@@ -103,11 +103,13 @@ systemd and Task Scheduler do not poll yet, FAA-253).
    cannot prove reads `table-restricted` and the error names the way round it (FAA-267). The pid is the job's own, so a
    `ProgramArguments` wrapper that starts the server as a child (`sh -c` without `exec`, `uv run`, `npm start`) cannot
    vouch for it: on such a host start the server with `exec` or run the installer from Apple's `/usr/bin/python3`.
+   A LaunchDaemon reads its answer differently: *The system domain*, below.
 4. Upgrade = new release, rewrite the plist with the new path, `launchd_install`
    again, then `prune_releases(releases_dir, current=<new release>)`: the running release
    and the one before it stay for rollback, older ones go (LC-11, LC-15).
 5. Uninstall = `launchd_uninstall` (Node: `await launchdUninstall(...)`) + `remove_descriptor`. Data stays; `purge=True`
-   (with `service_id`) removes data, logs and cache when the operator asks.
+   (with `service_id`) removes data, logs and cache when the operator asks; a LaunchDaemon refuses `purge` (*The system
+   domain*, below).
 
 **The operator's intent wins (LC-14).** A host stops a service with `bootout` **and**
 `disable` (off survives a login) and starts it with `enable` + `bootstrap`; restart is
@@ -148,7 +150,8 @@ it at boot, before any login, as the account its `UserName` names.
   Mac, so a LaunchDaemon's label is unique on the machine, not per account (put the account in it on a Mac with a
   personal and an organization account); an install refuses, before writing anything, a label another plist holds
   (the one launchd loaded the job from, or any plist of that label in the same folder) and a plist of that label that
-  names another `UserName`; an uninstall refuses the same holders before its `bootout`, which would stop their job.
+  names another `UserName` or another label; an uninstall refuses the same holders before its `bootout`, which would
+  stop their job.
 - **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
   `launchctl bootout system/<label>`). `purge` is refused: the data belongs to the `UserName`, so remove it as that user.
@@ -159,10 +162,14 @@ it at boot, before any login, as the account its `UserName` names.
   any account may read; the probe's `lifecycle.one-copy` reads the domain from the descriptor's plist the same way.
 - **The answer the installer waits for**: root reads the service's listener as another account's, so the installer takes
   the job's pid from `launchctl print system/<label>` and reads the token-free well-known document only on a connection
-  that pid accepted, while the pid runs as the `UserName`'s uid (`ps`); an install refuses a `UserName` that is no
-  account of the Mac or is root, and an origin other than `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that pid listens on at exactly `127.0.0.1`
-  (`lsof -p`), the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that starts the server as a
-  child cannot pass either check, and the refusal says so: start the server with `exec`.
+  that pid accepted, while the pid runs as the `UserName`'s uid (`ps`) and listens on exactly `127.0.0.1` (`lsof -p`);
+  an install refuses a `UserName` that is not a short name, no account of the Mac or root, and an origin other than
+  `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that
+  pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that
+  starts the server as a child cannot pass either check, and the refusal says so: start the server with `exec`. An
+  install refused after its bootstrap leaves the job loaded and says so; as root, `launchctl bootout system/<label>`
+  removes it. The domain comes from the plist's folder alone; a descriptor field for it is the contract's CT-234,
+  open.
 - **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another
   account's and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The
   root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
