@@ -682,6 +682,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
             with self.assertRaises(fs.ServiceError) as caught:
                 fs.launchd_uninstall(self.label, self.plist, domain="system")
             self.assertIn("removed by root", str(caught.exception))
+            self.assertIn("launchctl enable system/%s" % self.label, str(caught.exception))
             self.assertEqual(fake.state["calls"], [], "no launchctl call")
 
     @unittest.skipUnless(sys.platform == "darwin", "a LaunchDaemon is macOS's; the socket table names its pid there")
@@ -878,7 +879,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
             fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
                                service_id="example-agent", timeout=0.05, domain="system")
         self.assertIn("the job stays loaded and its plist starts it again at boot: as root, `launchctl bootout system/%s` "
-                      "and removing %s" % (self.label, self.plist), str(caught.exception))
+                      "and removing %s (or launchd_uninstall) take it away" % (self.label, self.plist), str(caught.exception))
 
     def test_the_job_reader_takes_only_a_loopback_origin(self):
         for origin in ("http://localhost:47201", "http://127.0.0.1:0", "http://127.0.0.1:99999"):

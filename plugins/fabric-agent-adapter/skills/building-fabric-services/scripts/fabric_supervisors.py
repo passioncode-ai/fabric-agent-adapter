@@ -356,8 +356,9 @@ def _need_root(domain: str, label: str, plist_path: Path, install: bool) -> None
                            "lifecycle reference, The system domain), or as root write %s and run "
                            "`launchctl bootstrap system %s`. Status and pid read without root." % (plist_path, plist_path))
     raise ServiceError("A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run "
-                       "launchd_uninstall as root, or as root run `launchctl bootout system/%s` and remove %s. Status and "
-                       "pid read without root." % (label, plist_path))
+                       "launchd_uninstall as root, or as root run `launchctl bootout system/%s`, remove %s and run "
+                       "`launchctl enable system/%s` (so a later install is not kept off). Status and pid read without "
+                       "root." % (label, plist_path, label))
 
 
 def launchd_loaded(label: str, domain: Optional[str] = None) -> bool:

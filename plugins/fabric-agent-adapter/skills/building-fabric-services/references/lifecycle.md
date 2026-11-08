@@ -155,9 +155,11 @@ it at boot, before any login, as the account its `UserName` names.
   which would stop that plist's job, so pass it the label the plist at its path names.
 - **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
-  `launchctl bootout system/<label>` and removing the plist). `purge` is refused: the data belongs to the `UserName`, so remove it as that user.
-  Upgrade is the same install again as root; a host's stop, start and restart (`bootout`, `bootstrap`,
-  `kickstart -k system/<label>`) need root too, and a host or broker without root reports the job read-only.
+  `launchctl bootout system/<label>`, removing the plist and `launchctl enable system/<label>`, as `launchd_uninstall`
+  does). `purge` is refused: the data belongs to the `UserName`, so remove it as that user. Upgrade is the same install
+  again as root. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
+  `bootout` + `disable system/<label>`, start is `enable` + `bootstrap system <plist>`, restart is
+  `kickstart -k system/<label>`; a host or broker without root reports the job read-only.
 - **Status and pid read without root**: `launchd_loaded(label, "system")`, `launchd_pid(label, "system")` and
   `launchd_override(label, "system")` (Node: the `domain: 'system'` option) ask `launchctl print system/<label>`, which
   any account may read; the probe's `lifecycle.one-copy` reads the domain from the descriptor's plist the same way.
@@ -175,7 +177,8 @@ it at boot, before any login, as the account its `UserName` names.
 - **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another
   account's and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The
   root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
-  bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential. The contract owner accepted this in
+  bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential; under a restricted socket table the
+  first proof is the CT-261 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
   principle as DEC-0161 (RT-3 extended to launchd's system domain; proposed, its text after its readings), so it stays a
   departure from the pin until the next repin (FAA-288).
   Every other client keeps HA-2 as written.

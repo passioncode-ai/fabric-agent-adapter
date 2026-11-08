@@ -340,7 +340,7 @@ function needRoot(domain, label, plistPath, install, euid) {
   if (install) {
     throw new ServiceError(`A LaunchDaemon (launchd's system domain) is installed by root, and this process is not root: run launchdInstall as root (the release, descriptor and token stay its UserName's, lifecycle reference, The system domain), or as root write ${plistPath} and run \`launchctl bootstrap system ${plistPath}\`. Status and pid read without root.`);
   }
-  throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run launchdUninstall as root, or as root run \`launchctl bootout system/${label}\` and remove ${plistPath}. Status and pid read without root.`);
+  throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run launchdUninstall as root, or as root run \`launchctl bootout system/${label}\`, remove ${plistPath} and run \`launchctl enable system/${label}\` (so a later install is not kept off). Status and pid read without root.`);
 }
 
 // The top-level string values of an XML plist's dict, read as CoreFoundation does: comments, the prolog and DOCTYPE

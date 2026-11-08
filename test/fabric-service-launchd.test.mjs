@@ -486,7 +486,8 @@ test('FAA-278: install and uninstall without root refuse before anything', async
     { ...common, origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1 }),
   (err) => err.message.includes('installed by root') && err.message.includes(`launchctl bootstrap system ${s.plist}`));
   assert.equal(fs.existsSync(s.plist), false, 'nothing written');
-  await assert.rejects(k.launchdUninstall(s.name, s.plist, common), /removed by root/);
+  await assert.rejects(k.launchdUninstall(s.name, s.plist, common), (err) => err.message.includes('removed by root')
+    && err.message.includes(`launchctl enable system/${s.name}`));
   assert.deepEqual(fake.calls, [], 'no launchctl call');
 });
 
@@ -676,7 +677,7 @@ test('FAA-278: a same-path plist of another label is refused, and a refusal afte
   fs.rmSync(s.plist);
   await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run,
     fetchJobWellKnown: async () => null }),
-  (err) => err.message.includes('did not answer') && err.message.includes(`the job stays loaded and its plist starts it again at boot: as root, \`launchctl bootout system/${s.name}\` and removing ${s.plist}`));
+  (err) => err.message.includes('did not answer') && err.message.includes(`the job stays loaded and its plist starts it again at boot: as root, \`launchctl bootout system/${s.name}\` and removing ${s.plist} (or launchdUninstall) take it away`));
 });
 
 test('FAA-278: a binary sibling plist is read through plutil', { skip: process.platform !== 'darwin' && 'plutil is macOS\'s' }, async (t) => {
