@@ -234,7 +234,7 @@ listener of this account's pid on the port counts as this account's (`CheckedHTT
 `checkedSocket({vouchPid})`). The launchd installers vouch with their own job's pid; elsewhere a restricted table
 refuses (the probe, the hub client and `fabric_http` included, FAA-272), and Apple's `/usr/bin/python3` sees the
 whole table (FAA-267). A vouch is a weaker proof than the table's: it shows the job's pid listens on the port (`127.0.0.1` or the
-IPv4 wildcard), not that it accepted this connection, so a more specific bind by root over a wildcard job would pass;
+IPv4 wildcard for a LaunchAgent's installer, exactly `127.0.0.1` for a LaunchDaemon's), not that it accepted this connection, so a more specific bind by root over a wildcard job would pass;
 the contract's ruling on vouching is CT-261.
 
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for

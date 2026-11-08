@@ -157,8 +157,9 @@ it at boot, before any login, as the account its `UserName` names.
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
   `launchctl bootout system/<label>`, removing the plist and `launchctl enable system/<label>`, as `launchd_uninstall`
   does). `purge` is refused: the data belongs to the `UserName`, so remove it as that user. Upgrade is the same install
-  again as root, so a descriptor's `commands.update` for a LaunchDaemon runs as root, and a host without root reports it
-  as the operator's. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
+  again as root, so a descriptor's `commands.update` for a LaunchDaemon runs as root, writes the new release (and any
+  descriptor it rewrites) as the `UserName` as an install does, and runs only the plist and `launchd_install` as root; a
+  host without root reports it as the operator's. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
   `bootout` + `disable system/<label>`, start is `enable` + `bootstrap system <plist>`, restart is
   `kickstart -k system/<label>`; a host or broker without root reports the job read-only.
 - **Status and pid read without root**: `launchd_loaded(label, "system")` and `launchd_pid(label, "system")` ask
@@ -181,8 +182,8 @@ it at boot, before any login, as the account its `UserName` names.
   root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
   bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential; under a restricted socket table the
   first proof is the CT-261 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
-  principle as DEC-0161 (RT-3 extended to launchd's system domain; proposed, its text after its readings), so it stays a
-  departure from the pin until the next repin (FAA-288).
+  principle as DEC-0161 (RT-3 extended to launchd's system domain; proposed, its text after its readings; whether it
+  covers the restricted-table vouch is asked), so it stays a departure from the pin until the next repin (FAA-288).
   Every other client keeps HA-2 as written.
 - **Hosts.** A host or broker that reads launchd only in `gui/<uid>` sees a LaunchDaemon as not loaded and must not load
   its plist into `gui/<uid>`. Fabric Dashboards from 0.8.39 takes the domain from the plist's folder and offers no verbs
