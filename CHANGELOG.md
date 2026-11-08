@@ -34,9 +34,9 @@ working-with-fabric.
 ### Fixed
 
 - SKILL.md headroom (FAA-263): building-fabric-services and working-with-fabric each keep at least 150 words under the
-  4750-word cap, the detail moved into their references (the dashboard kit, the interop *Actions* section, the remote
-  placement's *On the platform*, the session hooks, the native host hooks, the board's *When nobody answers*); no rule
-  changes.
+  4750-word cap; the detail stays in their references, which already held most of it (the dashboard kit, the interop
+  *Actions* section, the session hooks, the board's *When nobody answers*), and the remote placement's *On the
+  platform* and the native host hooks gained what they lacked; no rule changes.
 
 ### Upgrading
 

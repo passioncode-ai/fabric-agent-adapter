@@ -27,8 +27,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   them: a launchd plist in `~/Library/LaunchAgents` (macOS), a systemd user unit (Linux) or
   a per-user Scheduled Task (Windows), plus one descriptor in the services directory. A LaunchDaemon in
   `/Library/LaunchDaemons` (FAA-278) is written only by an installer running as root, which the kits never become:
-  without root they refuse before writing and name the command, and refuse a plist without `UserName`; the job runs as
-  the account its `UserName` names. The installer accepts its answer only on a connection launchd's own job accepted
+  without root they refuse before writing and name the command, and refuse a plist without `UserName` (except one written
+  there with an explicit `domain="gui"`, not refused yet, FAA-286 item 21); the job runs as the account its `UserName`
+  names. The installer accepts the job's answer only on a connection launchd's own job accepted
   (its pid from `launchctl print system/<label>`) or, where the socket table is restricted, on a port that pid listens
   on (`lsof -p`, the weaker vouch below, CT-261). The
   token is readable by any process of the same user; the protocol defends against web pages
@@ -45,8 +46,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   (root, FAA-278), which sends a token-free well-known GET only on a connection the pid launchd names for its job
   accepted while it runs as the plist's `UserName` and listens on exactly `127.0.0.1` (`lsof -p`), or, under a
   restricted table, to a port that pid listens on there (the weaker vouch below): a departure from the pinned HA-2 and
-  the contract's later RT-3, accepted in principle by the contract owner as DEC-0161 (proposed; whether it covers the
-  restricted-table vouch is asked) and kept as a departure until the next repin (FAA-288). They read, never change:
+  the contract's later RT-3, accepted in principle by the contract owner as DEC-0161 (proposed; the restricted-table vouch
+  included) and kept as a departure until the next repin (FAA-288). They read, never change:
   macOS `sysctl net.inet.tcp.pcblist_n` in the process, or the programs `/usr/sbin/netstat
   -anv -p tcp` and `/bin/ps -o uid= -p <pid>` (the Node twin always); Linux
   `/proc/net/tcp` and `/proc/net/tcp6`; Windows `GetExtendedTcpTable` and the process
@@ -56,7 +57,7 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   table is restricted (macOS 27.2, FAA-267) the launchd installers also run `/usr/sbin/lsof
   -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. That vouch shows the job listens on the port, not that it accepted
   the connection (a more specific bind by root over a wildcard job would pass; contract CT-261). A LaunchDaemon's root
-  installer runs that `lsof` and `ps -o uid=` on its job's pid on every read, and reads, never changes, every other
+  installer runs that `lsof` and `ps -o uid=` on its job's pid before it accepts an answer, and reads, never changes, every other
   plist in `/Library/LaunchDaemons` (to find another holder of its label, `plutil -convert xml1` for a binary one in
   Node), `launchctl print system/<label>` and the `UserName`'s uid (`pwd`, or `id -u` in Node). A token-free loopback door is not yet protected against
   another account's process (HA-3, FAA-227). An MCP client (Claude Code, Codex) sends the

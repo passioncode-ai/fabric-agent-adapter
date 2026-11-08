@@ -182,8 +182,8 @@ it at boot, before any login, as the account its `UserName` names.
   root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
   bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential; under a restricted socket table the
   first proof is the CT-261 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
-  principle as DEC-0161 (RT-3 extended to launchd's system domain; proposed, its text after its readings; whether it
-  covers the restricted-table vouch is asked), so it stays a departure from the pin until the next repin (FAA-288).
+  principle as DEC-0161 (RT-3 extended to launchd's system domain, the restricted-table vouch included; proposed, its
+  text after its readings), so it stays a departure from the pin until the next repin (FAA-288).
   Every other client keeps HA-2 as written.
 - **Hosts.** A host or broker that reads launchd only in `gui/<uid>` sees a LaunchDaemon as not loaded and must not load
   its plist into `gui/<uid>`. Fabric Dashboards from 0.8.39 takes the domain from the plist's folder and offers no verbs
