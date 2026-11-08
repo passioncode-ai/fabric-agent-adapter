@@ -38,7 +38,7 @@ class AgentsDatabase(unittest.TestCase):
                                             "for an audit of the project (`agents-db.audit`)",
                                             "the agents-database audit: its request id"),
             "building-fabric-services": ("a release's measured wins sent to the [agents database](references/agents-database.md)",
-                                         "the whole agent: creating-fabric-agents' row *Does it answer people?*"),
+                                         "the whole agent: creating-fabric-agents' `references/agents-that-answer-people.md`"),
             "working-with-fabric": ("(measured wins: [agents database](references/agents-database.md))",),
         }
         for name, needles in hooks.items():

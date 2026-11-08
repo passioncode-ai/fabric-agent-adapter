@@ -118,7 +118,7 @@ CHECKLIST = (
     'A reader that adds an event kind re-reads its feed once',
 )
 EXPECTED = (
-    'starts from references/communication-agent-template.md and loads references/agents-that-answer-people.md,'
+    'starts from the agents database\'s template when one is named, read beside references/communication-agent-template.md, else from that template, and loads references/agents-that-answer-people.md,'
     ' building its parts into the first release, not later',
     'records every inbound message in one turn with a trace id and an outcome from the fixed list, and publishes one '
     'support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0, '
@@ -140,7 +140,7 @@ EXPECTED = (
 )
 STEP_0_ROW = (
     '| **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it '
-    'starts from references/communication-agent-template.md and carries from its first release the turn record and the daily `support.quality_daily` report, the lane table '
+    'starts from the agents database\'s template when one is named, read beside references/communication-agent-template.md, else from that template prompt, and either way carries from its first release the turn record and the daily `support.quality_daily` report, the lane table '
     'with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, '
     'false-state gates and a checker that sees the material first, numbers and account state from tools, the live '
     'tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never '

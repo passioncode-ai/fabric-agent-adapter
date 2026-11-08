@@ -25,7 +25,7 @@ client's name, user content or a private path.
 
 Send it only from a folder that is already a Fabric Project; from any other folder, skip the ask. Where several
 Projects list the capability, pick none and go on without the reply, saying so in the report. Here this reference
-overrides two rules in working-with-fabric that ask the person: [project-board.md](../../working-with-fabric/references/project-board.md)
+overrides rules in working-with-fabric that ask the person: its `references/project-board.md`
 when the running Fabric does not list `com.directory`, its "When nobody answers" steps, and its SKILL.md steps that
 ask the person to open Fabric. For this ask the agent asks no one, uses no Project id held from an earlier thread or
 from the operator, never adapts the work itself, never resubmits on expiry and never escalates to the person; an
