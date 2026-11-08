@@ -168,9 +168,9 @@ it at boot, before any login, as the account its `UserName` names.
   pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that
   starts the server as a child cannot pass either check, and the refusal says so: start the server with `exec`. An
   install refused after its bootstrap leaves the job loaded and says so; as root, `launchctl bootout system/<label>`
-  removes it. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist lives in
-  `/Library/LaunchDaemons` whatever `domain=` the installer was given; a descriptor field for it is the contract's
-  CT-234, open.
+  removes it. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist must live
+  in `/Library/LaunchDaemons` even when the installer is given `domain="system"`: the installer neither moves nor checks
+  it. A descriptor field for the domain is the contract's CT-234, open.
 - **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another
   account's and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The
   root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
