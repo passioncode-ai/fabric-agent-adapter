@@ -128,26 +128,32 @@ operator's real jobs.
 
 A `gui/<uid>` job (a LaunchAgent) runs only while its user is logged in. A headless Mac that a FileVault restart
 (`fdesetup authrestart`) leaves with no GUI login, or a service installed over SSH, has no such session: `bootstrap`
-answers error 125 ("Domain does not support specified action") and the installer's error says to use the system domain
-(FAA-278). There the job is a **LaunchDaemon**: launchd starts it at boot, before any login, as the account its
-`UserName` names.
+answers error 125 ("Domain does not support specified action") and the installer's error says to remove the LaunchAgent
+it wrote (`launchd_uninstall`) and use the system domain (FAA-278). There the job is a **LaunchDaemon**: launchd starts
+it at boot, before any login, as the account its `UserName` names.
 
-- **The plist**: `launchd_plist(..., user_name="<short name>")` (Node: `userName`) writes `UserName`; the file goes in
-  `/Library/LaunchDaemons/<label>.plist`. A plist there is in the system domain by its path; `domain="system"` (Node:
-  `domain: 'system'`) says so for any path. Everything else in the plist is the same as a LaunchAgent's.
+- **The plist**: `launchd_plist(..., user_name="<short name>")` (Node: `userName`) writes `UserName`, which a system
+  install requires (without it the job would run as root, which every client refuses); the file goes in
+  `/Library/LaunchDaemons/<label>.plist`. A plist there is in the system domain by its path (the folder's case is
+  ignored); `domain="system"` (Node: `domain: 'system'`) says so for any path. Everything else is a LaunchAgent's.
+  `UserName` is the account whose Fabric and agents call the service: clients of another account refuse it (HA-2).
+- **Who runs which step.** The release, the descriptor and the service token are written as the `UserName` (steps 1 and
+  2 above, for example with `sudo -u <user> -H`), so they live in that user's home with its modes; only the plist and
+  `launchd_install` run as root. A service moved from a LaunchAgent is uninstalled as one first, so launchd never holds
+  both.
 - **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
-  `launchctl bootout system/<label>`). `purge` is refused: the data belongs to the `UserName`, not to root, so remove it
-  as that user.
+  `launchctl bootout system/<label>`). `purge` is refused: the data belongs to the `UserName`, so remove it as that user.
+  Upgrade is the same install again as root; a host's stop, start and restart (`bootout`, `bootstrap`,
+  `kickstart -k system/<label>`) need root too, and a host or broker without root reports the job read-only.
 - **Status and pid read without root**: `launchd_loaded(label, "system")`, `launchd_pid(label, "system")` and
   `launchd_override(label, "system")` (Node: the `domain: 'system'` option) ask `launchctl print system/<label>`, which
-  any account may read.
-- **The answer the installer waits for** comes from the job's own process: root reads the service's listener as
-  another account's, so the installer takes the job's pid from `launchctl print system/<label>` and accepts the
-  well-known answer only on a connection that pid accepted (`lsof -p <pid>` where the socket table is restricted). A
-  `ProgramArguments` wrapper that starts the server as a child cannot pass this check: start the server with `exec`.
-- The service itself is unchanged: its descriptor, port, lock and data directory are its `UserName`'s, as for a
-  LaunchAgent of that user. Clients on the same account reach it as their own (HA-2).
+  any account may read; the probe's `lifecycle.one-copy` reads the domain from the descriptor's plist the same way.
+- **The answer the installer waits for**: root reads the service's listener as another account's, so the installer takes
+  the job's pid from `launchctl print system/<label>` and reads the token-free well-known document only on a connection
+  that pid accepted. Where the socket table is restricted it accepts a port that pid listens on (`lsof -p`), the weaker
+  vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that starts the server as a child cannot pass either
+  check: start the server with `exec`.
 
 ## One copy under a supervisor
 

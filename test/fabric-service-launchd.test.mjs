@@ -508,11 +508,24 @@ test("FAA-278: root installs, and the job's own pid proves the answer", async (t
 test('FAA-278: root refuses an answer another process gives', async (t) => {
   const s = setup(t);
   const fake = systemFake();
-  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), {
-    origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 0.05, run: fake.run, platform: 'darwin', uid: UID,
-    domain: 'system', euid: 0, sleep: noSleep,
+  const common = { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 0.05, run: fake.run, platform: 'darwin',
+    uid: UID, domain: 'system', euid: 0, sleep: noSleep };
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...common,
     fetchJobWellKnown: async () => new ForeignUserAnswer("foreign-user: the server on port 47201 is not the LaunchDaemon's pid 4242"),
   }), /is not this LaunchDaemon's: foreign-user/);
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...common,
+    fetchJobWellKnown: async () => new ForeignUserAnswer("table-restricted: the server on port 47201 is not the LaunchDaemon's pid 4242"),
+  }), /could not be proved this LaunchDaemon's: table-restricted.*start the server with exec/);
+});
+
+test('FAA-278: a LaunchDaemon needs UserName, and its folder ignores case', async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent',
+    timeout: 1, run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep }), /needs UserName/);
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  assert.deepEqual(fake.calls, []);
+  assert.equal(k.launchdDomain('/library/launchdaemons/a.b.plist', { platform: 'darwin', uid: UID }), 'system');
 });
 
 test("FAA-278: a LaunchDaemon's purge is refused", async (t) => {
@@ -528,7 +541,10 @@ test('FAA-278: a gui bootstrap without a session names the system domain', async
   const opts = { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, platform: 'darwin', uid: UID, sleep: noSleep };
   await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), { ...opts,
     run: systemFake({ bootstrapError: 'Bootstrap failed: 125: Domain does not support specified action' }).run }),
-  (err) => err.message.includes('no GUI login session') && err.message.includes('/Library/LaunchDaemons'));
+  (err) => err.message.includes('no GUI login session') && err.message.includes('/Library/LaunchDaemons') && err.message.includes('remove the LaunchAgent'));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), { ...opts,
+    run: systemFake({ bootstrapError: 'Bootstrap failed: 5: Input/output error in /tmp/125/x.plist' }).run }),
+  (err) => !err.message.includes('GUI login'), '125 in a path is not the error code');
   await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), { ...opts,
     run: systemFake({ bootstrapError: 'Bootstrap failed: 5: Input/output error' }).run }),
   (err) => !err.message.includes('GUI login'));

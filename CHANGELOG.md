@@ -4,20 +4,24 @@
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_supervisors` and `fabric-supervisors.mjs`, and the facades
 `fabric_service` and `fabric-service.mjs` (new exports `launchd_domain` / `launchdDomain`, `SYSTEM_DAEMONS`,
-`jobWellKnownOf`); guidance in building-fabric-services and working-with-fabric.
+`jobWellKnownOf`); the probe `check_service.py` (`lifecycle.one-copy`); guidance in building-fabric-services and
+working-with-fabric.
 
 ### Added
 
 - **A LaunchDaemon for a headless Mac** (FAA-278, with FAA-228): the launchd helpers in both kits work in launchd's system
   domain, for a Mac that a FileVault restart (`fdesetup authrestart`) leaves with no GUI login, where a `gui/<uid>` job
-  never starts. A plist in `/Library/LaunchDaemons` (or `domain="system"` / `domain: 'system'`) is a LaunchDaemon;
-  `launchd_plist(..., user_name=)` / `launchdPlist({userName})` writes its `UserName`; `launchd_domain` /
-  `launchdDomain` names the domain. `launchd_loaded`, `launchd_pid` and `launchd_override` read the system domain
-  without root. `launchd_install` and `launchd_uninstall` there need root, refuse before writing anything otherwise and
-  name the command to run as root, refuse `purge` (the data is the `UserName`'s), and accept the installed service's
-  answer only on a connection launchd's own job accepted (its pid from `launchctl print system/<label>`; `lsof -p` where
-  the socket table is restricted). A `gui/<uid>` bootstrap that fails for lack of a GUI session (error 125, an SSH
-  install) now says to use the system domain. `references/lifecycle.md` *The system domain*; one scenario eval.
+  never starts. A plist in `/Library/LaunchDaemons` (the folder's case ignored) or `domain="system"` /
+  `domain: 'system'` is a LaunchDaemon, macOS only; `launchd_plist(..., user_name=)` / `launchdPlist({userName})` writes
+  its `UserName`, which a system install requires; `launchd_domain` / `launchdDomain` names the domain.
+  `launchd_loaded`, `launchd_pid` and `launchd_override` read the system domain without root. `launchd_install` and
+  `launchd_uninstall` there need root, refuse before writing anything otherwise and name the command to run as root,
+  refuse `purge` (the data is the `UserName`'s), and accept the installed service's token-free answer only on a
+  connection launchd's own job accepted (its pid from `launchctl print system/<label>`) or, under a restricted socket
+  table, on a port that pid listens on (`lsof -p`, a weaker vouch, CT-261). A `gui/<uid>` bootstrap that fails for lack
+  of a GUI session (error 125, an SSH install) now says to remove that LaunchAgent and use the system domain. The probe's
+  `lifecycle.one-copy` asks launchd in the domain the descriptor's plist names. `references/lifecycle.md` *The system
+  domain* says which steps run as the `UserName` and which as root; one scenario eval.
 
 ### Fixed
 

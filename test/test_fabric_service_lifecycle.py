@@ -693,7 +693,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
         with FakeLaunchd(), mock.patch.object(self.sup.os, "geteuid", return_value=0), \
                 mock.patch.object(self.sup, "launchd_pid", return_value=999999):
             with self.assertRaises(fs.ServiceError) as caught:
-                fs.launchd_install(self.label, self.plist, self.body(), origin=self.web.origin,
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
                                    service_id="example-agent", timeout=1, domain="system")
         self.assertIn("is not this LaunchDaemon's", str(caught.exception))
         self.assertIn("pid 999999", str(caught.exception))
@@ -705,6 +705,37 @@ class LaunchdSystemDomainTests(unittest.TestCase):
             self.assertIn("belongs to its UserName", str(caught.exception))
             self.assertEqual(fake.state["calls"], [])
 
+    def test_a_launch_daemon_needs_a_user_name(self):
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("needs UserName", str(caught.exception))
+            self.assertFalse(self.plist.exists())
+            self.assertEqual(fake.state["calls"], [])
+
+    def test_the_system_domain_is_macos_only_and_its_folder_ignores_case(self):
+        with mock.patch.object(self.sup.sys, "platform", "linux"):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_domain(domain="system")
+            self.assertIn("macOS only", str(caught.exception))
+        if sys.platform == "darwin":
+            self.assertEqual(fs.launchd_domain(Path("/library/launchdaemons/x.plist")), "system")
+
+    @unittest.skipUnless(sys.platform == "darwin", "lsof -p asks a macOS process")
+    def test_a_restricted_table_is_proved_by_the_jobs_lsof_or_named(self):
+        po = self.sup._po
+        port = self.web.server.server_address[1]
+        hidden = po.Owner(po.UNKNOWN, None, None, "sysctl", po.TABLE_RESTRICTED + ": probe")
+        listening = "p%d\nn127.0.0.1:%d\n" % (os.getpid(), port)
+        with mock.patch.object(po, "server_end", return_value=hidden), mock.patch.object(po, "_run", return_value=listening):
+            doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid())
+        self.assertEqual((doc or {}).get("service", {}).get("id"), "example-agent", why)
+        with mock.patch.object(po, "server_end", return_value=hidden), mock.patch.object(po, "_run", return_value=""):
+            doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid())
+        self.assertIsNone(doc)
+        self.assertTrue(why.startswith(po.TABLE_RESTRICTED), why)
+
     def test_a_gui_bootstrap_without_a_session_names_the_system_domain(self):
         error = "Bootstrap failed: 125: Domain does not support specified action"
         with FakeLaunchd(bootstrap_error=error), mock.patch.object(self.sup.time, "sleep"):
@@ -713,12 +744,19 @@ class LaunchdSystemDomainTests(unittest.TestCase):
                                    service_id="example-agent", timeout=1)
         self.assertIn("no GUI login session", str(caught.exception))
         self.assertIn("/Library/LaunchDaemons", str(caught.exception))
+        self.assertIn("remove the LaunchAgent", str(caught.exception))
         with FakeLaunchd(bootstrap_error="Bootstrap failed: 5: Input/output error"), \
                 mock.patch.object(self.sup.time, "sleep"):
             with self.assertRaises(fs.ServiceError) as caught:
                 fs.launchd_install(self.label, self.plist, self.body(), origin=self.web.origin,
                                    service_id="example-agent", timeout=1)
         self.assertNotIn("GUI login", str(caught.exception), "an I/O error is not a missing session")
+        with FakeLaunchd(bootstrap_error="Bootstrap failed: 5: Input/output error in /tmp/125/x.plist"), \
+                mock.patch.object(self.sup.time, "sleep"):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1)
+        self.assertNotIn("GUI login", str(caught.exception), "125 in a path is not the error code")
 
 
 if __name__ == "__main__":

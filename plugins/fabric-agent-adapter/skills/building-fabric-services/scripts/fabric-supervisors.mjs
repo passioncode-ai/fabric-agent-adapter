@@ -324,7 +324,7 @@ export function launchdDomain(plistPath = null, { domain = null, platform = proc
   if (![null, undefined, 'gui', 'system'].includes(domain)) throw new ServiceError('domain must be gui or system');
   let which = domain;
   if ((which === null || which === undefined) && plistPath !== null && plistPath !== undefined) {
-    which = path.dirname(path.resolve(String(plistPath))) === SYSTEM_DAEMONS ? 'system' : 'gui';
+    which = path.dirname(path.resolve(String(plistPath))).toLowerCase() === SYSTEM_DAEMONS.toLowerCase() ? 'system' : 'gui'; // APFS ignores case
   }
   if (which === 'system') {
     if (platform !== 'darwin') throw new ServiceError('launchd is the supervisor on macOS only; use systemdInstall on Linux and taskInstall on Windows.');
@@ -421,6 +421,7 @@ function loopbackWellKnown(port, agent) {
 // Whether launchd's job `pid` listens on 127.0.0.1:<port> or the IPv4 wildcard, asked of the process itself (`lsof -p`),
 // which a restricted socket table does not hide. Only for a LaunchDaemon root bootstrapped, whose pid launchd named.
 async function jobListens(pid, port, run = runProgram) {
+  if (process.platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
   try {
     const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
     return parseLsofListeners(out).some(([host, p]) => (host === '127.0.0.1' || host === '*') && p === port);
@@ -441,8 +442,10 @@ class JobAgent extends http.Agent {
   createConnection(options, callback) {
     const port = Number(options.port);
     const socket = net.connect({ host: '127.0.0.1', port, noDelay: true });
-    socket.once('error', (err) => callback(err));
+    const timer = setTimeout(() => socket.destroy(Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' })), options.timeout ?? 10000);
+    socket.once('error', (err) => { clearTimeout(timer); callback(err); });
     socket.once('connect', async () => {
+      clearTimeout(timer);
       socket.pause();
       let who;
       try {
@@ -491,6 +494,9 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   launchdLabel(label);
   if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
   needRoot(dom, label, plistPath, true, euid);
+  if (dom === 'system' && !/<key>UserName<\/key>\s*<string>[^<]+<\/string>/.test(String(plistText))) {
+    throw new ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with launchdPlist(..., { userName: <the account whose Fabric and agents call it> }).");
+  }
   const opts = { run, platform, uid, domain: dom === 'system' ? 'system' : null };
   atomicWrite(plistPath, plistText, 0o644);
   const lint = run(['plutil', '-lint', String(plistPath)]);
@@ -508,8 +514,8 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
     if (result?.status === 0) break;
     last = String(result?.stderr || result?.stdout || '').trim();
     if (attempt === 4) {
-      if (dom !== 'system' && ['125', 'Domain does not support', 'Could not find domain'].some((sign) => last.includes(sign))) {
-        throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}. This user has no GUI login session (an SSH session, or a headless Mac after a FileVault restart), so ${dom} does not run jobs: install it as a LaunchDaemon in the system domain (a plist in ${SYSTEM_DAEMONS} with UserName, as root; FAA-278).`);
+      if (dom !== 'system' && /:\s*125:|Domain does not support|Could not find domain/.test(last)) {
+        throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}. This user has no GUI login session (an SSH session, or a headless Mac after a FileVault restart), so ${dom} does not run jobs: remove the LaunchAgent this attempt wrote (launchdUninstall), then install it as a LaunchDaemon in the system domain (a plist in ${SYSTEM_DAEMONS} with UserName, as root; FAA-278).`);
       }
       throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}`);
     }
@@ -525,6 +531,7 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
       if (!refused && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
       await sleep(500);
     }
+    if (refused?.startsWith(TABLE_RESTRICTED)) throw new ServiceError(`${origin} could not be proved this LaunchDaemon's: ${refused}; the job's pid did not show the listener: start the server with exec (no wrapper child), or read the job's log.`);
     if (refused) throw new ServiceError(`${origin} is not this LaunchDaemon's: ${refused}; another process holds the port.`);
     throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log.`);
   }

@@ -336,10 +336,12 @@ def launchd_domain(plist_path: Optional[Path] = None, domain: Optional[str] = No
     if domain not in (None, "gui", "system"):
         raise ServiceError("domain must be gui or system")
     if domain is None and plist_path is not None:
-        domain = "system" if Path(os.path.abspath(str(plist_path))).parent == SYSTEM_DAEMONS else "gui"
+        folder = str(Path(os.path.abspath(str(plist_path))).parent)
+        domain = "system" if folder.lower() == str(SYSTEM_DAEMONS).lower() else "gui"  # APFS ignores case
     if domain == "system":
-        if sys.platform == "win32":
-            raise ServiceError("launchd exists only on macOS; this system's supervisor is Task Scheduler.")
+        if sys.platform != "darwin":
+            raise ServiceError("launchd is the supervisor on macOS only; use systemd_install on Linux and task_install on "
+                               "Windows.")
         return "system"
     return _domain()
 
@@ -411,6 +413,8 @@ def _job_listens(pid: int, port: int) -> bool:
     """Whether launchd's job `pid` listens on 127.0.0.1:<port> or the IPv4 wildcard, asked of the process itself
     (`lsof -p`), which a restricted socket table does not hide. Used only for a LaunchDaemon root just bootstrapped,
     whose pid launchd itself named (FAA-278)."""
+    if sys.platform != "darwin" or not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
+        return False
     try:
         out = _po._run([_po.LSOF, "-nP", "-a", "-p", str(pid), "-i4TCP", "-sTCP:LISTEN", "-Fn"])
     except _po.TableUnreadable:
@@ -452,7 +456,8 @@ def _read_job_well_known(origin: str, job_pid: int,
         response = conn.getresponse()
         return (json.loads(response.read().decode()) if response.status == 200 else None), None
     except _po.ListenerRefused as exc:
-        return None, "foreign-user: %s" % exc
+        restricted = exc.owner is not None and (exc.owner.reason or "").startswith(_po.TABLE_RESTRICTED)
+        return None, "%s: %s" % (_po.TABLE_RESTRICTED if restricted else "foreign-user", exc)
     except (OSError, ValueError, http.client.HTTPException):
         return None, None
     finally:
@@ -472,7 +477,7 @@ def launchd_override(label: str, domain: Optional[str] = None) -> Optional[str]:
     """The operator's launchd override for ``label``: ``"disabled"``, ``"enabled"``, None when
     none is recorded (a first install), or ``"unknown"`` when the table cannot be read.
 
-    Reads ``launchctl print-disabled gui/<uid>``; macOS 14+ prints ``=> disabled|enabled``,
+    Reads ``launchctl print-disabled gui/<uid>`` (``system`` with ``domain="system"``); macOS 14+ prints ``=> disabled|enabled``,
     older releases ``=> true|false`` (true means disabled)."""
     result = _launchctl("print-disabled", launchd_domain(domain=domain))
     if result.returncode != 0:
@@ -504,6 +509,15 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     dom = launchd_domain(plist_path, domain)
     which = "system" if dom == "system" else None
     _need_root(dom, label, plist_path, True)
+    if dom == "system":
+        try:
+            named = plistlib.loads(plist_bytes).get("UserName")
+        except Exception:  # a plist that does not parse fails plutil -lint below
+            named = None
+        if not named:
+            raise ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's "
+                               "home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with "
+                               "launchd_plist(..., user_name=<the account whose Fabric and agents call it>).")
     atomic_write(plist_path, plist_bytes, 0o644)
     lint = subprocess.run(["plutil", "-lint", str(plist_path)], capture_output=True, text=True)
     if lint.returncode != 0:
@@ -526,11 +540,11 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         last = (result.stderr or result.stdout).strip()
         time.sleep(1.0)
     else:
-        if dom != "system" and any(sign in last for sign in ("125", "Domain does not support", "Could not find domain")):
+        if dom != "system" and re.search(r":\s*125:|Domain does not support|Could not find domain", last):
             raise ServiceError("launchctl bootstrap failed: %s. This user has no GUI login session (an SSH session, or a "
-                               "headless Mac after a FileVault restart), so %s does not run jobs: install it as a "
-                               "LaunchDaemon in the system domain (a plist in %s with UserName, as root; FAA-278)."
-                               % (last, dom, SYSTEM_DAEMONS))
+                               "headless Mac after a FileVault restart), so %s does not run jobs: remove the LaunchAgent "
+                               "this attempt wrote (launchd_uninstall), then install it as a LaunchDaemon in the system "
+                               "domain (a plist in %s with UserName, as root; FAA-278)." % (last, dom, SYSTEM_DAEMONS))
         raise ServiceError("launchctl bootstrap failed: %s" % last)
     deadline = time.time() + timeout
     if dom == "system":
@@ -541,6 +555,9 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
                 return doc
             time.sleep(0.5)
+        if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
+            raise ServiceError("%s could not be proved this LaunchDaemon's: %s; the job's pid did not show the listener: "
+                               "start the server with exec (no wrapper child), or read the job's log." % (origin, foreign))
         if foreign:
             raise ServiceError("%s is not this LaunchDaemon's: %s; another process holds the port." % (origin, foreign))
         raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))
