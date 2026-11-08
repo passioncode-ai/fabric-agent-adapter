@@ -629,6 +629,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
         platform.start()
         self.addCleanup(platform.stop)
         # The plists name a neutral account; on this machine it maps to the uid the tests' own server runs as.
+        self.real_account_uid = self.sup._account_uid
         account = mock.patch.object(self.sup, "_account_uid", return_value=os.getuid())
         account.start()
         self.addCleanup(account.stop)
@@ -838,6 +839,23 @@ class LaunchdSystemDomainTests(unittest.TestCase):
         self.assertIn("is root", str(caught.exception))
         self.assertFalse(self.plist.exists(), "nothing written")
 
+    @unittest.skipUnless(hasattr(os, "getuid"), "accounts by name are POSIX's")
+    def test_only_a_short_name_is_an_account(self):
+        # Not mocked: macOS getpwnam also answers an upper-case short name or the full name; launchd's UserName does not.
+        import pwd
+        me = pwd.getpwuid(os.getuid())
+        real = self.real_account_uid
+        for odd in {me.pw_name.upper(), me.pw_gecos.split(",")[0], "Some Person", "x\x00y", 5, "", "501"} - {me.pw_name}:
+            with self.subTest(odd=odd):
+                self.assertIsNone(real(odd))
+        if self.sup._USER_NAME.match(me.pw_name):
+            self.assertEqual(real(me.pw_name), os.getuid())
+
+    def test_the_job_reader_takes_only_a_loopback_origin(self):
+        for origin in ("http://localhost:47201", "http://127.0.0.1:0", "http://127.0.0.1:99999"):
+            with self.subTest(origin=origin), self.assertRaises(fs.ServiceError):
+                self.sup._read_job_well_known(origin, 4242, 501)
+
     def test_uninstall_refuses_a_label_another_plist_holds(self):
         other = Path(self.temp.name) / "someone-else.plist"
         other.write_bytes(self.body(user_name="otheruser"))
@@ -867,7 +885,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
                 mock.patch.object(self.sup, "_pid_uid", return_value=os.getuid()):
             doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid(), os.getuid())
         self.assertIsNone(doc)
-        self.assertIn("does not listen on exactly 127.0.0.1:%d" % port, why)
+        self.assertIn("is not shown listening on exactly 127.0.0.1:%d" % port, why)
 
     @unittest.skipUnless(sys.platform == "darwin", "APFS ignores case; samefile tells one file")
     def test_the_jobs_own_plist_in_another_case_is_not_another_holder(self):

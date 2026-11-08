@@ -632,6 +632,28 @@ test('FAA-278: a comment, CDATA or a character reference does not hide a sibling
   (err) => err.message.includes(`already held by ${sibling} (otheruser's)`));
 });
 
+test('FAA-278: a plist is read as launchd reads it: the last of a repeated key, references in key names', async (t) => {
+  const s = setup(t);
+  const opts = { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, platform: 'darwin', uid: UID,
+    domain: 'system', euid: 0, sleep: noSleep };
+  // CoreFoundation keeps the last UserName: here a numeric one, which is no account; the first is never the job's.
+  const twice = s.body('1', { userName: 'agentuser' }).replace('\t<string>agentuser</string>\n',
+    '\t<string>agentuser</string>\n\t<key>UserName</key>\n\t<string>501</string>\n');
+  let fake = systemFake();
+  await assert.rejects(k.launchdInstall(s.name, s.plist, twice, { ...opts, run: fake.run }), /UserName 501 is no account/);
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  const sibling = path.join(s.dir, 'someone-else.plist');
+  fs.writeFileSync(sibling, s.body('1', { userName: 'otheruser' }).replace('<key>Label</key>', '<key>&#76;abel</key>'));
+  fake = systemFake();
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: fake.run }),
+    (err) => err.message.includes(`already held by ${sibling}`));
+  // A reference no code point has makes the file unreadable, as plistlib finds it: no holder, and no RangeError.
+  fs.writeFileSync(sibling, s.body('1', { userName: 'otheruser' }).replace(`<string>${s.name}</string>`, '<string>&#x110000;</string>'));
+  const doc = await k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run,
+    fetchJobWellKnown: async () => ({ service: { id: 'example-agent', instance: 'default' } }) });
+  assert.equal(doc.service.id, 'example-agent');
+});
+
 test('FAA-278: a binary sibling plist is read through plutil', { skip: process.platform !== 'darwin' && 'plutil is macOS\'s' }, async (t) => {
   const s = setup(t);
   const sibling = path.join(s.dir, 'someone-else.plist');

@@ -140,8 +140,10 @@ it at boot, before any login, as the account its `UserName` names.
   `UserName` is the account whose Fabric and agents call the service: clients of another account refuse it (HA-2).
 - **Who runs which step.** The release, the descriptor and the service token are written as the `UserName` (steps 1 and
   2 above, for example with `sudo -u <user> -H`), so they live in that user's home with its modes, and the plist's
-  working directory and log paths name that home; only the plist and `launchd_install` run as root. A service moved
-  from a LaunchAgent is uninstalled as one first, so launchd never holds both.
+  working directory and log paths name that home; only the plist, `launchd_install` and `launchd_uninstall` run as root,
+  and at uninstall `remove_descriptor` runs as the `UserName` again. A service moved from a LaunchAgent is uninstalled
+  as one first, so launchd never holds both. The descriptor's `lifecycle.plist` names the path exactly,
+  `/Library/LaunchDaemons/<label>.plist`: a host that reads the folder by its spelling then knows the domain too.
 - **The label is the machine's.** `/Library/LaunchDaemons` and the system domain are shared by every account of the
   Mac, so a LaunchDaemon's label is unique on the machine, not per account (put the account in it on a Mac with a
   personal and an organization account); an install refuses, before writing anything, a label another plist holds

@@ -424,11 +424,14 @@ def _job_listens(pid: int, port: int) -> bool:
 
 
 def _account_uid(user_name: str) -> Optional[int]:
-    """The uid of account ``user_name`` on this machine, or None when it has no such account."""
+    """The uid of account ``user_name`` on this machine, or None when it has no such account. Only a short name: macOS
+    getpwnam also answers an upper-case name or the full name, which launchd's UserName does not take."""
+    if not isinstance(user_name, str) or not _USER_NAME.match(user_name):
+        return None
     try:
         import pwd
         return pwd.getpwnam(user_name).pw_uid
-    except (ImportError, KeyError):
+    except (ImportError, KeyError, ValueError):
         return None
 
 
@@ -447,7 +450,7 @@ def _positive(value: Any) -> bool:
 class _JobConnection(http.client.HTTPConnection):
     """A connection whose server end must be launchd's job `job_pid`, running as `job_uid`, its UserName's uid (a
     LaunchDaemon runs as its UserName, so the installer, root, reads it as another account's: the job's own pid and
-    uid are the proof, FAA-278; contract DEC-0161, RT-3 extended to launchd's system domain)."""
+    uid are the proof, FAA-278; contract DEC-0161, proposed: RT-3 extended to launchd's system domain)."""
 
     def __init__(self, host: str, port: int, job_pid: int, timeout: float, job_uid: Optional[int] = None) -> None:
         if not isinstance(job_pid, int) or isinstance(job_pid, bool) or job_pid <= 1:
@@ -464,9 +467,9 @@ class _JobConnection(http.client.HTTPConnection):
         restricted = owner.kind == _po.UNKNOWN and (owner.reason or "").startswith(_po.TABLE_RESTRICTED)
         if owner.pid == self.job_pid and not _job_listens(self.job_pid, self.port):
             self.close()
-            # The job's pid, but not bound to exactly 127.0.0.1:<port> (a wildcard): DEC-0161 vouches for neither.
-            raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the LaunchDaemon's pid %d does not listen on exactly "
-                                      "127.0.0.1:%d (a wildcard is never vouched for); nothing was sent"
+            # The job's pid, but lsof did not show it bound to exactly 127.0.0.1:<port>: a wildcard is never vouched for.
+            raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the LaunchDaemon's pid %d is not shown listening on exactly "
+                                      "127.0.0.1:%d by lsof (a wildcard is never vouched for); nothing was sent"
                                       % (self.job_pid, self.port))
         if owner.pid == self.job_pid or (restricted and _job_listens(self.job_pid, self.port)):
             runs_as = _pid_uid(self.job_pid)
@@ -487,12 +490,16 @@ def _read_job_well_known(origin: str, job_pid: int, job_uid: Optional[int] = Non
                          timeout: float = 2.0) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """As `_read_well_known`, for a LaunchDaemon: a loopback origin is read only when launchd's job `job_pid`, running as
     `job_uid`, accepted the connection; (the answer or None, why the listener was refused or None)."""
-    parts = urllib.parse.urlsplit(origin)
-    if not (parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port):
-        return _read_well_known(origin, timeout)
-    conn = _JobConnection("127.0.0.1", parts.port, job_pid, timeout, job_uid)
     try:
-        conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % parts.port})
+        port = urllib.parse.urlsplit(origin).port
+    except ValueError:  # a port out of range
+        port = None
+    if not (port and 1 <= port <= 65535 and origin == "http://127.0.0.1:%d" % port):
+        raise ServiceError("A LaunchDaemon's answer is read only at http://127.0.0.1:<port>, where its job's pid and uid "
+                           "prove it; %s is not." % origin)
+    conn = _JobConnection("127.0.0.1", port, job_pid, timeout, job_uid)
+    try:
+        conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % port})
         response = conn.getresponse()
         return (json.loads(response.read().decode()) if response.status == 200 else None), None
     except _po.ListenerRefused as exc:
@@ -610,7 +617,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             port = None
         if not (port and 1 <= port <= 65535 and origin == "http://127.0.0.1:%d" % port):
             raise ServiceError("A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by "
-                               "the job's pid and uid (DEC-0161); %s is not." % origin)
+                               "the job's pid and uid (FAA-278); %s is not." % origin)
         try:
             named = plistlib.loads(plist_bytes).get("UserName")
         except Exception:  # a plist that does not parse fails plutil -lint below
@@ -674,12 +681,15 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             if _answers(doc, service_id, instance):
                 return doc
             time.sleep(0.5)
+        loaded = "; the job stays loaded: as root, `launchctl bootout system/%s` removes it" % label
         if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
             raise ServiceError("%s could not be proved this LaunchDaemon's: %s; the job's pid did not show the listener: "
-                               "start the server with exec (no wrapper child), or read the job's log." % (origin, foreign))
+                               "start the server with exec (no wrapper child), or read the job's log%s."
+                               % (origin, foreign, loaded))
         if foreign:
-            raise ServiceError("%s is not this LaunchDaemon's: %s." % (origin, foreign))
-        raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))
+            raise ServiceError("%s is not this LaunchDaemon's: %s%s." % (origin, foreign, loaded))
+        raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log%s."
+                           % (origin, service_id, instance, timeout, loaded))
     foreign = vouch = None
     while time.time() < deadline:
         doc, foreign = _read_well_known(origin, vouch_pid=vouch)

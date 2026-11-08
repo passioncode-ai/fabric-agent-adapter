@@ -343,23 +343,64 @@ function needRoot(domain, label, plistPath, install, euid) {
   throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run launchdUninstall as root, or as root run \`launchctl bootout system/${label}\` and remove ${plistPath}. Status and pid read without root.`);
 }
 
-// A string key of an XML plist's top-level dict, however it is indented, never a key nested deeper (an
-// EnvironmentVariables entry named UserName): the walk counts <dict> and <array> depth as plistlib's parse does.
+// The top-level string values of an XML plist's dict, read as CoreFoundation does: comments, the prolog and DOCTYPE
+// skipped, entities, character references and CDATA decoded in keys and values, a repeated key's last value kept, a key
+// nested deeper (an EnvironmentVariables entry named UserName) never read. null when the text cannot be read so.
 const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
-function topKey(text, key) {
-  const xml = String(text ?? '').replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-  const walk = /<(\/?)(dict|array)\b[^>]*?(\/?)>|<key>([^<]*)<\/key>\s*<string>([^<]*)<\/string>/g;
+function decodeXml(text) {
+  return text.replace(/&(?:(amp|lt|gt|quot|apos)|#([0-9]+)|#x([0-9a-fA-F]+));/g, (_, e, d, h) => {
+    if (e) return XML_ENTITIES[e];
+    const code = d ? Number(d) : parseInt(h, 16);
+    if (!(code >= 0 && code <= 0x10ffff)) throw new RangeError('character reference out of range');
+    return String.fromCodePoint(code);
+  });
+}
+function topStrings(text) {
+  const token = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>|<!\[CDATA\[([\s\S]*?)\]\]>|<(\/?)([A-Za-z][\w.:-]*)\s*[^>]*?(\/?)>|([^<]+)/g;
+  const values = Object.create(null);
   let depth = 0;
-  for (let m = walk.exec(xml); m; m = walk.exec(xml)) {
-    if (m[2]) {
-      if (!m[3]) depth += m[1] ? -1 : 1;
-    } else if (depth === 1 && m[4] === key) {
-      return m[5].replace(/&(?:(amp|lt|gt|quot|apos)|#([0-9]+)|#x([0-9a-fA-F]+));/g,
-        (_, e, d, h) => (e ? XML_ENTITIES[e] : String.fromCodePoint(d ? Number(d) : parseInt(h, 16))));
+  let key = null;
+  let capture = null;
+  let buffer = '';
+  try {
+    for (let m = token.exec(String(text ?? '')); m; m = token.exec(String(text ?? ''))) {
+      const [, cdata, closing, name, selfClosing, chars] = m;
+      if (cdata !== undefined || chars !== undefined) {
+        if (capture) buffer += cdata !== undefined ? cdata : decodeXml(chars);
+      } else if (name === 'dict' || name === 'array') {
+        if (selfClosing) {
+          if (depth === 1) key = null;
+        } else if (closing) {
+          depth -= 1;
+        } else {
+          if (depth === 1) key = null; // a container is this key's value
+          depth += 1;
+        }
+      } else if (name && depth === 1) {
+        if (selfClosing) {
+          if (name === 'string' && key !== null) values[key] = '';
+          key = name === 'key' ? '' : null;
+        } else if (!closing && (name === 'key' || name === 'string')) {
+          capture = name;
+          buffer = '';
+        } else if (closing && name === capture) {
+          if (capture === 'key') key = buffer;
+          else if (key !== null) { values[key] = buffer; key = null; }
+          capture = null;
+        } else if (closing) {
+          key = null; // another value (integer, date, data, true, false) closes the key
+        }
+      }
     }
+  } catch {
+    return null;
   }
-  return null;
+  return values;
+}
+
+function topKey(text, key) {
+  const values = topStrings(text);
+  return values && Object.hasOwn(values, key) ? values[key] : null;
 }
 
 const topUserName = (text) => topKey(text, 'UserName');
@@ -500,7 +541,7 @@ function accountUid(name, run) {
 
 // An http.Agent whose connections must be accepted by launchd's job `jobPid`, running as `jobUid`, its UserName's uid: a
 // LaunchDaemon runs as its UserName, so the installer, root, reads it as another account's, and the job's own pid and
-// uid are the proof (FAA-278; contract DEC-0161, RT-3 extended to launchd's system domain).
+// uid are the proof (FAA-278; contract DEC-0161, proposed: RT-3 extended to launchd's system domain).
 class JobAgent extends http.Agent {
   constructor({ jobPid, jobUid, ask = {}, ...options } = {}) {
     if (!Number.isInteger(jobPid) || jobPid <= 1) throw new ServiceError("A LaunchDaemon's answer is read only on its job's pid, a positive number.");
@@ -527,8 +568,8 @@ class JobAgent extends http.Agent {
       }
       if (who.pid === this.jobPid && !await jobListens(this.jobPid, port, this.ask.run)) {
         socket.destroy();
-        // The job's pid, but not bound to exactly 127.0.0.1:<port> (a wildcard): DEC-0161 vouches for neither.
-        callback(new ListenerRefused(SERVER_NOT_OWN, `the LaunchDaemon's pid ${this.jobPid} does not listen on exactly 127.0.0.1:${port} (a wildcard is never vouched for); nothing was sent`));
+        // The job's pid, but lsof did not show it bound to exactly 127.0.0.1:<port>: a wildcard is never vouched for.
+        callback(new ListenerRefused(SERVER_NOT_OWN, `the LaunchDaemon's pid ${this.jobPid} is not shown listening on exactly 127.0.0.1:${port} by lsof (a wildcard is never vouched for); nothing was sent`));
         return;
       }
       const proved = who.pid === this.jobPid || (who.kind === UNKNOWN && String(who.reason ?? '').startsWith(TABLE_RESTRICTED)
@@ -588,7 +629,7 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
   needRoot(dom, label, plistPath, true, euid);
   if (dom === 'system' && loopbackPort(origin) === null) {
-    throw new ServiceError(`A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by the job's pid and uid (DEC-0161); ${origin} is not.`);
+    throw new ServiceError(`A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by the job's pid and uid (FAA-278); ${origin} is not.`);
   }
   const named = dom === 'system' ? topUserName(plistText) : null;
   if (dom === 'system' && named) {
@@ -643,9 +684,10 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
       if (!now && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
       await sleep(500);
     }
-    if (refused?.startsWith(TABLE_RESTRICTED)) throw new ServiceError(`${origin} could not be proved this LaunchDaemon's: ${refused}; the job's pid did not show the listener: start the server with exec (no wrapper child), or read the job's log.`);
-    if (refused) throw new ServiceError(`${origin} is not this LaunchDaemon's: ${refused}.`);
-    throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log.`);
+    const loaded = `; the job stays loaded: as root, \`launchctl bootout system/${label}\` removes it`;
+    if (refused?.startsWith(TABLE_RESTRICTED)) throw new ServiceError(`${origin} could not be proved this LaunchDaemon's: ${refused}; the job's pid did not show the listener: start the server with exec (no wrapper child), or read the job's log${loaded}.`);
+    if (refused) throw new ServiceError(`${origin} is not this LaunchDaemon's: ${refused}${loaded}.`);
+    throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log${loaded}.`);
   }
   let foreign = null;
   let vouchPid = null;
