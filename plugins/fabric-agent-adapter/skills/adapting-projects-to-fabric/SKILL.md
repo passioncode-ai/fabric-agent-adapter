@@ -93,7 +93,7 @@ is unavailable, continue only through local structure and mark exact schema vali
 ### 3. Scaffold the provider bundle
 
 Before scaffolding, ask the [agents database](references/agents-database.md) for an audit of the project
-(`agents-db.audit`) and carry its `optimize` proposals into the adaptation plan.
+(`agents-db.audit`) and carry its `optimize` proposals into the completion report.
 Load [provider bundle](references/provider-bundle.md) before creating or mapping files.
 Then run one explicit profile command:
 
@@ -265,7 +265,7 @@ Report:
 - gate table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`;
 - remaining placeholders and blockers;
 - the operator channel answer (step 8), or why it was skipped;
-- the agents-database audit: its request id and the `optimize` proposals carried, or why none was sent;
+- the agents-database audit: its request id and the `optimize` proposals carried, that none had come, or why none was sent;
 - the exact next command or runtime action.
 
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates

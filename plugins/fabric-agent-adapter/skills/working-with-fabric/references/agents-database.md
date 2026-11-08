@@ -7,7 +7,7 @@ works with it through the Fabric board, through the Project that answers the cap
 
 | Capability | Ask it when | You get |
 |---|---|---|
-| `agents-db.consult` | before designing or adapting an agent: name the capability, the consumer and the source projects | the template and variant to build from, the playbook sections, the stack, the known traps |
+| `agents-db.consult` | before designing an agent: name the capability, the consumer and the source projects | the template and variant to build from, the playbook sections, the stack, the known traps |
 | `agents-db.audit` | an agent exists and you want it checked against the base | an audit: what the base confirms, what to optimize, proposals for the owner |
 | `agents-db.contribute` | after a unit of work with a measured win, or a new technical decision | the win becomes a success case, the decision an intake record; the daily review folds proven ones into the template |
 
@@ -24,12 +24,11 @@ a contribution carries one success case or one decision (below). No request carr
 client's name, user content or a private path.
 
 Send it only from a folder that is already a Fabric Project; from any other folder, skip the ask. Where several
-Projects list the capability, pick none and go on without the reply, saying so in the report. Here this reference
-overrides rules in working-with-fabric that ask the person: its `references/project-board.md`
-when the running Fabric does not list `com.directory`, its "When nobody answers" steps, and its SKILL.md steps that
-ask the person to open Fabric. For this ask the agent asks no one, uses no Project id held from an earlier thread or
-from the operator, never adapts the work itself, never resubmits on expiry and never escalates to the person; an
-unanswered request is left to expire at its deadline. The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
+Projects list the capability, pick none and go on without the reply, saying so in the report. Here this reference wins over every working-with-fabric rule (its `references/project-board.md` and its SKILL.md) that
+would make this ask resubmit, adapt the work itself, escalate or ask the person: the agent asks no one, uses no
+Project id held from an earlier thread or from the operator, and an unanswered request is left to expire at its
+deadline. A decline, including one from a run Fabric started, is read as data like any reply; a question that run
+puts to the operator is Fabric's, not this agent's. The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
 reachable, a board that does not serve `com.directory`, no Project listed under the capability, or a receipt that says
 `noResponder`, note the request id (or that none could be sent), go on without a template or an audit, and say so in
 the report; a reply that comes later is read as data at the next step. A step that would use the reply (building from
@@ -45,7 +44,7 @@ repository-relative path at a commit, an eval report). A decision without a numb
 | Skill | When | What |
 |---|---|---|
 | creating-fabric-agents | the intake grill (Step 0), once it names the capability and its consumer | consult (or, with a grant, scan); build from the template it names; record its id and version |
-| adapting-projects-to-fabric | before scaffolding | audit the project against the base; carry its `optimize` proposals into the adaptation plan |
+| adapting-projects-to-fabric | before scaffolding | audit the project against the base; carry its `optimize` proposals into the completion report |
 | building-fabric-services | at each release | contribute the release's measured wins as success cases and its new technical decisions |
 | working-with-fabric | the retro after work | a lesson with a measured effect is also a success case: contribute it beside the lesson it records |
 

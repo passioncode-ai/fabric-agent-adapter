@@ -31,6 +31,8 @@ assembly.md and the template's own CHANGELOG.md come with the folder; until the 
 wave 2»; FAA-265), it lives here as one reference, and S2's operating rules apply by reference.
 
 
+When the agents database named a template, build from it and use these steps for what this prompt adds to it.
+
 1. Fill in the brief (section 0 of the prompt). Every `<...>` is a decision of the agent's owner; a field you cannot fill
    is a question for the owner before the build, not a guess.
 2. Give the whole prompt to the coding agent in the agent's own repository.

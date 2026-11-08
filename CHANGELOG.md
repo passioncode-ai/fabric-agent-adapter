@@ -20,7 +20,7 @@ facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_
 
 ### Fixed
 
-- **`warn` is a level** (FAA-276): `make_event`, `makeEvent` and so `JsonlEventLog.append` take `warn`, the dashboard
+- **`warn` is a level** (FAA-276): `make_event`, `makeEvent` and so Python's `JsonlEventLog.append` take `warn`, the dashboard
   chip's name, and store it as the feed's `warning`; any other level outside `info`, `notice`, `warning`, `error` is
   refused as before. A host agent that vendored 0.76.0 found its event writes refused at `warn`. A failed action still
   belongs at `error`: `warn` is stored as `warning`, never `error`.
@@ -38,7 +38,8 @@ facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_
 ### Upgrading
 
 - A service that vendored 0.76.0 kit modules re-vendors `fabric_events` (or `fabric-events.mjs`) for `warn`, and
-  `fabric_peer_owner` for the calibration deadline; `fabric_kit.py status` names what differs.
+  `fabric_peer_owner` for the calibration deadline; a re-vendored facade (`fabric_service`, `fabric-service.mjs`)
+  needs the new `fabric_events` it imports `LEVEL_ALIASES` from. `fabric_kit.py status` names what differs.
 
 ## 0.76.0 (2026-11-07)
 
