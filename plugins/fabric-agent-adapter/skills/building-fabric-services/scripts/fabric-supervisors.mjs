@@ -699,7 +699,7 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
       if (!now && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
       await sleep(500);
     }
-    const loaded = `; the job stays loaded: as root, \`launchctl bootout system/${label}\` removes it`;
+    const loaded = `; the job stays loaded and its plist starts it again at boot: as root, \`launchctl bootout system/${label}\` and removing ${plistPath} (or launchdUninstall) take it away`;
     if (refused?.startsWith(TABLE_RESTRICTED)) throw new ServiceError(`${origin} could not be proved this LaunchDaemon's: ${refused}; the job's pid did not show the listener: start the server with exec (no wrapper child), or read the job's log${loaded}.`);
     if (refused) throw new ServiceError(`${origin} is not this LaunchDaemon's: ${refused}${loaded}.`);
     throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log${loaded}.`);

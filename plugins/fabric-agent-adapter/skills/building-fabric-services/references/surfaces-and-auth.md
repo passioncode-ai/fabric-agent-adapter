@@ -40,7 +40,9 @@
 
 ## CLI for people and scripts
 
-`<tool> service status|start|stop|restart` (launchctl on the label, then the
+`<tool> service status|start|stop|restart` (launchctl on the label in the domain `launchd_domain(plist)` names; for a
+LaunchDaemon start, stop and restart are root's, and a CLI without root reports the job read-only, lifecycle.md, The system
+domain; then the
 well-known document from this OS account's listener, else `foreign-user`: protocol.md, The listener's owner), `<tool> dashboard` (resolve the exact registered service with the `fabric-dashboards`
 MCP, run `check_dashboard_link.py` on the action, then open its `open_link` with the host's `open` and
 `fallback=never`; never `open <url>`, `open -a Safari`, `xdg-open` or `webbrowser.open`; an installed host that

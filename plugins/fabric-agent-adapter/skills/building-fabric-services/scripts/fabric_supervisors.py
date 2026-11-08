@@ -689,7 +689,8 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             if _answers(doc, service_id, instance):
                 return doc
             time.sleep(0.5)
-        loaded = "; the job stays loaded: as root, `launchctl bootout system/%s` removes it" % label
+        loaded = ("; the job stays loaded and its plist starts it again at boot: as root, `launchctl bootout system/%s` "
+                  "and removing %s (or launchd_uninstall) take it away" % (label, plist_path))
         if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
             raise ServiceError("%s could not be proved this LaunchDaemon's: %s; the job's pid did not show the listener: "
                                "start the server with exec (no wrapper child), or read the job's log%s."

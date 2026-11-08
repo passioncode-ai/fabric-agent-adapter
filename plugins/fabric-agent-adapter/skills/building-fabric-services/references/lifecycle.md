@@ -50,7 +50,8 @@ carry a credential. Only `doctor` and `update` are commands a host may run.
 
 **Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
 authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's,
-on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers).
+on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers; a
+LaunchDaemon's root installer reads it as *The system domain* says).
 `status` is `starting`, `ready`, `degraded` or `stopping`; `degraded` is always present, and an empty list asserts
 full health. A process that cannot serve does not answer, and a host derives `down`. An install or upgrade polls
 that document until `service.id` matches (at most 40 s) before it calls the service started (the launchd installers;
@@ -149,12 +150,12 @@ it at boot, before any login, as the account its `UserName` names.
 - **The label is the machine's.** `/Library/LaunchDaemons` and the system domain are shared by every account of the
   Mac, so a LaunchDaemon's label is unique on the machine, not per account (put the account in it on a Mac with a
   personal and an organization account); an install refuses, before writing anything, a label another plist holds
-  (the one launchd loaded the job from, or any plist of that label in the same folder) and a plist of that label that
+  (the one launchd loaded the job from, or any plist of that label in the same folder) and the plist at its path when it
   names another `UserName` or another label; an uninstall refuses a label another plist holds before its `bootout`,
   which would stop that plist's job, so pass it the label the plist at its path names.
 - **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
-  `launchctl bootout system/<label>`). `purge` is refused: the data belongs to the `UserName`, so remove it as that user.
+  `launchctl bootout system/<label>` and removing the plist). `purge` is refused: the data belongs to the `UserName`, so remove it as that user.
   Upgrade is the same install again as root; a host's stop, start and restart (`bootout`, `bootstrap`,
   `kickstart -k system/<label>`) need root too, and a host or broker without root reports the job read-only.
 - **Status and pid read without root**: `launchd_loaded(label, "system")`, `launchd_pid(label, "system")` and
@@ -167,8 +168,8 @@ it at boot, before any login, as the account its `UserName` names.
   `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that
   pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that
   starts the server as a child cannot pass either check, and the refusal says so: start the server with `exec`. An
-  install refused after its bootstrap leaves the job loaded and says so; as root, `launchctl bootout system/<label>`
-  removes it. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist must live
+  install refused after its bootstrap leaves the job loaded, and its plist starts it again at boot; the error says so,
+  and as root `launchctl bootout system/<label>` and removing the plist (or `launchd_uninstall`) take it away. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist must live
   in `/Library/LaunchDaemons` even when the installer is given `domain="system"`: the installer neither moves nor checks
   it. A descriptor field for the domain is the contract's CT-234, open.
 - **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another

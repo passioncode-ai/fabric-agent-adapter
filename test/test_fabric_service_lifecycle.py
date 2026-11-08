@@ -812,7 +812,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
 
     @unittest.skipUnless(sys.platform == "darwin", "the socket table names the pid on macOS")
     def test_the_jobs_pid_must_run_as_its_user_name(self):
-        # DEC-0161 condition 2: the job's pid accepted the connection, but runs as another uid than UserName's.
+        # FAA-288: the job's pid accepted the connection, but runs as another uid than UserName's.
         doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid(), os.getuid() + 1)
         self.assertIsNone(doc)
         self.assertIn("runs as uid %d, not its UserName's uid %d" % (os.getuid(), os.getuid() + 1), why)
@@ -877,7 +877,8 @@ class LaunchdSystemDomainTests(unittest.TestCase):
                 mock.patch.object(self.sup.time, "sleep"), self.assertRaises(fs.ServiceError) as caught:
             fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
                                service_id="example-agent", timeout=0.05, domain="system")
-        self.assertIn("the job stays loaded: as root, `launchctl bootout system/%s`" % self.label, str(caught.exception))
+        self.assertIn("the job stays loaded and its plist starts it again at boot: as root, `launchctl bootout system/%s` "
+                      "and removing %s" % (self.label, self.plist), str(caught.exception))
 
     def test_the_job_reader_takes_only_a_loopback_origin(self):
         for origin in ("http://localhost:47201", "http://127.0.0.1:0", "http://127.0.0.1:99999"):
@@ -904,7 +905,7 @@ class LaunchdSystemDomainTests(unittest.TestCase):
         self.assertEqual(doc["service"]["id"], "example-agent")
 
     def test_the_jobs_pid_on_a_wildcard_is_not_vouched_for(self):
-        # DEC-0161: the job's own pid, but bound to 0.0.0.0, never vouches, readable table or not.
+        # FAA-288: the job's own pid, but bound to 0.0.0.0, never vouches, readable table or not.
         po = self.sup._po
         port = self.web.server.server_address[1]
         own = po.Owner(po.THIS_ACCOUNT, os.getuid(), os.getpid(), "sysctl")

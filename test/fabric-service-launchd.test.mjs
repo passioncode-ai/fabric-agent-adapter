@@ -676,7 +676,7 @@ test('FAA-278: a same-path plist of another label is refused, and a refusal afte
   fs.rmSync(s.plist);
   await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run,
     fetchJobWellKnown: async () => null }),
-  (err) => err.message.includes('did not answer') && err.message.includes(`the job stays loaded: as root, \`launchctl bootout system/${s.name}\``));
+  (err) => err.message.includes('did not answer') && err.message.includes(`the job stays loaded and its plist starts it again at boot: as root, \`launchctl bootout system/${s.name}\` and removing ${s.plist}`));
 });
 
 test('FAA-278: a binary sibling plist is read through plutil', { skip: process.platform !== 'darwin' && 'plutil is macOS\'s' }, async (t) => {
@@ -759,7 +759,7 @@ test("FAA-278: jobWellKnownOf reads only what launchd's job accepted", { skip: p
   const mine = await k.jobWellKnownOf(origin, { jobPid: process.pid, jobUid: process.getuid() });
   assert.equal(mine?.service?.id, 'example-agent');
   const otherUid = await k.jobWellKnownOf(origin, { jobPid: process.pid, jobUid: process.getuid() + 1 });
-  assert.ok(otherUid instanceof ForeignUserAnswer, 'DEC-0161: the job must run as its UserName');
+  assert.ok(otherUid instanceof ForeignUserAnswer, 'FAA-288: the job must run as its UserName');
   assert.match(otherUid.reason, /runs as uid [0-9]+, not its UserName's uid/);
   await assert.rejects(k.jobWellKnownOf(origin, { jobPid: process.pid }), /UserName's uid/);
   const other = await k.jobWellKnownOf(origin, { jobPid: 999999, jobUid: process.getuid() });
