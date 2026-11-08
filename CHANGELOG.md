@@ -30,6 +30,8 @@ facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_
   a child that answered no port (a partial line, a banner) is killed at once, and one that answered a port gets only
   what is left of the deadline to exit. The process's first owner check (and its lock) no longer waits past
   `TIMEOUT_SECONDS` for the child.
+- Wording trims in building-fabric-services and working-with-fabric make room under the SKILL.md word cap; no rule
+  changes (working-with-fabric no longer says which call serves the three-minute rule).
 - `board.md` says a `table-restricted` refusal does not clear by retrying, and `connectors.md` names the reason
   (FAA-273 item 18).
 

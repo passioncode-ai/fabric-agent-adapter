@@ -688,7 +688,7 @@
       "request": "The task is done and released as done: the cache cut the hub's calls from 40 to 12 a turn. Close it out.",
       "expected": [
         "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing)",
-        "also contributes the measured effect to the agents database (agents-db.contribute) beside the lesson it records",
+        "also contributes the measured effect to the agents database (agents-db.contribute) beside the lesson it records, from a folder that is already a Fabric Project (elsewhere it skips the ask and says so)",
         "puts no person's or client's name, user content, key or private path into the contribution"
       ]
     }

@@ -536,10 +536,11 @@ class RestrictedTable(unittest.TestCase):
     def test_a_table_without_the_childs_listener_fails_calibration(self):
         # The child check runs on macOS alone; elsewhere a pipe cannot be waited on, and that proves nothing (None).
         expected = (False,) if sys.platform != "win32" else (False, None)
-        self.assertIn(P._child_listener_seen(lambda: []), expected)
-        if sys.executable:
-            self.assertIn(P._child_listener_seen(lambda: [P.Row(("127.0.0.1", 1), ("*", 0), True, 501, 1, False)]),
-                          expected)
+        with mock.patch.object(P, "TIMEOUT_SECONDS", 15.0):  # a real interpreter on a loaded host; not the deadline test
+            self.assertIn(P._child_listener_seen(lambda: []), expected)
+            if sys.executable:
+                self.assertIn(P._child_listener_seen(lambda: [P.Row(("127.0.0.1", 1), ("*", 0), True, 501, 1, False)]),
+                              expected)
 
     @unittest.skipIf(sys.platform == "win32", "a shell script as the interpreter")
     def test_a_child_that_never_answers_proves_nothing_and_does_not_hang(self):
@@ -564,7 +565,8 @@ class RestrictedTable(unittest.TestCase):
         import tempfile
         import time
         cases = (("printf '> '", None), ("printf 'Python banner\\n'", None), ("printf '12345\\n'", False),
-                 ("printf '> '; exit 0", None), ("printf '%080d' 0", None))
+                 ("printf '> '; exit 0", None), ("printf '%080d' 0", None),
+                 ("sleep 1.8; printf '12345\\n'", False))  # a late port: 3 s in all, where a second wait made 4.8 s
         for answer, expected in cases:
             with self.subTest(answer=answer), tempfile.TemporaryDirectory() as d:
                 fake = os.path.join(d, "python3")
@@ -592,7 +594,8 @@ class RestrictedTable(unittest.TestCase):
             while len(held) < 1100:
                 held.append(os.open(os.devnull, os.O_RDONLY))
             seen = []
-            self.assertIsNotNone(P._child_listener_seen(lambda: seen.append(1) or []))
+            with mock.patch.object(P, "TIMEOUT_SECONDS", 15.0):  # a real interpreter on a loaded host
+                self.assertIsNotNone(P._child_listener_seen(lambda: seen.append(1) or []))
             self.assertEqual(seen, [1], "the child answered and the table was read")
         finally:
             for fd in held:

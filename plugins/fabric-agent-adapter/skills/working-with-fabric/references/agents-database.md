@@ -26,8 +26,10 @@ client's name, user content or a private path.
 Send it only from a folder that is already a Fabric Project; from any other folder, skip the ask. Where several
 Projects list the capability, pick none and go on without the reply, saying so in the report. Here this reference
 overrides two rules in working-with-fabric that ask the person: [project-board.md](../../working-with-fabric/references/project-board.md)
-when the running Fabric does not list `com.directory`, and its SKILL.md steps that ask the person to open Fabric. For
-this ask the agent asks no one and uses no Project id held from an earlier thread or from the operator. The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
+when the running Fabric does not list `com.directory`, its "When nobody answers" steps, and its SKILL.md steps that
+ask the person to open Fabric. For this ask the agent asks no one, uses no Project id held from an earlier thread or
+from the operator, never adapts the work itself, never resubmits on expiry and never escalates to the person; an
+unanswered request is left to expire at its deadline. The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
 reachable, a board that does not serve `com.directory`, no Project listed under the capability, or a receipt that says
 `noResponder`, note the request id (or that none could be sent), go on without a template or an audit, and say so in
 the report; a reply that comes later is read as data at the next step. A step that would use the reply (building from
