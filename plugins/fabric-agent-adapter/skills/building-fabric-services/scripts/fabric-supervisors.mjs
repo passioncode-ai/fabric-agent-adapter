@@ -9,8 +9,8 @@ import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabri
 import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
-import { CheckedAgent, LSOF, ListenerRefused, SERVER_NOT_OWN, TABLE_RESTRICTED, UNKNOWN, parseLsofListeners, runProgram,
-  serverEnd } from './fabric-peer-owner.mjs';
+import { CheckedAgent, LSOF, ListenerRefused, PS, SERVER_NOT_OWN, TABLE_RESTRICTED, UNKNOWN, parseLsofListeners, parsePsUid,
+  runProgram, serverEnd } from './fabric-peer-owner.mjs';
 import http from 'node:http';
 import net from 'node:net';
 
@@ -342,11 +342,43 @@ function needRoot(domain, label, plistPath, install, euid) {
   throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run launchdUninstall as root, or as root run \`launchctl bootout system/${label}\` and remove ${plistPath}. Status and pid read without root.`);
 }
 
-// The UserName of a launchd plist's top-level dict (the plist launchdPlist writes: one tab per level), never a key
-// nested deeper, such as an EnvironmentVariables entry of that name.
-function topUserName(text) {
-  const hit = /^\t<key>UserName<\/key>\n\t<string>([^<]+)<\/string>$/m.exec(String(text));
+// A string key of a launchd plist's top-level dict, in the XML launchdPlist and `plutil -convert xml1` write (one tab per
+// level), never a key nested deeper, such as an EnvironmentVariables entry named UserName.
+function topKey(text, key) {
+  const hit = new RegExp(`^\\t<key>${key}<\\/key>\\n\\t<string>([^<]+)<\\/string>$`, 'm').exec(String(text));
   return hit ? hit[1] : null;
+}
+
+const topUserName = (text) => topKey(text, 'UserName');
+
+// A plist file's text as XML, a binary plist converted with plutil; null when it cannot be read.
+function plistXml(file, run) {
+  let text;
+  try { text = fs.readFileSync(file, 'latin1'); } catch { return null; }
+  if (!text.startsWith('bplist')) return Buffer.from(text, 'latin1').toString('utf8');
+  const converted = run(['plutil', '-convert', 'xml1', '-o', '-', String(file)]);
+  return converted?.status === 0 ? String(converted.stdout ?? '') : null;
+}
+
+// Other plists that hold launchd label `label` in the system domain (FAA-278): the plist launchd loaded the job from,
+// when it is not `plistPath`, and any plist of that label beside `plistPath`. Reading needs no root.
+function labelHolders(label, plistPath, run) {
+  const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+  const own = real(String(plistPath));
+  const found = [];
+  const loaded = run(['launchctl', 'print', `system/${label}`]);
+  if (loaded?.status === 0) {
+    const hit = /^\s*path\s*=\s*(.+?)\s*$/m.exec(String(loaded.stdout ?? ''));
+    if (hit) found.push(hit[1]);
+  }
+  const folder = path.dirname(String(plistPath));
+  let names = [];
+  try { names = fs.readdirSync(folder).filter((name) => name.endsWith('.plist')).sort(); } catch { names = []; }
+  for (const name of names) {
+    const file = path.join(folder, name);
+    if (topKey(plistXml(file, run), 'Label') === label) found.push(file);
+  }
+  return [...new Set(found)].filter((file) => real(file) !== own);
 }
 
 const ownEuid = () => (typeof process.geteuid === 'function' ? process.geteuid() : null);
@@ -425,7 +457,7 @@ function loopbackWellKnown(port, agent) {
   }).finally(() => agent.destroy());
 }
 
-// Whether launchd's job `pid` listens on 127.0.0.1:<port> or the IPv4 wildcard, asked of the process itself (`lsof -p`),
+// Whether launchd's job `pid` listens on exactly 127.0.0.1:<port>, never the wildcard, asked of the process itself (`lsof -p`),
 // which a restricted socket table does not hide. Only for a LaunchDaemon root bootstrapped, whose pid launchd named.
 async function jobListens(pid, port, run = runProgram) {
   if (process.platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
@@ -437,13 +469,23 @@ async function jobListens(pid, port, run = runProgram) {
   }
 }
 
-// An http.Agent whose connections must be accepted by launchd's job `jobPid`: a LaunchDaemon runs as its UserName, so
-// the installer, root, reads it as another account's, and the job's own pid is the proof (FAA-278).
+// The uid account `name` has on this machine (`id -u`), or null when it has none.
+function accountUid(name, run) {
+  const result = run(['id', '-u', String(name)]);
+  const uid = result?.status === 0 ? String(result.stdout ?? '').trim() : '';
+  return /^[0-9]+$/.test(uid) ? Number(uid) : null;
+}
+
+// An http.Agent whose connections must be accepted by launchd's job `jobPid`, running as `jobUid`, its UserName's uid: a
+// LaunchDaemon runs as its UserName, so the installer, root, reads it as another account's, and the job's own pid and
+// uid are the proof (FAA-278; contract DEC-0161, RT-3 extended to launchd's system domain).
 class JobAgent extends http.Agent {
-  constructor({ jobPid, ask = {}, ...options } = {}) {
+  constructor({ jobPid, jobUid, ask = {}, ...options } = {}) {
     if (!Number.isInteger(jobPid) || jobPid <= 1) throw new ServiceError("A LaunchDaemon's answer is read only on its job's pid, a positive number.");
+    if (!Number.isInteger(jobUid) || jobUid < 0) throw new ServiceError("A LaunchDaemon's answer is read only from its UserName's uid, a number.");
     super(options);
     this.jobPid = jobPid;
+    this.jobUid = jobUid;
     this.ask = ask;
   }
 
@@ -465,7 +507,14 @@ class JobAgent extends http.Agent {
         && await jobListens(this.jobPid, port, this.ask.run));
       if (!proved) {
         socket.destroy();
-        callback(new ListenerRefused(SERVER_NOT_OWN, `the server on port ${port} is not the LaunchDaemon's pid ${this.jobPid} (${who.reason ?? who.kind}); nothing was sent`, who));
+        callback(new ListenerRefused(SERVER_NOT_OWN, `the server on port ${port} is not the LaunchDaemon's pid ${this.jobPid} (${who.reason ?? who.kind}): another process holds the port, or the job's program starts the server as a child (start it with exec); nothing was sent`, who));
+        return;
+      }
+      let runsAs = null;
+      try { runsAs = parsePsUid(await (this.ask.run ?? runProgram)(PS, ['-o', 'uid=', '-p', String(this.jobPid)])); } catch { runsAs = null; }
+      if (runsAs !== this.jobUid) {
+        socket.destroy();
+        callback(new ListenerRefused(SERVER_NOT_OWN, `the LaunchDaemon's pid ${this.jobPid} runs as uid ${runsAs}, not its UserName's uid ${this.jobUid}; nothing was sent`, who));
         return;
       }
       socket.removeAllListeners('error');
@@ -475,11 +524,12 @@ class JobAgent extends http.Agent {
   }
 }
 
-// As wellKnownOf, for a LaunchDaemon: a loopback origin is read only when launchd's job `jobPid` accepted the connection.
-export async function jobWellKnownOf(origin, { jobPid } = {}) {
+// As wellKnownOf, for a LaunchDaemon: a loopback origin is read only when launchd's job `jobPid`, running as `jobUid`,
+// accepted the connection.
+export async function jobWellKnownOf(origin, { jobPid, jobUid } = {}) {
   const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
   if (!m) return wellKnownOf(origin);
-  return loopbackWellKnown(Number(m[1]), new JobAgent({ keepAlive: false, jobPid }));
+  return loopbackWellKnown(Number(m[1]), new JobAgent({ keepAlive: false, jobPid, jobUid }));
 }
 
 /**
@@ -504,11 +554,19 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   needRoot(dom, label, plistPath, true, euid);
   const named = dom === 'system' ? topUserName(plistText) : null;
   if (dom === 'system' && named) {
-    let installed = null;
-    try { installed = topUserName(fs.readFileSync(plistPath, 'utf8')); } catch { installed = null; }
+    const holders = labelHolders(label, plistPath, run);
+    if (holders.length) {
+      const owner = topUserName(plistXml(holders[0], run));
+      throw new ServiceError(`Label ${label} is already held by ${holders[0]}${owner ? ` (${owner}'s)` : ''}: the system domain is shared by every account of this Mac, so a label is the machine's and one plist holds it. Choose a label of your own (for example with the account in it), or remove that LaunchDaemon as root first.`);
+    }
+    const installed = topUserName(plistXml(plistPath, run));
     if (installed && installed !== named) {
       throw new ServiceError(`${plistPath} is ${installed}'s LaunchDaemon: the system domain is shared by every account of this Mac, so a label is the machine's. Choose a label of your own (for example with the account in it), or uninstall that one as root first.`);
     }
+  }
+  const jobUid = named ? accountUid(named, run) : null;
+  if (dom === 'system' && named && jobUid === null) {
+    throw new ServiceError(`UserName ${named} is no account of this Mac: launchd would not start the job. Name the account whose Fabric and agents call the service.`);
   }
   if (dom === 'system' && !named) {
     throw new ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with launchdPlist(..., { userName: <the account whose Fabric and agents call it> }).");
@@ -542,13 +600,14 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
     let refused = null;
     while (Date.now() < deadline) {
       const jobPid = launchdPid(label, opts);
-      const doc = jobPid ? await fetchJobWellKnown(origin, { jobPid }) : null;
-      refused = (doc instanceof ForeignUserAnswer ? doc.reason : null) ?? refused; // the last refusal stays the reason
-      if (!refused && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
+      const doc = jobPid ? await fetchJobWellKnown(origin, { jobPid, jobUid }) : null;
+      const now = doc instanceof ForeignUserAnswer ? doc.reason : null;
+      refused = now ?? refused; // the last refusal stays the reason, but only this round's answer decides
+      if (!now && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
       await sleep(500);
     }
     if (refused?.startsWith(TABLE_RESTRICTED)) throw new ServiceError(`${origin} could not be proved this LaunchDaemon's: ${refused}; the job's pid did not show the listener: start the server with exec (no wrapper child), or read the job's log.`);
-    if (refused) throw new ServiceError(`${origin} is not this LaunchDaemon's: ${refused}; another process holds the port.`);
+    if (refused) throw new ServiceError(`${origin} is not this LaunchDaemon's: ${refused}.`);
     throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log.`);
   }
   let foreign = null;

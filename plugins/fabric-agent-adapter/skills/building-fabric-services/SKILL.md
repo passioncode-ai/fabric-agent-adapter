@@ -370,8 +370,8 @@ things change and the kits implement each:
    example is [`scripts/sample-remote-service.mjs`](scripts/sample-remote-service.mjs): it runs
    with its own TLS or behind a platform router.
 2. **Secrets live on the platform:** the service token and the session key (32 bytes) are
-   platform secrets, never in the repository, a URL or an argument vector; a provider key is kept in Project
-   Observatory and its move to the platform recorded (the reference, *On the platform*).
+   platform secrets, never in the repository, a URL or an argument vector; a provider key stays in Project
+   Observatory or the person's secret manager, its move recorded ([remote placement](references/remote-placement.md), *On the platform*).
 3. **Register it on the operator's computer**, the installer side, run there:
    `registerRemote({ id, name, origin, token, source })` / `register_remote(...)` writes the token file
    (0600) and the descriptor, with `source.repository` naming the code's repository; pass the token from a file or

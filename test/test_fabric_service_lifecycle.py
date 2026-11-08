@@ -62,7 +62,8 @@ FAKE_LAUNCHCTL = textwrap.dedent('''\
             else:
                 st["pending_unload"][label] = lag - 1
         if label in st["loaded"]:
-            out = "%s = {{\\n\\tpid = 4242\\n}}\\n" % args[1]
+            loaded_from = st.get("paths", {{}}).get(label)
+            out = "%s = {{\\n%s\\tpid = 4242\\n}}\\n" % (args[1], "\\tpath = %s\\n" % loaded_from if loaded_from else "")
         else:
             rc, out = 113, "Could not find service in domain"
     elif verb == "print-disabled":
@@ -623,6 +624,14 @@ class LaunchdSystemDomainTests(unittest.TestCase):
 
     def setUp(self):
         self.sup = sys.modules["fabric_supervisors"]
+        # The system domain is macOS's; on Linux CI the refusals and fakes still run as if on a Mac.
+        platform = mock.patch.object(self.sup.sys, "platform", "darwin")
+        platform.start()
+        self.addCleanup(platform.stop)
+        # The plists name a neutral account; on this machine it maps to the uid the tests' own server runs as.
+        account = mock.patch.object(self.sup, "_account_uid", return_value=os.getuid())
+        account.start()
+        self.addCleanup(account.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.label = throwaway_label()
         self.plist = Path(self.temp.name) / (self.label + ".plist")
@@ -730,8 +739,44 @@ class LaunchdSystemDomainTests(unittest.TestCase):
                 fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
                                    service_id="example-agent", timeout=1, domain="system")
             self.assertIn("otheruser's LaunchDaemon", str(caught.exception))
-            self.assertEqual(fake.state["calls"], [])
+            self.assertEqual(fake.state["calls"], [["print", "system/%s" % self.label]], "only the label's holders read")
         self.assertIn(b"otheruser", self.plist.read_bytes(), "the other account's plist is untouched")
+
+    def test_a_label_held_by_another_plist_is_refused_before_anything(self):
+        # The same label under another file name beside it, and the job launchd loaded from another path: both refused
+        # before the plist is written and before a bootout that would stop the other account's job.
+        other = Path(self.temp.name) / "someone-else.plist"
+        other.write_bytes(self.body(user_name="otheruser"))
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("already held by %s (otheruser's)" % other, str(caught.exception))
+            self.assertFalse(self.plist.exists(), "nothing written")
+            self.assertNotIn("bootout", [c[0] for c in fake.state["calls"]])
+        other.unlink()
+        elsewhere = tempfile.TemporaryDirectory()
+        self.addCleanup(elsewhere.cleanup)
+        loaded = Path(elsewhere.name) / "loaded.plist"
+        loaded.write_bytes(self.body(user_name="otheruser"))
+        with FakeLaunchd(loaded=[self.label], paths={self.label: str(loaded)}) as fake, \
+                mock.patch.object(self.sup.os, "geteuid", return_value=0):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("already held by %s" % loaded, str(caught.exception))
+            self.assertFalse(self.plist.exists(), "nothing written")
+            self.assertNotIn("bootout", [c[0] for c in fake.state["calls"]])
+
+    def test_a_refused_round_does_not_refuse_the_jobs_later_answer(self):
+        answers = iter([(None, "foreign-user: not the job's pid"), ({"service": {"id": "example-agent",
+                                                                              "instance": "default"}}, None)])
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0), \
+                mock.patch.object(self.sup, "_read_job_well_known", side_effect=lambda *a: next(answers)), \
+                mock.patch.object(self.sup.time, "sleep"):
+            doc = fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                     service_id="example-agent", timeout=5, domain="system")
+        self.assertEqual(doc["service"]["id"], "example-agent")
 
     def test_the_system_domain_is_macos_only_and_its_folder_ignores_case(self):
         with mock.patch.object(self.sup.sys, "platform", "linux"):
@@ -747,18 +792,40 @@ class LaunchdSystemDomainTests(unittest.TestCase):
         port = self.web.server.server_address[1]
         hidden = po.Owner(po.UNKNOWN, None, None, "sysctl", po.TABLE_RESTRICTED + ": probe")
         listening = "p%d\nn127.0.0.1:%d\n" % (os.getpid(), port)
-        with mock.patch.object(po, "server_end", return_value=hidden), mock.patch.object(po, "_run", return_value=listening):
-            doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid())
+        with mock.patch.object(po, "server_end", return_value=hidden), mock.patch.object(po, "_run", return_value=listening), \
+                mock.patch.object(self.sup, "_pid_uid", return_value=os.getuid()):
+            doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid(), os.getuid())
         self.assertEqual((doc or {}).get("service", {}).get("id"), "example-agent", why)
         wildcard = "p%d\nn*:%d\n" % (os.getpid(), port)
         for out in ("", wildcard):
             with self.subTest(lsof=out), mock.patch.object(po, "server_end", return_value=hidden), \
                     mock.patch.object(po, "_run", return_value=out):
-                doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid())
+                doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid(), os.getuid())
             self.assertIsNone(doc, "a wildcard bind is not vouched for (RT-3)")
             self.assertTrue(why.startswith(po.TABLE_RESTRICTED), why)
         with self.assertRaises(fs.ServiceError):
-            self.sup._JobConnection("127.0.0.1", port, None, 1.0)
+            self.sup._JobConnection("127.0.0.1", port, None, 1.0, os.getuid())
+        with self.assertRaises(fs.ServiceError):
+            self.sup._JobConnection("127.0.0.1", port, os.getpid(), 1.0)
+
+    @unittest.skipUnless(sys.platform == "darwin", "the socket table names the pid on macOS")
+    def test_the_jobs_pid_must_run_as_its_user_name(self):
+        # DEC-0161 condition 2: the job's pid accepted the connection, but runs as another uid than UserName's.
+        doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid(), os.getuid() + 1)
+        self.assertIsNone(doc)
+        self.assertIn("runs as uid %d, not its UserName's uid %d" % (os.getuid(), os.getuid() + 1), why)
+        doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid(), os.getuid())
+        self.assertEqual((doc or {}).get("service", {}).get("id"), "example-agent", why)
+
+    def test_a_user_name_that_is_no_account_is_refused_before_anything(self):
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0), \
+                mock.patch.object(self.sup, "_account_uid", return_value=None):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("is no account of this Mac", str(caught.exception))
+            self.assertFalse(self.plist.exists(), "nothing written")
+            self.assertNotIn("bootout", [c[0] for c in fake.state["calls"]])
 
     def test_a_gui_bootstrap_without_a_session_names_the_system_domain(self):
         error = "Bootstrap failed: 125: Domain does not support specified action"

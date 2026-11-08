@@ -423,37 +423,69 @@ def _job_listens(pid: int, port: int) -> bool:
     return any(host == "127.0.0.1" and p == port for host, p in _po.parse_lsof_listeners(out))  # exact bind, as RT-3
 
 
-class _JobConnection(http.client.HTTPConnection):
-    """A connection whose server end must be launchd's job `job_pid` (a LaunchDaemon runs as its UserName, so the
-    installer, root, reads it as another account's: the job's own pid is the proof, FAA-278)."""
+def _account_uid(user_name: str) -> Optional[int]:
+    """The uid of account ``user_name`` on this machine, or None when it has no such account."""
+    try:
+        import pwd
+        return pwd.getpwnam(user_name).pw_uid
+    except (ImportError, KeyError):
+        return None
 
-    def __init__(self, host: str, port: int, job_pid: int, timeout: float) -> None:
+
+def _pid_uid(pid: int) -> Optional[int]:
+    """The uid process ``pid`` runs as (``ps -o uid= -p``), or None when it is gone or cannot be read."""
+    try:
+        return _po.parse_ps_uid(_po._run([_po.PS, "-o", "uid=", "-p", str(pid)]))
+    except _po.TableUnreadable:
+        return None
+
+
+def _positive(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+class _JobConnection(http.client.HTTPConnection):
+    """A connection whose server end must be launchd's job `job_pid`, running as `job_uid`, its UserName's uid (a
+    LaunchDaemon runs as its UserName, so the installer, root, reads it as another account's: the job's own pid and
+    uid are the proof, FAA-278; contract DEC-0161, RT-3 extended to launchd's system domain)."""
+
+    def __init__(self, host: str, port: int, job_pid: int, timeout: float, job_uid: Optional[int] = None) -> None:
         if not isinstance(job_pid, int) or isinstance(job_pid, bool) or job_pid <= 1:
             raise ServiceError("A LaunchDaemon's answer is read only on its job's pid, a positive number.")
+        if not _positive(job_uid):
+            raise ServiceError("A LaunchDaemon's answer is read only from its UserName's uid, a number.")
         super().__init__(host, port, timeout=timeout)
         self.job_pid = job_pid
+        self.job_uid = job_uid
 
     def connect(self) -> None:
         super().connect()
         owner = _po.server_end(self.sock)
-        if owner.pid == self.job_pid:
-            return
-        if (owner.kind == _po.UNKNOWN and (owner.reason or "").startswith(_po.TABLE_RESTRICTED)
-                and _job_listens(self.job_pid, self.port)):
-            return
+        proved = owner.pid == self.job_pid or (
+            owner.kind == _po.UNKNOWN and (owner.reason or "").startswith(_po.TABLE_RESTRICTED)
+            and _job_listens(self.job_pid, self.port))
+        if proved:
+            runs_as = _pid_uid(self.job_pid)
+            if runs_as == self.job_uid:
+                return
+            self.close()
+            raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the LaunchDaemon's pid %d runs as uid %s, not its UserName's "
+                                      "uid %d; nothing was sent" % (self.job_pid, runs_as, self.job_uid), owner)
         self.close()
-        raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the server on port %d is not the LaunchDaemon's pid %d (%s); "
-                                  "nothing was sent" % (self.port, self.job_pid, owner.reason or owner.kind), owner)
+        raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the server on port %d is not the LaunchDaemon's pid %d (%s): "
+                                  "another process holds the port, or the job's program starts the server as a child "
+                                  "(start it with exec); nothing was sent"
+                                  % (self.port, self.job_pid, owner.reason or owner.kind), owner)
 
 
-def _read_job_well_known(origin: str, job_pid: int,
+def _read_job_well_known(origin: str, job_pid: int, job_uid: Optional[int] = None,
                          timeout: float = 2.0) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
-    """As `_read_well_known`, for a LaunchDaemon: a loopback origin is read only when launchd's job `job_pid` accepted
-    the connection; (the answer or None, why the listener was refused or None)."""
+    """As `_read_well_known`, for a LaunchDaemon: a loopback origin is read only when launchd's job `job_pid`, running as
+    `job_uid`, accepted the connection; (the answer or None, why the listener was refused or None)."""
     parts = urllib.parse.urlsplit(origin)
     if not (parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port):
         return _read_well_known(origin, timeout)
-    conn = _JobConnection("127.0.0.1", parts.port, job_pid, timeout)
+    conn = _JobConnection("127.0.0.1", parts.port, job_pid, timeout, job_uid)
     try:
         conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % parts.port})
         response = conn.getresponse()
@@ -492,6 +524,37 @@ def launchd_override(label: str, domain: Optional[str] = None) -> Optional[str]:
     return None
 
 
+_PATH_ROW = re.compile(r"^\s*path\s*=\s*(.+?)\s*\Z")
+
+
+def _plist_field(path: Path, key: str) -> Optional[str]:
+    try:
+        value = plistlib.loads(Path(path).read_bytes()).get(key)
+    except Exception:  # unreadable or not a plist: it claims nothing
+        return None
+    return value if isinstance(value, str) else None
+
+
+def _label_holders(label: str, plist_path: Path) -> List[Path]:
+    """Other plists that hold launchd label ``label`` in the system domain (FAA-278): the plist launchd loaded the job
+    from, when it is not ``plist_path``, and any plist of that label beside ``plist_path``. Reading needs no root."""
+    own = os.path.realpath(str(plist_path))
+    found: List[Path] = []
+    result = _launchctl("print", "system/%s" % label)
+    if result.returncode == 0:
+        for line in (result.stdout or "").splitlines():
+            hit = _PATH_ROW.match(line)
+            if hit:
+                found.append(Path(hit.group(1)))
+                break
+    try:
+        siblings = sorted(Path(plist_path).parent.glob("*.plist"))
+    except OSError:
+        siblings = []
+    found += [p for p in siblings if _plist_field(p, "Label") == label]
+    return [p for p in dict.fromkeys(found) if os.path.realpath(str(p)) != own]
+
+
 def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin: str,
                     service_id: str, instance: str = "default", timeout: float = 40.0,
                     force_enable: bool = False, domain: Optional[str] = None) -> Dict[str, Any]:
@@ -517,15 +580,24 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             named = plistlib.loads(plist_bytes).get("UserName")
         except Exception:  # a plist that does not parse fails plutil -lint below
             named = None
+        if named:
+            holders = _label_holders(label, plist_path)
+            if holders:
+                owner = _plist_field(holders[0], "UserName")
+                raise ServiceError("Label %s is already held by %s%s: the system domain is shared by every account of this "
+                                   "Mac, so a label is the machine's and one plist holds it. Choose a label of your own (for "
+                                   "example with the account in it), or remove that LaunchDaemon as root first."
+                                   % (label, holders[0], " (%s's)" % owner if owner else ""))
         if named and plist_path.exists():
-            try:
-                installed = plistlib.loads(plist_path.read_bytes()).get("UserName")
-            except Exception:
-                installed = None
+            installed = _plist_field(plist_path, "UserName")
             if installed and installed != named:
                 raise ServiceError("%s is %s's LaunchDaemon: the system domain is shared by every account of this Mac, so "
                                    "a label is the machine's. Choose a label of your own (for example with the account in "
                                    "it), or uninstall that one as root first." % (plist_path, installed))
+        job_uid = _account_uid(named) if named else None
+        if named and job_uid is None:
+            raise ServiceError("UserName %s is no account of this Mac: launchd would not start the job. Name the account "
+                               "whose Fabric and agents call the service." % named)
         if not named:
             raise ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's "
                                "home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with "
@@ -563,7 +635,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         foreign = None
         while time.time() < deadline:
             job = launchd_pid(label, "system")
-            doc, why = _read_job_well_known(origin, job) if job else (None, None)
+            doc, why = _read_job_well_known(origin, job, job_uid) if job else (None, None)
             foreign = why or foreign  # the last refusal stays the reason while launchd shows no pid
             if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
                 return doc
@@ -572,7 +644,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             raise ServiceError("%s could not be proved this LaunchDaemon's: %s; the job's pid did not show the listener: "
                                "start the server with exec (no wrapper child), or read the job's log." % (origin, foreign))
         if foreign:
-            raise ServiceError("%s is not this LaunchDaemon's: %s; another process holds the port." % (origin, foreign))
+            raise ServiceError("%s is not this LaunchDaemon's: %s." % (origin, foreign))
         raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))
     foreign = vouch = None
     while time.time() < deadline:
