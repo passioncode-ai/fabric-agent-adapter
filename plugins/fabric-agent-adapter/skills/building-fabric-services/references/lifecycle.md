@@ -160,9 +160,10 @@ it at boot, before any login, as the account its `UserName` names.
   again as root. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
   `bootout` + `disable system/<label>`, start is `enable` + `bootstrap system <plist>`, restart is
   `kickstart -k system/<label>`; a host or broker without root reports the job read-only.
-- **Status and pid read without root**: `launchd_loaded(label, "system")`, `launchd_pid(label, "system")` and
-  `launchd_override(label, "system")` (Node: the `domain: 'system'` option) ask `launchctl print system/<label>`, which
-  any account may read; the probe's `lifecycle.one-copy` reads the domain from the descriptor's plist the same way.
+- **Status and pid read without root**: `launchd_loaded(label, "system")` and `launchd_pid(label, "system")` ask
+  `launchctl print system/<label>`, and `launchd_override(label, "system")` asks `launchctl print-disabled system`
+  (Node: the `domain: 'system'` option), both of which any account may read; the probe's `lifecycle.one-copy` reads the
+  domain from the descriptor's plist the same way.
 - **The answer the installer waits for**: root reads the service's listener as another account's, so the installer takes
   the job's pid from `launchctl print system/<label>` and reads the token-free well-known document only on a connection
   that pid accepted, while the pid runs as the `UserName`'s uid (`ps`) and listens on exactly `127.0.0.1` (`lsof -p`);
