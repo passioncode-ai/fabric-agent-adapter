@@ -54,8 +54,8 @@ test('FAA-122: a value nested too deep names its place, as the Python twin does'
 });
 
 test('warn is stored as warning, and a wrong level is still refused (FAA-276)', () => {
-  assert.equal(k.makeEvent(1, '2026-11-07T20:00:00Z', 'job.failed', 'warn', 'The weekly report failed to send.').level, 'warning');
+  assert.equal(k.makeEvent(1, '2026-11-07T20:00:00Z', 'job.degraded', 'warn', 'The weekly report fell back to yesterday\'s data.').level, 'warning');
   for (const bad of ['warnings', 'WARN', 'fatal', null, ['warn'], 'constructor', 'toString']) {
-    assert.throws(() => k.makeEvent(1, '2026-11-07T20:00:00Z', 'job.failed', bad, 'The weekly report failed to send.'), /level must be one of/);
+    assert.throws(() => k.makeEvent(1, '2026-11-07T20:00:00Z', 'job.degraded', bad, 'The weekly report fell back to yesterday\'s data.'), /level must be one of/);
   }
 });

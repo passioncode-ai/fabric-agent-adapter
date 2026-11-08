@@ -2,8 +2,9 @@
 
 **Load this when you are about to build, or rebuild, an agent that talks with people on a channel**: a support bot, a
 sales or lead desk, a community or group assistant, a mail inbox, store-review replies, partner or ads direct messages.
-Copy the prompt below into the coding agent that will build it, fill in the brief, and let it build the agent end to
-end. The prompt is the recipe; the pages it links hold the rules in full:
+When the agents database names a template for this kind of agent, build from it and read this prompt beside it;
+otherwise copy the prompt below into the coding agent that will build it, fill in the brief, and let it build the agent
+end to end. Either way the agent carries the first-release parts this prompt names. The prompt is the recipe; the pages it links hold the rules in full:
 [agents that answer people](agents-that-answer-people.md), the channel-agent standard in
 [practices](practices.md#agents-on-a-channel-people-write-to), [models and providers](models-and-providers.md),
 [orchestration and learning](orchestration-and-learning.md), [resilience and autonomy](resilience-and-autonomy.md) and

@@ -49,9 +49,8 @@ and say in the report which skill was missing.
 
 No file is created until every row has an answer. An answer of "later" fails the grill.
 
-Before its design questions, consult the [agents database](references/agents-database.md): `agents-db.consult` on the
-board (or, with a grant, its scan tool over the source projects), and build from the template it names. An agent that
-answers people reads it beside references/communication-agent-template.md, whose first-release parts stand either way.
+Once the grill names the capability and its consumer, consult the [agents database](references/agents-database.md): `agents-db.consult` on the
+board (or, with a grant, its scan tool over the source projects), and build from the template it names.
 
 | Question | The gate |
 |---|---|
@@ -68,7 +67,7 @@ answers people reads it beside references/communication-agent-template.md, whose
 | **Who pays?** | one key per agent and context with its own ceiling (USD 100 a month by default, more only where the operator names it), from the estate's key manager, read from the environment; checked before every call, the agent's own stop under the key's limit; a personal key never pays for an organization |
 | **How does it learn?** | decisions recorded with reasons, one trace per turn, every failure a planted fixture first, history replayed, learnings proposed and never self-approved (references/orchestration-and-learning.md) |
 | **Text for people?** | if it writes anything a person reads (a reply, a message, a post, a report, a UI string), its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in new output, from the first commit (the resilience reference, *Text for people*) |
-| **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it starts from references/communication-agent-template.md and carries from its first release the turn record and the daily `support.quality_daily` report, the lane table with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, false-state gates and a checker that sees the material first, numbers and account state from tools, the live tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never counted or judged as answers, a commitments ledger, a knowledge client that reads the service's `answer` flag, a gap queue and a feed re-read on a new event kind (references/agents-that-answer-people.md) |
+| **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it starts from the agents database's template when one is named, read beside references/communication-agent-template.md, else from that template prompt, and either way carries from its first release the turn record and the daily `support.quality_daily` report, the lane table with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, false-state gates and a checker that sees the material first, numbers and account state from tools, the live tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never counted or judged as answers, a commitments ledger, a knowledge client that reads the service's `answer` flag, a gap queue and a feed re-read on a new event kind (references/agents-that-answer-people.md) |
 
 ## Step 1: the knowledge intake
 
@@ -241,7 +240,7 @@ file and a test per line, or `NOT_RUN` where the agent has no such stage.
 Report: capability, consumer, profile with the step-0 grill answers; the knowledge pack
 and which traps became fixtures; created files; contract version and commit; the gate
 table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`; remaining placeholders; the
-operator channel answer (step 6); the template it was built from (id and version, or none); and the exact next command. Never summarize the outcome as
+operator channel answer (step 6); the template it was built from (the database's id and version, the communication template prompt, or none); and the exact next command. Never summarize the outcome as
 "Fabric-compatible" unless every required admission gate passed against the real provider.
 
 ## Agent pages open only in Fabric Dashboards

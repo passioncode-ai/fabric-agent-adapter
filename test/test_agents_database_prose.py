@@ -31,9 +31,9 @@ class AgentsDatabase(unittest.TestCase):
 
     def test_each_skill_asks_at_its_step(self):
         hooks = {
-            "creating-fabric-agents": ("Before its design questions, consult the [agents database]",
-                                       "reads it beside references/communication-agent-template.md",
-                                       "the template it was built from (id and version, or none)"),
+            "creating-fabric-agents": ("Once the grill names the capability and its consumer, consult the [agents database]",
+                                       "starts from the agents database's template when one is named, read beside references/communication-agent-template.md",
+                                       "the template it was built from (the database's id and version, the communication template prompt, or none)"),
             "adapting-projects-to-fabric": ("Before scaffolding, ask the [agents database](references/agents-database.md) "
                                             "for an audit of the project (`agents-db.audit`)",
                                             "the agents-database audit: its request id"),

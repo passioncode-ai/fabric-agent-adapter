@@ -526,8 +526,9 @@ def _child_line(child: "subprocess.Popen[bytes]", deadline: float) -> Optional[b
 
 def _child_listener_seen(rows_of) -> Optional[bool]:
     """Whether the table shows a listener of a child process of this one: False when it does not (the table shows
-    this process alone, FAA-267), None when no child could be started or did not answer within TIMEOUT_SECONDS (a
-    frozen or embedded host has no interpreter to start). The calibration trusts only True."""
+    this process alone, FAA-267), None when no child could be started (a frozen or embedded host has no interpreter to
+    start), or it gave no port line within TIMEOUT_SECONDS (silence, a partial or non-numeric line, an early exit, a
+    pipe that cannot be read). The calibration trusts only True."""
     if not sys.executable or getattr(sys, "frozen", False):
         return None
     try:

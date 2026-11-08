@@ -254,7 +254,7 @@
       "request": "Adapt our existing reviews bot to Fabric.",
       "expected": [
         "before scaffolding, asks the agents database for an audit of the project (agents-db.audit)",
-        "carries the audit's optimize proposals into the adaptation plan instead of applying them silently",
+        "when the audit has come, carries its optimize proposals into the adaptation plan instead of applying them silently; when it has not, goes ahead and says so in the report",
         "puts no person's or client's name, user content, key or private path into what it sends"
       ]
     }

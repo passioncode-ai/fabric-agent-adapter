@@ -11,8 +11,10 @@ facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_
 - **The agents database in the four skills** (FAA-275, requested on the board by its owner): one shared reference,
   `references/agents-database.md` (byte for byte in every skill), names its three board capabilities
   (`agents-db.consult`, `agents-db.audit`, `agents-db.contribute`), what a success case is, and where an agent built
-  from a template records it (`provenance.template`, in the agent's README until the contract decides). Each skill asks
-  at its own step: creating-fabric-agents consults before the grill's design questions and names the template in its
+  from a template records it (`provenance.template`, in the agent's README until the contract decides). An agent that
+  answers people starts from the database's template when one is named, read beside the communication template
+  prompt, else from that prompt; its first-release parts stand either way. Each skill asks
+  at its own step: creating-fabric-agents consults once the grill names the capability and its consumer and names the template in its
   report, adapting-projects-to-fabric asks for an audit before scaffolding, building-fabric-services contributes a
   release's measured wins, working-with-fabric a retro's. One scenario eval per skill.
 

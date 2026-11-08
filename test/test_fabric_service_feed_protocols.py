@@ -113,11 +113,11 @@ class FeedData(unittest.TestCase):
         temp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, temp, True)
         log = fs.JsonlEventLog(temp / "events.jsonl")
-        log.append("job.failed", "warn", "The weekly report failed to send.")
+        log.append("job.degraded", "warn", "The weekly report fell back to yesterday's data.")
         self.assertEqual(log.fetch(None, 10)[0]["level"], "warning")
         for bad in ("warnings", "WARN", "fatal", None, ["warn"]):
             with self.subTest(level=bad), self.assertRaises(fs.ServiceError):
-                fs.make_event(1, "2026-11-07T20:00:00Z", "job.failed", bad, "The weekly report failed to send.")
+                fs.make_event(1, "2026-11-07T20:00:00Z", "job.degraded", bad, "The weekly report fell back to yesterday's data.")
 
 
 class ProbeRules(unittest.TestCase):
