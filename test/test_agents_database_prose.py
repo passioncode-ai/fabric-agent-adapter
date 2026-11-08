@@ -32,10 +32,12 @@ class AgentsDatabase(unittest.TestCase):
     def test_each_skill_asks_at_its_step(self):
         hooks = {
             "creating-fabric-agents": ("Before its design questions, consult the [agents database]",
+                                       "reads it beside references/communication-agent-template.md",
                                        "the template it was built from (id and version, or none)"),
             "adapting-projects-to-fabric": ("Before scaffolding, ask the [agents database](references/agents-database.md) "
-                                            "for an audit of the project (`agents-db.audit`)",),
-            "building-fabric-services": ("Each release's measured wins: [agents database](references/agents-database.md)",),
+                                            "for an audit of the project (`agents-db.audit`)",
+                                            "the agents-database audit: its request id"),
+            "building-fabric-services": ("a release's measured wins sent to the [agents database](references/agents-database.md)",),
             "working-with-fabric": ("(measured wins: [agents database](references/agents-database.md))",),
         }
         for name, needles in hooks.items():

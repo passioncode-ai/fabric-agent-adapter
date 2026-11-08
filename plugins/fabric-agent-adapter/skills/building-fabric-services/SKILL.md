@@ -225,7 +225,7 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
 3. Uninstall: `launchd_uninstall` (waits for the unload, removes the plist, resets the
    override; `purge=True` removes data only when the operator asks), `remove_descriptor`.
 4. After an upgrade, `prune_releases(releases_dir, current=…)` keeps the running release
-   and the one before it. Each release's measured wins: [agents database](references/agents-database.md).
+   and the one before it.
 
 On Linux the supervisor is a systemd user unit (`systemd_unit` + `systemd_install`), on
 Windows a per-user Scheduled Task (`task_xml` + `task_install`); the Node kit has the same
@@ -438,7 +438,8 @@ this estate needs.
 
 Report: the `id`, port and surfaces with the Step 0 answers; files created or changed;
 the probe table verbatim with every `NOT_RUN` explained; the lock and kill-9 results
-with pids; and the one next command. Never call a service conformant while the probe
+with pids; a release's measured wins sent to the [agents database](references/agents-database.md); and the one next
+command. Never call a service conformant while the probe
 reports a `FAIL`.
 
 ## Agent pages open only in Fabric Dashboards
@@ -455,7 +456,7 @@ answer or a notification, `<tool> dashboard`, a completion message, a page the a
    reported, never replaced by HTTP.
 5. Links carry no token or login code: the host signs in.
 
-Run `scripts/check_dashboard_link.py` (from this skill's own directory; it is not copied into the project) on an
+Run `scripts/check_dashboard_link.py` (from this skill's directory, never copied into the project) on an
 action before it is printed or opened, and have the project's checks run it for every completion and notification
 renderer. The generated `AGENTS.md` carries the rule as its dashboard
 rule block; [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case. The

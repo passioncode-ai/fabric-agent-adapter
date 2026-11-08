@@ -684,7 +684,7 @@
       "request": "We just released 2.3.0 of our service; the median answer time fell from 1.8 s to 0.9 s over last week's traffic. Wrap it up.",
       "expected": [
         "contributes the win to the agents database (agents-db.contribute) as a success case: the metric, before and after, the unit, the window and the evidence",
-        "contributes a new technical decision without a number as a decision",
+        "if the release made a new technical decision without a number, contributes it as a decision",
         "puts no person's or client's name, user content, key or private path into the contribution"
       ]
     }

@@ -265,6 +265,7 @@ Report:
 - gate table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`;
 - remaining placeholders and blockers;
 - the operator channel answer (step 8), or why it was skipped;
+- the agents-database audit: its request id and the `optimize` proposals carried, or why none was sent;
 - the exact next command or runtime action.
 
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates
