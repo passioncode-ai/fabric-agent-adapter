@@ -24,7 +24,7 @@ facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_
   chip's name, and store it as the feed's `warning`; any other level outside `info`, `notice`, `warning`, `error` is
   refused as before. A host agent that vendored 0.76.0 found its event writes refused at `warn`. A failed action still
   belongs at `error`: `warn` is stored as `warning`, never `error`.
-- **The calibration child is waited on without a ceiling and within one deadline** (FAA-273 item 13 and the `selectors`
+- **The calibration child is waited on without an fd ceiling and within one deadline** (FAA-273 item 13 and the `selectors`
   half of item 11): the Python owner check waits for the child's port with `selectors` (no FD_SETSIZE limit, so a
   process holding more than 1024 files still calibrates on sysctl) and reads it with `os.read` under the same deadline;
   a child that answered no port (a partial line, a banner) is killed at once, and one that answered a port gets only

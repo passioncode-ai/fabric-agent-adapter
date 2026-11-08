@@ -71,8 +71,9 @@ the dates API); connectors for outbound HTTP and OpenRouter (`fabric_http`, `fab
 retries, the agent's own key, a spend ceiling before every attempt, usage receipts, a fallback model;
 [connectors](plugins/fabric-agent-adapter/skills/building-fabric-services/references/connectors.md)); the draft-and-check step of a support agent as a
 [recipe](plugins/fabric-agent-adapter/skills/building-fabric-services/recipes/support-agent/README.md)
-(the whole agent starts from creating-fabric-agents'
-[communication agent template](plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/communication-agent-template.md));
+(the whole agent starts from the agents database's template when one is named, read beside creating-fabric-agents'
+[communication agent template](plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/communication-agent-template.md),
+else from that template);
 a complete `scripts/sample_service.py`; and `scripts/check_service.py`, a live probe. A service that answers
 requests other Projects post to its Project on Fabric's project board uses the board responder
 (`scripts/fabric_hub.py` and `scripts/fabric_board.py`, Node `fabric-hub.mjs` and `fabric-board.mjs`): the

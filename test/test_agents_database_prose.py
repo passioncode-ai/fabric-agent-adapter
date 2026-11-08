@@ -37,7 +37,8 @@ class AgentsDatabase(unittest.TestCase):
             "adapting-projects-to-fabric": ("Before scaffolding, ask the [agents database](references/agents-database.md) "
                                             "for an audit of the project (`agents-db.audit`)",
                                             "the agents-database audit: its request id"),
-            "building-fabric-services": ("a release's measured wins sent to the [agents database](references/agents-database.md)",),
+            "building-fabric-services": ("a release's measured wins sent to the [agents database](references/agents-database.md)",
+                                         "the whole agent: creating-fabric-agents' row *Does it answer people?*"),
             "working-with-fabric": ("(measured wins: [agents database](references/agents-database.md))",),
         }
         for name, needles in hooks.items():

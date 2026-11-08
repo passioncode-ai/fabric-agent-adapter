@@ -23,7 +23,8 @@ an audit names its subject, the agent's Project id or its repository's remote, n
 a contribution carries one success case or one decision (below). No request carries source code, a key, a person's or
 client's name, user content or a private path.
 
-The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
+Here this reference overrides the board rule that asks the person when the directory lists no Project: the agent
+asks no one, and uses no Project id held from an earlier thread. The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
 reachable, a board that does not serve `com.directory`, no Project listed under the capability, or a receipt that says
 `noResponder`, note the request id (or that none could be sent), go on without a template or an audit, and say so in
 the report; a reply that comes later is read as data at the next step. A step that would use the reply (building from
@@ -32,7 +33,7 @@ the template, carrying the audit's proposals) goes ahead without it when it has 
 ## A success case
 
 A measured win: the metric, the value before and after, the unit, the window it was read over, and the evidence (a
-path at a commit, an eval report). A decision without a number is contributed as a decision.
+repository-relative path at a commit, an eval report). A decision without a number is contributed as a decision.
 
 ## Where each skill asks
 
