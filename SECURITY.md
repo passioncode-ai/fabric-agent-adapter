@@ -54,7 +54,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   per new connection (Node). On macOS the Python reader calibrates once per process with a
   short-lived child of its own interpreter listening on a random `127.0.0.1` port; when the
   table is restricted (macOS 27.2, FAA-267) the launchd installers also run `/usr/sbin/lsof
-  -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. That vouch shows the job listens on the port, not that it accepted
+  -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. A LaunchDaemon's root installer also reads, never
+  changes, every plist in `/Library/LaunchDaemons` (to find another holder of its label, `plutil -convert xml1` for a
+  binary one in Node), `launchctl print system/<label>` and the `UserName`'s uid (`pwd`, or `id -u` in Node). That vouch shows the job listens on the port, not that it accepted
   the connection (a more specific bind by root over a wildcard job would pass; contract CT-261). A token-free loopback door is not yet protected against
   another account's process (HA-3, FAA-227). An MCP client (Claude Code, Codex) sends the
   token it was registered with on every later connection without this check (the contract's

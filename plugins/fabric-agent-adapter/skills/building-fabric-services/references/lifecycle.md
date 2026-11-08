@@ -157,7 +157,8 @@ it at boot, before any login, as the account its `UserName` names.
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
   `launchctl bootout system/<label>`, removing the plist and `launchctl enable system/<label>`, as `launchd_uninstall`
   does). `purge` is refused: the data belongs to the `UserName`, so remove it as that user. Upgrade is the same install
-  again as root. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
+  again as root, so a descriptor's `commands.update` for a LaunchDaemon runs as root, and a host without root reports it
+  as the operator's. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
   `bootout` + `disable system/<label>`, start is `enable` + `bootstrap system <plist>`, restart is
   `kickstart -k system/<label>`; a host or broker without root reports the job read-only.
 - **Status and pid read without root**: `launchd_loaded(label, "system")` and `launchd_pid(label, "system")` ask
