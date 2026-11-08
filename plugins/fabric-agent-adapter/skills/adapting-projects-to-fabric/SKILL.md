@@ -5,7 +5,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.76.0"
+  version: "0.77.0"
   contract-version: "0.1.0"
   contract-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
 ---
@@ -92,6 +92,8 @@ is unavailable, continue only through local structure and mark exact schema vali
 
 ### 3. Scaffold the provider bundle
 
+Before scaffolding, ask the [agents database](references/agents-database.md) for an audit of the project
+(`agents-db.audit`) and carry its `optimize` proposals into the completion report.
 Load [provider bundle](references/provider-bundle.md) before creating or mapping files.
 Then run one explicit profile command:
 
@@ -263,6 +265,7 @@ Report:
 - gate table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`;
 - remaining placeholders and blockers;
 - the operator channel answer (step 8), or why it was skipped;
+- the agents-database audit: its request id and the `optimize` proposals carried, that none had come, or why none was sent;
 - the exact next command or runtime action.
 
 Never summarize the outcome as “Fabric-compatible” unless all required admission gates

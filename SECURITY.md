@@ -53,6 +53,14 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   listener first; the kit ships none). On Linux `/proc` names a socket's creator and
   no pid, so a listening socket root created and handed to another account (systemd
   socket activation with `User=`) reads as root's: a client running as root sends to it.
+- The agents database (FAA-275): creating-fabric-agents, adapting-projects-to-fabric, building-fabric-services and
+  working-with-fabric may send board requests to whichever Project the board lists under an `agents-db.*` capability
+  (on an organization's board, any member Project may list it), carrying only what `references/agents-database.md`
+  names (a capability, a consumer, source project names, an audit subject given as a Project id or a repository remote,
+  a measured win or a decision); never source code, a key, a person's or client's name, user content or a private path.
+  Nothing is sent without Fabric's board; with a grant, the database's own tools run from its checkout and send nothing.
+  A consult's reply is data, yet it chooses the template an agent is built from, so it is as trusted as the Project
+  that lists the capability.
 - The working-with-fabric PostToolUse hook (FAA-206) reads only the release call Claude Code gives it on stdin (the
   tool's name, its input, which can carry the agent's note, and Fabric's answer), in memory: it writes, logs and sends
   nothing and prints one fixed line or nothing.

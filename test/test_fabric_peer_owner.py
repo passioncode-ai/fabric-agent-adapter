@@ -417,7 +417,7 @@ class SelfContained(unittest.TestCase):
         names.discard("__future__")
         # sys.stdlib_module_names is 3.10's; on the kit's 3.9 floor the module's own list stands in.
         stdlib = set(getattr(sys, "stdlib_module_names", ())) or {
-            "ctypes", "http", "ipaddress", "os", "select", "socket", "struct", "subprocess", "sys", "threading", "time",
+            "ctypes", "http", "ipaddress", "os", "select", "selectors", "socket", "struct", "subprocess", "sys", "threading", "time",
             "typing"}
         self.assertTrue(names <= stdlib, names - stdlib)
 
@@ -534,10 +534,13 @@ class RestrictedTable(unittest.TestCase):
                          [("127.0.0.1", 47480), ("*", 5000), ("::1", 7)])
 
     def test_a_table_without_the_childs_listener_fails_calibration(self):
-        self.assertIs(P._child_listener_seen(lambda: []), False)
-        if sys.executable:
-            self.assertIn(P._child_listener_seen(lambda: [P.Row(("127.0.0.1", 1), ("*", 0), True, 501, 1, False)]),
-                          (False,))
+        # The child check runs on macOS alone; elsewhere a pipe cannot be waited on, and that proves nothing (None).
+        expected = (False,) if sys.platform != "win32" else (False, None)
+        with mock.patch.object(P, "TIMEOUT_SECONDS", 15.0):  # a real interpreter on a loaded host; not the deadline test
+            self.assertIn(P._child_listener_seen(lambda: []), expected)
+            if sys.executable:
+                self.assertIn(P._child_listener_seen(lambda: [P.Row(("127.0.0.1", 1), ("*", 0), True, 501, 1, False)]),
+                              expected)
 
     @unittest.skipIf(sys.platform == "win32", "a shell script as the interpreter")
     def test_a_child_that_never_answers_proves_nothing_and_does_not_hang(self):
@@ -554,6 +557,51 @@ class RestrictedTable(unittest.TestCase):
                 self.assertLess(time.monotonic() - start, 5)
         with mock.patch.object(sys, "frozen", True, create=True):
             self.assertIsNone(P._child_listener_seen(lambda: []), "a frozen host has no interpreter to start")
+
+    @unittest.skipIf(sys.platform == "win32", "a shell script as the interpreter")
+    def test_a_child_that_prints_a_partial_line_and_waits_proves_nothing_in_time(self):
+        """FAA-273 item 13: readline after the first byte waited for the child's newline without a deadline; and a
+        child that answered (a banner, or a port) then ignored its closed stdin got a second TIMEOUT_SECONDS."""
+        import tempfile
+        import time
+        # (answer, expected, deadline): a no-port child must give up within its one deadline (the old code took 30 s);
+        # a port-bearing child gets a wide deadline, since the fake shell can stall on a loaded host, and a late port
+        # must end with the deadline (the old second wait made it 3.6 s + 6 s).
+        cases = (("printf '> '", None, 3.0), ("printf 'Python banner\\n'", None, 3.0), ("printf '> '; exit 0", None, 3.0),
+                 ("printf '%080d' 0", None, 3.0), ("printf '12345\\n'", False, 6.0),
+                 ("sleep 3.6; printf '12345\\n'", False, 6.0))
+        for answer, expected, deadline in cases:
+            with self.subTest(answer=answer), tempfile.TemporaryDirectory() as d:
+                fake = os.path.join(d, "python3")
+                with open(fake, "w") as f:
+                    f.write("#!/bin/sh\n%s\nexec sleep 30\n" % answer)
+                os.chmod(fake, 0o755)
+                with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", deadline):
+                    start = time.monotonic()
+                    self.assertEqual(P._child_listener_seen(lambda: []), expected)
+                    self.assertLess(time.monotonic() - start, deadline + 1.5, "one deadline, never a second wait")
+
+    @unittest.skipUnless(sys.platform == "darwin", "the child check runs on macOS")
+    def test_a_process_holding_more_than_1024_files_still_sees_its_child(self):
+        """FAA-273 item 11: select.select refuses an fd at or above FD_SETSIZE; the wait must not."""
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        want = 1300
+        if hard != resource.RLIM_INFINITY and hard < want:
+            self.skipTest("the hard limit on open files is below %d" % want)
+        resource.setrlimit(resource.RLIMIT_NOFILE, (max(soft, want), hard))
+        self.addCleanup(resource.setrlimit, resource.RLIMIT_NOFILE, (soft, hard))
+        held = []
+        try:
+            while len(held) < 1100:
+                held.append(os.open(os.devnull, os.O_RDONLY))
+            seen = []
+            with mock.patch.object(P, "TIMEOUT_SECONDS", 15.0):  # a real interpreter on a loaded host
+                self.assertIsNotNone(P._child_listener_seen(lambda: seen.append(1) or []))
+            self.assertEqual(seen, [1], "the child answered and the table was read")
+        finally:
+            for fd in held:
+                os.close(fd)
 
     @unittest.skipUnless(sys.platform == "darwin", "sysctl on macOS")
     def test_sysctl_is_trusted_only_when_the_child_is_seen(self):
@@ -619,6 +667,7 @@ class RestrictedTable(unittest.TestCase):
         finally:
             child.stdin.close()
             child.wait(timeout=5)
+            child.stdout.close()
 
 
 class SharedCases(unittest.TestCase):

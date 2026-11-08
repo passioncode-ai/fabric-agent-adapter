@@ -340,7 +340,8 @@ def _read_well_known(origin: str, timeout: float = 2.0,
                      vouch_pid: Optional[int] = None) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """(the well-known answer or None, why the listener was refused or None). A loopback origin is read only on a
     connection whose server end is this OS account's process (DEC-0154 HA-2): another account's, root's, or one whose
-    owner cannot be told is `foreign-user`, never this service's answer. `vouch_pid`, the pid of a launchd job this
+    owner cannot be told is never this service's answer, labelled `foreign-user`, or `table-restricted` when the socket
+    table hides other processes. `vouch_pid`, the pid of a launchd job this
     caller started, proves the listener when the socket table hides other processes (FAA-267)."""
     parts = urllib.parse.urlsplit(origin)
     if parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port:

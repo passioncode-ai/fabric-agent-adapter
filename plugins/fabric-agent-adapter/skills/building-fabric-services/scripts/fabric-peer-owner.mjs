@@ -45,7 +45,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 
-export const PEER_OWNER_VERSION = '1.1.0+kit.2'; // the Python twin's, Observatory's 1.1.0 with the kit's differences
+export const PEER_OWNER_VERSION = '1.1.0+kit.3'; // the Python twin's, Observatory's 1.1.0 with the kit's differences
 export const THIS_ACCOUNT = 'this-account';
 export const ANOTHER_ACCOUNT = 'another-account';
 export const SYSTEM = 'system';

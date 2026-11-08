@@ -248,6 +248,15 @@
         "does not add an owner field to the descriptor",
         "runs check_service.py, reads descriptor.source-repository and well-known.connections as PASS, and treats a NOT_RUN on either as not passing"
       ]
+    },
+    {
+      "id": "audit-against-the-agents-database",
+      "request": "Adapt our existing reviews bot to Fabric.",
+      "expected": [
+        "before scaffolding, asks the agents database for an audit of the project (agents-db.audit) from a folder that is already a Fabric Project (elsewhere it skips the ask and says so)",
+        "when the audit has come, carries its optimize proposals into the completion report instead of applying them silently; when it has not, goes ahead and says so in the report",
+        "puts no person's or client's name, user content, key or private path into what it sends"
+      ]
     }
   ]
 }

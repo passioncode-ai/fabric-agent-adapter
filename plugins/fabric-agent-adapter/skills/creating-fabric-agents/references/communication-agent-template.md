@@ -2,8 +2,9 @@
 
 **Load this when you are about to build, or rebuild, an agent that talks with people on a channel**: a support bot, a
 sales or lead desk, a community or group assistant, a mail inbox, store-review replies, partner or ads direct messages.
-Copy the prompt below into the coding agent that will build it, fill in the brief, and let it build the agent end to
-end. The prompt is the recipe; the pages it links hold the rules in full:
+When the agents database names a template for this kind of agent, build from it and read this prompt beside it;
+otherwise copy the prompt below into the coding agent that will build it, fill in the brief, and let it build the agent
+end to end. Either way the agent carries the first-release parts this prompt names. The prompt is the recipe; the pages it links hold the rules in full:
 [agents that answer people](agents-that-answer-people.md), the channel-agent standard in
 [practices](practices.md#agents-on-a-channel-people-write-to), [models and providers](models-and-providers.md),
 [orchestration and learning](orchestration-and-learning.md), [resilience and autonomy](resilience-and-autonomy.md) and
@@ -29,6 +30,8 @@ and data rooms (0), the contract, its pin and its doors (8), placement (0 and 8)
 assembly.md and the template's own CHANGELOG.md come with the folder; until the template format is a schema (S2, «Open for
 wave 2»; FAA-265), it lives here as one reference, and S2's operating rules apply by reference.
 
+
+When the agents database named a template, build from it and use these steps for what this prompt adds to it.
 
 1. Fill in the brief (section 0 of the prompt). Every `<...>` is a decision of the agent's owner; a field you cannot fill
    is a question for the owner before the build, not a guess.

@@ -14,7 +14,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.76.0"
+  version: "0.77.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
@@ -168,8 +168,8 @@ handler.
 Calling out: [the connectors reference](references/connectors.md) (`fabric_http` with one
 deadline, safe retries and a size cap; `fabric_openrouter` with the agent's own key, a
 spend ceiling before every attempt, receipts and a fallback). The draft-and-check step of a
-support agent on the kit: [`recipes/support-agent/`](recipes/support-agent/README.md); the whole agent starts from
-creating-fabric-agents' `references/communication-agent-template.md` (parts: `agents-that-answer-people.md`).
+support agent on the kit: [`recipes/support-agent/`](recipes/support-agent/README.md); the whole agent:
+creating-fabric-agents' `references/agents-that-answer-people.md`.
 
 Startup order is the part that goes wrong; keep it exactly:
 
@@ -217,7 +217,7 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
    claims, and a new one without `source.repository` (a rewrite warns). A preview or branch
    copy is a second **instance**, never a second id: one more service the operator sees. Verify a release with its
    own doctor or self-check before it replaces `default`; a temporary instance is uninstalled
-   (`launchd_uninstall`, `remove_descriptor`) as soon as its check is done, not left running.
+   (`launchd_uninstall`, `remove_descriptor`) once its check is done, never left running.
 2. `launchd_plist(...)` then `launchd_install(...)`: writes and lints the plist,
    `bootout` and waits for the unload, `bootstrap` with retries on the transient I/O
    error, then polls the well-known document until **this** identity answers on this OS account's listener (HA-2).
@@ -438,7 +438,8 @@ this estate needs.
 
 Report: the `id`, port and surfaces with the Step 0 answers; files created or changed;
 the probe table verbatim with every `NOT_RUN` explained; the lock and kill-9 results
-with pids; and the one next command. Never call a service conformant while the probe
+with pids; a release's measured wins sent to the [agents database](references/agents-database.md); and the one next
+command. Never call a service conformant while the probe
 reports a `FAIL`.
 
 ## Agent pages open only in Fabric Dashboards
@@ -455,7 +456,7 @@ answer or a notification, `<tool> dashboard`, a completion message, a page the a
    reported, never replaced by HTTP.
 5. Links carry no token or login code: the host signs in.
 
-Run `scripts/check_dashboard_link.py` (from this skill's own directory; it is not copied into the project) on an
+Run `scripts/check_dashboard_link.py` (from this skill's directory, never copied into the project) on an
 action before it is printed or opened, and have the project's checks run it for every completion and notification
 renderer. The generated `AGENTS.md` carries the rule as its dashboard
 rule block; [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case. The

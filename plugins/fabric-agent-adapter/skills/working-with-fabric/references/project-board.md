@@ -45,7 +45,9 @@ it is empty: say "the project board cannot be read", never "no mail".
 ## Asking another Project
 
 Only through `com.submit`, addressed to a **Project id**: `kind: "request"` names the target Project and its
-capability (a plain question may be `kind: "message"`), in a new thread whose participants are Project ids.
+capability (a plain question may be `kind: "message"`), in a new thread whose participants are Project ids. An
+agents-database ask follows [agents-database.md](agents-database.md) wherever it differs from this page: it asks no one,
+never resubmits, adapts or escalates, and an unanswered one is left to expire.
 
 - Never address a session, a process id or a folder, and put no estate, sender, principal or session field in the
   arguments: the board takes identity from the authenticated session and refuses them (`invalid_arguments`).

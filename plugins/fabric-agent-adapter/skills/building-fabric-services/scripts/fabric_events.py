@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from types import MappingProxyType
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
@@ -33,6 +34,10 @@ EVENTS_MAX_LIMIT = 200
 LEVELS = ("info", "notice", "warning", "error")
 
 
+# The dashboard kit names its chip `warn`; an event written at that name is stored at the feed's `warning` (FAA-276).
+LEVEL_ALIASES = MappingProxyType({"warn": "warning"})
+
+
 _KIND = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){0,5}\Z")
 
 
@@ -45,13 +50,15 @@ _SPAN_ID = re.compile(r"^(?!0{16}\Z)[0-9a-f]{16}\Z")
 def make_event(event_id: Any, at: str, kind: str, level: str, text: str, *, subject: Optional[Dict[str, str]] = None,
                link: Optional[str] = None, notify: bool = False, trace_id: Optional[str] = None,
                span_id: Optional[str] = None, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """One activity event: one sentence a person reads, never a machine id. `data` (DEC-0070) adds machine-readable
+    """One activity event: one sentence a person reads, never a machine id. `level` is one of `LEVELS`; `warn`, the
+    dashboard chip's name, is stored as `warning`. `data` (DEC-0070) adds machine-readable
     fields beside the sentence, `{schema, value}`, never a secret: it is refused here, so no feed carries one.
 
     An event about traced work carries its trace as a pair, `trace_id` and `span_id`
     (fabric-interop/0.1 C3.4 c); fabric_interop.trace_ids(traceparent) gives both."""
+    level = LEVEL_ALIASES.get(level, level) if isinstance(level, str) else level
     if level not in LEVELS:
-        raise ServiceError("level must be one of %s." % ", ".join(LEVELS))
+        raise ServiceError("level must be one of %s (or `warn` for `warning`)." % ", ".join(LEVELS))
     if not _KIND.match(kind):
         raise ServiceError("kind %r must be dotted lowercase." % kind)
     text = " ".join(str(text).split())

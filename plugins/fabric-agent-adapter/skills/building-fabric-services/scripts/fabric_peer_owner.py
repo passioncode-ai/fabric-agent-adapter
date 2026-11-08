@@ -1,6 +1,6 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.1.0+kit.2: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
+    peer_owner 1.1.0+kit.3: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
     DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py` at
     commit f86f0622 (passioncode-ai/project-observatory-dashboard, the same licence). It differs
     from that file in this paragraph, in `Owner` and `Row` (NamedTuples here where it has
@@ -18,7 +18,8 @@
     Python without it reads netstat on macOS and imports the module everywhere. Since kit.2 (FAA-267), on
     macOS: the sysctl calibration also requires a child process's listener, an empty netstat reads as
     `TABLE_RESTRICTED`, and a caller may vouch for a listener with a pid it started (`pid_listens`,
-    `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`).
+    `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`, `own_connection(vouch_pid=...)`); since kit.3
+    the child's port is waited on with `selectors` and read under one deadline (FAA-273).
     A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
     created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
@@ -109,7 +110,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.1.0+kit.2"  # Observatory's 1.1.0 with the kit's differences above
+PEER_OWNER_VERSION = "1.1.0+kit.3"  # Observatory's 1.1.0 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
@@ -500,10 +501,34 @@ _CHILD_LISTENER = ("import socket,sys\ns=socket.socket();s.bind(('127.0.0.1',0))
                    "print(s.getsockname()[1],flush=True);sys.stdin.read()")
 
 
+def _child_line(child: "subprocess.Popen[bytes]", deadline: float) -> Optional[bytes]:
+    """The child's first line, or None when no newline came by `deadline`. It waits with `selectors` (kqueue on
+    macOS: no FD_SETSIZE ceiling at fd 1024, which `select.select` refuses) and reads what is there, so a partial line
+    from an interpreter that then waits cannot hold the caller past the deadline (FAA-273 item 13, and the `selectors`
+    half of item 11)."""
+    import selectors  # POSIX: this reader runs on macOS alone
+    got = b""
+    try:
+        with selectors.DefaultSelector() as sel:
+            sel.register(child.stdout, selectors.EVENT_READ)
+            while b"\n" not in got and len(got) < 64:
+                left = deadline - time.monotonic()
+                if left <= 0 or not sel.select(left):
+                    return None
+                chunk = os.read(child.stdout.fileno(), 64)
+                if not chunk:
+                    return None
+                got += chunk
+    except (OSError, ValueError):
+        return None
+    return got.split(b"\n", 1)[0] if b"\n" in got else None
+
+
 def _child_listener_seen(rows_of) -> Optional[bool]:
     """Whether the table shows a listener of a child process of this one: False when it does not (the table shows
-    this process alone, FAA-267), None when no child could be started or did not answer within TIMEOUT_SECONDS (a
-    frozen or embedded host has no interpreter to start). The calibration trusts only True."""
+    this process alone, FAA-267), None when no child could be started (a frozen or embedded host has no interpreter to
+    start), or it gave no port line within TIMEOUT_SECONDS (silence, a partial or non-numeric line, an early exit, a
+    pipe that cannot be read). The calibration trusts only True."""
     if not sys.executable or getattr(sys, "frozen", False):
         return None
     try:
@@ -511,21 +536,25 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except OSError:
         return None
+    deadline = time.monotonic() + TIMEOUT_SECONDS
+    port = None
     try:
-        import select  # POSIX: this reader runs on macOS alone
-        if not select.select([child.stdout], [], [], TIMEOUT_SECONDS)[0]:
+        line = _child_line(child, deadline)
+        if line is None or not line.strip().isdigit():
             return None
-        line = child.stdout.readline().strip()
-        if not line.isdigit():
-            return None
-        port = int(line)
-        return any(r.listening and r.local == ("127.0.0.1", port) and r.pid == child.pid for r in rows_of())
-    except (TableUnreadable, OSError, struct.error, ValueError):
-        return False
+        port = int(line.strip())
+        try:
+            return any(r.listening and r.local == ("127.0.0.1", port) and r.pid == child.pid for r in rows_of())
+        except (TableUnreadable, OSError, struct.error, ValueError):
+            return False
     finally:
+        # One deadline for the whole check: a child that gave no port is killed at once, and one that did gets what is
+        # left of the deadline to exit on its closed stdin before it is killed.
         try:
             child.stdin.close()
-            child.wait(timeout=TIMEOUT_SECONDS)
+            if port is None:
+                child.kill()
+            child.wait(timeout=max(0.0, deadline - time.monotonic()))
         except (OSError, subprocess.TimeoutExpired):
             child.kill()
             child.wait()

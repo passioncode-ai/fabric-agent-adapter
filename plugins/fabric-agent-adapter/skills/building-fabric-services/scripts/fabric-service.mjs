@@ -148,6 +148,7 @@ export {
   cookieValue,
 } from './fabric-auth.mjs';
 export {
+  LEVEL_ALIASES,
   LEVELS,
   EVENTS_DEFAULT_LIMIT,
   EVENTS_MAX_LIMIT,

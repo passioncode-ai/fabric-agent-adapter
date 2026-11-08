@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.77.0 (2026-11-08)
+
+The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabric-events.mjs`, `fabric_peer_owner`
+(peer_owner `1.1.0+kit.3`) and `fabric-peer-owner.mjs` (the version line), `fabric_supervisors` (a docstring), and the
+facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_ALIASES`); guidance in all four skills.
+
+### Added
+
+- **The agents database in the four skills** (FAA-275, requested on the board by its owner): one shared reference,
+  `references/agents-database.md` (byte for byte in every skill), names its three board capabilities
+  (`agents-db.consult`, `agents-db.audit`, `agents-db.contribute`), what a success case is, and where an agent built
+  from a template records it (`provenance.template`, in the agent's README until the contract decides). An agent that
+  answers people starts from the database's template when one is named, read beside the communication template
+  prompt, else from that prompt; its first-release parts stand either way. Each skill asks
+  at its own step: creating-fabric-agents consults once the grill names the capability and its consumer and names the template in its
+  report, adapting-projects-to-fabric asks for an audit before scaffolding, building-fabric-services contributes a
+  release's measured wins, working-with-fabric a retro's. One scenario eval per skill.
+
+### Fixed
+
+- **`warn` is a level** (FAA-276): `make_event`, `makeEvent` and so Python's `JsonlEventLog.append` take `warn`, the dashboard
+  chip's name, and store it as the feed's `warning`; any other level outside `info`, `notice`, `warning`, `error` is
+  refused as before. A host agent that vendored 0.76.0 found its event writes refused at `warn`. A failed action still
+  belongs at `error`: `warn` is stored as `warning`, never `error`.
+- **The calibration child is waited on without an fd ceiling and within one deadline** (FAA-273 item 13 and the `selectors`
+  half of item 11): the Python owner check waits for the child's port with `selectors` (no FD_SETSIZE limit, so a
+  process holding more than 1024 files still calibrates on sysctl) and reads it with `os.read` under the same deadline;
+  a child that answered no port (a partial line, a banner) is killed at once, and one that answered a port gets only
+  what is left of the deadline to exit. The process's first owner check (and its lock) no longer waits past
+  `TIMEOUT_SECONDS` for the child.
+- Wording trims in building-fabric-services and working-with-fabric make room under the SKILL.md word cap; no rule
+  changes (working-with-fabric no longer says which call serves the three-minute rule).
+- `board.md` says a `table-restricted` refusal does not clear by retrying, and `connectors.md` names the reason
+  (FAA-273 item 18).
+
+### Upgrading
+
+- A service that vendored 0.76.0 kit modules re-vendors `fabric_events` (or `fabric-events.mjs`) for `warn`, and
+  `fabric_peer_owner` for the calibration deadline; a re-vendored facade (`fabric_service`, `fabric-service.mjs`)
+  needs the new `fabric_events` it imports `LEVEL_ALIASES` from. `fabric_kit.py status` names what differs.
+
 ## 0.76.0 (2026-11-07)
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `fabric-peer-owner.mjs` (peer_owner

@@ -438,7 +438,7 @@
       "trap": "the agent worked for half an hour on a claimed task without looking at Fabric again, and waited on a reply without checking its nudges or its unread board answers; the claim went silent and Fabric's sweep took it as abandoned",
       "request": "You claimed the migration task and it will take about forty minutes; partway through you will wait for a peer's reply on the board. How do you stay in touch with Fabric while you work?",
       "expected": [
-        "every three minutes while it works, and before any wait, calls fabric_work_list and acts first on its nudges and waiting_for_you (Fabric's rule work.check-every-three-minutes, served by fabric_whoami)",
+        "every three minutes while it works, and before any wait, calls fabric_work_list and acts first on its nudges and waiting_for_you (Fabric's rule work.check-every-three-minutes)",
         "then reads its unread board answers with com.list {unread: true} and marks what it handled read with com.read_ack",
         "never leaves a held task still: it moves it, hands it over or lets it go, since Fabric sweeps abandoned work on the same cadence"
       ]
@@ -681,6 +681,15 @@
         "records what it learned about the product as insight/1 lines in insights/ (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else <name>-data/ beside the main checkout), or says in one line that there is nothing",
         "puts no secret, token or other value in either",
         "treats a release Fabric answered with released false as no release: no retro line came for it, and the session-end retro still stands"
+      ]
+    },
+    {
+      "id": "a-retro-with-a-measured-effect-is-a-success-case",
+      "request": "The task is done and released as done: the cache cut the hub's calls from 40 to 12 a turn. Close it out.",
+      "expected": [
+        "writes the retro (observatory_lesson and insight/1 lines, or one line that there is nothing)",
+        "also contributes the measured effect to the agents database (agents-db.contribute) beside the lesson it records, from a folder that is already a Fabric Project (elsewhere it skips the ask and says so)",
+        "puts no person's or client's name, user content, key or private path into the contribution"
       ]
     }
   ]
