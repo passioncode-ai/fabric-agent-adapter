@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/passioncode-ai/fabric-agent-adapter/schemas/template/template-header.schema.json",
+  "title": "The `template:` header of an agent template's TEMPLATE.md (fabric-workspace S2, decision W0-Q8)",
+  "type": "object",
+  "required": ["template"],
+  "additionalProperties": false,
+  "properties": {
+    "template": {
+      "type": "object",
+      "required": ["id", "name", "version", "family", "checked", "readiness", "variants"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$", "description": "equals the folder's name"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 120},
+        "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+        "family": {"type": "string", "pattern": "^[a-z]+(-[a-z]+)*$"},
+        "checked": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+        "readiness": {"enum": ["draft", "validated", "proven"]},
+        "sources": {"type": "integer", "minimum": 0},
+        "variants": {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"}, "uniqueItems": true}
+      }
+    }
+  }
+}

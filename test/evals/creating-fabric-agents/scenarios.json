@@ -278,6 +278,16 @@
         "names the template in the completion report, or says none was found",
         "an agent that answers store reviews also reads references/communication-agent-template.md and keeps its first-release parts (turn record, support.quality_daily) whatever the database template says"
       ]
+    },
+    {
+      "id": "a-template-folder-passes-the-template-check",
+      "request": "Write the template for our new kind of agent so another organization can assemble one from it.",
+      "expected": [
+        "writes one folder per template with TEMPLATE.md (the template: header, the prompt, A1 to A12 inherited by reference), manifest.json, connections.json, access.json, data-rooms.json, checks/, assembly.md and CHANGELOG.md, as references/agent-templates.md lists",
+        "writes each JSON file in the canonical shape of schemas/template/ (source_class, direction read|write|read-write|call, levels owner, administrator, project_architect, member, never), with a template's own key only as x-<name>",
+        "runs scripts/template_check.py on the folder from the skill's own directory and fixes every error before calling the template done; --legacy only for an older folder being migrated, its warnings fixed",
+        "keeps the template's content in the agents database and only its format in the adapter, never names a private organization or agent in it"
+      ]
     }
   ]
 }

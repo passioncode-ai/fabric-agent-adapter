@@ -1,0 +1,16 @@
+{
+  "template": "example-agent",
+  "version": "1.0.0",
+  "contract": {
+    "service": {"name": "fabric-service/0.1", "home": "fabric-agent-contract", "checked_against": "0.1.0"},
+    "interop": {"name": "fabric-interop/0.1", "home": "fabric-agent-contract", "checked_against": "0.1.0"}
+  },
+  "doors": [{"tool": "example.answer", "effect": "read"}],
+  "models": {"answer": "the organization's model map: answers to people"},
+  "dashboard": {"opens_in": "Fabric Dashboards", "pages": ["/dashboard"]},
+  "budget": {"monthly_usd_default": 100, "stop_in_code": "just under the key's limit"},
+  "variants": {
+    "cloud": {"placement": {"per": "organization", "where": ["cloud"]}},
+    "local": {"placement": {"per": "organization", "where": ["own machine"]}}
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/passioncode-ai/fabric-agent-adapter/schemas/template/connections.schema.json",
+  "title": "connections.json of an agent template: the source classes it reads and writes, each with its connector and grant",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["source_class", "connector", "grant", "required", "direction"],
+    "additionalProperties": false,
+    "properties": {
+      "source_class": {"type": "string", "minLength": 1, "description": "a class of source (a tracker, a chat, a store), never one installation"},
+      "connector": {"type": "string", "minLength": 1},
+      "grant": {"type": "string", "minLength": 1, "description": "the grant or scope it needs, by name; never a value"},
+      "required": {"type": "boolean"},
+      "when": {"type": "string", "minLength": 1, "description": "the condition under which an optional connection is needed, or under which a required one applies"},
+      "direction": {"enum": ["read", "write", "read-write", "call"]},
+      "scope": {"type": "string", "minLength": 1, "description": "what the direction covers, in words (\"draft pull requests only\")"},
+      "spends": {"type": "boolean", "description": "true when a call through it costs money (rule A6)"},
+      "variants": {"type": "array", "items": {"type": "string"}, "minItems": 1, "uniqueItems": true},
+      "notes": {"type": "string"}
+    }
+  }
+}

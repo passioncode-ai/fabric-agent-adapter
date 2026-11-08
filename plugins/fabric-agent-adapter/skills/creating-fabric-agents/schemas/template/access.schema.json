@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/passioncode-ai/fabric-agent-adapter/schemas/template/access.schema.json",
+  "title": "access.json of an agent template: per access level, what it does without asking, what needs approval, what escalates",
+  "type": "object",
+  "required": ["levels", "never"],
+  "additionalProperties": false,
+  "patternProperties": {"^x-[a-z0-9-]+$": {}},
+  "properties": {
+    "levels": {
+      "type": "object",
+      "required": ["owner", "administrator", "project_architect", "member"],
+      "additionalProperties": false,
+      "properties": {
+        "owner": {"$ref": "#/$defs/owner"},
+        "administrator": {"$ref": "#/$defs/level"},
+        "project_architect": {"$ref": "#/$defs/level"},
+        "member": {"$ref": "#/$defs/level"}
+      }
+    },
+    "never": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "what the agent never does at any level"},
+    "rule": {"type": "string", "minLength": 1},
+    "notes": {"type": "string"}
+  },
+  "$defs": {
+    "acts": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "level": {
+      "type": "object",
+      "required": ["without_asking", "with_approval", "escalates"],
+      "additionalProperties": false,
+      "properties": {
+        "without_asking": {"$ref": "#/$defs/acts"},
+        "with_approval": {"$ref": "#/$defs/acts"},
+        "escalates": {"$ref": "#/$defs/acts"},
+        "notes": {"type": "string"}
+      }
+    },
+    "owner": {
+      "type": "object",
+      "required": ["without_asking", "with_approval", "escalates"],
+      "additionalProperties": false,
+      "properties": {
+        "without_asking": {"$ref": "#/$defs/acts"},
+        "with_approval": {"$ref": "#/$defs/acts"},
+        "escalates": {"type": "array", "maxItems": 0, "description": "nobody stands above the owner"},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

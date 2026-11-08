@@ -107,6 +107,8 @@ prior art of its own:
 - [communication-agent-template.md](references/communication-agent-template.md): the template prompt
   for an agent that talks with people on a channel (support, sales and leads, community, inbox, reviews): the measured
   inbound pipeline, business patterns, knowledge, the learning loop and acceptance.
+- [agent-templates.md](references/agent-templates.md): a template folder for a kind of agent, its schema and
+  `scripts/template_check.py`, which a template passes before it is done.
 
 ## Step 2: the project skeleton
 
