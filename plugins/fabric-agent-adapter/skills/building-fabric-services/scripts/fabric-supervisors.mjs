@@ -324,7 +324,8 @@ export function launchdDomain(plistPath = null, { domain = null, platform = proc
   if (![null, undefined, 'gui', 'system'].includes(domain)) throw new ServiceError('domain must be gui or system');
   let which = domain;
   if ((which === null || which === undefined) && plistPath !== null && plistPath !== undefined) {
-    which = path.dirname(path.resolve(String(plistPath))).toLowerCase() === SYSTEM_DAEMONS.toLowerCase() ? 'system' : 'gui'; // APFS ignores case
+    const paths = platform === 'darwin' ? path.posix : path; // a macOS path, whatever host reads it
+    which = paths.dirname(paths.resolve(String(plistPath))).toLowerCase() === SYSTEM_DAEMONS.toLowerCase() ? 'system' : 'gui'; // APFS ignores case
   }
   if (which === 'system') {
     if (platform !== 'darwin') throw new ServiceError('launchd is the supervisor on macOS only; use systemdInstall on Linux and taskInstall on Windows.');
@@ -346,13 +347,16 @@ function needRoot(domain, label, plistPath, install, euid) {
 // EnvironmentVariables entry named UserName): the walk counts <dict> and <array> depth as plistlib's parse does.
 const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function topKey(text, key) {
+  const xml = String(text ?? '').replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
   const walk = /<(\/?)(dict|array)\b[^>]*?(\/?)>|<key>([^<]*)<\/key>\s*<string>([^<]*)<\/string>/g;
   let depth = 0;
-  for (let m = walk.exec(String(text ?? '')); m; m = walk.exec(String(text ?? ''))) {
+  for (let m = walk.exec(xml); m; m = walk.exec(xml)) {
     if (m[2]) {
       if (!m[3]) depth += m[1] ? -1 : 1;
     } else if (depth === 1 && m[4] === key) {
-      return m[5].replace(/&(amp|lt|gt|quot|apos);/g, (_, e) => XML_ENTITIES[e]);
+      return m[5].replace(/&(?:(amp|lt|gt|quot|apos)|#([0-9]+)|#x([0-9a-fA-F]+));/g,
+        (_, e, d, h) => (e ? XML_ENTITIES[e] : String.fromCodePoint(d ? Number(d) : parseInt(h, 16))));
     }
   }
   return null;
@@ -372,7 +376,7 @@ function plistXml(file, run) {
 // Other plists that hold launchd label `label` in the system domain (FAA-278): the plist launchd loaded the job from,
 // when it is not `plistPath`, and any plist of that label beside `plistPath`. Reading needs no root.
 function labelHolders(label, plistPath, run) {
-  const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+  const real = (p) => { try { return fs.realpathSync.native(p); } catch { return path.resolve(p); } }; // the case on disk
   const own = real(String(plistPath));
   const found = [];
   const loaded = run(['launchctl', 'print', `system/${label}`]);
@@ -388,6 +392,14 @@ function labelHolders(label, plistPath, run) {
     if (topKey(plistXml(file, run), 'Label') === label) found.push(file);
   }
   return [...new Set(found)].filter((file) => real(file) !== own);
+}
+
+function refuseHeldLabel(label, plistPath, run) {
+  const holders = labelHolders(label, plistPath, run);
+  if (holders.length) {
+    const owner = topUserName(plistXml(holders[0], run));
+    throw new ServiceError(`Label ${label} is already held by ${holders[0]}${owner ? ` (${owner}'s)` : ''}: the system domain is shared by every account of this Mac, so a label is the machine's and one plist holds it. Choose a label of your own (for example with the account in it), or remove that LaunchDaemon as root first.`);
+  }
 }
 
 const ownEuid = () => (typeof process.geteuid === 'function' ? process.geteuid() : null);
@@ -480,6 +492,7 @@ async function jobListens(pid, port, run = runProgram) {
 
 // The uid account `name` has on this machine (`id -u`), or null when it has none.
 function accountUid(name, run) {
+  if (!USER_NAME.test(String(name))) return null; // `id -u 501` answers a uid, but launchd looks UserName up by name
   const result = run(['id', '-u', String(name)]);
   const uid = result?.status === 0 ? String(result.stdout ?? '').trim() : '';
   return /^[0-9]+$/.test(uid) ? Number(uid) : null;
@@ -512,6 +525,12 @@ class JobAgent extends http.Agent {
       } catch (err) {
         who = { kind: UNKNOWN, uid: null, pid: null, reason: `check: ${err?.name ?? 'Error'}` };
       }
+      if (who.pid === this.jobPid && !await jobListens(this.jobPid, port, this.ask.run)) {
+        socket.destroy();
+        // The job's pid, but not bound to exactly 127.0.0.1:<port> (a wildcard): DEC-0161 vouches for neither.
+        callback(new ListenerRefused(SERVER_NOT_OWN, `the LaunchDaemon's pid ${this.jobPid} does not listen on exactly 127.0.0.1:${port} (a wildcard is never vouched for); nothing was sent`));
+        return;
+      }
       const proved = who.pid === this.jobPid || (who.kind === UNKNOWN && String(who.reason ?? '').startsWith(TABLE_RESTRICTED)
         && await jobListens(this.jobPid, port, this.ask.run));
       if (!proved) {
@@ -534,12 +553,18 @@ class JobAgent extends http.Agent {
   }
 }
 
+// The port of exactly http://127.0.0.1:<port> (1 to 65535, no leading zero), else null.
+function loopbackPort(origin) {
+  const m = /^http:\/\/127\.0\.0\.1:([1-9][0-9]{0,4})$/.exec(String(origin));
+  return m && Number(m[1]) <= 65535 ? Number(m[1]) : null;
+}
+
 // As wellKnownOf, for a LaunchDaemon: a loopback origin is read only when launchd's job `jobPid`, running as `jobUid`,
 // accepted the connection.
 export async function jobWellKnownOf(origin, { jobPid, jobUid } = {}) {
-  const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
-  if (!m) return wellKnownOf(origin);
-  return loopbackWellKnown(Number(m[1]), new JobAgent({ keepAlive: false, jobPid, jobUid }));
+  const port = loopbackPort(origin);
+  if (port === null) throw new ServiceError(`A LaunchDaemon's answer is read only at http://127.0.0.1:<port>, where its job's pid and uid prove it; ${origin} is not.`);
+  return loopbackWellKnown(port, new JobAgent({ keepAlive: false, jobPid, jobUid }));
 }
 
 /**
@@ -562,16 +587,12 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   launchdLabel(label);
   if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
   needRoot(dom, label, plistPath, true, euid);
-  if (dom === 'system' && !/^http:\/\/127\.0\.0\.1:[0-9]{1,5}$/.test(origin)) {
+  if (dom === 'system' && loopbackPort(origin) === null) {
     throw new ServiceError(`A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by the job's pid and uid (DEC-0161); ${origin} is not.`);
   }
   const named = dom === 'system' ? topUserName(plistText) : null;
   if (dom === 'system' && named) {
-    const holders = labelHolders(label, plistPath, run);
-    if (holders.length) {
-      const owner = topUserName(plistXml(holders[0], run));
-      throw new ServiceError(`Label ${label} is already held by ${holders[0]}${owner ? ` (${owner}'s)` : ''}: the system domain is shared by every account of this Mac, so a label is the machine's and one plist holds it. Choose a label of your own (for example with the account in it), or remove that LaunchDaemon as root first.`);
-    }
+    refuseHeldLabel(label, plistPath, run);
     const installed = topUserName(plistXml(plistPath, run));
     if (installed && installed !== named) {
       throw new ServiceError(`${plistPath} is ${installed}'s LaunchDaemon: the system domain is shared by every account of this Mac, so a label is the machine's. Choose a label of your own (for example with the account in it), or uninstall that one as root first.`);
@@ -660,6 +681,7 @@ export async function launchdUninstall(label, plistPath, { timeout = 30, purge =
   if (purge && !serviceId) throw new ServiceError('purge needs the service id whose data, logs and cache to remove.');
   needRoot(dom, label, plistPath, false, euid);
   if (purge && dom === 'system') throw new ServiceError("A LaunchDaemon's data belongs to its UserName, not to root: uninstall without purge, then remove the data as that user.");
+  if (dom === 'system') refuseHeldLabel(label, plistPath, run); // a bootout would stop another plist's job (FAA-278)
   const dirs = purge ? instanceDirs(serviceId, instance, platform) : {}; // one instance's folders only (FAA-125)
   const opts = { run, platform, uid, domain: dom === 'system' ? 'system' : null };
   const target = `${dom}/${label}`;

@@ -691,7 +691,7 @@
     {
       "id": "a-headless-mac-runs-a-launch-daemon",
       "trap": "the agent installs a LaunchAgent in gui/<uid> on a Mac that a FileVault restart leaves with no GUI login, so the service never starts, or writes /Library/LaunchDaemons as a normal user and reports success",
-      "request": "Our Mac Studio reboots with fdesetup authrestart and nobody logs in. Install example-agent there so it is up after every restart; I am connected over SSH.",
+      "request": "Our office Mac mini reboots with fdesetup authrestart and nobody logs in. Install example-agent there so it is up after every restart; I am connected over SSH.",
       "expected": [
         "names why a gui/<uid> LaunchAgent cannot run there: no GUI login session (bootstrap error 125)",
         "writes the release, the descriptor and the token as the account the service runs as (its UserName), the account whose Fabric and agents call it",

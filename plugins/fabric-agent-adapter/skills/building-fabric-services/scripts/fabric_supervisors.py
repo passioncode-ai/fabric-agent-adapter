@@ -461,10 +461,14 @@ class _JobConnection(http.client.HTTPConnection):
     def connect(self) -> None:
         super().connect()
         owner = _po.server_end(self.sock)
-        proved = owner.pid == self.job_pid or (
-            owner.kind == _po.UNKNOWN and (owner.reason or "").startswith(_po.TABLE_RESTRICTED)
-            and _job_listens(self.job_pid, self.port))
-        if proved:
+        restricted = owner.kind == _po.UNKNOWN and (owner.reason or "").startswith(_po.TABLE_RESTRICTED)
+        if owner.pid == self.job_pid and not _job_listens(self.job_pid, self.port):
+            self.close()
+            # The job's pid, but not bound to exactly 127.0.0.1:<port> (a wildcard): DEC-0161 vouches for neither.
+            raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the LaunchDaemon's pid %d does not listen on exactly "
+                                      "127.0.0.1:%d (a wildcard is never vouched for); nothing was sent"
+                                      % (self.job_pid, self.port))
+        if owner.pid == self.job_pid or (restricted and _job_listens(self.job_pid, self.port)):
             runs_as = _pid_uid(self.job_pid)
             if runs_as == self.job_uid:
                 return
@@ -536,10 +540,17 @@ def _plist_field(path: Path, key: str) -> Optional[str]:
     return value if isinstance(value, str) else None
 
 
+def _same_file(a: Any, b: Any) -> bool:
+    """One file, whatever the case of its path (APFS ignores case, realpath keeps it)."""
+    try:
+        return os.path.samefile(str(a), str(b))
+    except OSError:
+        return os.path.realpath(str(a)) == os.path.realpath(str(b))
+
+
 def _label_holders(label: str, plist_path: Path) -> List[Path]:
     """Other plists that hold launchd label ``label`` in the system domain (FAA-278): the plist launchd loaded the job
     from, when it is not ``plist_path``, and any plist of that label beside ``plist_path``. Reading needs no root."""
-    own = os.path.realpath(str(plist_path))
     found: List[Path] = []
     result = _launchctl("print", "system/%s" % label)
     if result.returncode == 0:
@@ -553,7 +564,23 @@ def _label_holders(label: str, plist_path: Path) -> List[Path]:
     except OSError:
         siblings = []
     found += [p for p in siblings if _plist_field(p, "Label") == label]
-    return [p for p in dict.fromkeys(found) if os.path.realpath(str(p)) != own]
+    return [p for p in dict.fromkeys(found) if not _same_file(p, plist_path)]
+
+
+def _answers(doc: Any, service_id: str, instance: str) -> bool:
+    """Whether a well-known answer names this service and instance; any other JSON is no answer."""
+    service = doc.get("service") if isinstance(doc, dict) else None
+    return isinstance(service, dict) and service.get("id") == service_id and service.get("instance") == instance
+
+
+def _refuse_held_label(label: str, plist_path: Path) -> None:
+    holders = _label_holders(label, plist_path)
+    if holders:
+        owner = _plist_field(holders[0], "UserName")
+        raise ServiceError("Label %s is already held by %s%s: the system domain is shared by every account of this "
+                           "Mac, so a label is the machine's and one plist holds it. Choose a label of your own (for "
+                           "example with the account in it), or remove that LaunchDaemon as root first."
+                           % (label, holders[0], " (%s's)" % owner if owner else ""))
 
 
 def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin: str,
@@ -577,9 +604,11 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     which = "system" if dom == "system" else None
     _need_root(dom, label, plist_path, True)
     if dom == "system":
-        loopback = urllib.parse.urlsplit(origin)
-        if not (loopback.scheme == "http" and loopback.hostname == "127.0.0.1" and loopback.port
-                and origin == "http://127.0.0.1:%d" % loopback.port):
+        try:
+            port = urllib.parse.urlsplit(origin).port
+        except ValueError:  # a port out of range
+            port = None
+        if not (port and 1 <= port <= 65535 and origin == "http://127.0.0.1:%d" % port):
             raise ServiceError("A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by "
                                "the job's pid and uid (DEC-0161); %s is not." % origin)
         try:
@@ -588,13 +617,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             named = None
         named = named if isinstance(named, str) else None  # a UserName that is not a string names no account
         if named:
-            holders = _label_holders(label, plist_path)
-            if holders:
-                owner = _plist_field(holders[0], "UserName")
-                raise ServiceError("Label %s is already held by %s%s: the system domain is shared by every account of this "
-                                   "Mac, so a label is the machine's and one plist holds it. Choose a label of your own (for "
-                                   "example with the account in it), or remove that LaunchDaemon as root first."
-                                   % (label, holders[0], " (%s's)" % owner if owner else ""))
+            _refuse_held_label(label, plist_path)
         if named and plist_path.exists():
             installed = _plist_field(plist_path, "UserName")
             if installed and installed != named:
@@ -648,7 +671,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             job = launchd_pid(label, "system")
             doc, why = _read_job_well_known(origin, job, job_uid) if job else (None, None)
             foreign = why or foreign  # the last refusal stays the reason while launchd shows no pid
-            if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
+            if _answers(doc, service_id, instance):
                 return doc
             time.sleep(0.5)
         if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
@@ -662,7 +685,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         doc, foreign = _read_well_known(origin, vouch_pid=vouch)
         if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
             vouch = launchd_pid(label)  # only a restricted table needs the job's pid (FAA-267)
-        if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
+        if _answers(doc, service_id, instance):
             return doc
         time.sleep(0.5)
     if foreign:
@@ -695,6 +718,8 @@ def launchd_uninstall(label: str, plist_path: Path, *, timeout: float = 30.0, pu
     if purge and dom == "system":
         raise ServiceError("A LaunchDaemon's data belongs to its UserName, not to root: uninstall without purge, then "
                            "remove the data as that user.")
+    if dom == "system":
+        _refuse_held_label(label, Path(plist_path))  # a bootout would stop another plist's job (FAA-278)
     dirs = instance_dirs(str(service_id), instance) if purge else {}
     target = "%s/%s" % (dom, label)
     _launchctl("bootout", target)

@@ -146,7 +146,7 @@ it at boot, before any login, as the account its `UserName` names.
   Mac, so a LaunchDaemon's label is unique on the machine, not per account (put the account in it on a Mac with a
   personal and an organization account); an install refuses, before writing anything, a label another plist holds
   (the one launchd loaded the job from, or any plist of that label in the same folder) and a plist of that label that
-  names another `UserName`.
+  names another `UserName`; an uninstall refuses the same holders before its `bootout`, which would stop their job.
 - **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
   `launchctl bootout system/<label>`). `purge` is refused: the data belongs to the `UserName`, so remove it as that user.
@@ -161,15 +161,16 @@ it at boot, before any login, as the account its `UserName` names.
   account of the Mac or is root, and an origin other than `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that pid listens on at exactly `127.0.0.1`
   (`lsof -p`), the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that starts the server as a
   child cannot pass either check, and the refusal says so: start the server with `exec`.
-- **A contract exception, accepted.** At the pin, HA-2 reads a launch daemon's listener as another account's and nothing
-  it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The root installer reads
-  its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and an exact `127.0.0.1`
-  bind, and sends no credential. The contract owner accepted this as DEC-0161 (RT-3 extended to launchd's system domain;
-  number reserved, its text after its readings), so it stays a departure from the pin until the next repin (FAA-288).
+- **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another
+  account's and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The
+  root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
+  bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential. The contract owner accepted this in
+  principle as DEC-0161 (RT-3 extended to launchd's system domain; proposed, its text after its readings), so it stays a
+  departure from the pin until the next repin (FAA-288).
   Every other client keeps HA-2 as written.
-- **Hosts.** A host or broker that reads launchd only in `gui/<uid>` (Fabric Dashboards' verbs today) sees a
-  LaunchDaemon as not loaded and must not load its plist into `gui/<uid>`; Fabric Dashboards takes the domain from the
-  plist's folder and refuses the verbs without root (FAA-287).
+- **Hosts.** A host or broker that reads launchd only in `gui/<uid>` sees a LaunchDaemon as not loaded and must not load
+  its plist into `gui/<uid>`. Fabric Dashboards from 0.8.39 takes the domain from the plist's folder and offers no verbs
+  for a system job; the lifecycle broker is still asked (FAA-287).
 
 ## One copy under a supervisor
 

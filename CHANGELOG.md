@@ -4,7 +4,7 @@
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_supervisors` and `fabric-supervisors.mjs`, and the facades
 `fabric_service` and `fabric-service.mjs` (new exports `launchd_domain` / `launchdDomain`, `SYSTEM_DAEMONS`,
-`jobWellKnownOf`); the probe `check_service.py` (`lifecycle.one-copy`); guidance in building-fabric-services and
+`jobWellKnownOf`, `ForeignUserAnswer`); the probe `check_service.py` (`lifecycle.one-copy`); guidance in building-fabric-services and
 working-with-fabric.
 
 ### Added
@@ -23,9 +23,10 @@ working-with-fabric.
   of a GUI session (error 125, an SSH install) now says to remove that LaunchAgent and use the system domain. The probe's
   `lifecycle.one-copy` asks launchd in the domain the descriptor's plist names. A LaunchDaemon's label is the machine's:
   an install refuses, before writing anything, a label another plist holds, a `UserName` that is root or no account of
-  the Mac, and an origin other than `http://127.0.0.1:<port>`. The root installer's read of its own job's token-free answer departs from the pinned HA-2 (and the contract's
-  later RT-3); the contract owner accepted it as DEC-0161 (FAA-288), and the restricted-table vouch takes only an exact
-  `127.0.0.1` bind. `references/lifecycle.md`
+  the Mac, and an origin other than `http://127.0.0.1:<port>`; an uninstall refuses the same holders before its
+  `bootout`. The root installer's read of its own job's token-free answer, proved by the job's pid, its uid and a bind on
+  exactly `127.0.0.1`, departs from the pinned HA-2 (and the contract's later RT-3); the contract owner accepted it in
+  principle as DEC-0161, proposed (FAA-288). `references/lifecycle.md`
   *The system domain* says which steps run as the `UserName` and which as root, and what a host must not do (FAA-287);
   one scenario eval.
 

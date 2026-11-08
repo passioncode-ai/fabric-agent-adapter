@@ -575,7 +575,7 @@ test('FAA-278: a label held by another plist is refused before anything', async 
 test('FAA-278: root or a loose origin is refused before anything', async (t) => {
   const s = setup(t);
   const opts = { serviceId: 'example-agent', timeout: 1, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep };
-  for (const origin of ['http://localhost:47201', 'http://127.0.0.1:47201/']) {
+  for (const origin of ['http://localhost:47201', 'http://127.0.0.1:47201/', 'http://127.0.0.1:0', 'http://127.0.0.1:99999', 'http://127.0.0.1:080']) {
     const fake = systemFake();
     await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, origin, run: fake.run }),
       /origin is http:\/\/127\.0\.0\.1:<port>/);
@@ -607,6 +607,54 @@ test('FAA-278: a plist written by another tool is read whatever its indent', asy
   // A UserName nested deeper (an environment entry) is never the job's, whatever the indent.
   const nested = spaced(s.body('1', { environment: { UserName: 'agentuser' } }));
   await assert.rejects(k.launchdInstall(s.name, s.plist, nested, { ...opts, run: systemFake().run }), /needs UserName/);
+});
+
+test('FAA-278: a numeric UserName is no account, as launchd reads it by name', async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  const numbered = s.body('1', { userName: 'agentuser' }).replace('<string>agentuser</string>', '<string>501</string>');
+  await assert.rejects(k.launchdInstall(s.name, s.plist, numbered, { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent',
+    timeout: 1, run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep }), /is no account of this Mac/);
+  assert.ok(!fake.calls.some((c) => c[0] === 'id'), 'never asked id for a uid');
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+});
+
+test('FAA-278: a comment, CDATA or a character reference does not hide a sibling\'s label', async (t) => {
+  const s = setup(t);
+  const sibling = path.join(s.dir, 'someone-else.plist');
+  const odd = s.body('1', { userName: 'otheruser' })
+    .replace('<dict>', '<!-- an old <dict> left here --><dict>')
+    .replace(`<string>${s.name}</string>`, `<string><![CDATA[${s.name}]]></string>`)
+    .replace('<string>otheruser</string>', '<string>&#111;theruser</string>');
+  fs.writeFileSync(sibling, odd);
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { origin: 'http://127.0.0.1:47201',
+    serviceId: 'example-agent', timeout: 1, run: systemFake().run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep }),
+  (err) => err.message.includes(`already held by ${sibling} (otheruser's)`));
+});
+
+test('FAA-278: a binary sibling plist is read through plutil', { skip: process.platform !== 'darwin' && 'plutil is macOS\'s' }, async (t) => {
+  const s = setup(t);
+  const sibling = path.join(s.dir, 'someone-else.plist');
+  fs.writeFileSync(sibling, s.body('1', { userName: 'otheruser' }));
+  assert.equal(spawnSync('plutil', ['-convert', 'binary1', sibling]).status, 0);
+  const fake = systemFake();
+  const run = (argv) => (argv[0] === 'plutil' && argv[1] === '-convert'
+    ? (({ status, stdout, stderr }) => ({ status, stdout: String(stdout), stderr: String(stderr) }))(spawnSync(argv[0], argv.slice(1)))
+    : fake.run(argv));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { origin: 'http://127.0.0.1:47201',
+    serviceId: 'example-agent', timeout: 1, run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep }),
+  (err) => err.message.includes(`already held by ${sibling} (otheruser's)`));
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+});
+
+test('FAA-278: uninstall refuses a label another plist holds, and the job reader takes only a loopback origin', async (t) => {
+  const s = setup(t);
+  fs.writeFileSync(path.join(s.dir, 'someone-else.plist'), s.body('1', { userName: 'otheruser' }));
+  const fake = systemFake({ loaded: [s.name] });
+  await assert.rejects(k.launchdUninstall(s.name, s.plist, { run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep }),
+    /already held by/);
+  assert.ok(!fake.calls.some((c) => c[1] === 'bootout'));
+  await assert.rejects(k.jobWellKnownOf('http://localhost:47201', { jobPid: 4242, jobUid: 501 }), /read only at http:\/\/127\.0\.0\.1:<port>/);
 });
 
 test('FAA-278: a UserName that is no account of this Mac is refused before anything', async (t) => {

@@ -818,8 +818,9 @@ class LaunchdSystemDomainTests(unittest.TestCase):
         self.assertEqual((doc or {}).get("service", {}).get("id"), "example-agent", why)
 
     def test_root_a_number_or_a_loose_origin_is_refused_before_anything(self):
-        cases = [(self.body(user_name="agentuser"), self.web.origin.replace("127.0.0.1", "localhost"), "origin is"),
-                 (self.body(user_name="agentuser"), self.web.origin + "/", "origin is")]
+        cases = [(self.body(user_name="agentuser"), origin, "origin is") for origin in (
+            self.web.origin.replace("127.0.0.1", "localhost"), self.web.origin + "/", "http://127.0.0.1:0",
+            "http://127.0.0.1:99999", "http://127.0.0.1:080")]
         numbered = plistlib.loads(self.body(user_name="agentuser"))
         numbered["UserName"] = 5
         cases.append((plistlib.dumps(numbered), self.web.origin, "needs UserName"))
@@ -836,6 +837,44 @@ class LaunchdSystemDomainTests(unittest.TestCase):
                                service_id="example-agent", timeout=1, domain="system")
         self.assertIn("is root", str(caught.exception))
         self.assertFalse(self.plist.exists(), "nothing written")
+
+    def test_uninstall_refuses_a_label_another_plist_holds(self):
+        other = Path(self.temp.name) / "someone-else.plist"
+        other.write_bytes(self.body(user_name="otheruser"))
+        with FakeLaunchd(loaded=[self.label]) as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_uninstall(self.label, self.plist, domain="system")
+            self.assertNotIn("bootout", [c[0] for c in fake.state["calls"]])
+        self.assertIn("already held by %s" % other, str(caught.exception))
+
+    def test_an_answer_that_is_not_an_object_is_no_answer(self):
+        answers = iter([([], None), ({"service": "x"}, None),
+                        ({"service": {"id": "example-agent", "instance": "default"}}, None)])
+        with FakeLaunchd(), mock.patch.object(self.sup.os, "geteuid", return_value=0), \
+                mock.patch.object(self.sup, "_read_job_well_known", side_effect=lambda *a: next(answers)), \
+                mock.patch.object(self.sup.time, "sleep"):
+            doc = fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                     service_id="example-agent", timeout=5, domain="system")
+        self.assertEqual(doc["service"]["id"], "example-agent")
+
+    def test_the_jobs_pid_on_a_wildcard_is_not_vouched_for(self):
+        # DEC-0161: the job's own pid, but bound to 0.0.0.0, never vouches, readable table or not.
+        po = self.sup._po
+        port = self.web.server.server_address[1]
+        own = po.Owner(po.THIS_ACCOUNT, os.getuid(), os.getpid(), "sysctl")
+        with mock.patch.object(po, "server_end", return_value=own), \
+                mock.patch.object(po, "_run", return_value="p%d\nn*:%d\n" % (os.getpid(), port)), \
+                mock.patch.object(self.sup, "_pid_uid", return_value=os.getuid()):
+            doc, why = self.sup._read_job_well_known(self.web.origin, os.getpid(), os.getuid())
+        self.assertIsNone(doc)
+        self.assertIn("does not listen on exactly 127.0.0.1:%d" % port, why)
+
+    @unittest.skipUnless(sys.platform == "darwin", "APFS ignores case; samefile tells one file")
+    def test_the_jobs_own_plist_in_another_case_is_not_another_holder(self):
+        self.plist.write_bytes(self.body(user_name="agentuser"))
+        shouted = str(self.plist).upper() if str(self.plist).upper() != str(self.plist) else str(self.plist)
+        with FakeLaunchd(loaded=[self.label], paths={self.label: shouted}):
+            self.assertEqual(self.sup._label_holders(self.label, self.plist), [])
 
     def test_a_plist_written_by_another_tool_is_read_whatever_its_indent(self):
         # Two spaces, not launchd_plist's tab: the same-path and same-label refusals still read UserName and Label.
