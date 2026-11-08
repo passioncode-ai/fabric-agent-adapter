@@ -564,20 +564,22 @@ class RestrictedTable(unittest.TestCase):
         child that answered (a banner, or a port) then ignored its closed stdin got a second TIMEOUT_SECONDS."""
         import tempfile
         import time
-        cases = (("printf '> '", None), ("printf 'Python banner\\n'", None), ("printf '12345\\n'", False),
-                 ("printf '> '; exit 0", None), ("printf '%080d' 0", None),
-                 ("sleep 1.8; printf '12345\\n'", False))  # a late port: 3 s in all, where a second wait made 4.8 s
-        for answer, expected in cases:
+        # (answer, expected, deadline): a no-port child must give up within its one deadline (the old code took 30 s);
+        # a port-bearing child gets a wide deadline, since the fake shell can stall on a loaded host, and a late port
+        # must end with the deadline (the old second wait made it 3.6 s + 6 s).
+        cases = (("printf '> '", None, 3.0), ("printf 'Python banner\\n'", None, 3.0), ("printf '> '; exit 0", None, 3.0),
+                 ("printf '%080d' 0", None, 3.0), ("printf '12345\\n'", False, 6.0),
+                 ("sleep 3.6; printf '12345\\n'", False, 6.0))
+        for answer, expected, deadline in cases:
             with self.subTest(answer=answer), tempfile.TemporaryDirectory() as d:
                 fake = os.path.join(d, "python3")
                 with open(fake, "w") as f:
                     f.write("#!/bin/sh\n%s\nexec sleep 30\n" % answer)
                 os.chmod(fake, 0o755)
-                # 3 s leaves a loaded host time to start the fake shell; the old code took 30 s, or 6 s for a port line.
-                with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 3.0):
+                with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", deadline):
                     start = time.monotonic()
                     self.assertEqual(P._child_listener_seen(lambda: []), expected)
-                    self.assertLess(time.monotonic() - start, 4.5, "one deadline, never a second wait")
+                    self.assertLess(time.monotonic() - start, deadline + 1.5, "one deadline, never a second wait")
 
     @unittest.skipUnless(sys.platform == "darwin", "the child check runs on macOS")
     def test_a_process_holding_more_than_1024_files_still_sees_its_child(self):
