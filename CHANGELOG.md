@@ -33,6 +33,11 @@ facades `fabric_service` and `fabric-service.mjs` (one more export each, `LEVEL_
 - `board.md` says a `table-restricted` refusal does not clear by retrying, and `connectors.md` names the reason
   (FAA-273 item 18).
 
+### Upgrading
+
+- A service that vendored 0.76.0 kit modules re-vendors `fabric_events` (or `fabric-events.mjs`) for `warn`, and
+  `fabric_peer_owner` for the calibration deadline; `fabric_kit.py status` names what differs.
+
 ## 0.76.0 (2026-11-07)
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_peer_owner` and `fabric-peer-owner.mjs` (peer_owner
