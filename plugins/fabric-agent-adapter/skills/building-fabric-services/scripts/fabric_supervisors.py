@@ -45,6 +45,10 @@ DEFAULT_EXIT_TIMEOUT = 15
 
 
 _LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,250}\Z")  # what launchd and the Node twin take as a label
+_USER_NAME = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}\Z")  # a macOS short name, as a LaunchDaemon's UserName takes it
+
+#: Where a LaunchDaemon's plist lives: a job in launchd's system domain, started at boot with no GUI login (FAA-278).
+SYSTEM_DAEMONS = Path("/Library/LaunchDaemons")
 
 
 def _no_marker_argument(argv: Sequence[str]) -> None:
@@ -255,7 +259,7 @@ def task_uninstall(task: str, *, run: Callable[..., Any] = subprocess.run, syste
 
 def launchd_plist(label: str, program_arguments: Sequence[str], *, working_directory: Path,
                   stdout_path: Path, environment: Optional[Dict[str, str]] = None,
-                  exit_timeout: int = DEFAULT_EXIT_TIMEOUT) -> bytes:
+                  exit_timeout: int = DEFAULT_EXIT_TIMEOUT, user_name: Optional[str] = None) -> bytes:
     """RunAtLoad + KeepAlive true + ThrottleInterval 10; no secret may appear in `environment`.
 
     ``ExitTimeOut`` (15 s) sits above the drain and its hard exit (``Drain``: 8 + 2 s), so launchd's
@@ -264,7 +268,10 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
 
     The same refusals as the Node twin (finding 10): a label launchd cannot name, no program, an ExitTimeOut that does
     not outlast the drain, an environment name ending TOKEN/SECRET/PASSWORD/KEY (a `*_FILE` path is fine), a value or
-    an argument shaped like a credential, and a control character in any string the plist carries."""
+    an argument shaped like a credential, and a control character in any string the plist carries.
+
+    ``user_name`` writes ``UserName``, the account a LaunchDaemon (system domain, FAA-278) runs as; it must be a macOS
+    short name, and it is meaningful only for a plist installed in ``/Library/LaunchDaemons``."""
     import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
     if not _LABEL.match(str(label)):
         raise ServiceError("label must match %s" % _LABEL.pattern)
@@ -273,6 +280,8 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
         raise ServiceError("A launchd job starts a program; ProgramArguments is empty.")
     if not exit_timeout > DRAIN_SECONDS:
         raise ServiceError("ExitTimeOut must outlast the %d s drain." % DRAIN_SECONDS)
+    if user_name is not None and not _USER_NAME.match(str(user_name)):
+        raise ServiceError("UserName must be a macOS short name matching %s" % _USER_NAME.pattern)
     env = dict(environment or {})
     for key, value in env.items():
         if re.search(r"(TOKEN|SECRET|PASSWORD|KEY)\Z", key) and not key.endswith("_FILE"):
@@ -303,6 +312,8 @@ def launchd_plist(label: str, program_arguments: Sequence[str], *, working_direc
         "StandardErrorPath": str(stdout_path),
         "EnvironmentVariables": env,
     }
+    if user_name is not None:
+        plist["UserName"] = str(user_name)
     return plistlib.dumps(plist)
 
 
@@ -317,16 +328,48 @@ def _domain() -> str:
     return "gui/%d" % os.getuid()
 
 
-def launchd_loaded(label: str) -> bool:
-    return _launchctl("print", "%s/%s" % (_domain(), label)).returncode == 0
+def launchd_domain(plist_path: Optional[Path] = None, domain: Optional[str] = None) -> str:
+    """The launchd domain a job lives in: ``system`` for a LaunchDaemon (``domain="system"``, or a plist in
+    ``/Library/LaunchDaemons``), else this user's ``gui/<uid>`` (FAA-278). A LaunchDaemon starts at boot, before any
+    login, so it is the form for a headless Mac that a FileVault restart (``fdesetup authrestart``) leaves with no GUI
+    session; a ``gui/<uid>`` job starts only while its user is logged in."""
+    if domain not in (None, "gui", "system"):
+        raise ServiceError("domain must be gui or system")
+    if domain is None and plist_path is not None:
+        domain = "system" if Path(os.path.abspath(str(plist_path))).parent == SYSTEM_DAEMONS else "gui"
+    if domain == "system":
+        if sys.platform == "win32":
+            raise ServiceError("launchd exists only on macOS; this system's supervisor is Task Scheduler.")
+        return "system"
+    return _domain()
+
+
+def _need_root(domain: str, label: str, plist_path: Path, install: bool) -> None:
+    """A system-domain job is installed and removed by root: refuse before anything is written (FAA-278)."""
+    if domain != "system" or os.geteuid() == 0:
+        return
+    if install:
+        raise ServiceError("A LaunchDaemon (launchd's system domain) is installed by root, and this process is not "
+                           "root: run the installer as root, or as root write %s and run `launchctl bootstrap system %s`. "
+                           "Status and pid read without root." % (plist_path, plist_path))
+    raise ServiceError("A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run "
+                       "the uninstaller as root, or as root run `launchctl bootout system/%s` and remove %s. Status and "
+                       "pid read without root." % (label, plist_path))
+
+
+def launchd_loaded(label: str, domain: Optional[str] = None) -> bool:
+    """Whether launchd has the job ``label`` loaded in this user's ``gui/<uid>`` domain, or with ``domain="system"`` in
+    the system domain (FAA-278); reading needs no root."""
+    return _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label)).returncode == 0
 
 
 _PID_ROW = re.compile(r"^\s*pid\s*=\s*(\d+)\s*\Z")
 
 
-def launchd_pid(label: str) -> Optional[int]:
-    """The running pid of this account's launchd job ``label``, or None (not running, or not readable)."""
-    result = _launchctl("print", "%s/%s" % (_domain(), label))
+def launchd_pid(label: str, domain: Optional[str] = None) -> Optional[int]:
+    """The running pid of this account's launchd job ``label`` (with ``domain="system"``, of the LaunchDaemon), or
+    None (not running, or not readable). Reading needs no root."""
+    result = _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label))
     if result.returncode != 0:
         return None
     for line in (result.stdout or "").splitlines():
@@ -364,6 +407,58 @@ def _read_well_known(origin: str, timeout: float = 2.0,
         return None, None
 
 
+def _job_listens(pid: int, port: int) -> bool:
+    """Whether launchd's job `pid` listens on 127.0.0.1:<port> or the IPv4 wildcard, asked of the process itself
+    (`lsof -p`), which a restricted socket table does not hide. Used only for a LaunchDaemon root just bootstrapped,
+    whose pid launchd itself named (FAA-278)."""
+    try:
+        out = _po._run([_po.LSOF, "-nP", "-a", "-p", str(pid), "-i4TCP", "-sTCP:LISTEN", "-Fn"])
+    except _po.TableUnreadable:
+        return False
+    return any(host in ("127.0.0.1", "*") and p == port for host, p in _po.parse_lsof_listeners(out))
+
+
+class _JobConnection(http.client.HTTPConnection):
+    """A connection whose server end must be launchd's job `job_pid` (a LaunchDaemon runs as its UserName, so the
+    installer, root, reads it as another account's: the job's own pid is the proof, FAA-278)."""
+
+    def __init__(self, host: str, port: int, job_pid: int, timeout: float) -> None:
+        super().__init__(host, port, timeout=timeout)
+        self.job_pid = job_pid
+
+    def connect(self) -> None:
+        super().connect()
+        owner = _po.server_end(self.sock)
+        if owner.pid == self.job_pid:
+            return
+        if (owner.kind == _po.UNKNOWN and (owner.reason or "").startswith(_po.TABLE_RESTRICTED)
+                and _job_listens(self.job_pid, self.port)):
+            return
+        self.close()
+        raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the server on port %d is not the LaunchDaemon's pid %d (%s); "
+                                  "nothing was sent" % (self.port, self.job_pid, owner.reason or owner.kind), owner)
+
+
+def _read_job_well_known(origin: str, job_pid: int,
+                         timeout: float = 2.0) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """As `_read_well_known`, for a LaunchDaemon: a loopback origin is read only when launchd's job `job_pid` accepted
+    the connection; (the answer or None, why the listener was refused or None)."""
+    parts = urllib.parse.urlsplit(origin)
+    if not (parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port):
+        return _read_well_known(origin, timeout)
+    conn = _JobConnection("127.0.0.1", parts.port, job_pid, timeout)
+    try:
+        conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % parts.port})
+        response = conn.getresponse()
+        return (json.loads(response.read().decode()) if response.status == 200 else None), None
+    except _po.ListenerRefused as exc:
+        return None, "foreign-user: %s" % exc
+    except (OSError, ValueError, http.client.HTTPException):
+        return None, None
+    finally:
+        conn.close()
+
+
 def fetch_well_known(origin: str, timeout: float = 2.0) -> Optional[Dict[str, Any]]:
     """The well-known answer at `origin`, or None: nothing answers, the answer is not JSON, or the listener is not this
     OS account's process (DEC-0154 HA-2)."""
@@ -373,13 +468,13 @@ def fetch_well_known(origin: str, timeout: float = 2.0) -> Optional[Dict[str, An
 _OVERRIDE_ROW = re.compile(r'^\s*"([^"]+)"\s*=>\s*(\S+)\s*\Z')
 
 
-def launchd_override(label: str) -> Optional[str]:
+def launchd_override(label: str, domain: Optional[str] = None) -> Optional[str]:
     """The operator's launchd override for ``label``: ``"disabled"``, ``"enabled"``, None when
     none is recorded (a first install), or ``"unknown"`` when the table cannot be read.
 
     Reads ``launchctl print-disabled gui/<uid>``; macOS 14+ prints ``=> disabled|enabled``,
     older releases ``=> true|false`` (true means disabled)."""
-    result = _launchctl("print-disabled", _domain())
+    result = _launchctl("print-disabled", launchd_domain(domain=domain))
     if result.returncode != 0:
         return "unknown"
     for line in result.stdout.splitlines():
@@ -391,7 +486,7 @@ def launchd_override(label: str) -> Optional[str]:
 
 def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin: str,
                     service_id: str, instance: str = "default", timeout: float = 40.0,
-                    force_enable: bool = False) -> Dict[str, Any]:
+                    force_enable: bool = False, domain: Optional[str] = None) -> Dict[str, Any]:
     """Write + lint the plist, bootout and WAIT for unload, bootstrap (retry EIO 5), then
     poll the well-known document until it answers with this identity.
 
@@ -399,32 +494,56 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     label. A label the operator disabled stays disabled and unloaded — the plist is still
     rewritten, so the new release is what starts once they turn it back on — and the answer is
     ``{"disabled": True, "label", "plist", "loaded"}`` instead of the well-known document.
-    ``force_enable`` is for an operator who asked for the service to be switched on."""
+    ``force_enable`` is for an operator who asked for the service to be switched on.
+
+    A plist in ``/Library/LaunchDaemons`` (or ``domain="system"``) is a LaunchDaemon in launchd's system domain, started
+    at boot with no login (FAA-278): only root installs it, refused before anything is written otherwise, and the
+    answer counts only when launchd's own job accepted the connection (its ``UserName``, not the installer, owns it).
+    A ``gui/<uid>`` bootstrap with no GUI session (SSH, a headless Mac after a FileVault restart) says so."""
     plist_path = Path(plist_path)
+    dom = launchd_domain(plist_path, domain)
+    which = "system" if dom == "system" else None
+    _need_root(dom, label, plist_path, True)
     atomic_write(plist_path, plist_bytes, 0o644)
     lint = subprocess.run(["plutil", "-lint", str(plist_path)], capture_output=True, text=True)
     if lint.returncode != 0:
         raise ServiceError("plist failed plutil -lint: %s" % lint.stdout.strip())
-    target = "%s/%s" % (_domain(), label)
-    override = launchd_override(label)
+    target = "%s/%s" % (dom, label)
+    override = launchd_override(label, which)
     if force_enable or override is None:
         _launchctl("enable", target)
     elif override == "disabled":
-        return {"disabled": True, "label": label, "plist": str(plist_path), "loaded": launchd_loaded(label)}
+        return {"disabled": True, "label": label, "plist": str(plist_path), "loaded": launchd_loaded(label, which)}
     _launchctl("bootout", target)
     deadline = time.time() + 15
-    while launchd_loaded(label) and time.time() < deadline:
+    while launchd_loaded(label, which) and time.time() < deadline:
         time.sleep(0.25)
     last = ""
     for _ in range(5):
-        result = _launchctl("bootstrap", _domain(), str(plist_path))
+        result = _launchctl("bootstrap", dom, str(plist_path))
         if result.returncode == 0:
             break
         last = (result.stderr or result.stdout).strip()
         time.sleep(1.0)
     else:
+        if dom != "system" and any(sign in last for sign in ("125", "Domain does not support", "Could not find domain")):
+            raise ServiceError("launchctl bootstrap failed: %s. This user has no GUI login session (an SSH session, or a "
+                               "headless Mac after a FileVault restart), so %s does not run jobs: install it as a "
+                               "LaunchDaemon in the system domain (a plist in %s with UserName, as root; FAA-278)."
+                               % (last, dom, SYSTEM_DAEMONS))
         raise ServiceError("launchctl bootstrap failed: %s" % last)
     deadline = time.time() + timeout
+    if dom == "system":
+        foreign = None
+        while time.time() < deadline:
+            job = launchd_pid(label, "system")
+            doc, foreign = _read_job_well_known(origin, job) if job else (None, None)
+            if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
+                return doc
+            time.sleep(0.5)
+        if foreign:
+            raise ServiceError("%s is not this LaunchDaemon's: %s; another process holds the port." % (origin, foreign))
+        raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))
     foreign = vouch = None
     while time.time() < deadline:
         doc, foreign = _read_well_known(origin, vouch_pid=vouch)
@@ -445,20 +564,29 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
 
 
 def launchd_uninstall(label: str, plist_path: Path, *, timeout: float = 30.0, purge: bool = False,
-                      service_id: Optional[str] = None, instance: str = "default") -> Dict[str, Any]:
+                      service_id: Optional[str] = None, instance: str = "default",
+                      domain: Optional[str] = None) -> Dict[str, Any]:
     """Symmetric with ``launchd_install`` (LC-14): bootout and WAIT until the job is gone, remove
     the plist, and reset the override to ``enabled`` — launchctl has no verb that deletes an
     override, and a leftover ``disabled`` would make a later fresh install stay off. Data stays
     unless ``purge`` (then ``service_id`` names whose data, logs and cache go, and ``instance`` which
     instance's: ``instance_dirs``, so one context's purge never reaches another's, FAA-125). A job still
-    loaded at ``timeout`` raises, leaving the plist and data in place."""
+    loaded at ``timeout`` raises, leaving the plist and data in place. A LaunchDaemon (a plist in
+    ``/Library/LaunchDaemons``, or ``domain="system"``) is removed only by root, and its data belongs to its UserName,
+    so ``purge`` is refused for it: remove the data as that user (FAA-278)."""
     if purge and not service_id:
         raise ServiceError("purge needs the service id whose data, logs and cache to remove.")
+    dom = launchd_domain(Path(plist_path), domain)
+    which = "system" if dom == "system" else None
+    _need_root(dom, label, Path(plist_path), False)
+    if purge and dom == "system":
+        raise ServiceError("A LaunchDaemon's data belongs to its UserName, not to root: uninstall without purge, then "
+                           "remove the data as that user.")
     dirs = instance_dirs(str(service_id), instance) if purge else {}
-    target = "%s/%s" % (_domain(), label)
+    target = "%s/%s" % (dom, label)
     _launchctl("bootout", target)
     deadline = time.monotonic() + timeout
-    while launchd_loaded(label):
+    while launchd_loaded(label, which):
         if time.monotonic() >= deadline:
             raise ServiceError("launchd job %s is still loaded %.0f s after bootout; nothing was removed." % (label, timeout))
         time.sleep(0.1)

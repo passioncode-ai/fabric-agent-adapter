@@ -687,6 +687,18 @@
         "if the release made a new technical decision without a number, contributes it as a decision",
         "puts no person's or client's name, user content, key or private path into the contribution"
       ]
+    },
+    {
+      "id": "a-headless-mac-runs-a-launch-daemon",
+      "trap": "the agent installs a LaunchAgent in gui/<uid> on a Mac that a FileVault restart leaves with no GUI login, so the service never starts, or writes /Library/LaunchDaemons as a normal user and reports success",
+      "request": "Our Mac Studio reboots with fdesetup authrestart and nobody logs in. Install example-agent there so it is up after every restart; I am connected over SSH.",
+      "expected": [
+        "names why a gui/<uid> LaunchAgent cannot run there: no GUI login session (bootstrap error 125)",
+        "writes the plist with launchd_plist(..., user_name=<the account it runs as>) into /Library/LaunchDaemons/<label>.plist and installs it with launchd_install as root (the system domain)",
+        "when its process is not root, reports the refusal and the exact command to run as root instead of claiming the install",
+        "reads status and pid without root with launchd_loaded(label, \"system\") and launchd_pid(label, \"system\")",
+        "starts the server with exec (no wrapper child) so the job's own pid proves the listener"
+      ]
     }
   ]
 }

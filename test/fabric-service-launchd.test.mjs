@@ -409,3 +409,140 @@ test('a listener the job cannot prove is table-restricted, and the error asks fo
     fetchWellKnown: async () => new ForeignUserAnswer('foreign-user: the server on port 47201 belongs to system') }),
   (err) => /is not this service's: foreign-user: /.test(err.message));
 });
+
+// FAA-278: a LaunchDaemon in launchd's system domain, the twin of LaunchdSystemDomainTests in
+// test_fabric_service_lifecycle.py. Status and pid read without root; install and uninstall need root; the job's own
+// pid proves its answer.
+function systemFake({ loaded = [], bootstrapError = null } = {}) {
+  const st = { loaded: [...loaded], calls: [] };
+  st.run = (argv) => {
+    st.calls.push([...argv]);
+    if (argv[0] === 'plutil') return { status: 0, stdout: 'OK', stderr: '' };
+    const [verb, arg, arg2] = argv.slice(1);
+    const ok = (stdout = '') => ({ status: 0, stdout, stderr: '' });
+    const name = (target) => target.split('/').pop();
+    if (verb === 'print') return st.loaded.includes(name(arg)) ? ok(`${arg} = {\n\tpid = 4242\n}\n`) : { status: 113, stdout: '', stderr: 'Could not find service' };
+    if (verb === 'print-disabled') return ok('disabled services = {\n}\n');
+    if (verb === 'enable') return ok();
+    if (verb === 'bootout') { st.loaded = st.loaded.filter((l) => l !== name(arg)); return ok(); }
+    if (verb === 'bootstrap') {
+      if (bootstrapError) return { status: 5, stdout: '', stderr: bootstrapError };
+      st.loaded.push(/<key>Label<\/key>\n\t<string>([^<]+)<\/string>/.exec(fs.readFileSync(arg2, 'utf8'))[1]);
+      return ok();
+    }
+    return { status: 64, stdout: '', stderr: `unknown verb ${verb}` };
+  };
+  return st;
+}
+
+test('FAA-278: a plist in /Library/LaunchDaemons is the system domain', () => {
+  const opts = { platform: 'darwin', uid: UID };
+  assert.equal(k.launchdDomain('/Library/LaunchDaemons/a.b.plist', opts), 'system');
+  assert.equal(k.launchdDomain('/tmp/a.b.plist', opts), `gui/${UID}`);
+  assert.equal(k.launchdDomain(null, { ...opts, domain: 'system' }), 'system');
+  assert.equal(k.launchdDomain('/Library/LaunchDaemons/a.b.plist', { ...opts, domain: 'gui' }), `gui/${UID}`);
+  assert.equal(k.launchdDomain(null, opts), `gui/${UID}`, 'the default is unchanged');
+  assert.throws(() => k.launchdDomain(null, { ...opts, domain: 'user' }), /domain must be gui or system/);
+  assert.throws(() => k.launchdDomain(null, { domain: 'system', platform: 'linux' }), /macOS only/);
+});
+
+test('FAA-278: the plist names its user, the same bytes in both kits', { skip: spawnSync('python3', ['--version']).status !== 0 && 'needs python3' }, () => {
+  const node = k.launchdPlist('a.b', ['/bin/echo'], { workingDirectory: '/', stdoutPath: '/l', userName: 'agentuser' });
+  assert.ok(node.includes('<key>UserName</key>\n\t<string>agentuser</string>'));
+  assert.ok(!k.launchdPlist('a.b', ['/bin/echo'], { workingDirectory: '/', stdoutPath: '/l' }).includes('UserName'));
+  for (const bad of ['Root User', '', 'a'.repeat(40), 'x;y', '../x']) {
+    assert.throws(() => k.launchdPlist('a.b', ['/bin/echo'], { workingDirectory: '/', stdoutPath: '/l', userName: bad }), /UserName must be/);
+  }
+  const py = spawnSync('python3', ['-c', `
+import sys
+from pathlib import PurePosixPath as Path
+sys.path.insert(0, ${JSON.stringify(scripts)})
+import fabric_service as fs
+sys.stdout.buffer.write(fs.launchd_plist("a.b", ["/bin/echo"], working_directory=Path("/"), stdout_path=Path("/l"), user_name="agentuser"))`]);
+  assert.equal(py.status, 0, String(py.stderr));
+  assert.equal(Buffer.from(node, 'utf8').toString('hex'), py.stdout.toString('hex'));
+});
+
+test('FAA-278: status and pid read the system domain without root', () => {
+  const fake = systemFake({ loaded: ['a.b'] });
+  const opts = { run: fake.run, platform: 'darwin', uid: UID, domain: 'system' };
+  assert.equal(k.launchdLoaded('a.b', opts), true);
+  assert.equal(k.launchdPid('a.b', opts), 4242);
+  assert.deepEqual(fake.calls[0], ['launchctl', 'print', 'system/a.b']);
+  k.launchdLoaded('a.b', { run: fake.run, platform: 'darwin', uid: UID });
+  assert.deepEqual(fake.calls.at(-1), ['launchctl', 'print', `gui/${UID}/a.b`], 'without a domain the gui domain, as before');
+});
+
+test('FAA-278: install and uninstall without root refuse before anything', async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  const common = { run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 501, sleep: noSleep };
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }),
+    { ...common, origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1 }),
+  (err) => err.message.includes('installed by root') && err.message.includes(`launchctl bootstrap system ${s.plist}`));
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  await assert.rejects(k.launchdUninstall(s.name, s.plist, common), /removed by root/);
+  assert.deepEqual(fake.calls, [], 'no launchctl call');
+});
+
+test("FAA-278: root installs, and the job's own pid proves the answer", async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  const seen = [];
+  const doc = await k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), {
+    origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, run: fake.run, platform: 'darwin', uid: UID,
+    domain: 'system', euid: 0, sleep: noSleep,
+    fetchWellKnown: async () => assert.fail('a LaunchDaemon is never read as this account'),
+    fetchJobWellKnown: async (origin, { jobPid }) => { seen.push(jobPid); return { service: { id: 'example-agent', instance: 'default' } }; },
+  });
+  assert.equal(doc.service.id, 'example-agent');
+  assert.deepEqual(seen, [4242], "launchd's pid for the job");
+  assert.ok(fake.calls.some((c) => c.join(' ') === `launchctl bootstrap system ${s.plist}`));
+  assert.ok(fake.calls.some((c) => c.join(' ') === `launchctl bootout system/${s.name}`));
+  assert.ok(fake.calls.some((c) => c.join(' ') === 'launchctl print-disabled system'));
+  await k.launchdUninstall(s.name, s.plist, { run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep });
+  assert.equal(fs.existsSync(s.plist), false);
+  assert.deepEqual(fake.calls.at(-1), ['launchctl', 'enable', `system/${s.name}`]);
+});
+
+test('FAA-278: root refuses an answer another process gives', async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), {
+    origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 0.05, run: fake.run, platform: 'darwin', uid: UID,
+    domain: 'system', euid: 0, sleep: noSleep,
+    fetchJobWellKnown: async () => new ForeignUserAnswer("foreign-user: the server on port 47201 is not the LaunchDaemon's pid 4242"),
+  }), /is not this LaunchDaemon's: foreign-user/);
+});
+
+test("FAA-278: a LaunchDaemon's purge is refused", async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  await assert.rejects(k.launchdUninstall(s.name, s.plist, { run: fake.run, platform: 'darwin', uid: UID, domain: 'system', euid: 0,
+    purge: true, serviceId: 'example-agent', sleep: noSleep }), /belongs to its UserName/);
+  assert.deepEqual(fake.calls, []);
+});
+
+test('FAA-278: a gui bootstrap without a session names the system domain', async (t) => {
+  const s = setup(t);
+  const opts = { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, platform: 'darwin', uid: UID, sleep: noSleep };
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), { ...opts,
+    run: systemFake({ bootstrapError: 'Bootstrap failed: 125: Domain does not support specified action' }).run }),
+  (err) => err.message.includes('no GUI login session') && err.message.includes('/Library/LaunchDaemons'));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body(), { ...opts,
+    run: systemFake({ bootstrapError: 'Bootstrap failed: 5: Input/output error' }).run }),
+  (err) => !err.message.includes('GUI login'));
+});
+
+test("FAA-278: jobWellKnownOf reads only what launchd's job accepted", { skip: process.platform !== 'darwin' && 'the socket table names the pid on macOS' }, async (t) => {
+  const http = await import('node:http');
+  const server = http.createServer((req, res) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ service: { id: 'example-agent', instance: 'default' } })); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => server.close());
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const mine = await k.jobWellKnownOf(origin, { jobPid: process.pid });
+  assert.equal(mine?.service?.id, 'example-agent');
+  const other = await k.jobWellKnownOf(origin, { jobPid: 999999 });
+  assert.ok(other instanceof ForeignUserAnswer, String(other));
+  assert.match(other.reason, /not the LaunchDaemon's pid 999999/);
+});

@@ -25,7 +25,11 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
 - The service kits create the service token (0600) and the instance lock in the
   service's own data directory, and write supervisor files only when an installer calls
   them: a launchd plist in `~/Library/LaunchAgents` (macOS), a systemd user unit (Linux) or
-  a per-user Scheduled Task (Windows), plus one descriptor in the services directory. The
+  a per-user Scheduled Task (Windows), plus one descriptor in the services directory. A LaunchDaemon in
+  `/Library/LaunchDaemons` (FAA-278) is written only by an installer running as root, which the kits never become:
+  without root they refuse before writing and name the command; the job runs as the account its `UserName` names, and
+  the installer accepts its answer only on a connection that launchd's own job accepted (its pid from
+  `launchctl print system/<label>`, `lsof -p` where the socket table is restricted). The
   token is readable by any process of the same user; the protocol defends against web pages
   and mistakes, not against hostile local code.
 - The kits' connectors (`fabric_http`, `fabric_openrouter` and their Node twins) reach the

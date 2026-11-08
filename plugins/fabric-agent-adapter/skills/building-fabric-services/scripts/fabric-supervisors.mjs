@@ -9,8 +9,10 @@ import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabri
 import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
-import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED } from './fabric-peer-owner.mjs';
+import { CheckedAgent, LSOF, ListenerRefused, SERVER_NOT_OWN, TABLE_RESTRICTED, UNKNOWN, parseLsofListeners, runProgram,
+  serverEnd } from './fabric-peer-owner.mjs';
 import http from 'node:http';
+import net from 'node:net';
 
 export const DEFAULT_EXIT_TIMEOUT = 15;
 
@@ -263,13 +265,15 @@ function plistValue(value, depth) {
  * FABRIC_SERVICE_SUPERVISOR=launchd tells the lock to back off instead of exiting into a respawn loop (DEC-0057).
  * No secret is written: an environment name ending TOKEN/SECRET/PASSWORD/KEY (a `*_FILE` path is fine), a value or an
  * argument shaped like a credential is refused. Returns the XML text, the same bytes Python's plistlib writes.
+ * `userName` writes UserName, the account a LaunchDaemon (launchd's system domain, FAA-278) runs as: a macOS short name.
  */
-export function launchdPlist(label, programArguments, { workingDirectory, stdoutPath, environment = {}, exitTimeout = DEFAULT_EXIT_TIMEOUT } = {}) {
+export function launchdPlist(label, programArguments, { workingDirectory, stdoutPath, environment = {}, exitTimeout = DEFAULT_EXIT_TIMEOUT, userName = null } = {}) {
   launchdLabel(label);
   const argv = programArguments.map(String);
   if (!argv.length) throw new ServiceError('A launchd job starts a program; ProgramArguments is empty.');
   if (!(exitTimeout > DRAIN_SECONDS)) throw new ServiceError(`ExitTimeOut must outlast the ${DRAIN_SECONDS} s drain.`);
   if (workingDirectory === undefined || stdoutPath === undefined) throw new ServiceError('A launchd job names its working directory and its log file.');
+  if (userName !== null && userName !== undefined && !USER_NAME.test(String(userName))) throw new ServiceError(`UserName must be a macOS short name matching ${USER_NAME.source}`);
   const env = { ...environment };
   for (const [name, value] of Object.entries(env)) {
     if (/(TOKEN|SECRET|PASSWORD|KEY)$/.test(name) && !name.endsWith('_FILE')) throw new ServiceError(`Environment variable ${name} looks like a secret; pass a *_FILE path instead.`);
@@ -295,25 +299,60 @@ export function launchdPlist(label, programArguments, { workingDirectory, stdout
     StandardErrorPath: String(stdoutPath),
     EnvironmentVariables: env,
   };
+  if (userName !== null && userName !== undefined) job.UserName = String(userName); // a LaunchDaemon's account (FAA-278)
   return '<?xml version="1.0" encoding="UTF-8"?>\n'
     + '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
     + `<plist version="1.0">\n${plistValue(job, 0)}</plist>\n`;
 }
 
-function launchdDomain(platform, uid) {
+function guiDomain(platform, uid) {
   // DEC-0032: launchd is macOS's supervisor; Linux has systemd and Windows Task Scheduler.
   if (platform !== 'darwin') throw new ServiceError('launchd is the supervisor on macOS only; use systemdInstall on Linux and taskInstall on Windows.');
   return `gui/${uid ?? process.getuid()}`;
 }
 
-/** True when launchd has the job loaded (`launchctl print gui/<uid>/<label>` answers). */
-export function launchdLoaded(label, { run = defaultRun, platform = process.platform, uid } = {}) {
-  return run(['launchctl', 'print', `${launchdDomain(platform, uid)}/${launchdLabel(label)}`])?.status === 0;
+/** Where a LaunchDaemon's plist lives: a job in launchd's system domain, started at boot with no GUI login (FAA-278). */
+export const SYSTEM_DAEMONS = '/Library/LaunchDaemons';
+const USER_NAME = /^[a-z_][a-z0-9_.-]{0,31}$/;
+
+/**
+ * The launchd domain a job lives in: `system` for a LaunchDaemon (`domain: 'system'`, or a plist in
+ * /Library/LaunchDaemons), else this user's `gui/<uid>` (FAA-278). A LaunchDaemon starts at boot, before any login, so it
+ * is the form for a headless Mac that a FileVault restart leaves with no GUI session.
+ */
+export function launchdDomain(plistPath = null, { domain = null, platform = process.platform, uid } = {}) {
+  if (![null, undefined, 'gui', 'system'].includes(domain)) throw new ServiceError('domain must be gui or system');
+  let which = domain;
+  if ((which === null || which === undefined) && plistPath !== null && plistPath !== undefined) {
+    which = path.dirname(path.resolve(String(plistPath))) === SYSTEM_DAEMONS ? 'system' : 'gui';
+  }
+  if (which === 'system') {
+    if (platform !== 'darwin') throw new ServiceError('launchd is the supervisor on macOS only; use systemdInstall on Linux and taskInstall on Windows.');
+    return 'system';
+  }
+  return guiDomain(platform, uid);
 }
 
-// The running pid of this account's launchd job `label`, or null (not running, or not readable).
-export function launchdPid(label, { run = defaultRun, platform = process.platform, uid } = {}) {
-  const result = run(['launchctl', 'print', `${launchdDomain(platform, uid)}/${launchdLabel(label)}`]);
+// A system-domain job is installed and removed by root: refuse before anything is written (FAA-278).
+function needRoot(domain, label, plistPath, install, euid) {
+  if (domain !== 'system' || euid === 0) return;
+  if (install) {
+    throw new ServiceError(`A LaunchDaemon (launchd's system domain) is installed by root, and this process is not root: run the installer as root, or as root write ${plistPath} and run \`launchctl bootstrap system ${plistPath}\`. Status and pid read without root.`);
+  }
+  throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run the uninstaller as root, or as root run \`launchctl bootout system/${label}\` and remove ${plistPath}. Status and pid read without root.`);
+}
+
+const ownEuid = () => (typeof process.geteuid === 'function' ? process.geteuid() : null);
+
+/** True when launchd has the job loaded (`launchctl print gui/<uid>/<label>`, or `system/<label>` with domain 'system'). */
+export function launchdLoaded(label, { run = defaultRun, platform = process.platform, uid, domain = null } = {}) {
+  return run(['launchctl', 'print', `${launchdDomain(null, { domain, platform, uid })}/${launchdLabel(label)}`])?.status === 0;
+}
+
+// The running pid of this account's launchd job `label` (with domain 'system', of the LaunchDaemon), or null (not
+// running, or not readable). Reading needs no root.
+export function launchdPid(label, { run = defaultRun, platform = process.platform, uid, domain = null } = {}) {
+  const result = run(['launchctl', 'print', `${launchdDomain(null, { domain, platform, uid })}/${launchdLabel(label)}`]);
   if (result?.status !== 0) return null;
   const hit = /^\s*pid\s*=\s*([0-9]+)\s*$/m.exec(String(result.stdout ?? ''));
   return hit ? Number(hit[1]) : null;
@@ -325,8 +364,8 @@ const OVERRIDE_ROW = /^\s*"([^"]+)"\s*=>\s*(\S+)\s*$/;
  * The operator's launchd override for `label`: 'disabled', 'enabled', null when none is recorded (a first install), or
  * 'unknown' when the table cannot be read. macOS 14+ prints `=> disabled|enabled`, older releases `=> true|false`.
  */
-export function launchdOverride(label, { run = defaultRun, platform = process.platform, uid } = {}) {
-  const result = run(['launchctl', 'print-disabled', launchdDomain(platform, uid)]);
+export function launchdOverride(label, { run = defaultRun, platform = process.platform, uid, domain = null } = {}) {
+  const result = run(['launchctl', 'print-disabled', launchdDomain(null, { domain, platform, uid })]);
   if (result?.status !== 0) return 'unknown';
   for (const line of String(result.stdout ?? '').split('\n')) {
     const match = OVERRIDE_ROW.exec(line);
@@ -355,9 +394,14 @@ export async function wellKnownOf(origin, { vouchPid = null } = {}) {
   }
   // A CheckedAgent without keep-alive: the request goes on the very socket it checked, and the socket closes after the
   // answer, so a poll leaves no connection open behind it.
-  const agent = new CheckedAgent({ keepAlive: false, vouchPid });
+  return loopbackWellKnown(Number(m[1]), new CheckedAgent({ keepAlive: false, vouchPid }));
+}
+
+// The well-known answer at 127.0.0.1:<port> over `agent`, whose connections check their server end: null when nothing
+// answers or the answer is not JSON, a ForeignUserAnswer when the agent refused the listener.
+function loopbackWellKnown(port, agent) {
   return new Promise((resolve) => {
-    const req = http.request({ host: '127.0.0.1', port: Number(m[1]), path: '/.well-known/fabric-service', agent,
+    const req = http.request({ host: '127.0.0.1', port, path: '/.well-known/fabric-service', agent,
       timeout: 2000 }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
@@ -374,6 +418,59 @@ export async function wellKnownOf(origin, { vouchPid = null } = {}) {
   }).finally(() => agent.destroy());
 }
 
+// Whether launchd's job `pid` listens on 127.0.0.1:<port> or the IPv4 wildcard, asked of the process itself (`lsof -p`),
+// which a restricted socket table does not hide. Only for a LaunchDaemon root bootstrapped, whose pid launchd named.
+async function jobListens(pid, port, run = runProgram) {
+  try {
+    const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
+    return parseLsofListeners(out).some(([host, p]) => (host === '127.0.0.1' || host === '*') && p === port);
+  } catch {
+    return false;
+  }
+}
+
+// An http.Agent whose connections must be accepted by launchd's job `jobPid`: a LaunchDaemon runs as its UserName, so
+// the installer, root, reads it as another account's, and the job's own pid is the proof (FAA-278).
+class JobAgent extends http.Agent {
+  constructor({ jobPid, ask = {}, ...options } = {}) {
+    super(options);
+    this.jobPid = jobPid;
+    this.ask = ask;
+  }
+
+  createConnection(options, callback) {
+    const port = Number(options.port);
+    const socket = net.connect({ host: '127.0.0.1', port, noDelay: true });
+    socket.once('error', (err) => callback(err));
+    socket.once('connect', async () => {
+      socket.pause();
+      let who;
+      try {
+        who = await serverEnd(socket, this.ask);
+      } catch (err) {
+        who = { kind: UNKNOWN, uid: null, pid: null, reason: `check: ${err?.name ?? 'Error'}` };
+      }
+      const proved = who.pid === this.jobPid || (who.kind === UNKNOWN && String(who.reason ?? '').startsWith(TABLE_RESTRICTED)
+        && await jobListens(this.jobPid, port, this.ask.run));
+      if (!proved) {
+        socket.destroy();
+        callback(new ListenerRefused(SERVER_NOT_OWN, `the server on port ${port} is not the LaunchDaemon's pid ${this.jobPid} (${who.reason ?? who.kind}); nothing was sent`, who));
+        return;
+      }
+      socket.removeAllListeners('error');
+      socket.resume();
+      callback(null, socket);
+    });
+  }
+}
+
+// As wellKnownOf, for a LaunchDaemon: a loopback origin is read only when launchd's job `jobPid` accepted the connection.
+export async function jobWellKnownOf(origin, { jobPid } = {}) {
+  const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
+  if (!m) return wellKnownOf(origin);
+  return loopbackWellKnown(Number(m[1]), new JobAgent({ keepAlive: false, jobPid }));
+}
+
 /**
  * Write and lint the plist, bootout and WAIT for the unload, bootstrap (retrying launchd's EIO 5 times), then poll the
  * well-known document until it answers with this identity; resolves to that document.
@@ -382,17 +479,23 @@ export async function wellKnownOf(origin, { vouchPid = null } = {}) {
  * operator disabled stays disabled and unloaded — the plist is still rewritten, so the new release is what starts once
  * they turn it back on — and the answer is {disabled: true, label, plist, loaded}. `forceEnable` is for an operator
  * who asked for the service to be switched on.
+ *
+ * A plist in /Library/LaunchDaemons (or `domain: 'system'`) is a LaunchDaemon in launchd's system domain, started at boot
+ * with no login (FAA-278): only root installs it, refused before anything is written otherwise, and the answer counts
+ * only when launchd's own job accepted the connection. A gui/<uid> bootstrap with no GUI session says so.
  */
 export async function launchdInstall(label, plistPath, plistText, { origin, serviceId, instance = 'default', timeout = 40, forceEnable = false,
-  run = defaultRun, platform = process.platform, uid, fetchWellKnown = wellKnownOf, sleep = pause } = {}) {
-  const domain = launchdDomain(platform, uid);
+  run = defaultRun, platform = process.platform, uid, domain = null, euid = ownEuid(), fetchWellKnown = wellKnownOf,
+  fetchJobWellKnown = jobWellKnownOf, sleep = pause } = {}) {
+  const dom = launchdDomain(plistPath, { domain, platform, uid });
   launchdLabel(label);
   if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
-  const opts = { run, platform, uid };
+  needRoot(dom, label, plistPath, true, euid);
+  const opts = { run, platform, uid, domain: dom === 'system' ? 'system' : null };
   atomicWrite(plistPath, plistText, 0o644);
   const lint = run(['plutil', '-lint', String(plistPath)]);
   if (lint?.status !== 0) throw new ServiceError(`plist failed plutil -lint: ${String(lint?.stdout || lint?.stderr || '').trim().slice(0, 200)}`);
-  const target = `${domain}/${label}`;
+  const target = `${dom}/${label}`;
   const override = launchdOverride(label, opts);
   if (forceEnable || override === null) run(['launchctl', 'enable', target]);
   else if (override === 'disabled') return { disabled: true, label, plist: String(plistPath), loaded: launchdLoaded(label, opts) };
@@ -401,13 +504,30 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   while (launchdLoaded(label, opts) && Date.now() < unloaded) await sleep(250);
   let last = '';
   for (let attempt = 0; ; attempt += 1) {
-    const result = run(['launchctl', 'bootstrap', domain, String(plistPath)]);
+    const result = run(['launchctl', 'bootstrap', dom, String(plistPath)]);
     if (result?.status === 0) break;
     last = String(result?.stderr || result?.stdout || '').trim();
-    if (attempt === 4) throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}`);
+    if (attempt === 4) {
+      if (dom !== 'system' && ['125', 'Domain does not support', 'Could not find domain'].some((sign) => last.includes(sign))) {
+        throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}. This user has no GUI login session (an SSH session, or a headless Mac after a FileVault restart), so ${dom} does not run jobs: install it as a LaunchDaemon in the system domain (a plist in ${SYSTEM_DAEMONS} with UserName, as root; FAA-278).`);
+      }
+      throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}`);
+    }
     await sleep(1000);
   }
   const deadline = Date.now() + timeout * 1000;
+  if (dom === 'system') {
+    let refused = null;
+    while (Date.now() < deadline) {
+      const jobPid = launchdPid(label, opts);
+      const doc = jobPid ? await fetchJobWellKnown(origin, { jobPid }) : null;
+      refused = doc instanceof ForeignUserAnswer ? doc.reason : null;
+      if (!refused && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
+      await sleep(500);
+    }
+    if (refused) throw new ServiceError(`${origin} is not this LaunchDaemon's: ${refused}; another process holds the port.`);
+    throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log.`);
+  }
   let foreign = null;
   let vouchPid = null;
   while (Date.now() < deadline) {
@@ -432,15 +552,19 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
  * override to enabled — launchctl has no verb that deletes an override, and a leftover `disabled` would keep a later
  * fresh install off. Data stays unless `purge` (then `serviceId` names whose data, logs and cache go, and `instance` which
  * instance's, so one context's purge never reaches another's, FAA-125). A job still
- * loaded at `timeout` seconds throws, leaving the plist and the data in place.
+ * loaded at `timeout` seconds throws, leaving the plist and the data in place. A LaunchDaemon (a plist in
+ * /Library/LaunchDaemons, or `domain: 'system'`) is removed only by root, and its data belongs to its UserName, so
+ * `purge` is refused for it (FAA-278).
  */
-export async function launchdUninstall(label, plistPath, { timeout = 30, purge = false, serviceId, instance = 'default', run = defaultRun, platform = process.platform, uid, sleep = pause } = {}) {
-  const domain = launchdDomain(platform, uid);
+export async function launchdUninstall(label, plistPath, { timeout = 30, purge = false, serviceId, instance = 'default', run = defaultRun, platform = process.platform, uid, domain = null, euid = ownEuid(), sleep = pause } = {}) {
+  const dom = launchdDomain(plistPath, { domain, platform, uid });
   launchdLabel(label);
   if (purge && !serviceId) throw new ServiceError('purge needs the service id whose data, logs and cache to remove.');
+  needRoot(dom, label, plistPath, false, euid);
+  if (purge && dom === 'system') throw new ServiceError("A LaunchDaemon's data belongs to its UserName, not to root: uninstall without purge, then remove the data as that user.");
   const dirs = purge ? instanceDirs(serviceId, instance, platform) : {}; // one instance's folders only (FAA-125)
-  const opts = { run, platform, uid };
-  const target = `${domain}/${label}`;
+  const opts = { run, platform, uid, domain: dom === 'system' ? 'system' : null };
+  const target = `${dom}/${label}`;
   run(['launchctl', 'bootout', target]);
   const deadline = Date.now() + timeout * 1000;
   while (launchdLoaded(label, opts)) {

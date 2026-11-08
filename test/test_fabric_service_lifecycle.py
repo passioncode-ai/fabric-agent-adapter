@@ -49,7 +49,7 @@ FAKE_LAUNCHCTL = textwrap.dedent('''\
     rc, out = 0, ""
 
     def label_of(target):
-        return target.split("/", 2)[2]
+        return target.rsplit("/", 1)[1]  # gui/<uid>/<label> or system/<label>
 
     verb = args[0] if args else ""
     if verb == "print":
@@ -88,7 +88,9 @@ FAKE_LAUNCHCTL = textwrap.dedent('''\
             rc, out = 3, "Boot-out failed: 3: No such process"
     elif verb == "bootstrap":
         label = plistlib.load(open(args[2], "rb"))["Label"]
-        if st["overrides"].get(label) == "disabled":
+        if st.get("bootstrap_error"):
+            rc, out = 5, st["bootstrap_error"]
+        elif st["overrides"].get(label) == "disabled":
             rc, out = 5, "Bootstrap failed: 5: Input/output error"
         elif label in st["loaded"]:
             rc, out = 5, "Bootstrap failed: 5: Input/output error"
@@ -612,6 +614,111 @@ class PruneReleasesTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in root.iterdir()), ["1.1.0-bbb", "1.2.0-ccc", "current", "receipt.json"])
             with self.assertRaises(fs.ServiceError):
                 fs.prune_releases(root, keep=1)
+
+
+
+class LaunchdSystemDomainTests(unittest.TestCase):
+    """FAA-278: a LaunchDaemon in launchd's system domain, for a headless Mac with no GUI login after a FileVault
+    restart. Status and pid read without root; install and uninstall need root; the job's own pid proves its answer."""
+
+    def setUp(self):
+        self.sup = sys.modules["fabric_supervisors"]
+        self.temp = tempfile.TemporaryDirectory()
+        self.label = throwaway_label()
+        self.plist = Path(self.temp.name) / (self.label + ".plist")
+        self.web = WellKnown("example-agent")
+
+    def tearDown(self):
+        self.web.close()
+        self.temp.cleanup()
+
+    def body(self, **kw):
+        return fs.launchd_plist(self.label, ["/bin/echo", "1"], working_directory=Path(self.temp.name),
+                                stdout_path=Path(self.temp.name) / "service.log", **kw)
+
+    def test_a_plist_in_launch_daemons_is_the_system_domain(self):
+        self.assertEqual(fs.launchd_domain(Path("/Library/LaunchDaemons/%s.plist" % self.label)), "system")
+        self.assertEqual(fs.launchd_domain(self.plist), "gui/%d" % os.getuid())
+        self.assertEqual(fs.launchd_domain(domain="system"), "system")
+        self.assertEqual(fs.launchd_domain(Path("/Library/LaunchDaemons/x.plist"), "gui"), "gui/%d" % os.getuid())
+        self.assertEqual(fs.launchd_domain(), "gui/%d" % os.getuid(), "the default is unchanged")
+        with self.assertRaises(fs.ServiceError):
+            fs.launchd_domain(domain="user")
+
+    def test_the_plist_names_its_user(self):
+        self.assertEqual(plistlib.loads(self.body(user_name="agentuser"))["UserName"], "agentuser")
+        self.assertNotIn("UserName", plistlib.loads(self.body()), "no UserName unless asked: a gui job runs as its user")
+        for bad in ("Root User", "", "a" * 40, "x;y", "../x"):
+            with self.subTest(bad=bad), self.assertRaises(fs.ServiceError):
+                self.body(user_name=bad)
+
+    def test_status_and_pid_read_the_system_domain_without_root(self):
+        with FakeLaunchd(loaded=[self.label]) as fake, mock.patch.object(self.sup.os, "geteuid", return_value=501):
+            self.assertTrue(fs.launchd_loaded(self.label, "system"))
+            self.assertEqual(fs.launchd_pid(self.label, "system"), 4242)
+            self.assertIn(["print", "system/%s" % self.label], fake.state["calls"])
+            fs.launchd_loaded(self.label)
+            self.assertEqual(fake.state["calls"][-1], ["print", "gui/%d/%s" % (os.getuid(), self.label)],
+                             "without a domain the user's gui domain, as before")
+
+    def test_install_and_uninstall_without_root_refuse_before_anything(self):
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=501):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("installed by root", str(caught.exception))
+            self.assertIn("launchctl bootstrap system %s" % self.plist, str(caught.exception))
+            self.assertFalse(self.plist.exists(), "nothing written")
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_uninstall(self.label, self.plist, domain="system")
+            self.assertIn("removed by root", str(caught.exception))
+            self.assertEqual(fake.state["calls"], [], "no launchctl call")
+
+    @unittest.skipUnless(sys.platform == "darwin", "a LaunchDaemon is macOS's; the socket table names its pid there")
+    def test_root_installs_and_the_jobs_own_pid_proves_the_answer(self):
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0), \
+                mock.patch.object(self.sup, "launchd_pid", return_value=os.getpid()):
+            doc = fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                     service_id="example-agent", timeout=5, domain="system")
+            self.assertEqual(doc["service"]["id"], "example-agent")
+            self.assertIn(["bootstrap", "system", str(self.plist)], fake.state["calls"])
+            self.assertIn(["bootout", "system/%s" % self.label], fake.state["calls"])
+            self.assertIn(["print-disabled", "system"], fake.state["calls"])
+            fs.launchd_uninstall(self.label, self.plist, domain="system")
+            self.assertFalse(self.plist.exists())
+            self.assertEqual(fake.state["calls"][-1], ["enable", "system/%s" % self.label])
+
+    @unittest.skipUnless(sys.platform == "darwin", "a LaunchDaemon is macOS's; the socket table names its pid there")
+    def test_root_refuses_an_answer_another_process_gives(self):
+        with FakeLaunchd(), mock.patch.object(self.sup.os, "geteuid", return_value=0), \
+                mock.patch.object(self.sup, "launchd_pid", return_value=999999):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+        self.assertIn("is not this LaunchDaemon's", str(caught.exception))
+        self.assertIn("pid 999999", str(caught.exception))
+
+    def test_a_purge_of_a_launch_daemon_is_refused(self):
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_uninstall(self.label, self.plist, domain="system", purge=True, service_id="example-agent")
+            self.assertIn("belongs to its UserName", str(caught.exception))
+            self.assertEqual(fake.state["calls"], [])
+
+    def test_a_gui_bootstrap_without_a_session_names_the_system_domain(self):
+        error = "Bootstrap failed: 125: Domain does not support specified action"
+        with FakeLaunchd(bootstrap_error=error), mock.patch.object(self.sup.time, "sleep"):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1)
+        self.assertIn("no GUI login session", str(caught.exception))
+        self.assertIn("/Library/LaunchDaemons", str(caught.exception))
+        with FakeLaunchd(bootstrap_error="Bootstrap failed: 5: Input/output error"), \
+                mock.patch.object(self.sup.time, "sleep"):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1)
+        self.assertNotIn("GUI login", str(caught.exception), "an I/O error is not a missing session")
 
 
 if __name__ == "__main__":

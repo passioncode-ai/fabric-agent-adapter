@@ -13,6 +13,7 @@ PassionCode.ai the same rules make up the organization's product lifecycle contr
 - [The rules](#the-rules)
 - [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes)
 - [Install, upgrade, uninstall](#install-upgrade-uninstall)
+- [The system domain](#the-system-domain)
 - [One copy under a supervisor](#one-copy-under-a-supervisor)
 - [An app's own descriptor and the node](#an-apps-own-descriptor-and-the-node)
 - [Directories](#directories)
@@ -122,6 +123,31 @@ timeout), removes the plist, and resets the override to `enabled`. launchctl has
 that deletes an override, and a leftover `disabled` would make a later fresh install stay
 off. Tests use a throwaway label or a fake `launchctl` first on `PATH`, never the
 operator's real jobs.
+
+## The system domain
+
+A `gui/<uid>` job (a LaunchAgent) runs only while its user is logged in. A headless Mac that a FileVault restart
+(`fdesetup authrestart`) leaves with no GUI login, or a service installed over SSH, has no such session: `bootstrap`
+answers error 125 ("Domain does not support specified action") and the installer's error says to use the system domain
+(FAA-278). There the job is a **LaunchDaemon**: launchd starts it at boot, before any login, as the account its
+`UserName` names.
+
+- **The plist**: `launchd_plist(..., user_name="<short name>")` (Node: `userName`) writes `UserName`; the file goes in
+  `/Library/LaunchDaemons/<label>.plist`. A plist there is in the system domain by its path; `domain="system"` (Node:
+  `domain: 'system'`) says so for any path. Everything else in the plist is the same as a LaunchAgent's.
+- **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
+  anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
+  `launchctl bootout system/<label>`). `purge` is refused: the data belongs to the `UserName`, not to root, so remove it
+  as that user.
+- **Status and pid read without root**: `launchd_loaded(label, "system")`, `launchd_pid(label, "system")` and
+  `launchd_override(label, "system")` (Node: the `domain: 'system'` option) ask `launchctl print system/<label>`, which
+  any account may read.
+- **The answer the installer waits for** comes from the job's own process: root reads the service's listener as
+  another account's, so the installer takes the job's pid from `launchctl print system/<label>` and accepts the
+  well-known answer only on a connection that pid accepted (`lsof -p <pid>` where the socket table is restricted). A
+  `ProgramArguments` wrapper that starts the server as a child cannot pass this check: start the server with `exec`.
+- The service itself is unchanged: its descriptor, port, lock and data directory are its `UserName`'s, as for a
+  LaunchAgent of that user. Clients on the same account reach it as their own (HA-2).
 
 ## One copy under a supervisor
 
