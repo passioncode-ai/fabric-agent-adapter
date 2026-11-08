@@ -342,11 +342,20 @@ function needRoot(domain, label, plistPath, install, euid) {
   throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run launchdUninstall as root, or as root run \`launchctl bootout system/${label}\` and remove ${plistPath}. Status and pid read without root.`);
 }
 
-// A string key of a launchd plist's top-level dict, in the XML launchdPlist and `plutil -convert xml1` write (one tab per
-// level), never a key nested deeper, such as an EnvironmentVariables entry named UserName.
+// A string key of an XML plist's top-level dict, however it is indented, never a key nested deeper (an
+// EnvironmentVariables entry named UserName): the walk counts <dict> and <array> depth as plistlib's parse does.
+const XML_ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 function topKey(text, key) {
-  const hit = new RegExp(`^\\t<key>${key}<\\/key>\\n\\t<string>([^<]+)<\\/string>$`, 'm').exec(String(text));
-  return hit ? hit[1] : null;
+  const walk = /<(\/?)(dict|array)\b[^>]*?(\/?)>|<key>([^<]*)<\/key>\s*<string>([^<]*)<\/string>/g;
+  let depth = 0;
+  for (let m = walk.exec(String(text ?? '')); m; m = walk.exec(String(text ?? ''))) {
+    if (m[2]) {
+      if (!m[3]) depth += m[1] ? -1 : 1;
+    } else if (depth === 1 && m[4] === key) {
+      return m[5].replace(/&(amp|lt|gt|quot|apos);/g, (_, e) => XML_ENTITIES[e]);
+    }
+  }
+  return null;
 }
 
 const topUserName = (text) => topKey(text, 'UserName');
@@ -514,7 +523,8 @@ class JobAgent extends http.Agent {
       try { runsAs = parsePsUid(await (this.ask.run ?? runProgram)(PS, ['-o', 'uid=', '-p', String(this.jobPid)])); } catch { runsAs = null; }
       if (runsAs !== this.jobUid) {
         socket.destroy();
-        callback(new ListenerRefused(SERVER_NOT_OWN, `the LaunchDaemon's pid ${this.jobPid} runs as uid ${runsAs}, not its UserName's uid ${this.jobUid}; nothing was sent`, who));
+        // Not the restricted owner: the pid was proved, only its uid is wrong, and the error says so.
+        callback(new ListenerRefused(SERVER_NOT_OWN, `the LaunchDaemon's pid ${this.jobPid} runs as uid ${runsAs}, not its UserName's uid ${this.jobUid}; nothing was sent`));
         return;
       }
       socket.removeAllListeners('error');
@@ -552,6 +562,9 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   launchdLabel(label);
   if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
   needRoot(dom, label, plistPath, true, euid);
+  if (dom === 'system' && !/^http:\/\/127\.0\.0\.1:[0-9]{1,5}$/.test(origin)) {
+    throw new ServiceError(`A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by the job's pid and uid (DEC-0161); ${origin} is not.`);
+  }
   const named = dom === 'system' ? topUserName(plistText) : null;
   if (dom === 'system' && named) {
     const holders = labelHolders(label, plistPath, run);
@@ -567,6 +580,9 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   const jobUid = named ? accountUid(named, run) : null;
   if (dom === 'system' && named && jobUid === null) {
     throw new ServiceError(`UserName ${named} is no account of this Mac: launchd would not start the job. Name the account whose Fabric and agents call the service.`);
+  }
+  if (dom === 'system' && jobUid === 0) {
+    throw new ServiceError(`UserName ${named} is root: the job would run as root, keep its data in root's home, and every client refuses root's listener (DEC-0154 HA-2). Name the account whose Fabric and agents call the service.`);
   }
   if (dom === 'system' && !named) {
     throw new ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with launchdPlist(..., { userName: <the account whose Fabric and agents call it> }).");

@@ -469,8 +469,9 @@ class _JobConnection(http.client.HTTPConnection):
             if runs_as == self.job_uid:
                 return
             self.close()
+            # Not the restricted owner: the pid was proved, only its uid is wrong, and the error says so.
             raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the LaunchDaemon's pid %d runs as uid %s, not its UserName's "
-                                      "uid %d; nothing was sent" % (self.job_pid, runs_as, self.job_uid), owner)
+                                      "uid %d; nothing was sent" % (self.job_pid, runs_as, self.job_uid))
         self.close()
         raise _po.ListenerRefused(_po.SERVER_NOT_OWN, "the server on port %d is not the LaunchDaemon's pid %d (%s): "
                                   "another process holds the port, or the job's program starts the server as a child "
@@ -576,10 +577,16 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     which = "system" if dom == "system" else None
     _need_root(dom, label, plist_path, True)
     if dom == "system":
+        loopback = urllib.parse.urlsplit(origin)
+        if not (loopback.scheme == "http" and loopback.hostname == "127.0.0.1" and loopback.port
+                and origin == "http://127.0.0.1:%d" % loopback.port):
+            raise ServiceError("A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by "
+                               "the job's pid and uid (DEC-0161); %s is not." % origin)
         try:
             named = plistlib.loads(plist_bytes).get("UserName")
         except Exception:  # a plist that does not parse fails plutil -lint below
             named = None
+        named = named if isinstance(named, str) else None  # a UserName that is not a string names no account
         if named:
             holders = _label_holders(label, plist_path)
             if holders:
@@ -598,6 +605,10 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         if named and job_uid is None:
             raise ServiceError("UserName %s is no account of this Mac: launchd would not start the job. Name the account "
                                "whose Fabric and agents call the service." % named)
+        if job_uid == 0:
+            raise ServiceError("UserName %s is root: the job would run as root, keep its data in root's home, and every "
+                               "client refuses root's listener (DEC-0154 HA-2). Name the account whose Fabric and agents "
+                               "call the service." % named)
         if not named:
             raise ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's "
                                "home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with "

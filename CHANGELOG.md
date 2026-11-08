@@ -22,8 +22,8 @@ working-with-fabric.
   table, on a port that pid listens on (`lsof -p`, a weaker vouch, CT-261). A `gui/<uid>` bootstrap that fails for lack
   of a GUI session (error 125, an SSH install) now says to remove that LaunchAgent and use the system domain. The probe's
   `lifecycle.one-copy` asks launchd in the domain the descriptor's plist names. A LaunchDaemon's label is the machine's:
-  an install refuses, before writing anything, a label another plist holds, and a `UserName` that is no account of the
-  Mac. The root installer's read of its own job's token-free answer departs from the pinned HA-2 (and the contract's
+  an install refuses, before writing anything, a label another plist holds, a `UserName` that is root or no account of
+  the Mac, and an origin other than `http://127.0.0.1:<port>`. The root installer's read of its own job's token-free answer departs from the pinned HA-2 (and the contract's
   later RT-3); the contract owner accepted it as DEC-0161 (FAA-288), and the restricted-table vouch takes only an exact
   `127.0.0.1` bind. `references/lifecycle.md`
   *The system domain* says which steps run as the `UserName` and which as root, and what a host must not do (FAA-287);

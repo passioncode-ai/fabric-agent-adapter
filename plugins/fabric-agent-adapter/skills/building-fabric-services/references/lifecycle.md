@@ -158,7 +158,7 @@ it at boot, before any login, as the account its `UserName` names.
 - **The answer the installer waits for**: root reads the service's listener as another account's, so the installer takes
   the job's pid from `launchctl print system/<label>` and reads the token-free well-known document only on a connection
   that pid accepted, while the pid runs as the `UserName`'s uid (`ps`); an install refuses a `UserName` that is no
-  account of the Mac. Where the socket table is restricted it accepts a port that pid listens on at exactly `127.0.0.1`
+  account of the Mac or is root, and an origin other than `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that pid listens on at exactly `127.0.0.1`
   (`lsof -p`), the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that starts the server as a
   child cannot pass either check, and the refusal says so: start the server with `exec`.
 - **A contract exception, accepted.** At the pin, HA-2 reads a launch daemon's listener as another account's and nothing

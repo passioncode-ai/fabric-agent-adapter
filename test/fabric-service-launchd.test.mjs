@@ -572,6 +572,43 @@ test('FAA-278: a label held by another plist is refused before anything', async 
   assert.ok(!fake.calls.some((c) => c[1] === 'bootout'));
 });
 
+test('FAA-278: root or a loose origin is refused before anything', async (t) => {
+  const s = setup(t);
+  const opts = { serviceId: 'example-agent', timeout: 1, platform: 'darwin', uid: UID, domain: 'system', euid: 0, sleep: noSleep };
+  for (const origin of ['http://localhost:47201', 'http://127.0.0.1:47201/']) {
+    const fake = systemFake();
+    await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, origin, run: fake.run }),
+      /origin is http:\/\/127\.0\.0\.1:<port>/);
+    assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  }
+  const rootFake = systemFake();
+  const asRoot = (argv) => (argv[0] === 'id' ? { status: 0, stdout: '0\n', stderr: '' } : rootFake.run(argv));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'root' }), { ...opts, origin: 'http://127.0.0.1:47201', run: asRoot }),
+    /is root/);
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+});
+
+test('FAA-278: a plist written by another tool is read whatever its indent', async (t) => {
+  const s = setup(t);
+  const spaced = (text) => text.replace(/\t/g, '  ');
+  const opts = { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, platform: 'darwin', uid: UID,
+    domain: 'system', euid: 0, sleep: noSleep };
+  fs.writeFileSync(s.plist, spaced(s.body('1', { userName: 'otheruser' })));
+  const before = fs.readFileSync(s.plist, 'utf8');
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run }),
+    /otheruser's LaunchDaemon/);
+  assert.equal(fs.readFileSync(s.plist, 'utf8'), before, "the other account's plist is untouched");
+  fs.rmSync(s.plist);
+  const sibling = path.join(s.dir, 'someone-else.plist');
+  fs.writeFileSync(sibling, spaced(s.body('1', { userName: 'otheruser' })));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...opts, run: systemFake().run }),
+    (err) => err.message.includes(`already held by ${sibling} (otheruser's)`));
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  // A UserName nested deeper (an environment entry) is never the job's, whatever the indent.
+  const nested = spaced(s.body('1', { environment: { UserName: 'agentuser' } }));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, nested, { ...opts, run: systemFake().run }), /needs UserName/);
+});
+
 test('FAA-278: a UserName that is no account of this Mac is refused before anything', async (t) => {
   const s = setup(t);
   const fake = systemFake({ accounts: false });
