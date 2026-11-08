@@ -42,7 +42,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   anything to `127.0.0.1:<port>`, they read the computer's socket table to tell which OS
   account owns the listener (DEC-0154 HA-2, `fabric_peer_owner`), and send nothing to
   another account's, root's, SYSTEM's or an untellable listener; the one exception is a LaunchDaemon's installer
-  (root, FAA-278), which sends a token-free well-known GET only to the listener of the pid launchd names for its job. They read, never change:
+  (root, FAA-278), which sends a token-free well-known GET only on a connection the pid launchd names for its job
+  accepted or, under a restricted table, to a port that pid listens on at exactly `127.0.0.1` (the weaker vouch below):
+  a departure from the pinned HA-2 and the contract's later RT-3, recorded and asked of the contract owner (FAA-288). They read, never change:
   macOS `sysctl net.inet.tcp.pcblist_n` in the process, or the programs `/usr/sbin/netstat
   -anv -p tcp` and `/bin/ps -o uid= -p <pid>` (the Node twin always); Linux
   `/proc/net/tcp` and `/proc/net/tcp6`; Windows `GetExtendedTcpTable` and the process

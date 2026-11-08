@@ -20,8 +20,12 @@ working-with-fabric.
   connection launchd's own job accepted (its pid from `launchctl print system/<label>`) or, under a restricted socket
   table, on a port that pid listens on (`lsof -p`, a weaker vouch, CT-261). A `gui/<uid>` bootstrap that fails for lack
   of a GUI session (error 125, an SSH install) now says to remove that LaunchAgent and use the system domain. The probe's
-  `lifecycle.one-copy` asks launchd in the domain the descriptor's plist names. `references/lifecycle.md` *The system
-  domain* says which steps run as the `UserName` and which as root; one scenario eval.
+  `lifecycle.one-copy` asks launchd in the domain the descriptor's plist names. A LaunchDaemon's label is the machine's:
+  an install refuses a plist of that label naming another `UserName`. The root installer's read of its own job's
+  token-free answer departs from the pinned HA-2 (and the contract's later RT-3); it is recorded and asked of the
+  contract owner (FAA-288), and the restricted-table vouch takes only an exact `127.0.0.1` bind. `references/lifecycle.md`
+  *The system domain* says which steps run as the `UserName` and which as root, and what a host must not do (FAA-287);
+  one scenario eval.
 
 ### Fixed
 
@@ -32,8 +36,9 @@ working-with-fabric.
 
 ### Upgrading
 
-- A service that installs a LaunchDaemon vendors `fabric_supervisors` (or `fabric-supervisors.mjs`) with its facade;
-  a LaunchAgent install is unchanged and needs nothing.
+- A service that installs a LaunchDaemon vendors `fabric_supervisors` (or `fabric-supervisors.mjs`) with its facade and
+  `fabric_peer_owner` (or `fabric-peer-owner.mjs`) of 0.76.0 or later, which it imports; a LaunchAgent install is
+  unchanged and needs nothing.
 
 ## 0.77.0 (2026-11-08)
 

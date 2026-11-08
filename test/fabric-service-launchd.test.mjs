@@ -526,6 +526,22 @@ test('FAA-278: a LaunchDaemon needs UserName, and its folder ignores case', asyn
   assert.equal(fs.existsSync(s.plist), false, 'nothing written');
   assert.deepEqual(fake.calls, []);
   assert.equal(k.launchdDomain('/library/launchdaemons/a.b.plist', { platform: 'darwin', uid: UID }), 'system');
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { environment: { UserName: 'agentuser' } }), {
+    origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, run: fake.run, platform: 'darwin', uid: UID,
+    domain: 'system', euid: 0, sleep: noSleep }), /needs UserName/, 'a UserName only in the environment is not the job\'s');
+  assert.deepEqual(fake.calls, []);
+});
+
+test("FAA-278: a label another UserName holds is refused, and a job pid must be a number", async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  fs.writeFileSync(s.plist, s.body('1', { userName: 'otheruser' }));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), {
+    origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, run: fake.run, platform: 'darwin', uid: UID,
+    domain: 'system', euid: 0, sleep: noSleep }), /otheruser's LaunchDaemon/);
+  assert.deepEqual(fake.calls, []);
+  assert.ok(fs.readFileSync(s.plist, 'utf8').includes('otheruser'), "the other account's plist is untouched");
+  await assert.rejects(k.jobWellKnownOf('http://127.0.0.1:47201', { jobPid: null }), /positive number/);
 });
 
 test("FAA-278: a LaunchDaemon's purge is refused", async (t) => {

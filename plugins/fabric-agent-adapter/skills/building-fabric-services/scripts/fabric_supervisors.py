@@ -352,10 +352,11 @@ def _need_root(domain: str, label: str, plist_path: Path, install: bool) -> None
         return
     if install:
         raise ServiceError("A LaunchDaemon (launchd's system domain) is installed by root, and this process is not "
-                           "root: run the installer as root, or as root write %s and run `launchctl bootstrap system %s`. "
-                           "Status and pid read without root." % (plist_path, plist_path))
+                           "root: run launchd_install as root (the release, descriptor and token stay its UserName's, "
+                           "lifecycle reference, The system domain), or as root write %s and run "
+                           "`launchctl bootstrap system %s`. Status and pid read without root." % (plist_path, plist_path))
     raise ServiceError("A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run "
-                       "the uninstaller as root, or as root run `launchctl bootout system/%s` and remove %s. Status and "
+                       "launchd_uninstall as root, or as root run `launchctl bootout system/%s` and remove %s. Status and "
                        "pid read without root." % (label, plist_path))
 
 
@@ -410,7 +411,7 @@ def _read_well_known(origin: str, timeout: float = 2.0,
 
 
 def _job_listens(pid: int, port: int) -> bool:
-    """Whether launchd's job `pid` listens on 127.0.0.1:<port> or the IPv4 wildcard, asked of the process itself
+    """Whether launchd's job `pid` listens on 127.0.0.1:<port> exactly (never the wildcard), asked of the process itself
     (`lsof -p`), which a restricted socket table does not hide. Used only for a LaunchDaemon root just bootstrapped,
     whose pid launchd itself named (FAA-278)."""
     if sys.platform != "darwin" or not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
@@ -419,7 +420,7 @@ def _job_listens(pid: int, port: int) -> bool:
         out = _po._run([_po.LSOF, "-nP", "-a", "-p", str(pid), "-i4TCP", "-sTCP:LISTEN", "-Fn"])
     except _po.TableUnreadable:
         return False
-    return any(host in ("127.0.0.1", "*") and p == port for host, p in _po.parse_lsof_listeners(out))
+    return any(host == "127.0.0.1" and p == port for host, p in _po.parse_lsof_listeners(out))  # exact bind, as RT-3
 
 
 class _JobConnection(http.client.HTTPConnection):
@@ -427,6 +428,8 @@ class _JobConnection(http.client.HTTPConnection):
     installer, root, reads it as another account's: the job's own pid is the proof, FAA-278)."""
 
     def __init__(self, host: str, port: int, job_pid: int, timeout: float) -> None:
+        if not isinstance(job_pid, int) or isinstance(job_pid, bool) or job_pid <= 1:
+            raise ServiceError("A LaunchDaemon's answer is read only on its job's pid, a positive number.")
         super().__init__(host, port, timeout=timeout)
         self.job_pid = job_pid
 
@@ -514,6 +517,15 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             named = plistlib.loads(plist_bytes).get("UserName")
         except Exception:  # a plist that does not parse fails plutil -lint below
             named = None
+        if named and plist_path.exists():
+            try:
+                installed = plistlib.loads(plist_path.read_bytes()).get("UserName")
+            except Exception:
+                installed = None
+            if installed and installed != named:
+                raise ServiceError("%s is %s's LaunchDaemon: the system domain is shared by every account of this Mac, so "
+                                   "a label is the machine's. Choose a label of your own (for example with the account in "
+                                   "it), or uninstall that one as root first." % (plist_path, installed))
         if not named:
             raise ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's "
                                "home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with "
@@ -551,7 +563,8 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         foreign = None
         while time.time() < deadline:
             job = launchd_pid(label, "system")
-            doc, foreign = _read_job_well_known(origin, job) if job else (None, None)
+            doc, why = _read_job_well_known(origin, job) if job else (None, None)
+            foreign = why or foreign  # the last refusal stays the reason while launchd shows no pid
             if doc and doc.get("service", {}).get("id") == service_id and doc.get("service", {}).get("instance") == instance:
                 return doc
             time.sleep(0.5)

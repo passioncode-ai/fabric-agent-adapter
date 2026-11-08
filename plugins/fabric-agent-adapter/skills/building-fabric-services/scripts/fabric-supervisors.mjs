@@ -337,9 +337,16 @@ export function launchdDomain(plistPath = null, { domain = null, platform = proc
 function needRoot(domain, label, plistPath, install, euid) {
   if (domain !== 'system' || euid === 0) return;
   if (install) {
-    throw new ServiceError(`A LaunchDaemon (launchd's system domain) is installed by root, and this process is not root: run the installer as root, or as root write ${plistPath} and run \`launchctl bootstrap system ${plistPath}\`. Status and pid read without root.`);
+    throw new ServiceError(`A LaunchDaemon (launchd's system domain) is installed by root, and this process is not root: run launchdInstall as root (the release, descriptor and token stay its UserName's, lifecycle reference, The system domain), or as root write ${plistPath} and run \`launchctl bootstrap system ${plistPath}\`. Status and pid read without root.`);
   }
-  throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run the uninstaller as root, or as root run \`launchctl bootout system/${label}\` and remove ${plistPath}. Status and pid read without root.`);
+  throw new ServiceError(`A LaunchDaemon (launchd's system domain) is removed by root, and this process is not root: run launchdUninstall as root, or as root run \`launchctl bootout system/${label}\` and remove ${plistPath}. Status and pid read without root.`);
+}
+
+// The UserName of a launchd plist's top-level dict (the plist launchdPlist writes: one tab per level), never a key
+// nested deeper, such as an EnvironmentVariables entry of that name.
+function topUserName(text) {
+  const hit = /^\t<key>UserName<\/key>\n\t<string>([^<]+)<\/string>$/m.exec(String(text));
+  return hit ? hit[1] : null;
 }
 
 const ownEuid = () => (typeof process.geteuid === 'function' ? process.geteuid() : null);
@@ -424,7 +431,7 @@ async function jobListens(pid, port, run = runProgram) {
   if (process.platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
   try {
     const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
-    return parseLsofListeners(out).some(([host, p]) => (host === '127.0.0.1' || host === '*') && p === port);
+    return parseLsofListeners(out).some(([host, p]) => host === '127.0.0.1' && p === port); // exact bind, as RT-3
   } catch {
     return false;
   }
@@ -434,6 +441,7 @@ async function jobListens(pid, port, run = runProgram) {
 // the installer, root, reads it as another account's, and the job's own pid is the proof (FAA-278).
 class JobAgent extends http.Agent {
   constructor({ jobPid, ask = {}, ...options } = {}) {
+    if (!Number.isInteger(jobPid) || jobPid <= 1) throw new ServiceError("A LaunchDaemon's answer is read only on its job's pid, a positive number.");
     super(options);
     this.jobPid = jobPid;
     this.ask = ask;
@@ -494,7 +502,15 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   launchdLabel(label);
   if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
   needRoot(dom, label, plistPath, true, euid);
-  if (dom === 'system' && !/<key>UserName<\/key>\s*<string>[^<]+<\/string>/.test(String(plistText))) {
+  const named = dom === 'system' ? topUserName(plistText) : null;
+  if (dom === 'system' && named) {
+    let installed = null;
+    try { installed = topUserName(fs.readFileSync(plistPath, 'utf8')); } catch { installed = null; }
+    if (installed && installed !== named) {
+      throw new ServiceError(`${plistPath} is ${installed}'s LaunchDaemon: the system domain is shared by every account of this Mac, so a label is the machine's. Choose a label of your own (for example with the account in it), or uninstall that one as root first.`);
+    }
+  }
+  if (dom === 'system' && !named) {
     throw new ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with launchdPlist(..., { userName: <the account whose Fabric and agents call it> }).");
   }
   const opts = { run, platform, uid, domain: dom === 'system' ? 'system' : null };
@@ -527,7 +543,7 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
     while (Date.now() < deadline) {
       const jobPid = launchdPid(label, opts);
       const doc = jobPid ? await fetchJobWellKnown(origin, { jobPid }) : null;
-      refused = doc instanceof ForeignUserAnswer ? doc.reason : null;
+      refused = (doc instanceof ForeignUserAnswer ? doc.reason : null) ?? refused; // the last refusal stays the reason
       if (!refused && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
       await sleep(500);
     }

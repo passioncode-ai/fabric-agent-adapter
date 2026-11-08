@@ -77,7 +77,7 @@ systemd and Task Scheduler do not poll yet, FAA-253).
 |---|---|---|
 | `Label` | reverse-DNS, stable (`com.example.example-agent`) | the host controls the job by label |
 | `ProgramArguments` | absolute interpreter + module/script inside a **release** directory | a worktree or checkout path breaks the day it moves |
-| `RunAtLoad` | `true` | back at every login |
+| `RunAtLoad` | `true` | back at every login (a LaunchDaemon: at every boot) |
 | `KeepAlive` | `true` | `{SuccessfulExit:false}` leaves a cleanly exited service down |
 | `ThrottleInterval` | `10` | bounds a crash loop |
 | `ExitTimeOut` | above the drain and its hard exit (15 s default; `Drain` ends by 10 s) | SIGKILL arrives after it, so it must never come first |
@@ -127,7 +127,7 @@ operator's real jobs.
 ## The system domain
 
 A `gui/<uid>` job (a LaunchAgent) runs only while its user is logged in. A headless Mac that a FileVault restart
-(`fdesetup authrestart`) leaves with no GUI login, or a service installed over SSH, has no such session: `bootstrap`
+(`fdesetup authrestart`) leaves with no GUI login, or an SSH session of a user with no GUI login, has none: `bootstrap`
 answers error 125 ("Domain does not support specified action") and the installer's error says to remove the LaunchAgent
 it wrote (`launchd_uninstall`) and use the system domain (FAA-278). There the job is a **LaunchDaemon**: launchd starts
 it at boot, before any login, as the account its `UserName` names.
@@ -138,9 +138,12 @@ it at boot, before any login, as the account its `UserName` names.
   ignored); `domain="system"` (Node: `domain: 'system'`) says so for any path. Everything else is a LaunchAgent's.
   `UserName` is the account whose Fabric and agents call the service: clients of another account refuse it (HA-2).
 - **Who runs which step.** The release, the descriptor and the service token are written as the `UserName` (steps 1 and
-  2 above, for example with `sudo -u <user> -H`), so they live in that user's home with its modes; only the plist and
-  `launchd_install` run as root. A service moved from a LaunchAgent is uninstalled as one first, so launchd never holds
-  both.
+  2 above, for example with `sudo -u <user> -H`), so they live in that user's home with its modes, and the plist's
+  working directory and log paths name that home; only the plist and `launchd_install` run as root. A service moved
+  from a LaunchAgent is uninstalled as one first, so launchd never holds both.
+- **The label is the machine's.** `/Library/LaunchDaemons` and the system domain are shared by every account of the
+  Mac, so a LaunchDaemon's label is unique on the machine, not per account (put the account in it on a Mac with a
+  personal and an organization account); an install refuses a plist of that label that names another `UserName`.
 - **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
   `launchctl bootout system/<label>`). `purge` is refused: the data belongs to the `UserName`, so remove it as that user.
@@ -151,9 +154,16 @@ it at boot, before any login, as the account its `UserName` names.
   any account may read; the probe's `lifecycle.one-copy` reads the domain from the descriptor's plist the same way.
 - **The answer the installer waits for**: root reads the service's listener as another account's, so the installer takes
   the job's pid from `launchctl print system/<label>` and reads the token-free well-known document only on a connection
-  that pid accepted. Where the socket table is restricted it accepts a port that pid listens on (`lsof -p`), the weaker
-  vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that starts the server as a child cannot pass either
-  check: start the server with `exec`.
+  that pid accepted. Where the socket table is restricted it accepts a port that pid listens on at exactly `127.0.0.1`
+  (`lsof -p`), the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that starts the server as a
+  child cannot pass either check: start the server with `exec`.
+- **A departure from the contract, recorded.** At the pin, HA-2 reads a launch daemon's listener as another account's
+  and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The root
+  installer reads its own job's token-free well-known answer anyway, proved by launchd's pid and nothing else, and sends
+  no credential; a contract exception for it is asked (FAA-288). Every other client keeps HA-2 as written.
+- **Hosts.** A host or broker that reads launchd only in `gui/<uid>` (Fabric Dashboards' verbs today) sees a
+  LaunchDaemon as not loaded and must not load its plist into `gui/<uid>`; reading the domain from the plist's folder is
+  asked of them (FAA-287).
 
 ## One copy under a supervisor
 
