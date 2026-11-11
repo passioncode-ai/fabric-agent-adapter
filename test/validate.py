@@ -288,6 +288,12 @@ def _require_children(key: Any, nested: Dict[str, Any], lineno: int) -> None:
         raise ValueError("line %d: %r has no value: YAML reads it as null" % (lineno - 1, key))
 
 
+# Claude Code shares one character budget among every installed skill's description and drops the descriptions
+# of the least used skills once the listing runs over it (measured 2026-11-11: 105 skills, 35 962 characters
+# against 30 000). The skill family keeps about 350 characters a skill; a longer trigger list lives in the body.
+DESCRIPTION_LISTING_BUDGET = 360
+
+
 def validate_metadata(data: Dict[str, Any], expected_name: str) -> List[str]:
     errors: List[str] = []
     name = data.get("name", "")
@@ -304,6 +310,9 @@ def validate_metadata(data: Dict[str, Any], expected_name: str) -> List[str]:
         errors.append("description must include a NOT-for boundary")
     if len(description) > 1024:
         errors.append("description exceeds 1024 characters")
+    elif len(description) > DESCRIPTION_LISTING_BUDGET:
+        errors.append("description is %d characters, over the skill listing budget of %d (move triggers into the "
+                      "body's 'When to use' section)" % (len(description), DESCRIPTION_LISTING_BUDGET))
     if data.get("license") != LICENSE_SPDX:
         errors.append("skill license must be %s" % LICENSE_SPDX)
     if len(data.get("compatibility", "")) > 500:
@@ -968,6 +977,10 @@ def validator_self_test() -> List[str]:
     detected = validate_metadata(illegal, "adapting-projects-to-fabric")
     if len(detected) < 3:
         return ["validator self-test did not detect bad name/description/boundary"]
+    verbose = dict(legal)
+    verbose["description"] = "Use when " + "x" * DESCRIPTION_LISTING_BUDGET + ". NOT for Y."
+    if not any("listing budget" in e for e in validate_metadata(verbose, "adapting-projects-to-fabric")):
+        return ["validator self-test accepted a description over the skill listing budget"]
     deferring = ("Intro.\n\nThis page implements [the contract](https://github.com/passioncode-ai/fabric-workspace/"
                  "blob/main/knowledge/lifecycle.md). Where the two differ, the contract\nwins and this page is the defect.\n")
     found = private_source_deferrals(deferring)

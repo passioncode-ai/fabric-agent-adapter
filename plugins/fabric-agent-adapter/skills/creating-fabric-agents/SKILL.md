@@ -1,6 +1,10 @@
 ---
 name: creating-fabric-agents
-description: Use when designing and building a NEW agent or provider that must be Fabric-compatible from its first commit, «создай агента, совместимого с фабрикой Passion Code», «новый агент под Fabric», "create a fabric-compatible agent", "build a new Fabric provider", "fabric-ready agent from scratch", «агент в облаке организации», "which models and OpenRouter key for a new Fabric agent". Runs the intake grill (capability, named consumer, workflow or agent, profile, effects, where it runs, models, who pays, how it learns), turns source projects' recorded failures into planted eval fixtures, scaffolds the pinned contract bundle and sets the canary expectation. NOT for adapting an existing project (adapting-projects-to-fabric), making an agent a local or online Fabric service with a dashboard (building-fabric-services), a coding session working through Fabric or its board (working-with-fabric), the Fabric host or orchestrator, or an agent, bot or A2A server that need not speak Fabric.
+description: >-
+  Use when designing a NEW agent that speaks Fabric from its first commit: intake grill, models and budget, eval
+  fixtures, contract bundle. Triggers: "create a fabric-compatible agent", «новый агент под Fabric». NOT for an
+  existing project (adapting-projects-to-fabric), running it as a service (building-fabric-services) or a session
+  (working-with-fabric).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
@@ -17,6 +21,10 @@ retrofit. The sibling skill `adapting-projects-to-fabric` wraps an interface tha
 exists; this one runs the stages that come *before* an interface exists (the intake
 grill and the knowledge intake), then hands the scaffolding and verification to the same
 pinned machinery, so both doors lead into one pipeline.
+
+## When to use
+
+The description above stays short for the skill listing budget; the whole reach, every trigger included, is in [references/when-to-use.md](references/when-to-use.md).
 
 ## Boundary
 

@@ -1,0 +1,5 @@
+# When to use observing-products
+
+The skill's full trigger description, kept here so the front matter's `description` stays within the client's skill listing budget (about 350 characters a skill). Read it when choosing between this skill and a neighbour.
+
+Use when an agent takes a standing watch over one product (observer mode): first set up every channel the product reports through (ops logs, errors, analytics, funnels, revenue, store reviews, uptime, CI, the Fabric project board, support) in docs/observer/channels.md with a proven read from each, then watch them every 30 minutes, triage what changed (S0 to S3) and fix it within the project's authority (observe, fix, ship), locally or as a cloud routine. Triggers: "observer mode", "watch the product", "monitor production and fix", "set up the product's channels", «режим наблюдателя», «наблюдай за продуктом», «следи за логами и воронками», «включи режим наблюдателя». NOT for one-off debugging of a known fault (ordinary work), building dashboards, alerting or error-tracking wiring, a one-time project audit, or Fabric's own internals (its observer switch, routine or journal records).

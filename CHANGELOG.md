@@ -20,6 +20,18 @@
   prints connected out of named; `test/test_observer_inventory.py`; trigger and scenario evals in
   `test/evals/observing-products/`. The release smoke checks the installed skill.
 
+### Changed
+
+- **Each skill's `description` is about 350 characters, within the skill listing budget** (FAA-291, a board request
+  of 2026-11-11). Claude Code shares one character budget among every installed skill's description and, over it,
+  keeps a description only for the most used skills (measured on the operator's machine: 105 skills, 35 962
+  characters against 30 000), so `working-with-fabric`, the skill the session hooks point at, was listed by name
+  alone. The five descriptions went from 4 542 characters to 1 722 (the four of 0.77.0 from 3 649 to 1 388): when to
+  use, two to four triggers in English and Russian, and the NOT-for boundary naming the neighbour. Each skill's
+  previous description, every trigger included, moved word for word to its `references/when-to-use.md`, linked
+  from a short `## When to use` section. `test/validate.py` now fails a description over 360 characters
+  (`DESCRIPTION_LISTING_BUDGET`) and its self-test plants one.
+
 ## 0.77.0 (2026-11-08)
 
 The contract pin stays `18f8d487`. Kit modules change: `fabric_events` and `fabric-events.mjs`, `fabric_peer_owner`
