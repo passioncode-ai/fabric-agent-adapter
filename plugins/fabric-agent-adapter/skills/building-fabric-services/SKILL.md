@@ -1,15 +1,10 @@
 ---
 name: building-fabric-services
 description: >-
-  Use when running an agent as a Fabric service (fabric-service/0.1, its kits and probe): a local service (launchd,
-  systemd, Windows), an ONLINE agent or dashboard on https, its dashboard link and kit (narrow panel, themes), data
-  and cache paths, how callers reach and authenticate it, long jobs (fabric.job.*), spend report and limits, runner
-  routes and model profiles, the estate record and delegation tokens, answering a Project's board requests, or packing
-  and signing it. «сделай агенту дашборд», «локальный сервис агента», «подключи агента к Fabric Dashboards», «отвечать
-  на запросы с доски проекта», «расходы агента на модели», "make this agent a local service", "make an online
-  dashboard a Fabric service", "add the well-known endpoint". NOT for a one-off script or cron job, a hosted product
-  with no agent, the provider manifest (adapting-projects-to-fabric), a new agent's design (creating-fabric-agents), a
-  session using Fabric or its board (working-with-fabric), or building the Dashboards app (window, tray).
+  Use when running an agent as a fabric-service/0.1 service, local or online: dashboard, auth, jobs, spend, board
+  requests. Triggers: "make this agent a local service", «сделай агенту дашборд», «локальный сервис агента». NOT
+  for a provider manifest (adapting-projects-to-fabric), a new agent (creating-fabric-agents) or a session
+  (working-with-fabric).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
@@ -31,6 +26,10 @@ extension of the Fabric Agent Contract (DEC-0015).
 Every rule below exists because a real service on this estate broke it. Treat them as
 non-negotiable; the kit implements them so you call a function instead of
 re-deriving a rule.
+
+## When to use
+
+The description above stays short for the skill listing budget; the whole reach, every trigger included, is in [references/when-to-use.md](references/when-to-use.md).
 
 ## Boundary
 

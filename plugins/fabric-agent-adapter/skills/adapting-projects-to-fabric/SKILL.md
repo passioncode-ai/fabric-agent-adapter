@@ -1,6 +1,10 @@
 ---
 name: adapting-projects-to-fabric
-description: Use when adapting an existing agent, MCP server, A2A peer, HTTP service, or terminal CLI to the Fabric Agent Contract (choosing MCP/A2A/local-runner, scaffolding a provider bundle, or checking Fabric compatibility); also for «подключить проект к Fabric» or «сделать агента совместимым с Fabric». NOT for building the Fabric host/orchestrator, configuring an MCP client, a brand-new agent (creating-fabric-agents), running an agent as a local or online Fabric service with a dashboard (building-fabric-services), or a coding session working through Fabric, its board or claims, «подключись к Fabric» (working-with-fabric).
+description: >-
+  Use when adapting an existing agent, MCP server, A2A peer, HTTP service or CLI to the Fabric Agent Contract:
+  profile, provider bundle, compatibility check. Triggers: "adapt this to Fabric", «подключить проект к Fabric».
+  NOT for a new agent (creating-fabric-agents), a service (building-fabric-services) or a session
+  (working-with-fabric).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
@@ -15,6 +19,10 @@ metadata:
 Turn an existing stable interface into a proposed Fabric provider bundle, then prove
 only the compatibility gates for which receipts exist. The Fabric Agent Contract is
 normative; this skill is an authoring workflow pinned to one immutable revision.
+
+## When to use
+
+The description above stays short for the skill listing budget; the whole reach, every trigger included, is in [references/when-to-use.md](references/when-to-use.md).
 
 ## Boundary
 
