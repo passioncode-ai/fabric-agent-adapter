@@ -5,6 +5,7 @@
 - [MCP for agents](#mcp-for-agents)
 - [CLI for people and scripts](#cli-for-people-and-scripts)
 - [A2A for remote agents](#a2a-for-remote-agents)
+- [Behind tailscale serve](#behind-tailscale-serve)
 - [Token](#token)
 - [Dashboard session](#dashboard-session)
 - [Headers every response carries](#headers-every-response-carries)
@@ -81,6 +82,45 @@ descriptorHeader})` report each of these by `code` and place, never the value. T
 A probe cannot see whether an interface would take the descriptor's token without sending it, which DEC-0122
 forbids, so it reads the card only and never calls an interface: an API-key scheme in the descriptor's own
 `auth.header` is a finding, and with `Authorization` (the default) the card cannot show it.
+
+## Behind tailscale serve
+
+An agent on a server (a VM, a teammate's machine) can reach people on the tailnet through `tailscale serve`, which
+proxies HTTPS on the node's tailnet name to a loopback listener and adds the caller's `Tailscale-User-Login`. The
+kit's `fabric_tailnet.py` / `fabric-tailnet.mjs` (FAA-297) turn that into a decision; the agent wires it into its own
+handler.
+
+- **A listener of serve's own.** Any process on the machine can send `Tailscale-User-Login` to a loopback port, so the
+  header is believed only on a listener that serve alone uses: a second loopback port, or, where the installed
+  `tailscale serve` can proxy to one, a Unix socket whose mode keeps other accounts out. Pass `listener="serve"` and the
+  connection's peer (`"unix"` for a socket). On any other listener a request carrying serve's headers is refused
+  (`serve-header-off-serve`); the Fabric listener keeps its session key and never reads them.
+- **A perimeter generated, not kept by hand.** `load_perimeter` / `loadPerimeter` take a `tailnet-perimeter/1`
+  document: `generatedFrom {registry, revision, at}` (required: a file without its source is refused,
+  `perimeter-not-generated`) and `groups {name: {members, dashboards, capabilities}}`. The organization's generator
+  writes it from its access registry; the agent reloads it when the file changes.
+- **A personal key for MCP.** `load_keys` / `loadKeys` take `[{id, login, sha256, capabilities}]`, the key's
+  `hash_key` / `hashKey` only. A call on the `mcp` surface needs `Authorization: Bearer <key>`; the key must belong to
+  the caller's login and its capabilities may not be wider than that login's groups.
+- **The answer.** `authorize(listener=, peer=, headers=, perimeter=, surface="dashboard"|"mcp", target=, keys=)`
+  answers `{allowed, status, code, login, groups}` (and `key`, the key's id, on an allowed MCP call). Send the
+  status and the code as they are; no answer carries a key or its hash.
+
+| Code | Status | When |
+|---|---|---|
+| `serve-header-off-serve` | 403 | serve's headers on a listener that is not serve's |
+| `peer-not-loopback` | 403 | the serve listener was reached from another address |
+| `identity-missing`, `identity-ambiguous`, `identity-malformed` | 401 | no login, two, or not a login |
+| `not-in-perimeter` | 403 | the login is in no group |
+| `dashboard-not-granted` | 403 | no group of the login lists the dashboard |
+| `key-required`, `key-unknown` | 401 | an MCP call without a bearer key, or with one not on the list |
+| `key-not-yours` | 403 | the key belongs to another login |
+| `key-wider-than-group` | 403 | the key's capabilities exceed the login's groups |
+| `capability-not-granted` | 403 | the key does not carry the capability called |
+
+A tagged node (a server, not a person) gets no identity header from serve and is refused `identity-missing`; a
+machine caller uses the estate's delegation tokens instead. The serve listener is an outward surface: watch it like
+the A2A tunnel above.
 
 ## Token
 

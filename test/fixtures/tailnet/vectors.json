@@ -1,0 +1,706 @@
+{
+ "about": "FAA-297: shared vectors for fabric_tailnet.py and fabric-tailnet.mjs. Keys are example strings, hashed.",
+ "perimeter": {
+  "schema": "tailnet-perimeter/1",
+  "generatedFrom": {
+   "registry": "example-access-registry",
+   "revision": "r42",
+   "at": "2026-11-11T00:00:00Z"
+  },
+  "groups": {
+   "ops": {
+    "members": [
+     "Ana@Example.com",
+     "bo@example.com"
+    ],
+    "dashboards": [
+     "vitals",
+     "cve-detect"
+    ],
+    "capabilities": [
+     "cve.scan",
+     "vitals.read"
+    ]
+   },
+   "viewers": {
+    "members": [
+     "cy@example.com"
+    ],
+    "dashboards": [
+     "vitals"
+    ],
+    "capabilities": [
+     "vitals.read"
+    ]
+   }
+  }
+ },
+ "keys": [
+  {
+   "id": "ana-1",
+   "login": "ana@example.com",
+   "sha256": "sha256:3f9e1533db103817e03ea43cf0b30152daf37fc769be11100b149ea8589fea50",
+   "capabilities": [
+    "cve.scan"
+   ]
+  },
+  {
+   "id": "cy-wide",
+   "login": "cy@example.com",
+   "sha256": "sha256:a686d8d44f2081614e68fe19150b317ac83a9bcc884a03ab80531fd382e70e5e",
+   "capabilities": [
+    "cve.scan",
+    "vitals.read"
+   ]
+  },
+  {
+   "id": "bo-1",
+   "login": "bo@example.com",
+   "sha256": "sha256:c0ec361b4e0c465f54b196d202c8d79f3c72d7d030f1b1a53a378d7196fda270",
+   "capabilities": [
+    "vitals.read"
+   ]
+  }
+ ],
+ "vectors": [
+  {
+   "name": "dashboard granted",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 200,
+    "code": "ok",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "login case folded",
+   "listener": "serve",
+   "peer": "::1",
+   "headers": [
+    [
+     "TAILSCALE-USER-LOGIN",
+     "ANA@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "cve-detect",
+   "expect": {
+    "status": 200,
+    "code": "ok",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "mapped loopback",
+   "listener": "serve",
+   "peer": "::ffff:127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "cy@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 200,
+    "code": "ok",
+    "login": "cy@example.com",
+    "groups": [
+     "viewers"
+    ]
+   }
+  },
+  {
+   "name": "unix socket",
+   "listener": "serve",
+   "peer": "unix",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "cy@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 200,
+    "code": "ok",
+    "login": "cy@example.com",
+    "groups": [
+     "viewers"
+    ]
+   }
+  },
+  {
+   "name": "dashboard not granted",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "cy@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "cve-detect",
+   "expect": {
+    "status": 403,
+    "code": "dashboard-not-granted",
+    "login": "cy@example.com",
+    "groups": [
+     "viewers"
+    ]
+   }
+  },
+  {
+   "name": "not in perimeter",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "eve@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 403,
+    "code": "not-in-perimeter",
+    "login": "eve@example.com",
+    "groups": []
+   }
+  },
+  {
+   "name": "no identity",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 401,
+    "code": "identity-missing",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "two identities",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ],
+    [
+     "tailscale-user-login",
+     "cy@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 401,
+    "code": "identity-ambiguous",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "malformed identity",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana example"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 401,
+    "code": "identity-malformed",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "login with a trailing newline",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com\n"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 200,
+    "code": "ok",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "login with a newline inside",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com\nbo@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 401,
+    "code": "identity-malformed",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "peer on the tailnet",
+   "listener": "serve",
+   "peer": "100.64.0.7",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 403,
+    "code": "peer-not-loopback",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "peer unreadable",
+   "listener": "serve",
+   "peer": null,
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 403,
+    "code": "peer-not-loopback",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "header on the fabric listener",
+   "listener": "fabric",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ]
+   ],
+   "surface": "dashboard",
+   "target": "vitals",
+   "expect": {
+    "status": 403,
+    "code": "serve-header-off-serve",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "name header on the fabric listener",
+   "listener": "fabric",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Name",
+     "Ana"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "cve.scan",
+   "expect": {
+    "status": 403,
+    "code": "serve-header-off-serve",
+    "login": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "mcp granted",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ],
+    [
+     "Authorization",
+     "Bearer example-key-ana"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "cve.scan",
+   "expect": {
+    "status": 200,
+    "code": "ok",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ],
+    "key": "ana-1"
+   }
+  },
+  {
+   "name": "mcp without a key",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "cve.scan",
+   "expect": {
+    "status": 401,
+    "code": "key-required",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "mcp basic auth",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ],
+    [
+     "authorization",
+     "Basic abc"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "cve.scan",
+   "expect": {
+    "status": 401,
+    "code": "key-required",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "mcp unknown key",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ],
+    [
+     "authorization",
+     "Bearer nope"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "cve.scan",
+   "expect": {
+    "status": 401,
+    "code": "key-unknown",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "mcp someone else's key",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ],
+    [
+     "authorization",
+     "Bearer example-key-bo"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "vitals.read",
+   "expect": {
+    "status": 403,
+    "code": "key-not-yours",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "mcp key wider than group",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "cy@example.com"
+    ],
+    [
+     "authorization",
+     "Bearer example-key-cy-wide"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "vitals.read",
+   "expect": {
+    "status": 403,
+    "code": "key-wider-than-group",
+    "login": "cy@example.com",
+    "groups": [
+     "viewers"
+    ]
+   }
+  },
+  {
+   "name": "mcp capability outside the key",
+   "listener": "serve",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "tailscale-user-login",
+     "ana@example.com"
+    ],
+    [
+     "authorization",
+     "Bearer example-key-ana"
+    ]
+   ],
+   "surface": "mcp",
+   "target": "vitals.read",
+   "expect": {
+    "status": 403,
+    "code": "capability-not-granted",
+    "login": "ana@example.com",
+    "groups": [
+     "ops"
+    ]
+   }
+  }
+ ],
+ "badPerimeters": [
+  {
+   "name": "no schema",
+   "doc": {
+    "groups": {}
+   },
+   "code": "perimeter-schema"
+  },
+  {
+   "name": "hand-kept",
+   "doc": {
+    "schema": "tailnet-perimeter/1",
+    "groups": {
+     "ops": {
+      "members": [
+       "a@example.com"
+      ]
+     }
+    }
+   },
+   "code": "perimeter-not-generated"
+  },
+  {
+   "name": "source without revision",
+   "doc": {
+    "schema": "tailnet-perimeter/1",
+    "generatedFrom": {
+     "registry": "r",
+     "at": "t"
+    },
+    "groups": {
+     "ops": {
+      "members": []
+     }
+    }
+   },
+   "code": "perimeter-not-generated"
+  },
+  {
+   "name": "no groups",
+   "doc": {
+    "schema": "tailnet-perimeter/1",
+    "generatedFrom": {
+     "registry": "r",
+     "revision": "1",
+     "at": "t"
+    },
+    "groups": {}
+   },
+   "code": "perimeter-invalid"
+  },
+  {
+   "name": "bad member",
+   "doc": {
+    "schema": "tailnet-perimeter/1",
+    "generatedFrom": {
+     "registry": "r",
+     "revision": "1",
+     "at": "t"
+    },
+    "groups": {
+     "ops": {
+      "members": [
+       "not a login"
+      ]
+     }
+    }
+   },
+   "code": "perimeter-invalid"
+  },
+  {
+   "name": "bad capability",
+   "doc": {
+    "schema": "tailnet-perimeter/1",
+    "generatedFrom": {
+     "registry": "r",
+     "revision": "1",
+     "at": "t"
+    },
+    "groups": {
+     "ops": {
+      "members": [],
+      "capabilities": [
+       "Bad Name"
+      ]
+     }
+    }
+   },
+   "code": "perimeter-invalid"
+  },
+  {
+   "name": "member with a trailing newline",
+   "doc": {
+    "schema": "tailnet-perimeter/1",
+    "generatedFrom": {
+     "registry": "r",
+     "revision": "1",
+     "at": "t"
+    },
+    "groups": {
+     "ops": {
+      "members": [
+       "a@example.com\n"
+      ]
+     }
+    }
+   },
+   "code": "perimeter-invalid"
+  },
+  {
+   "name": "group name with a trailing newline",
+   "doc": {
+    "schema": "tailnet-perimeter/1",
+    "generatedFrom": {
+     "registry": "r",
+     "revision": "1",
+     "at": "t"
+    },
+    "groups": {
+     "ops\n": {
+      "members": []
+     }
+    }
+   },
+   "code": "perimeter-invalid"
+  }
+ ],
+ "badKeys": [
+  {
+   "name": "not a list",
+   "keys": {},
+   "code": "keys-invalid"
+  },
+  {
+   "name": "a raw key",
+   "keys": [
+    {
+     "id": "k",
+     "login": "a@example.com",
+     "sha256": "example-key"
+    }
+   ],
+   "code": "keys-invalid"
+  },
+  {
+   "name": "duplicate id",
+   "keys": [
+    {
+     "id": "ana-1",
+     "login": "ana@example.com",
+     "sha256": "sha256:3f9e1533db103817e03ea43cf0b30152daf37fc769be11100b149ea8589fea50",
+     "capabilities": [
+      "cve.scan"
+     ]
+    },
+    {
+     "id": "ana-1",
+     "login": "bo@example.com",
+     "sha256": "sha256:c0ec361b4e0c465f54b196d202c8d79f3c72d7d030f1b1a53a378d7196fda270",
+     "capabilities": [
+      "vitals.read"
+     ]
+    }
+   ],
+   "code": "keys-duplicate"
+  }
+ ],
+ "hashKey": {
+  "in": "example-key-ana",
+  "out": "sha256:3f9e1533db103817e03ea43cf0b30152daf37fc769be11100b149ea8589fea50"
+ }
+}

@@ -1,8 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.78.0
 
 ### Added
+
+- **A kit module for an agent behind `tailscale serve`: `fabric_tailnet`** (FAA-297, a board request of 2026-11-11).
+  `fabric_tailnet.py` and `fabric-tailnet.mjs` (layer L0, no imports) decide who is calling and what that person may
+  open. The person comes from `Tailscale-User-Login`, believed only on the agent's own serve listener (a loopback port
+  or a Unix socket that only serve reaches) and from a loopback peer; a request carrying serve's headers on any other
+  listener is refused (`serve-header-off-serve`), never half-trusted. Groups, dashboards and capabilities come from a
+  `tailnet-perimeter/1` file generated from the organization's access registry: a file that does not name its source
+  (`generatedFrom`: registry, revision, time) is refused (`perimeter-not-generated`). MCP also takes a personal key,
+  stored only as its SHA-256, owned by one login, and refused when its capabilities are wider than that login's groups
+  (`key-wider-than-group`). Every refusal is 401 or 403 with a stable code; no answer carries a key or its hash. Both
+  twins answer one set of vectors, `test/fixtures/tailnet/vectors.json`; the reference is
+  `references/surfaces-and-auth.md` → "Behind tailscale serve".
 
 - **A fifth skill, `observing-products`: observer mode** (FAA-290, the observer-mode design of Fabric CO-546). Any
   agent with the plugin can take a standing watch over one product. Setup first: it writes the product's channel
