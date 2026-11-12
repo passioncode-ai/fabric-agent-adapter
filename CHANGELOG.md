@@ -28,8 +28,23 @@ Wave 2 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. Ki
 
 ### Changed
 
+- **working-with-fabric finds Claude Code's files where `CLAUDE_CONFIG_DIR` points** (and Switchboard's source folder),
+  with the launcher's folder rule; the installer reads the same place (FAA-218, FAA-234). A local Claude Code
+  registration is read as Claude Code applies it, keyed by the git root or the folder itself outside git, measured
+  with 2.1.299 (`docs/evidence/runs/2026-11-12-faa-235-local-scope-key.md`, FAA-235).
+- Session start warns in one line when the registered `fabric-mcp` is another user's copy (Claude Code, Codex, Kimi
+  Code) (FAA-232); `status` checks Codex's and Kimi Code's registrations too (FAA-233) and names an ignored
+  `PASSIONCODE_APPLICATIONS` value, a copy outside that folder, your own copy in `~/Applications` and a folder you
+  cannot enter (FAA-239, FAA-240).
+- A turn carries its git branch where Fabric 0.3.16 and later take it; `FABRIC_SESSION_NO_BRANCH=1` turns it off
+  (FAA-152, its branch part).
+- The Stop hook spools the turn's facts before it reads other repositories, and waits for that read only within its
+  1.5 s budget (FAA-161). A turn's Bash calls carry the working folder inside the session folder, so a relative
+  `git -C` names the right repository (FAA-184).
+- The retro texts name `agents-db.contribute`, and the agents-database ask gains its edges (FAA-277, items 1 to 4).
 - `test/validate.py` searches the shipped files for a provider token shape, a private key block and a home path, and
   every shipped script that writes `<https>` carries its legend (FAA-212).
+- The nudge notes were re-read against Fabric's tag v0.3.14 (FAA-143).
 - The insight/1 shape follows the estate's spec: `evidence` and `audience` are required, and the kind `market`
   exists (`session-hooks.md`, FAA-217).
 - `dashboard-links.md`: the `unsupported` host state takes no browser fallback, by the operator's rule; macOS never
