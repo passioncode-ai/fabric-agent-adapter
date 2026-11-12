@@ -38,6 +38,31 @@ export function credentialName(name) {
 
 /** A JWT or JWS anywhere in a value. */
 export const JWT_SHAPE = /eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*/;
+const isUrlBase64 = (code) => (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a) || (code >= 0x30 && code <= 0x39)
+  || code === 0x2d || code === 0x5f;
+const runEnd = (text, from) => { let end = from; while (end < text.length && isUrlBase64(text.charCodeAt(end))) end += 1; return end; };
+/** The spans JWT_SHAPE matches in a text, leftmost and not overlapping, read in one pass (the contract's jwtSpans,
+ * FAA-313): the regular expression backtracks from every `eyJ` of a long run, quadratic in it, while every `eyJ` of one
+ * run shares that run's end, so only its first is tried, and a match ends where its third segment's run ends. `first`
+ * stops at the first match. */
+export function jwtSpans(text, first = false) {
+  const spans = [];
+  let from = 0;
+  for (let at = text.indexOf('eyJ', from); at >= 0; at = text.indexOf('eyJ', from)) {
+    const one = runEnd(text, at + 3);
+    from = one;
+    if (one - at - 3 < 2 || text[one] !== '.') continue;
+    const two = runEnd(text, one + 1);
+    if (two - one - 1 < 2 || text[two] !== '.') continue;
+    const three = runEnd(text, two + 1);
+    spans.push([at, three]);
+    if (first) break;
+    from = three;
+  }
+  return spans;
+}
+/** Whether JWT_SHAPE matches anywhere in a text, read in one pass (the contract's hasJwt, FAA-313). */
+export const hasJwt = (text) => jwtSpans(text, true).length > 0;
 /** A value that says it is a credential (`Bearer ` at its start, in any case), or a provider key's shape with its prefix
  * in its canonical case only, at the start of a value, after a character that is no ASCII letter or digit, or after an
  * escape; an `sk-` key holds a digit and an upper-case letter with 16 or more characters, or a digit with 32 or more,
@@ -48,7 +73,7 @@ const LONG_RUN = /[A-Za-z0-9+/=_-]{40,}/g;
 export const longSecret = (value) => (value.match(LONG_RUN) ?? []).some((run) => /[a-z]/.test(run) && /[A-Z]/.test(run) && /[0-9]/.test(run));
 
 /** Whether a value could be a credential: a JWT anywhere, a provider key or `Bearer …`, or a long secret-shaped run. */
-export const secretValue = (value) => JWT_SHAPE.test(value) || SECRET_VALUE.test(value) || longSecret(value);
+export const secretValue = (value) => hasJwt(value) || SECRET_VALUE.test(value) || longSecret(value);
 
 export const BEARER_INSIDE = /\bbearer\s+(?=[A-Za-z0-9._~+/-]*\d)[A-Za-z0-9._~+/-]{12,}=*/i;
 const PATH_LIKE = /^(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*:\/\/)/i;
@@ -58,7 +83,7 @@ const pathLike = (piece) =>
 
 /** The same for a launch argument or a server's command and URL: a long run is looked for between path separators. */
 export const secretArgument = (value) =>
-  JWT_SHAPE.test(value) || SECRET_VALUE.test(value) || BEARER_INSIDE.test(value) ||
+  hasJwt(value) || SECRET_VALUE.test(value) || BEARER_INSIDE.test(value) ||
   value.split(/[\s=]/).some((piece) => (pathLike(piece) ? piece.split(/[\\/]/).some((part) => longSecret(part)) : longSecret(piece)));
 
 const decodeKeepingPlus = (raw) => { try { return decodeURIComponent(raw); } catch { return raw; } };
