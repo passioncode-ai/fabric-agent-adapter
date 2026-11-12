@@ -1,9 +1,9 @@
 ---
 name: working-with-fabric
 description: >-
-  Use when a coding agent works in a project through Fabric: fabric-mcp, the project board, claiming work, the
-  operator's decisions, the session hooks. Triggers: "connect to Fabric", "check the project board", «подключись к
-  Fabric», «возьми задачу в Fabric». NOT for building an agent or service (creating-fabric-agents,
+  Use when a coding agent works in a project through Fabric: fabric-mcp, the board, claims, a relayed operator
+  approval, a usage limit hit mid-run, the hooks. Triggers: «возьми задачу в Fabric», "hit your limit, resets at". NOT
+  for Fabric's own code, agent-sync leases, building agents or services (creating-fabric-agents,
   building-fabric-services).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: >-
