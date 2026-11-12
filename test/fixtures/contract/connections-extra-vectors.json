@@ -24000,9 +24000,18 @@
     }
    },
    "expected": {
-    "declared": false,
-    "reported": true,
-    "connections": []
+    "declared": true,
+    "reported": false,
+    "connections": [
+     {
+      "id": "c",
+      "kind": "connector",
+      "target": "api",
+      "state": "ok",
+      "label": "see http://h/?q=%zzÊKIA0123456789ABCDEF",
+      "failing": false
+     }
+    ]
    }
   },
   {

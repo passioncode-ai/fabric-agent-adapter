@@ -126,6 +126,9 @@
     "fabric-settings-backup": [
       "1"
     ],
+    "fabric-source": [
+      "1"
+    ],
     "heartbeat": [
       "1"
     ],
@@ -784,6 +787,273 @@
       }
     },
     {
+      "name": "service-events-page-support-quality-projects",
+      "valid": true,
+      "document": {
+        "events": [
+          {
+            "id": "5101",
+            "at": "2026-10-19T00:20:00Z",
+            "kind": "support.quality_daily",
+            "level": "info",
+            "text": "Support quality for chat on 2026-10-18, alpha: 35 tickets ended.",
+            "data": {
+              "schema": "https://support.example.com/schemas/support-quality-daily.schema.json",
+              "value": {
+                "kind": "support-quality-daily/1",
+                "day": "2026-10-18",
+                "channel": "chat",
+                "project": "project:alpha",
+                "rubricVersion": "v1",
+                "judgeModel": "qwen/qwen3.8-flash",
+                "notMeasured": [
+                  "nobodyDropped.answeredLater"
+                ],
+                "arrived": 37,
+                "ended": 35,
+                "notATicket": 4,
+                "open": {
+                  "handedOpen": 2,
+                  "questionOpen": 1,
+                  "awaitingCustomer": 3,
+                  "awaitingApproval": 0
+                },
+                "outcomes": {
+                  "handoffsClosedByPerson": 6,
+                  "referred": 1,
+                  "answeredElsewhere": 2,
+                  "noReplyOwed": 3,
+                  "customerSilent": 1,
+                  "expiredByDecision": 0,
+                  "expired": 1,
+                  "unanswered": 0,
+                  "firstReplyLate": 2,
+                  "promotions": 0
+                },
+                "nobodyDropped": {
+                  "turns": 142,
+                  "replyCoverage": 1,
+                  "firstReplyP50Ms": 8300,
+                  "firstReplyP90Ms": 17000,
+                  "repeatAskRate": 0.02,
+                  "agentRepeats": 0,
+                  "answeredLater": null
+                },
+                "quality": {
+                  "sampled": 40,
+                  "helpedYes": 16,
+                  "helpedPartly": 14,
+                  "helpedNo": 6
+                },
+                "checks": {
+                  "language": 0.97,
+                  "addressed": 0.92,
+                  "policy_safe": 1,
+                  "routing": 0.95,
+                  "actionable": 0.9,
+                  "continuity": 0.97
+                },
+                "stability": {
+                  "turnErrors": 0,
+                  "modelCallFailures": 3,
+                  "recoveredByFallback": 3,
+                  "processErrors": 0,
+                  "restarts": 0,
+                  "knowledgeAgeHours": 20,
+                  "safeReplyTurns": 1,
+                  "safeReplyTickets": 1
+                },
+                "autonomy": {
+                  "resolvedWithoutPerson": 120,
+                  "toPersonPolicy": 15,
+                  "toPersonInability": 7,
+                  "queueOldestMinutes": 45,
+                  "queueSlaMinutes": 240,
+                  "answeredTickets": 20
+                }
+              }
+            }
+          },
+          {
+            "id": "5102",
+            "at": "2026-10-19T00:20:01Z",
+            "kind": "support.quality_daily",
+            "level": "info",
+            "text": "Support quality for chat on 2026-10-18, beta: 11 tickets ended.",
+            "data": {
+              "schema": "https://support.example.com/schemas/support-quality-daily.schema.json",
+              "value": {
+                "kind": "support-quality-daily/1",
+                "day": "2026-10-18",
+                "channel": "chat",
+                "project": "project:beta",
+                "rubricVersion": "v1",
+                "judgeModel": "qwen/qwen3.8-flash",
+                "notMeasured": [
+                  "nobodyDropped.answeredLater"
+                ],
+                "arrived": 12,
+                "ended": 11,
+                "notATicket": 0,
+                "open": {
+                  "handedOpen": 0,
+                  "questionOpen": 1,
+                  "awaitingCustomer": 1,
+                  "awaitingApproval": 0
+                },
+                "outcomes": {
+                  "handoffsClosedByPerson": 2,
+                  "referred": 0,
+                  "answeredElsewhere": 1,
+                  "noReplyOwed": 1,
+                  "customerSilent": 0,
+                  "expiredByDecision": 0,
+                  "expired": 0,
+                  "unanswered": 0,
+                  "firstReplyLate": 1,
+                  "promotions": 0
+                },
+                "nobodyDropped": {
+                  "turns": 142,
+                  "replyCoverage": 1,
+                  "firstReplyP50Ms": 8300,
+                  "firstReplyP90Ms": 17000,
+                  "repeatAskRate": 0.02,
+                  "agentRepeats": 0,
+                  "answeredLater": null
+                },
+                "quality": {
+                  "sampled": 40,
+                  "helpedYes": 16,
+                  "helpedPartly": 14,
+                  "helpedNo": 6
+                },
+                "checks": {
+                  "language": 0.97,
+                  "addressed": 0.92,
+                  "policy_safe": 1,
+                  "routing": 0.95,
+                  "actionable": 0.9,
+                  "continuity": 0.97
+                },
+                "stability": {
+                  "turnErrors": 0,
+                  "modelCallFailures": 3,
+                  "recoveredByFallback": 3,
+                  "processErrors": 0,
+                  "restarts": 0,
+                  "knowledgeAgeHours": 20,
+                  "safeReplyTurns": 0,
+                  "safeReplyTickets": 0
+                },
+                "autonomy": {
+                  "resolvedWithoutPerson": 120,
+                  "toPersonPolicy": 15,
+                  "toPersonInability": 7,
+                  "queueOldestMinutes": 45,
+                  "queueSlaMinutes": 240,
+                  "answeredTickets": 7
+                }
+              }
+            }
+          }
+        ],
+        "cursor": "5102"
+      }
+    },
+    {
+      "name": "service-events-page-support-quality-sk-slug",
+      "valid": true,
+      "document": {
+        "events": [
+          {
+            "id": "5101",
+            "at": "2026-10-19T00:20:00Z",
+            "kind": "support.quality_daily",
+            "level": "info",
+            "text": "Support quality for chat on 2026-10-18, project:helpdesk-customer-support: 35 tickets ended.",
+            "data": {
+              "schema": "https://support.example.com/schemas/support-quality-daily.schema.json",
+              "value": {
+                "kind": "support-quality-daily/1",
+                "day": "2026-10-18",
+                "channel": "chat",
+                "project": "project:helpdesk-customer-support",
+                "rubricVersion": "v1",
+                "judgeModel": "qwen/qwen3.8-flash",
+                "notMeasured": [
+                  "nobodyDropped.answeredLater"
+                ],
+                "arrived": 37,
+                "ended": 35,
+                "notATicket": 4,
+                "open": {
+                  "handedOpen": 2,
+                  "questionOpen": 1,
+                  "awaitingCustomer": 3,
+                  "awaitingApproval": 0
+                },
+                "outcomes": {
+                  "handoffsClosedByPerson": 6,
+                  "referred": 1,
+                  "answeredElsewhere": 2,
+                  "noReplyOwed": 3,
+                  "customerSilent": 1,
+                  "expiredByDecision": 0,
+                  "expired": 1,
+                  "unanswered": 0,
+                  "firstReplyLate": 2,
+                  "promotions": 0
+                },
+                "nobodyDropped": {
+                  "turns": 142,
+                  "replyCoverage": 1,
+                  "firstReplyP50Ms": 8300,
+                  "firstReplyP90Ms": 17000,
+                  "repeatAskRate": 0.02,
+                  "agentRepeats": 0,
+                  "answeredLater": null
+                },
+                "quality": {
+                  "sampled": 40,
+                  "helpedYes": 16,
+                  "helpedPartly": 14,
+                  "helpedNo": 6
+                },
+                "checks": {
+                  "language": 0.97,
+                  "addressed": 0.92,
+                  "policy_safe": 1,
+                  "routing": 0.95,
+                  "actionable": 0.9,
+                  "continuity": 0.97
+                },
+                "stability": {
+                  "turnErrors": 0,
+                  "modelCallFailures": 3,
+                  "recoveredByFallback": 3,
+                  "processErrors": 0,
+                  "restarts": 0,
+                  "knowledgeAgeHours": 20,
+                  "safeReplyTurns": 1,
+                  "safeReplyTickets": 1
+                },
+                "autonomy": {
+                  "resolvedWithoutPerson": 120,
+                  "toPersonPolicy": 15,
+                  "toPersonInability": 7,
+                  "queueOldestMinutes": 45,
+                  "queueSlaMinutes": 240,
+                  "answeredTickets": 20
+                }
+              }
+            }
+          }
+        ],
+        "cursor": "5101"
+      }
+    },
+    {
       "name": "service-events-page-data-long-string",
       "valid": false,
       "document": {
@@ -1436,12 +1706,7 @@
         ],
         "cursor": "1"
       },
-      "findings": [
-        {
-          "code": "FAC-SEM-101",
-          "instancePath": "/events/0/data/value/list/1"
-        }
-      ]
+      "findings": []
     },
     {
       "page": {

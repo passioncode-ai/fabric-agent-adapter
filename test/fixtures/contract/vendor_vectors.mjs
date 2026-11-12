@@ -19,7 +19,7 @@
 //
 // Plain `node` does not do: Node's type stripping refuses src/http-signature.ts (a parameter property,
 // ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX), and Node 26 has no --experimental-transform-types. Checked 2026-11-12 at the pin
-// 18f8d487 under Node 26: every file it writes equal to the vendored one. The hub keys' private seeds are dropped:
+// 93e7db16 under Node 26 (and before it at 18f8d487): every file it writes equal to the vendored one. The hub keys' private seeds are dropped:
 // the kits verify and never sign.
 
 import crypto from 'node:crypto';

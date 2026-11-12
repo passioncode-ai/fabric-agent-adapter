@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `18f8d48762edc5bfb1433657cbfe1c16196df1a6`
+Pinned to `fabric-agent-contract` commit `93e7db164c7829e2783b4b7705c4113bb5201131`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;
@@ -238,7 +238,8 @@ listener of this account's pid on the port counts as this account's (`CheckedHTT
 refuses (the probe, the hub client and `fabric_http` included, FAA-272), and Apple's `/usr/bin/python3` sees the
 whole table (FAA-267). A vouch is a weaker proof than the table's: it shows the job's pid listens on the port (`127.0.0.1` or the
 IPv4 wildcard for a LaunchAgent's installer, exactly `127.0.0.1` for a LaunchDaemon's), not that it accepted this connection, so a more specific bind by root over a wildcard job would pass;
-the contract's ruling on vouching is CT-261.
+the pin's ruling on vouching is DEC-0155 RT-3 (the contract's CT-261), which vouches only for a listen on exactly
+`127.0.0.1`: the kit's IPv4 wildcard vouch for a LaunchAgent departs from it until a later release (filed by FAA-258).
 
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
 a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`, its
