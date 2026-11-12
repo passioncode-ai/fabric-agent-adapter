@@ -95,6 +95,9 @@ def _refuse_sibling(step: str, missing: BaseException) -> NoReturn:
 
 _WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the checked tree adds no .pyc
 _STEP = "fabric_secrets"  # the sibling being loaded, so a refusal names it whatever the exception says
+#: The public names of fabric_secrets the check and its command line read (FAA-190 (2), (12)), checked when it loads.
+SECRETS_NAMES = ("BEARER_INSIDE", "JS_SPACE", "NOT_LINE_END", "SCHEME", "credential_name", "has_jwt", "jwt_spans",
+                 "long_secret", "raw_values", "secret_value", "url_parts")
 try:
     import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
     _STEP = "fabric_source_ignore"
@@ -105,12 +108,18 @@ try:
     _STEP = "fabric_source_homes"
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
+    _STEP = "fabric_source_check_cli"
+    from fabric_source_check_cli import (  # noqa: E402,F401 - the command line, beside this file (FAA-190 (104))
+        LIST_NAME, _Parser, _absolute, _list_path, _print, default_list, run_check)
+    _STEP = "fabric_secrets"
+    for _name in SECRETS_NAMES:  # a detector from another version fails here, never at the first file read (FAA-190 (89))
+        if not hasattr(_secrets, _name):
+            raise ImportError(_name)
 except Exception as _missing:  # a copy without its siblings, or mixed from two versions: a refusal, never exit 1
     _refuse_sibling(_STEP, _missing)
 finally:
     sys.dont_write_bytecode = _WROTE_BYTECODE
 
-LIST_NAME = "instance-strings.txt"
 #: The folders `pack` refuses to carry (fabric_package.JUNK); --every-file leaves them and the files below unread.
 PACK_REFUSES = {".git", "__pycache__"}
 WALK_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", ".tox", ".mypy_cache", ".pytest_cache"}
@@ -145,12 +154,12 @@ SYNTHETIC = ("example", "not-a-key", "notakey", "fake", "dummy", "placeholder", 
 # This check's own key shapes, the detector's before DEC-0151 (unbounded, ASCII case-insensitive), apart from the shared
 # SECRET_VALUE for parity with the contract's tree check (KEY_SHAPE_SOURCES, `src/source-rules.ts` at the pin; CT-207,
 # FAA-258). Not the detector's `^bearer\s.+`, which reads a whole header value and would take prose that starts with the
-# word: a bearer token is looked for as `_BEARER_INSIDE` does, the word, then a run of 12 or more with a digit.
+# word: a bearer token is looked for as `BEARER_INSIDE` does, the word, then a run of 12 or more with a digit.
 KEY_SHAPE_SOURCES = ("sk-[A-Za-z0-9_-]{16,}", "gh[pousr]_[A-Za-z0-9]{20,}", "xox[abposr]-[A-Za-z0-9-]{10,}", "AKIA[0-9A-Z]{16}", "glpat-[A-Za-z0-9_-]{20,}")
 PROVIDER_KEY = re.compile("(" + "|".join(KEY_SHAPE_SOURCES) + ")", re.IGNORECASE | re.ASCII)
 #: A URL parameter's value read as the contract's tree check reads it (`URL_SECRET_VALUE` in `src/source-rules.ts`): the
 #: detector's whole-value `^bearer` branch and this check's own unbounded shapes, never the shared DEC-0151 detector.
-URL_SECRET_VALUE = re.compile("(^bearer[" + _secrets.JS_SPACE + "]" + _secrets._NOT_LINE_END + "+|" + "|".join(KEY_SHAPE_SOURCES) + ")",
+URL_SECRET_VALUE = re.compile("(^bearer[" + _secrets.JS_SPACE + "]" + _secrets.NOT_LINE_END + "+|" + "|".join(KEY_SHAPE_SOURCES) + ")",
                               re.IGNORECASE | re.ASCII)
 #: Files that are credentials by their name: pack's own rule (fabric_package.SECRET_FILE and SECRET_FILE_OK, held
 #: equal by test_source_check), and the kit's token files (`service.token`, fabric_auth; `board.credential`, fabric_hub).
@@ -217,7 +226,7 @@ def _url_secret(url: str, depth: int = 0) -> bool:
     So: a password of 8 or more mixing letters and digits, or a query or fragment value that, percent-decoded, is shaped
     like a credential (a provider key, a JWT, a long random run under a credential's name)."""
     url = url.rstrip(".,;)]}")
-    if not _secrets._SCHEME.match(url):
+    if not _secrets.SCHEME.match(url):
         return False
     password, query, fragment = _secrets.url_parts(url)
     # what says it is synthetic is the value, never the host or the path (`examples.blob.core.windows.net`)
@@ -233,7 +242,7 @@ def _url_secret(url: str, depth: int = 0) -> bool:
                     return True
                 if not _real(value):
                     continue
-                if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
+                if (_secrets.credential_name(name) and _secrets.long_secret(value)) or \
                         _secrets.has_jwt(value) or URL_SECRET_VALUE.search(value):
                     return True
     return False
@@ -293,13 +302,13 @@ def _secret_in(line: str) -> Optional[str]:
     # with a segment ending in `sk` (`task-management-service`) would read as a key.
     if any(True for _ in _provider_keys(line)):
         return "a value shaped like a provider key"
-    if any(_real(m.group(0)) for m in _overlapping(_secrets._BEARER_INSIDE, line)):
+    if any(_real(m.group(0)) for m in _overlapping(_secrets.BEARER_INSIDE, line)):
         return "a bearer token"
     if "://" in line and any(_url_secret(m.group(0)) for m in URL.finditer(line)):
         return "a URL that carries a credential"
     for m in (_assigned(line) if ":" in line or "=" in line else ()):
         name, value = m.group(1), m.group(2)
-        if _credential(name, value, _quoted(line, m)) and _secrets._long_secret(unquote(value)) and _real(unquote(value)):
+        if _credential(name, value, _quoted(line, m)) and _secrets.long_secret(unquote(value)) and _real(unquote(value)):
             return "a long random value assigned to a credential's name"
     return None
 
@@ -489,10 +498,10 @@ def _raw_secret_spans(text: str) -> List[Tuple[int, int]]:
     spans += [(a, b) for a, b in _secrets.jwt_spans(text) if _real(text[a:b])]  # one pass (FAA-313)
     spans += [m.span(1) for m in JWK_PRIVATE.finditer(text) if _real(m.group(1))]
     spans += list(_provider_keys(text))
-    spans += [m.span() for m in _overlapping(_secrets._BEARER_INSIDE, text) if _real(m.group(0))]
+    spans += [m.span() for m in _overlapping(_secrets.BEARER_INSIDE, text) if _real(m.group(0))]
     spans += [m.span() for m in URL.finditer(text) if _url_secret(m.group(0))]
     spans += [m.span(2) for m in _assigned(text)
-              if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets._long_secret(unquote(m.group(2)))
+              if _credential(m.group(1), m.group(2), _quoted(text, m)) and _secrets.long_secret(unquote(m.group(2)))
               and _real(unquote(m.group(2)))]
     return spans
 
@@ -814,145 +823,9 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
             "dependencies": [shown(d) for d in dependencies]}
 
 
-def _absolute(path: str, platform: str) -> bool:
-    return bool(re.match(r"[A-Za-z]:[\\/]|[\\/]{2}", path)) if platform == "win32" else path.startswith("/")
-
-
-def default_list(platform: Optional[str] = None, env: Optional[Dict[str, str]] = None) -> Path:
-    """Where the owner's list is kept when none is named: the user's configuration folder, never a project's."""
-    platform = platform or sys.platform
-    env = os.environ if env is None else env
-    # a relative value is ignored, as the XDG spec says (a quoted `~/.config` is relative too): never "no list"
-    if platform == "win32":
-        appdata = env.get("APPDATA", "")
-        base = Path(appdata) if appdata and _absolute(appdata, platform) else Path.home() / "AppData" / "Roaming"
-    else:
-        xdg = env.get("XDG_CONFIG_HOME", "")
-        base = Path(xdg) if xdg.startswith("/") else Path.home() / ".config"
-    return base / "passioncode-fabric" / LIST_NAME
-
-
-def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
-    """The owner's list and whether it must be read (a named or an existing default list; else no list)."""
-    named = given or os.environ.get("FABRIC_INSTANCE_STRINGS")
-    if named:
-        try:
-            return Path(named).expanduser(), True
-        except (RuntimeError, KeyError):  # `~user` with no such user (KeyError on 3.9): never "no finding"
-            raise CheckError("the owner's list cannot be read")
-    try:
-        default = default_list()
-    except (RuntimeError, KeyError):  # no HOME and no account entry (a container's arbitrary user)
-        raise CheckError("there is no home folder to find the owner's list in: set an absolute XDG_CONFIG_HOME (APPDATA on "
-                         "Windows) or name the list with --instance-strings")
-    try:
-        os.stat(str(default))
-    except (FileNotFoundError, NotADirectoryError):
-        # a link to a list, its folder or the configuration folder on a volume not mounted: there, but not reachable
-        if any(os.path.lexists(str(p)) and not os.path.exists(str(p)) for p in (default, *default.parents)):
-            raise CheckError("the owner's list in your configuration folder cannot be read")
-        return None, False
-    except OSError:  # a list that is there but cannot be reached is not "no list": that would fail open
-        raise CheckError("the owner's list cannot be read")
-    return default, True
-
-
-class _Parser(argparse.ArgumentParser):
-    def error(self, message: str) -> NoReturn:  # argparse would repeat the arguments it could not read
-        self.print_usage(sys.stderr)
-        self.exit(2, "fabric_source_check.py: the arguments cannot be read; see the usage above\n")
-
-
-def _print(text: str) -> None:
-    """Print a line the console may not encode (a name in another script, a byte Git kept as a surrogate)."""
-    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
-    print(text.encode(encoding, "backslashreplace").decode(encoding, "replace"))
-
-
 def run(argv: Optional[List[str]] = None) -> int:
-    parser = _Parser(prog="fabric_source_check.py", description="Find instance data in an agent's source.")
-    sub = parser.add_subparsers(dest="command", required=True)
-    cmd = sub.add_parser("check", help="read the source tree and report instance data without repeating it")
-    cmd.add_argument("root", nargs="?", default=".")
-    cmd.add_argument("--instance-strings", metavar="FILE")
-    cmd.add_argument("--exclude", action="append", default=[], metavar="GLOB")
-    cmd.add_argument("--json", action="store_true")
-    cmd.add_argument("--every-file", action="store_true", help="read every file, not only what Git would commit")
-    try:
-        args = parser.parse_args(argv)
-    except SystemExit as exc:  # --help, or arguments argparse refused: the exit code, as the command line gives it
-        return exc.code if isinstance(exc.code, int) else 2
-    try:
-        try:
-            root = Path(args.root).expanduser().resolve()
-            is_folder = root.is_dir()
-        except (OSError, RuntimeError, KeyError):  # a parent it cannot search, a symlink loop, `~` with no home
-            raise CheckError("the folder cannot be read")
-        if not is_folder:
-            raise CheckError("ROOT is not a folder")
-        list_path, _ = _list_path(args.instance_strings)  # may raise CheckError
-        entries: List[str] = []
-        if list_path is not None:
-            try:
-                resolved = list_path.resolve()
-            except (OSError, RuntimeError):  # RuntimeError: Python 3.9's symlink loop
-                raise CheckError("the owner's list cannot be read")
-            if resolved == root or root in resolved.parents:
-                raise CheckError("the owner's list is inside the tree it checks, where it would travel with the source; "
-                                 "keep it in your configuration folder (passioncode-fabric/%s)" % LIST_NAME)
-            try:
-                present = resolved.is_file()
-            except OSError:
-                raise CheckError("the owner's list cannot be read")
-            if not present:
-                raise CheckError("the owner's list named by --instance-strings or FABRIC_INSTANCE_STRINGS does not exist or is "
-                                 "not a regular file"
-                                 if args.instance_strings or os.environ.get("FABRIC_INSTANCE_STRINGS")
-                                 else "the owner's list in your configuration folder is not a file")
-            try:
-                entries = read_list(resolved)
-            except UnicodeDecodeError:
-                raise CheckError("the owner's list is not UTF-8")
-            except OSError:
-                raise CheckError("the owner's list cannot be read")
-        result = check(root, entries, ignore_globs(root, args.exclude), args.every_file)
-    except CheckError as exc:
-        print("fabric_source_check.py: %s" % exc, file=sys.stderr)
-        return 2
-    if result.get("manifest"):  # under fabric.source.json: its own report (fabric_source_tree.print_run)
-        return sys.modules["fabric_source_tree"].print_run(result, entries, list_path is not None, args.json, _print)
-    findings = result["findings"]
-    skipped = result["skipped"]
-    listed = sum(1 for e in entries if e and not e.startswith(HOME_ENTRY))
-    homes = sum(1 for e in entries if e.startswith(HOME_ENTRY))
-    # a binary file is not read either: it is complete only when every one is named as source in the ignore file
-    complete = not (skipped["unreadable"] or skipped["binary"] or skipped["nested"])  # type: ignore[index]
-    result.update({"instanceStrings": listed, "ownerHomes": homes, "instanceList": list_path is not None, "blocking": bool(findings),
-                   "complete": complete})
-    if args.json:
-        _print(json.dumps(result, indent=2))
-    else:
-        for f in findings:  # type: ignore[union-attr]
-            _print("%s:%s: %s (%s)" % (f["path"], f["line"], f["kind"], f["rule"]))
-        for n in result["notRead"]:  # type: ignore[union-attr]
-            _print("%s: not read (%s)" % (n["path"], n["why"]))
-        for folder in result["dependencies"]:  # type: ignore[union-attr]
-            _print("%s: not read (a dependency folder; --every-file reads it)" % folder)
-        if skipped["dependencies"]:  # type: ignore[index]
-            _print("%d dependency folder(s) not read (node_modules, virtual environments, caches); --every-file reads "
-                   "them" % skipped["dependencies"])  # type: ignore[index]
-        _print("%d file(s) read (%s), %d finding(s); not read: %d binary, %d unreadable, %d nested repository; "
-               "%d left out by name; %d instance string(s) listed%s%s"
-               % (result["files"], "what Git would commit" if result["mode"] == "git" else
-                  "every file, as pack reads them" if args.every_file else "every file but dependency folders, Git not used",
-                  len(findings), skipped["binary"], skipped["unreadable"], skipped["nested"],  # type: ignore[index]
-                  skipped["excluded"], listed,  # type: ignore[index]
-                  "" if listed or homes else (" (the owner's list holds no string of three or more characters)"
-                                              if list_path else " (no owner's list)"),
-                  "; %d home name(s) declared" % homes if homes else ""))
-    if findings:
-        return 1
-    return 0 if complete else 2
+    """The command line (fabric_source_check_cli.run_check), run with this module's check."""
+    return run_check(argv, check, read_list, ignore_globs, HOME_ENTRY)
 
 
 if __name__ == "__main__":

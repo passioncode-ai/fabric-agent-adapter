@@ -121,6 +121,12 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check <project-root>
 ```
 
+Run it by path, with its scripts folder whole: it loads its siblings (`fabric_source_ignore.py`,
+`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_check_cli.py`, `fabric_source_tree.py` and the
+contract's detector `fabric_secrets.py`) and refuses with exit `2` when one is missing or from another version, a
+detector without one of the public names it reads included (FAA-190). `python3 -m fabric_source_check` writes its own
+`.pyc` before the check turns bytecode off; run by path, it writes nothing.
+
 - It **never repeats** a value it found: no value, no line holding one, no entry of the owner's list and not the
   folder it checks reaches its output. A file's path is checked like its text (line `0` of a finding), and printed
   with an entry of the list as `<line N>`, a home folder's name as `<home>` and each segment holding a
