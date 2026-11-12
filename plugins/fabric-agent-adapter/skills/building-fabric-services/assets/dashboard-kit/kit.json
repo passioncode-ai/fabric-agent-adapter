@@ -16,7 +16,7 @@
   ],
   "files": {
     "fabric-dashboard.css": "7a90bbe1f1a2170df5dac0f596a3f302167bef9a7243457bb21dd0eb34f4d359",
-    "fabric-dashboard.js": "fdb685749af1f7100901f99feb30640d82e7fca1359cf4f07e4a492799eff019",
+    "fabric-dashboard.js": "146ec9a0fd50af2df3245c02ec7dfba75b7d4e8cb5476fedb5ef727869fef1cc",
     "fabric-button.js": "60c2b6d44571213e0237c29a94a4cf220f9de3efcfa697ac6a33777d1ad25fd6",
     "themes.json": "511839f1a1a83eb37fadfd132791474497d5c28c5091700b9aa31ad076e359b5"
   },
@@ -57,7 +57,7 @@
     },
     "1.1.6": {
       "fabric-dashboard.css": "7a90bbe1f1a2170df5dac0f596a3f302167bef9a7243457bb21dd0eb34f4d359",
-      "fabric-dashboard.js": "fdb685749af1f7100901f99feb30640d82e7fca1359cf4f07e4a492799eff019",
+      "fabric-dashboard.js": "146ec9a0fd50af2df3245c02ec7dfba75b7d4e8cb5476fedb5ef727869fef1cc",
       "fabric-button.js": "60c2b6d44571213e0237c29a94a4cf220f9de3efcfa697ac6a33777d1ad25fd6"
     }
   }
