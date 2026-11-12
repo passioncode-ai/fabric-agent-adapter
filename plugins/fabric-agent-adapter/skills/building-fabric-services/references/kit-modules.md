@@ -79,7 +79,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_a2a` | the reading side of an A2A Agent Card: `surfaces.a2a` as the schema reads it, and what a public card must not carry (DEC-0122) |
 | L3 | `fabric_page_links` | a service's pages as Fabric Dashboards' open_link: build and read it, a raw local address, FAC-SEM-143 on a link and on a URL-mode input request (DEC-0123); the Python twin reads URLs as WHATWG does by hand |
 | L3 | `fabric_load` | the call queue and the load report of DEC-0104 (FAA-289): `job_caller_key`, `next_queued_job`, `admit_job`, `queue_status_message`, `read_queue_position`, FAC-SEM-131 to 133, the `service-load/1` and `extensions/load/0.1` shapes, `load_extension`; imports `fabric_connections` for ajv's `date-time` ([interop](interop.md#a-nodes-call-queue)) |
-| L3 | `fabric_lock` | the instance lock and the supervisor marker (LC-01, DEC-0057) |
+| L3 | `fabric_lock` | the instance lock, its watch where the lock has no path-keyed name (macOS, FAA-303), and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |
 | L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document, the loopback HTTP server that refuses another OS account's peer before reading it (`LoopbackHTTPServer`, Node `loopbackServer`; FAA-227) |
