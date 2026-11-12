@@ -79,7 +79,8 @@ export function fabricRoot(platform = process.platform, env = process.env) {
 /**
  * true: a process of this OS account runs under pid; false: none does. null (falsy): a process of another account does
  * (EPERM), as when the id hub.json names was reused: not verified, never called running (FAA-304, the session hooks'
- * answer since FAA-254). Never signals it.
+ * answer since FAA-254). Never signals it. On Windows libuv opens the process for terminate, query and synchronize, so
+ * an elevated process of the same user answers EPERM too; the Python twin asks OpenProcess for the same access (FAA-323).
  */
 export function pidAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;

@@ -318,8 +318,9 @@ class Hub(Base):
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from test_fabric_hub import windows_answers
         env = sys.modules["fabric_session_env"]
-        self.assertEqual(windows_answers(env._windows_pid_alive), {"denied": None, "invalid": False, "running": True,
-                                                                   "exited": False, "unreadable": False})
+        self.assertEqual(windows_answers(env._windows_pid_alive), {"denied": None, "elevated": None, "invalid": False,
+                                                                   "running": True, "exited": False, "unreadable": False,
+                                                                   "ended-259": False})
 
     def test_another_account_s_process_under_the_pid_is_not_verified(self):
         # FAA-254: EPERM is a process of another OS account under the id hub.json names (a reused pid): never called

@@ -405,7 +405,9 @@ Python (`fabric_hub`): `fabric_root(platform, env)`, `locate_hub(root=None, aliv
 `request_board_access(agent_id, project_id, capabilities, reason)`, `poll_access(request_id, poll_secret,
 credential_file)`, `join_board(project_id, credential_file) -> BoardGrant`, `call_door(tool, args)`,
 `call_binding(tool, args, credential_file)`; `pid_alive(pid)` answers True, False, or None for another OS account's
-process (not verified); `Backoff(first=2, cap=300, jitter=0.2, floor=1)`; `HubError(code,
+process (not verified); on Windows it asks OpenProcess for the access Node's `process.kill(pid, 0)` asks (libuv's
+terminate, query and synchronize), so an elevated process of the same user reads None in both kits, as another
+account's does, where limited query access alone would have read it as running (FAA-323); `Backoff(first=2, cap=300, jitter=0.2, floor=1)`; `HubError(code,
 message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,

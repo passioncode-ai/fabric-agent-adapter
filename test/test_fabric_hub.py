@@ -22,18 +22,28 @@ VECTORS = json.loads((HERE / "fixtures/contract/hub-key-vectors.json").read_text
 
 
 
+#: The access libuv's uv_kill asks OpenProcess for (process.kill(pid, 0) in Node): PROCESS_TERMINATE,
+#: PROCESS_QUERY_INFORMATION and SYNCHRONIZE. An elevated process of the same user denies it where limited query access
+#: would pass, so asking the same mask keeps the twins' answers equal (FAA-323).
+UV_KILL_ACCESS = 0x0001 | 0x0400 | 0x00100000
+
+
 class FakeKernel:
     """kernel32 as pid_alive calls it on Windows: OpenProcess answers a handle or 0 with a last error, GetExitCodeProcess
-    writes the exit code (259 is STILL_ACTIVE). Each case names what the OS would say."""
-    CASES = {"denied": (0, 5, None), "invalid": (0, 87, None), "running": (7, 0, 259), "exited": (7, 0, 0),
-             "unreadable": (7, 0, False)}
+    writes the exit code (259 is STILL_ACTIVE), WaitForSingleObject answers 0 (WAIT_OBJECT_0) for a process that has
+    ended or 258 (WAIT_TIMEOUT) for one that runs. Each case names what the OS would say: `elevated` is an elevated
+    process of the same user, which refuses libuv's access as another account's does (FAA-323); `ended-259` one that
+    exited with code 259, which only the wait tells apart, as libuv's does."""
+    CASES = {"denied": (0, 5, None, None), "elevated": (0, 5, None, None), "invalid": (0, 87, None, None),
+             "running": (7, 0, 259, 258), "exited": (7, 0, 0, 0), "unreadable": (7, 0, False, None),
+             "ended-259": (7, 0, 259, 0)}
 
     def __init__(self, case):
-        self.handle, self.error, self.code = self.CASES[case]
+        self.handle, self.error, self.code, self.wait = self.CASES[case]
         self.closed = []
 
     def OpenProcess(self, access, inherit, pid):
-        assert access == 0x1000 and inherit is False and pid == 4242  # PROCESS_QUERY_LIMITED_INFORMATION only
+        assert access == UV_KILL_ACCESS and inherit is False and pid == 4242, access  # libuv's mask, never less
         return self.handle
 
     def GetExitCodeProcess(self, handle, code):
@@ -41,6 +51,10 @@ class FakeKernel:
             return 0
         code._obj.value = self.code
         return 1
+
+    def WaitForSingleObject(self, handle, milliseconds):
+        assert milliseconds == 0 and self.wait is not None
+        return self.wait
 
     def CloseHandle(self, handle):
         self.closed.append(handle)
@@ -110,8 +124,9 @@ class LocateTests(HubTestCase):
         """FAA-304: on Windows, OpenProcess refused with ERROR_ACCESS_DENIED is another account's or an elevated
         process, the third answer (None) Node's process.kill(pid, 0) gives as EPERM; any other refusal is no process.
         The OS calls are faked, so this runs on every OS."""
-        self.assertEqual(windows_answers(fh._windows_pid_alive), {"denied": None, "invalid": False, "running": True,
-                                                                  "exited": False, "unreadable": False})
+        self.assertEqual(windows_answers(fh._windows_pid_alive), {"denied": None, "elevated": None, "invalid": False,
+                                                                  "running": True, "exited": False, "unreadable": False,
+                                                                  "ended-259": False})
 
     def test_refuses_what_is_not_fabrics_hub(self):
         cases = [
