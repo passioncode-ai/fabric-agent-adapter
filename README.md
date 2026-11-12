@@ -23,10 +23,12 @@ The skills are `adapting-projects-to-fabric`, `creating-fabric-agents`,
 `working-with-fabric` is for the other side: a coding agent (Claude Code, Codex, Kimi Code, Kilo, Hermes) opened in
 a terminal that works in a project through Fabric. It finds Fabric (`hub.json`, its `pid`), has the machine's
 lifecycle broker start it when it is down, registers `fabric-mcp` once with no secret, calls `fabric_whoami`
-first, reads the project board (`com.status`, `com.list`, `com.read_ack` only what was read), answers what waits on its
-Project in the same turn with its state (the result later; a request its Project's service should take stays queued; before Fabric 0.3.17 a run Fabric starts
+first, reads the project board (`com.status`, `com.list`, `com.read_ack` only what was read): an announcement or
+question waiting on its Project gets its state in the same turn (the result later), and a request to its Project is
+read through its capability's slot in `com.status` (`active` is left to its holder and nobody is asked; otherwise
+`com.enroll`, and only the slot's holder gives the request its state; before Fabric 0.3.17 a run Fabric starts
 declines a request no session can take and the asker resends, and from 0.3.17 the session's own Project is granted
-`board.respond` at `com.enroll`, CO-506), and asks other
+`board.respond` at `com.enroll`, CO-506). It asks other
 Projects only through `com.submit`, asks who is working on what and claims its task before it starts
 (`fabric_work_list`, `fabric_work_claim`, Fabric v0.3.5 and later), links tasks to backlog rows instead of copying them, and
 releases at the end (`fabric_work_release`). `scripts/fabric_session.py status` prints where Fabric stands and one

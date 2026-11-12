@@ -62,6 +62,20 @@ class LiveSession(unittest.TestCase):
                       "keeps it and nobody is asked)", skill)
 
 
+class Readme(unittest.TestCase):
+    def test_the_readme_states_the_preamble_rule(self):
+        """README.md restates the session preamble (fabric_session_cli.PREAMBLE): an announcement or question gets its
+        state in the same turn, a request is read through its capability's slot, never the pre-FAA-311 'stays queued'."""
+        readme = flat(ROOT / "README.md")
+        for word in ("an announcement or question waiting on its Project gets its state in the same turn",
+                     "a request to its Project is read through its capability's slot in `com.status`",
+                     "`active` is left to its holder and nobody is asked",
+                     "otherwise `com.enroll`, and only the slot's holder gives the request its state"):
+            with self.subTest(word=word[:40]):
+                self.assertIn(word, readme)
+        self.assertNotIn("should take stays queued", readme)
+
+
 class DispatchedRun(unittest.TestCase):
     def test_step_3_reads_the_slot_and_leaves_an_active_one(self):
         step3 = RUN.split("3. **Take the request.**", 1)[1].split("4. **Do the work**", 1)[0]
