@@ -66,6 +66,19 @@ for _name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTOR
     os.environ.pop(_name, None)
 
 
+def growth(work, small, large, runs=3):
+    """How much longer `work(large)` takes than `work(small)`: each size's fastest of `runs`, measured in turn so a load
+    that slows the machine slows both (FAA-209: a wall-clock bound fails under load, a ratio of two sizes does not)."""
+    best = {small: None, large: None}
+    for _ in range(runs):
+        for size in (small, large):
+            started = time.perf_counter()
+            work(size)
+            took = time.perf_counter() - started
+            best[size] = took if best[size] is None else min(best[size], took)
+    return best[large] / max(best[small], 1e-9)
+
+
 class Tree(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -183,12 +196,17 @@ class Findings(Tree):
         code, out, err = run(["check", str(self.root)])
         self.assertEqual(code, 1)
         self.assertNotIn(key[3:11], out + err)
-        start = time.perf_counter()  # a long run of dropped starts is read once, not once a start
-        self.assertIsNone(sc._secret_finding(("sk" + "-not-a-key-") * 200000))
-        crafted = "a" + "xo" + "xb-" + ("sk" + "-") * 300000 + "_fa" + "ke"  # each inner start ran to the end once
-        self.assertIsNone(sc._secret_finding(crafted))
-        self.assertEqual(sc._secret_spans(crafted), [])
-        self.assertLess(time.perf_counter() - start, 5)
+        # a long run of dropped starts is read once, not once a start: four times the run costs about four times as
+        # much, where reading each start to the end cost sixteen (FAA-209: a ratio, not a wall-clock bound)
+        def dropped(n):
+            self.assertIsNone(sc._secret_finding(("sk" + "-not-a-key-") * n))
+
+        def crafted(n):  # each inner start ran to the end once
+            text = "a" + "xo" + "xb-" + ("sk" + "-") * n + "_fa" + "ke"
+            self.assertIsNone(sc._secret_finding(text))
+            self.assertEqual(sc._secret_spans(text), [])
+        self.assertLess(growth(dropped, 50000, 200000), 9)
+        self.assertLess(growth(crafted, 75000, 300000), 9)
 
     def test_a_narrow_key_before_a_synthetic_word_is_found(self):
         # a key whose class ends before the synthetic word (ghp_, AKIA, xox) is read by its own end
@@ -356,17 +374,9 @@ class Findings(Tree):
         self.assertLess(time.monotonic() - started, 1.0)
 
     def test_a_minified_json_line_of_quoted_members_is_read_in_linear_time(self):
-        def cost(members):
-            line = "{" + ",".join('"f%d":"%s"' % (i, "0123456789abcdef" * 4) for i in range(members)) + "}"
-            best = None
-            for _ in range(2):
-                started = time.perf_counter()
-                self.assertIsNone(sc._secret_finding(line))
-                took = time.perf_counter() - started
-                best = took if best is None else min(best, took)
-            return best
+        lines = {n: "{" + ",".join('"f%d":"%s"' % (i, "0123456789abcdef" * 4) for i in range(n)) + "}" for n in (14000, 56000)}
         # four times the line costs about four times as much; copying the rest of the line per member cost nine
-        self.assertLess(cost(56000) / cost(14000), 6.5)
+        self.assertLess(growth(lambda n: self.assertIsNone(sc._secret_finding(lines[n])), 14000, 56000), 6.5)
 
     def test_the_litter_files_the_check_skips_are_packs(self):
         packer = _package_module()
