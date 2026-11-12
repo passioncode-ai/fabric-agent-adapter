@@ -171,6 +171,7 @@ then restart your agents. Alone, without any account:
 npx @passioncode-ai/fabric-agent-adapter        # installs every skill into the agents hub ~/.agents/skills
 npx @passioncode-ai/fabric-agent-adapter --prune-shadow   # remove ~/.claude/skills copies that shadow the plugin
 npx @passioncode-ai/fabric-agent-adapter --force          # update a copy already in the hub (a launcher link is never replaced)
+npx @passioncode-ai/fabric-agent-adapter new ./example-agent --id example-agent [--service]   # a new agent project, contract built in
 ```
 
 A copy already in the hub is left alone unless `--force` is given; with it, the new copy is built beside the old one
@@ -303,7 +304,14 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" scaffold /path/to/project \
 python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
   --contract /path/to/fabric-agent-contract --json
 python3 "$SKILL_DIR/scripts/adapt_project.py" source /path/to/project --dry-run   # propose fabric.source.json
+python3 "$SKILL_DIR/scripts/new_agent.py" ./example-agent --id example-agent      # what `npx ... new` runs
 ```
+
+`new` (FAA-270) writes a new agent project from the kit's template: the provider bundle pinned to the contract,
+`fabric.source.json`, the placement guard with its tests, and with `--service` the service kit's sample; a repeat
+changes nothing, a folder holding other files is refused without `--force`, and the last line is JSON
+([new-agent.md](plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/new-agent.md)). Inferring the agent
+from a sentence and running its evals (`new "<sentence>"`, `test`) stay with FAA-26.
 
 Pack, sign and verify an agent as a `fabric-package/1` folder (contract DEC-0050, DEC-0051; nothing is written without
 `--apply`, and the key file is the person's, never made or kept here). First check the checkout, then make the clean

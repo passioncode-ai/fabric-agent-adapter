@@ -85,7 +85,8 @@ source under it.
 | `publicAddresses` | the e-mail addresses the source may carry (a support address); another one warns |
 | `slots` | what an installation fills, by name: `secret` (a key), `config` (a setting: a repository URL, a folder, the supervisor label, the publisher's identity), `store` (a data store, with its path in the data folder), `endpoint` (the operator's infrastructure by role) |
 
-- **Laying it down.** A project gets it from `adapt_project.py source <project-root>` (adapting-projects-to-fabric's scripts), which proposes `include` from the
+- **Laying it down.** A new agent gets it from `new_agent.py` (creating-fabric-agents' `references/new-agent.md`); an
+  existing project from `adapt_project.py source <project-root>` (adapting-projects-to-fabric's scripts), which proposes `include` from the
   project's top-level entries (what Git would commit, instance data by its name left out) and names the kit's slots
   (`PUBLISHER_URI` where a provider manifest is there, `PLACEMENT_RECORD`, and with `--service` `SUPERVISOR_LABEL` and
   `SERVICE_PORT`); `--secret NAME:PURPOSE` and `--store NAME:PATH:PURPOSE` add the agent's own. `--dry-run` prints the

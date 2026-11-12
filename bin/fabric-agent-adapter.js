@@ -43,6 +43,11 @@ Packages (fabric-package/1):
   npx @passioncode-ai/fabric-agent-adapter verify <folder> --trust <trust.json> [--countersigned]
       check the folder and its signatures against the keys you pin
 
+A new agent (FAA-270; needs Python 3.9 or later):
+  npx @passioncode-ai/fabric-agent-adapter new <folder> --id <agent-id> [--profile mcp|a2a|local-runner] [--service] [--force] [--json]
+      create an agent project with the contract built in: the provider bundle, fabric.source.json, the placement
+      guard and, with --service, the service kit's sample; the last line is JSON
+
 Claude Code (recommended):
   claude plugin marketplace add ${REPO}
   claude plugin install ${PLUGIN_ID}
@@ -257,8 +262,26 @@ function main(argv) {
   return 0;
 }
 
+// `new` runs the skill's own script (adapting-projects-to-fabric/scripts/new_agent.py), one implementation for the
+// skill and this CLI, under the first Python 3 found on PATH; its output and exit code pass through unchanged.
+function newAgent(args) {
+  const { spawnSync } = require('child_process');
+  const script = path.join(ROOT, 'plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/new_agent.py');
+  const candidates = process.platform === 'win32' ? [['py', ['-3']], ['python', []], ['python3', []]] : [['python3', []], ['python', []]];
+  for (const [command, prefix] of candidates) {
+    const probe = spawnSync(command, [...prefix, '-c', 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)'], { stdio: 'ignore' });
+    if (probe.status !== 0) continue;
+    const run = spawnSync(command, [...prefix, script, ...args], { stdio: 'inherit' });
+    return run.status === null ? 1 : run.status;
+  }
+  console.error('error: `new` needs Python 3.9 or later on PATH (python3, or py -3 on Windows)');
+  return 2;
+}
+
 const PACKAGE_COMMANDS = ['pack', 'sign', 'verify'];
-if (PACKAGE_COMMANDS.includes(process.argv[2])) {
+if (process.argv[2] === 'new') {
+  process.exitCode = newAgent(process.argv.slice(3));
+} else if (PACKAGE_COMMANDS.includes(process.argv[2])) {
   // The package commands live in the kit (fabric-package.mjs), one implementation for the skill and this CLI.
   const kit = path.join(ROOT, 'plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-package.mjs');
   import(require('url').pathToFileURL(kit).href).then((m) => { process.exitCode = m.main(process.argv.slice(2)); });

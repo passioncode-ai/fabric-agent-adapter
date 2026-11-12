@@ -159,6 +159,9 @@ run it with the owner's list of their own strings, or record that none was given
 
 ## Step 3: scaffold the provider bundle
 
+For a project that does not exist yet, one command writes this step's bundle with the source manifest and the
+placement guard: `npx @passioncode-ai/fabric-agent-adapter new <folder> --id <agent-id>` ([new-agent.md](references/new-agent.md)).
+
 Reuse the sibling skill's scaffolder against the new skeleton with the profile chosen at
 step 0:
 
