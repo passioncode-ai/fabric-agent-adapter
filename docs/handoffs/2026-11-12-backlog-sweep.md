@@ -16,6 +16,7 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.80.0, 0.80.1 | wave 2 and wave 3's first builders (session scripts, kit and docs, the three operator rules, FAA-307, 2B's kit rows, FAA-289, the docs rows) | PRs #279 and #280, tags `v0.80.0` and `v0.80.1`; each run failed a platform test (macOS-only paths, Windows separators), nothing published |
 | 0.80.2 | 0.80.0 shipped, its two cross-platform test fixes in | PR #281, merge `b8d2355a`, tag `v0.80.2`, npm `latest` 0.80.2 |
 | 0.81.0 | wave 3: the repin to contract `v0.1.0+2026-11-08.1` (FAA-258, DEC-0151 `SECRET_VALUE`), the `fabric-source/1` tree and `new` (FAA-261, FAA-270, G21), `fabric_holds` and `limits.holds` (FAA-265), FAA-298, FAA-227, FAA-251, parts of FAA-260 and FAA-286, the seam reading's five fixes; new rows FAA-311 to FAA-319 | PR #282, merge `5511f98b`, tag `v0.81.0`, release run 43284542201 success, npm `latest` 0.81.0, GitHub release `v0.81.0` |
+| 0.82.0 | wave 4: FAA-311 (SA-6), FAA-312, 313, 315, 318 (peer owner and the one-pass JWT read), FAA-304, 306, 309, 314, 316, 317, FAA-303 (the lock watch on macOS), FAA-308, FAA-292's decision, and the seven findings of its blind seam reading; new rows FAA-320 to FAA-323 | branch `agent/faa-0.82.0`, validate run 43299843019 green on `178409d1`; the PR, merge and tag receipts follow in the next handoff cut |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -25,12 +26,15 @@ Recorded for the operator; later builder briefs name the rule.
 
 ## Next task
 
-1. 0.82.0 (wave 4) on `agent/faa-0.82.0`: merge the builders `agent/faa-w4a` (FAA-311), `w4b` (FAA-292, 312, 313, 315, 318), `w4c` (FAA-304, 306, 309, 314, 316, 317) and `w4d` (FAA-303, 308); rebuild `kit.json`; the CHANGELOG and the register under leases; the suites; one blind seam reading; PR, merge, tag.
+1. 0.82.0: PR from `agent/faa-0.82.0`, merge, tag `v0.82.0`, watch the release run, confirm npm and the GitHub
+   release, release the agent-sync leases (`CHANGELOG.md`, `docs/backlog.md`), remove the wave 4 worktrees and
+   branches (`agent/faa-w4a` to `w4e`).
 2. Tell fabric-workspace on the board that G21 is done (FAA-270) with the version; tell the estate's two services
-   with usage budgets about `limits.holds` (FAA-319). Remove the merged worktrees and branches.
-3. Wave 4: FAA-292 (peer owner through libproc), the small new rows (FAA-303, 304, 306, 308, 309, 311 to 318), the
-   follow-up rows (FAA-187, 190, 192, 194, 196, 200, 264) and the recipes and the rest (FAA-10, 66, 116, 126, 135,
-   182, 189, 201, 206, 233, 243, 250, 256, 260, 286), each triaged against `main` first.
+   with usage budgets about `limits.holds` (FAA-319). The board answered 503 (`stack-unavailable`) all evening of
+   2026-11-12; Fabric itself owns its recovery.
+3. Wave 5: FAA-292's L0 module (the accepted-socket proof), FAA-320 to FAA-323, the follow-up rows (FAA-187, 190,
+   192, 194, 196, 200, 264) and the recipes and the rest (FAA-10, 66, 116, 126, 135, 182, 189, 201, 206, 233, 243,
+   250, 256, 260, 286), each triaged against `main` first.
 
 ## Waits
 
