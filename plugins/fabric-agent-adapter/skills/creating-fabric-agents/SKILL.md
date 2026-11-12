@@ -250,7 +250,9 @@ file and a test per line, or `NOT_RUN` where the agent has no such stage.
 Report: capability, consumer, profile with the step-0 grill answers; the knowledge pack
 and which traps became fixtures; created files; contract version and commit; the gate
 table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`; remaining placeholders; the
-operator channel answer (step 6); the template it was built from (the database's id and version, the communication template prompt, or none); and the exact next command. Never summarize the outcome as
+operator channel answer (step 6); the template it was built from (the database's id and version, the communication template prompt, or none); for an agent that answers people, one line per item of
+[the checklist](references/agents-that-answer-people.md#checklist), each with a file and a test or `NOT_RUN`, its
+first-reply time measured from the person's message; and the exact next command. Never summarize the outcome as
 "Fabric-compatible" unless every required admission gate passed against the real provider.
 
 ## Agent pages open only in Fabric Dashboards
