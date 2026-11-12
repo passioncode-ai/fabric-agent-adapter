@@ -2414,7 +2414,7 @@ class Status(Base):
         # FAA-240 item 1: status's darwin guard on launcher_folder (removing it fails this)
         apps = "/opt/example/Apps"  # a darwin path on any runner: a Windows temp folder is not absolute there (0.80.0 CI)
         env = dict(self.env, PASSIONCODE_APPLICATIONS=apps)
-        self.assertEqual(fs.status(self.repo, env, "darwin")["launcherFolder"], apps)
+        self.assertEqual(fs.status(self.repo, env, "darwin")["launcherFolder"], str(Path(apps)))  # Path's separators
         for platform in ("linux", "win32"):
             self.assertIsNone(fs.status(self.repo, env, platform)["launcherFolder"], platform)
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.80.2 (2026-11-12)
+
+0.80.1 was tagged and never published: its `windows` job (run 43212508702) failed one test, so `release` and `publish`
+were skipped. 0.80.2 is 0.80.1 with that test fixed, and is the release that ships 0.80.0's changes. No module changes.
+
+### Fixed
+
+- `test_the_launchers_folder_is_macos_only` compared the folder `status` returns, written with the runner's own path
+  separators, with a POSIX string; it compares it with `str(Path(...))`.
+
 ## 0.80.1 (2026-11-12)
 
 0.80.0 was tagged and never published: its release run (43209105658) failed `floors`, `python` and `windows` on two
