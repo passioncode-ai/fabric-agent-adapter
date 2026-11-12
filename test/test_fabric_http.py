@@ -258,6 +258,53 @@ class DefaultTransport(unittest.TestCase):
             proxy.shutdown()
             proxy.server_close()
 
+    def test_insecure_http_that_reaches_loopback_is_checked_by_the_connected_address(self):
+        """FAA-260 items 1 and 8 (0.74.0 unit readings 7, 8 and 11): with insecure=True a URL not spelled as loopback
+        that still reaches 127.0.0.1 (`0.0.0.0`, `[::ffff:127.0.0.1]`, a name the hosts file maps there) and a request
+        through a loopback http_proxy are checked by the connected peer's address, so another account's listener gets
+        nothing and the Authorization header stays home."""
+        import socket
+        from unittest import mock
+        po = fh._po
+        port = self.server.server_address[1]
+        other = po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "x")
+        urls = []
+        for host, family in (("0.0.0.0", socket.AF_INET), ("[::ffff:127.0.0.1]", socket.AF_INET6)):
+            probe = socket.socket(family)
+            try:  # Windows refuses a connect to 0.0.0.0; a host without IPv6 has no mapped address
+                probe.settimeout(2)
+                probe.connect((host.strip("[]"), port))
+                urls.append("http://%s:%d/ok" % (host, port))
+            except OSError:
+                pass
+            finally:
+                probe.close()
+        # a name not spelled as loopback whose resolver answers 127.0.0.1, as a hosts-file entry does
+        real = socket.getaddrinfo
+
+        def hosts_file(host, *args, **kwargs):
+            return real("127.0.0.1" if host == "service.example" else host, *args, **kwargs)
+        before = len(Handler.seen)
+        with mock.patch.object(socket, "getaddrinfo", hosts_file):
+            for url in urls + ["http://service.example:%d/ok" % port]:
+                with self.subTest(url=url), mock.patch.object(po, "server_end", return_value=other) as checked:
+                    with self.assertRaises(fh.HttpError) as cm:
+                        fh.request("GET", url, headers={"Authorization": "Bearer synthetic"}, deadline_s=10, insecure=True)
+                    self.assertEqual(cm.exception.kind, "foreign-user")
+                    self.assertEqual(checked.call_count, 1)
+            self.assertEqual(len(Handler.seen), before)
+            # this account's listener is served as before
+            self.assertEqual(fh.request("GET", "http://service.example:%d/ok" % port, deadline_s=10, insecure=True).status, 200)
+        # a loopback proxy from the environment: the proxy's owner is told before the request reaches it
+        env = {"http_proxy": "http://127.0.0.1:%d" % port, "no_proxy": "", "NO_PROXY": ""}
+        before = len(Handler.seen)
+        with mock.patch.dict("os.environ", env), mock.patch.object(po, "server_end", return_value=other):
+            with self.assertRaises(fh.HttpError) as cm:
+                fh.request("GET", "http://far.example/ok", headers={"Authorization": "Bearer synthetic"}, deadline_s=10,
+                           insecure=True, retries=0)
+        self.assertEqual(cm.exception.kind, "foreign-user")
+        self.assertEqual(len(Handler.seen), before)
+
     def test_a_url_ending_in_a_line_break_is_sent_as_in_0_55_0(self):
         # 0.56.0 product r17, unit r17: urllib trims the ends of what it sends; the request reaches /ok.
         self.assertEqual(fh.request("GET", self.base + "/ok\n", deadline_s=10).status, 200)

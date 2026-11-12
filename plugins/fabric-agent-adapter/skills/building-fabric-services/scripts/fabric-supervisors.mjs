@@ -343,6 +343,8 @@ function guiDomain(platform, uid) {
 /** Where a LaunchDaemon's plist lives: a job in launchd's system domain, started at boot with no GUI login (FAA-278). */
 export const SYSTEM_DAEMONS = '/Library/LaunchDaemons';
 const USER_NAME = /^[a-z_][a-z0-9_.-]{0,31}$/;
+/** The short-name rule in words, printed alike by both twins (FAA-286 item 13). */
+export const USER_NAME_RULE = 'a lower-case letter or _, then up to 31 lower-case letters, digits, _, . or -';
 
 /**
  * The launchd domain a job lives in: `system` for a LaunchDaemon (`domain: 'system'`, or a plist in
@@ -351,6 +353,9 @@ const USER_NAME = /^[a-z_][a-z0-9_.-]{0,31}$/;
  */
 export function launchdDomain(plistPath = null, { domain = null, platform = process.platform, uid } = {}) {
   if (![null, undefined, 'gui', 'system'].includes(domain)) throw new ServiceError('domain must be gui or system');
+  if (plistPath !== null && plistPath !== undefined && /^(?:system|gui)(?:\/[0-9]*)?$/.test(String(plistPath))) {
+    throw new ServiceError(`${plistPath} is a launchd domain, not a plist path: pass { domain: '${String(plistPath) === 'system' ? 'system' : 'gui'}' } (FAA-286)`);
+  }
   let which = domain;
   if ((which === null || which === undefined) && plistPath !== null && plistPath !== undefined) {
     const paths = platform === 'darwin' ? path.posix : path; // a macOS path, whatever host reads it
@@ -361,6 +366,34 @@ export function launchdDomain(plistPath = null, { domain = null, platform = proc
     return 'system';
   }
   return guiDomain(platform, uid);
+}
+
+// A domain the plist's folder contradicts (FAA-286 items 14 and 21): a system job in a LaunchAgents folder (launchd also
+// loads it into gui/<uid> at login), or a gui job in /Library/LaunchDaemons (launchd loads it at boot as root). Another
+// folder is allowed for a system job, as the tests' and a staging install's are.
+function pairProblem(plistPath, domain, platform) {
+  const paths = platform === 'darwin' ? path.posix : path;
+  const folder = paths.dirname(paths.resolve(String(plistPath)));
+  const parts = String(plistPath).split(/[\\/]+/); // the folder's own name, whatever separator a test's host path uses
+  if (domain === 'system' && String(parts[parts.length - 2] ?? '').toLowerCase() === 'launchagents') {
+    return `A LaunchDaemon's plist lives in ${SYSTEM_DAEMONS}: ${plistPath} is in a LaunchAgents folder, which launchd also loads into gui/<uid> at login, so the job would run twice.`;
+  }
+  if (domain === 'gui' && folder.toLowerCase() === SYSTEM_DAEMONS.toLowerCase()) {
+    return `${plistPath} is in ${SYSTEM_DAEMONS}, which launchd loads at boot as a LaunchDaemon: a gui/<uid> job's plist goes in ~/Library/LaunchAgents.`;
+  }
+  return null;
+}
+
+// A LaunchAgent of `label` in `userName`'s ~/Library/LaunchAgents, which would run a second copy at its login (FAA-286
+// item 6); null when there is none or the home cannot be read.
+function leftoverAgent(label, userName, run) {
+  const read = run(['dscl', '.', '-read', `/Users/${userName}`, 'NFSHomeDirectory']);
+  const home = read?.status === 0 ? /NFSHomeDirectory:\s*(\S.*?)\s*$/m.exec(String(read.stdout ?? ''))?.[1] : null;
+  if (!home) return null;
+  const folder = path.join(home, 'Library', 'LaunchAgents');
+  let names = [];
+  try { names = fs.readdirSync(folder).filter((n) => n.endsWith('.plist')).sort(); } catch { return null; }
+  return names.map((n) => path.join(folder, n)).find((file) => topKey(plistXml(file, run), 'Label') === label) ?? null;
 }
 
 // A system-domain job is installed and removed by root: refuse before anything is written (FAA-278).
@@ -390,6 +423,9 @@ function decodeXml(text) {
 function topStrings(text) {
   const token = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>|<!\[CDATA\[([\s\S]*?)\]\]>|<(\/?)([A-Za-z][\w.:-]*)\s*[^>]*?(\/?)>|([^<]+)/g;
   const values = Object.create(null);
+  // The open containers: only the root dict's own keys are read (FAA-286 item 10: a root <array> holding a
+  // <key>UserName</key> is no dict, as plistlib reads it).
+  const open = [];
   let depth = 0;
   let key = null;
   let capture = null;
@@ -398,17 +434,21 @@ function topStrings(text) {
     for (let m = token.exec(String(text ?? '')); m; m = token.exec(String(text ?? ''))) {
       const [, cdata, closing, name, selfClosing, chars] = m;
       if (cdata !== undefined || chars !== undefined) {
-        if (capture) buffer += cdata !== undefined ? cdata : decodeXml(chars);
+        // every character reference, at any depth and in any value, is checked as expat checks it (FAA-286 item 10)
+        const decoded = chars !== undefined ? decodeXml(chars) : cdata;
+        if (capture) buffer += decoded;
       } else if (name === 'dict' || name === 'array') {
         if (selfClosing) {
           if (depth === 1 && key !== null) { delete values[key]; key = null; }
         } else if (closing) {
           depth -= 1;
+          open.pop();
         } else {
           if (depth === 1 && key !== null) { delete values[key]; key = null; } // a container is this key's value
           depth += 1;
+          open.push(name);
         }
-      } else if (name && depth === 1) {
+      } else if (name && depth === 1 && open[0] === 'dict') {
         if (selfClosing) {
           if (key !== null) {
             if (name === 'string') values[key] = '';
@@ -431,6 +471,7 @@ function topStrings(text) {
   } catch {
     return null;
   }
+  if (key !== null || capture !== null || depth !== 0) return null; // a dangling <key> or an open element: unreadable
   return values;
 }
 
@@ -569,8 +610,8 @@ function loopbackWellKnown(port, agent, host = '127.0.0.1') {
 
 // Whether launchd's job `pid` listens on exactly 127.0.0.1:<port>, never the wildcard, asked of the process itself (`lsof -p`),
 // which a restricted socket table does not hide. Only for a LaunchDaemon root bootstrapped, whose pid launchd named.
-async function jobListens(pid, port, run = runProgram) {
-  if (process.platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
+async function jobListens(pid, port, run = runProgram, platform = process.platform) {
+  if (platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
   try {
     const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
     return parseLsofListeners(out).some(([host, p]) => host === '127.0.0.1' && p === port); // exact bind, as RT-3
@@ -600,7 +641,11 @@ class JobAgent extends http.Agent {
     this.ask = ask;
   }
 
-  createConnection(options, callback) {
+  createConnection(options, given) {
+    // One answer per connection (FAA-286 item 12): an error during the async owner, lsof and ps checks would reach the
+    // callback a second time, as CheckedAgent's checkedSocket guards it.
+    let answered = false;
+    const callback = (err, socket) => { if (!answered) { answered = true; given(err, socket); } };
     const port = Number(options.port);
     const socket = net.connect({ host: '127.0.0.1', port, noDelay: true });
     const timer = setTimeout(() => socket.destroy(Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' })), options.timeout ?? 10000);
@@ -614,14 +659,14 @@ class JobAgent extends http.Agent {
       } catch (err) {
         who = { kind: UNKNOWN, uid: null, pid: null, reason: `check: ${err?.name ?? 'Error'}` };
       }
-      if (who.pid === this.jobPid && !await jobListens(this.jobPid, port, this.ask.run)) {
+      if (who.pid === this.jobPid && !await jobListens(this.jobPid, port, this.ask.run, this.ask.platform)) {
         socket.destroy();
         // The job's pid, but lsof did not show it bound to exactly 127.0.0.1:<port>: a wildcard is never vouched for.
         callback(new ListenerRefused(SERVER_NOT_OWN, `the LaunchDaemon's pid ${this.jobPid} is not shown listening on exactly 127.0.0.1:${port} by lsof (a wildcard is never vouched for); nothing was sent`));
         return;
       }
       const proved = who.pid === this.jobPid || (who.kind === UNKNOWN && String(who.reason ?? '').startsWith(TABLE_RESTRICTED)
-        && await jobListens(this.jobPid, port, this.ask.run));
+        && await jobListens(this.jobPid, port, this.ask.run, this.ask.platform));
       if (!proved) {
         socket.destroy();
         callback(new ListenerRefused(SERVER_NOT_OWN, `the server on port ${port} is not the LaunchDaemon's pid ${this.jobPid} (${who.reason ?? who.kind}): another process holds the port, or the job's program starts the server as a child (start it with exec); nothing was sent`, who));
@@ -649,11 +694,11 @@ function loopbackPort(origin) {
 }
 
 // As wellKnownOf, for a LaunchDaemon: a loopback origin is read only when launchd's job `jobPid`, running as `jobUid`,
-// accepted the connection.
-export async function jobWellKnownOf(origin, { jobPid, jobUid } = {}) {
+// accepted the connection. `ask` reaches the owner, lsof and ps readers (a test's fakes; `platform` for lsof's).
+export async function jobWellKnownOf(origin, { jobPid, jobUid, ask = {} } = {}) {
   const port = loopbackPort(origin);
   if (port === null) throw new ServiceError(`A LaunchDaemon's answer is read only at http://127.0.0.1:<port>, where its job's pid and uid prove it; ${origin} is not.`);
-  return loopbackWellKnown(port, new JobAgent({ keepAlive: false, jobPid, jobUid }));
+  return loopbackWellKnown(port, new JobAgent({ keepAlive: false, jobPid, jobUid, ask }));
 }
 
 /**
@@ -672,9 +717,15 @@ export async function jobWellKnownOf(origin, { jobPid, jobUid } = {}) {
 export async function launchdInstall(label, plistPath, plistText, { origin, serviceId, instance = 'default', timeout = 40, forceEnable = false,
   run = defaultRun, platform = process.platform, uid, domain = null, euid = ownEuid(), fetchWellKnown = wellKnownOf,
   fetchJobWellKnown = jobWellKnownOf, sleep = pause } = {}) {
+  const pair = pairProblem(plistPath, domain, platform);
+  if (pair) throw new ServiceError(pair);
   const dom = launchdDomain(plistPath, { domain, platform, uid });
   launchdLabel(label);
   if (!origin || !serviceId) throw new ServiceError('launchdInstall needs the origin and the service id it waits to see answer.');
+  if (/^bplist/.test(Buffer.isBuffer(plistText) ? plistText.toString('latin1', 0, 6) : String(plistText ?? '').slice(0, 6))) {
+    // named as what it is, never as a missing UserName (FAA-286 item 7): the text launchdPlist writes is XML
+    throw new ServiceError('The plist is a binary plist: pass the XML text launchdPlist writes (plutil -convert xml1 converts one).');
+  }
   needRoot(dom, label, plistPath, true, euid);
   if (dom === 'system' && loopbackPort(origin) === null) {
     throw new ServiceError(`A LaunchDaemon's origin is http://127.0.0.1:<port>: only there is its answer proved by the job's pid and uid (FAA-278); ${origin} is not.`);
@@ -693,7 +744,7 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
     }
   }
   if (dom === 'system' && named && !USER_NAME.test(named)) {
-    throw new ServiceError(`UserName ${named} is not a macOS short name (${USER_NAME.source}): launchd takes the account's short name.`);
+    throw new ServiceError(`UserName ${named} is not a macOS short name (${USER_NAME_RULE}): launchd takes the account's short name.`);
   }
   const jobUid = named ? accountUid(named, run) : null;
   if (dom === 'system' && named && jobUid === null) {
@@ -705,7 +756,12 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
   if (dom === 'system' && !named) {
     throw new ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with launchdPlist(..., { userName: <the account whose Fabric and agents call it> }).");
   }
+  if (dom === 'system') {
+    const leftover = leftoverAgent(label, named, run);
+    if (leftover) throw new ServiceError(`${leftover} is a LaunchAgent of label ${label}: it would start a second copy at ${named}'s login beside this LaunchDaemon. Remove it first (launchdUninstall as ${named}; lifecycle reference, The system domain).`);
+  }
   const opts = { run, platform, uid, domain: dom === 'system' ? 'system' : null };
+  const existed = fs.existsSync(plistPath);
   atomicWrite(plistPath, plistText, 0o644);
   const lint = run(['plutil', '-lint', String(plistPath)]);
   if (lint?.status !== 0) throw new ServiceError(`plist failed plutil -lint: ${String(lint?.stdout || lint?.stderr || '').trim().slice(0, 200)}`);
@@ -724,6 +780,11 @@ export async function launchdInstall(label, plistPath, plistText, { origin, serv
     if (attempt === 4) {
       if (dom !== 'system' && /:\s*125:|Domain does not support|Could not find domain/.test(last)) {
         throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}. This user has no GUI login session (an SSH session, or a headless Mac after a FileVault restart), so ${dom} does not run jobs: remove the LaunchAgent this attempt wrote (launchdUninstall), then install it as a LaunchDaemon in the system domain (a plist in ${SYSTEM_DAEMONS} with UserName, as root; FAA-278).`);
+      }
+      if (dom === 'system') {
+        // a plist left in /Library/LaunchDaemons loads at the next boot (FAA-286 item 15): one this call wrote goes
+        if (!existed) { try { fs.unlinkSync(plistPath); } catch { /* named below */ } }
+        throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}; ${fs.existsSync(plistPath) ? `${plistPath} stays and loads at the next boot: remove it as root` : 'the plist this call wrote was removed'}`);
       }
       throw new ServiceError(`launchctl bootstrap failed: ${last.slice(0, 200)}`);
     }
@@ -780,6 +841,10 @@ export async function launchdUninstall(label, plistPath, { timeout = 30, purge =
   needRoot(dom, label, plistPath, false, euid);
   if (purge && dom === 'system') throw new ServiceError("A LaunchDaemon's data belongs to its UserName, not to root: uninstall without purge, then remove the data as that user.");
   if (dom === 'system') refuseHeldLabel(label, plistPath, run); // a bootout would stop another plist's job (FAA-278)
+  const holds = fs.existsSync(plistPath) ? topKey(plistXml(plistPath, run), 'Label') : null;
+  if (holds !== null && holds !== label) { // FAA-286 item 9: booting out one job and unlinking another's plist
+    throw new ServiceError(`${plistPath} holds launchd label ${holds}, not ${label}: nothing was removed. Name the plist of ${label}, or uninstall ${holds} with its own label.`);
+  }
   const dirs = purge ? instanceDirs(serviceId, instance, platform) : {}; // one instance's folders only (FAA-125)
   const opts = { run, platform, uid, domain: dom === 'system' ? 'system' : null };
   const target = `${dom}/${label}`;

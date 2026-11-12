@@ -2,11 +2,12 @@
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_descriptor.py. Node 20+, no dependency.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import path from 'node:path';
 import { credentialName, repositoryCredential, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 import { ID, INSTANCE, LOCAL_PATH, PRIMARY_CAPABILITY, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
-import { ANOTHER_ACCOUNT } from './fabric-peer-owner.mjs'; // L0: who listens on a port (DEC-0154 HA-2, FAA-225)
+import { ANOTHER_ACCOUNT, SYSTEM, THIS_ACCOUNT, UNKNOWN, owner as peerOwnerOf, peer as peerOfSocket } from './fabric-peer-owner.mjs'; // L0: who listens on a port and who connected (DEC-0154 HA-2, FAA-225, FAA-227)
 import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
 import { ACTIONS_EXTENSION_KEY, actionsExtension, actionsExtensionRules } from './fabric-actions.mjs';
@@ -328,6 +329,69 @@ server.once('error', async () => {
 });
 server.listen({ port: Number(port), host: '127.0.0.1', exclusive: true }, () => server.close(() => say(null)));
 `;
+
+// How a loopback server treats the OS account of the process that connected (DEC-0154 HA-2's server side, HA-3;
+// FAA-227): `refuse` (the default) closes a connection whose peer is another OS account's before reading a byte of it
+// and serves the rest, labelled; `strict` also refuses a peer whose owner cannot be told and a system account other
+// than root (uid 0, which can read every account's files and installs a LaunchDaemon); `off` reads no table. The twin
+// of fabric_descriptor.py's PEER_CHECKS and LoopbackHTTPServer.
+export const PEER_CHECKS = Object.freeze(['refuse', 'strict', 'off']);
+
+/** Why a server refuses the peer `owner` (a fabric-peer-owner owner) under `mode`, or null to serve it: the owner's
+ * kind, or for `unknown` its reason; never an address or anything the peer sent. */
+export function connectionRefusal(owner, mode = 'refuse') {
+  if (!PEER_CHECKS.includes(mode)) throw new ServiceError(`peerCheck must be one of ${PEER_CHECKS.join(', ')}.`);
+  if (mode === 'off' || owner === null || owner === undefined) return null;
+  const kind = owner.kind ?? UNKNOWN;
+  if (kind === ANOTHER_ACCOUNT) return kind;
+  if (mode === 'strict' && kind !== THIS_ACCOUNT) {
+    if (kind === SYSTEM && owner.uid === 0) return null;
+    return owner.reason || kind;
+  }
+  return null;
+}
+
+const connectionOwners = new WeakMap();
+
+/** The owner of the peer behind an HTTP request's socket (`req.socket`) a loopbackServer served, or null. */
+export function connectionOwner(socket) {
+  return connectionOwners.get(socket) ?? null;
+}
+
+/** A net.Server to listen on in place of `httpServer` (DEC-0154 HA-2's server side, FAA-227): each connection arrives
+ * paused, its peer is told from the computer's socket table (`peer`, fabric-peer-owner's by default), and only a peer
+ * `peerCheck` serves is handed to `httpServer` (never listened on itself), which then reads the request; a refused one
+ * is destroyed unread, counted in `peerRefusals`, and reported to `onRefused(owner, reason)` (default: one line on
+ * stderr with the owner's kind, uid and pid). Handlers find their peer's owner with `connectionOwner(req.socket)`.
+ * Close the returned server to stop accepting; `httpServer.closeAllConnections()` ends the served ones. */
+export function loopbackServer(httpServer, { peerCheck = 'refuse', peer = peerOfSocket, onRefused } = {}) {
+  connectionRefusal(null, peerCheck);
+  const report = onRefused ?? ((who, reason) => process.stderr.write(
+    `fabric: refused a loopback peer (${reason}, uid ${who?.uid ?? 'None'}, pid ${who?.pid ?? 'None'}) before reading it (DEC-0154)\n`));
+  const gate = net.createServer({ pauseOnConnect: true }, async (socket) => {
+    let who = null;
+    if (peerCheck !== 'off') {
+      try {
+        who = await peer(socket);
+      } catch (err) {
+        who = peerOwnerOf(UNKNOWN, { reason: `reader: ${err?.name ?? 'Error'}` });
+      }
+    }
+    const reason = connectionRefusal(who, peerCheck);
+    if (reason !== null) {
+      gate.peerRefusals += 1;
+      socket.destroy();
+      report(who, reason);
+      return;
+    }
+    if (socket.destroyed) return;
+    if (who !== null) connectionOwners.set(socket, who);
+    httpServer.emit('connection', socket);
+    socket.resume();
+  });
+  gate.peerRefusals = 0;
+  return gate;
+}
 
 /** Who listens on 127.0.0.1:<port> now, as [kind, uid] from the kit's fabric-peer-owner, or null when nothing holds it
  * (FAA-225, DEC-0154 HA-2). */

@@ -102,9 +102,75 @@
         "action": {
           "kind": "browser_link",
           "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
-        }
+        },
+        "listener_owner": "this-account"
       },
       "expected_ok": true
+    },
+    {
+      "id": "confirmed-absent-foreign-listener",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "not_installed"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "listener_owner": "another-account"
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "confirmed-absent-root-listener",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "not_installed"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "listener_owner": "system"
+      },
+      "expected_ok": false
+    },
+    {
+      "id": "confirmed-absent-owner-unread",
+      "input": {
+        "resolved": {
+          "service": "example-agent.default",
+          "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard%23%2Fjobs%2F1",
+          "http_url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        },
+        "host": {
+          "state": "not_installed"
+        },
+        "target_device": "workstation",
+        "viewer_device": "workstation",
+        "fallback": "if_absent",
+        "action": {
+          "kind": "browser_link",
+          "url": "http://127.0.0.1:47195/dashboard#/jobs/1"
+        }
+      },
+      "expected_ok": false
     },
     {
       "id": "never-fallback",

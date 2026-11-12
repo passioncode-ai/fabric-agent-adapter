@@ -47,6 +47,8 @@ DEFAULT_EXIT_TIMEOUT = 15
 
 _LABEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,250}\Z")  # what launchd and the Node twin take as a label
 _USER_NAME = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}\Z")  # a macOS short name, as a LaunchDaemon's UserName takes it
+#: The short-name rule in words, printed alike by both twins (FAA-286 item 13).
+USER_NAME_RULE = "a lower-case letter or _, then up to 31 lower-case letters, digits, _, . or -"
 
 #: Where a LaunchDaemon's plist lives: a job in launchd's system domain, started at boot with no GUI login (FAA-278).
 SYSTEM_DAEMONS = Path("/Library/LaunchDaemons")
@@ -373,6 +375,9 @@ def launchd_domain(plist_path: Optional[Path] = None, domain: Optional[str] = No
     session; a ``gui/<uid>`` job starts only while its user is logged in."""
     if domain not in (None, "gui", "system"):
         raise ServiceError("domain must be gui or system")
+    if plist_path is not None and re.match(r"^(?:system|gui)(?:/[0-9]*)?\Z", str(plist_path)):
+        raise ServiceError("%s is a launchd domain, not a plist path: pass domain=%r (FAA-286)"
+                           % (plist_path, "system" if str(plist_path) == "system" else "gui"))
     if domain is None and plist_path is not None:
         folder = re.sub(r"^/{2,}", "/", str(Path(os.path.abspath(str(plist_path))).parent))  # POSIX keeps a leading //
         domain = "system" if folder.lower() == str(SYSTEM_DAEMONS).lower() else "gui"  # APFS ignores case
@@ -382,6 +387,39 @@ def launchd_domain(plist_path: Optional[Path] = None, domain: Optional[str] = No
                                "Windows.")
         return "system"
     return _domain()
+
+
+def _in_daemons(plist_path: Path) -> bool:
+    folder = re.sub(r"^/{2,}", "/", str(Path(os.path.abspath(str(plist_path))).parent))
+    return folder.lower() == str(SYSTEM_DAEMONS).lower()
+
+
+def _pair_problem(plist_path: Path, domain: Optional[str]) -> Optional[str]:
+    """A domain the plist's folder contradicts (FAA-286 items 14 and 21): a system job in a LaunchAgents folder (launchd
+    also loads it into gui/<uid> at login), or a gui job in /Library/LaunchDaemons (launchd loads it at boot as root).
+    Another folder is allowed for a system job, as the tests' and a staging install's are."""
+    if domain == "system" and Path(os.path.abspath(str(plist_path))).parent.name.lower() == "launchagents":
+        return ("A LaunchDaemon's plist lives in %s: %s is in a LaunchAgents folder, which launchd also loads into "
+                "gui/<uid> at login, so the job would run twice." % (SYSTEM_DAEMONS, plist_path))
+    if domain == "gui" and _in_daemons(plist_path):
+        return ("%s is in %s, which launchd loads at boot as a LaunchDaemon: a gui/<uid> job's plist goes in "
+                "~/Library/LaunchAgents." % (plist_path, SYSTEM_DAEMONS))
+    return None
+
+
+def _leftover_agent(label: str, user_name: str) -> Optional[Path]:
+    """A LaunchAgent of ``label`` in ``user_name``'s ~/Library/LaunchAgents, which would run a second copy at its login
+    (FAA-286 item 6)."""
+    try:
+        import pwd
+        home = Path(pwd.getpwnam(user_name).pw_dir)
+    except (ImportError, KeyError, ValueError):
+        return None
+    try:
+        agents = sorted((home / "Library" / "LaunchAgents").glob("*.plist"))
+    except OSError:
+        return None
+    return next((p for p in agents if _plist_field(p, "Label") == label), None)
 
 
 def _need_root(domain: str, label: str, plist_path: Path, install: bool) -> None:
@@ -700,6 +738,9 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     read_answer = fetch_well_known or (lambda origin_, vouch_pid=None: well_known_of(origin_, vouch_pid=vouch_pid))
     read_job = fetch_job_well_known or job_well_known_of
     plist_path = Path(plist_path)
+    pair = _pair_problem(plist_path, domain)
+    if pair:
+        raise ServiceError(pair)
     dom = launchd_domain(plist_path, domain)
     which = "system" if dom == "system" else None
     _need_root(dom, label, plist_path, True)
@@ -713,8 +754,8 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
                                "the job's pid and uid (FAA-278); %s is not." % origin)
         try:
             named = plistlib.loads(plist_bytes).get("UserName")
-        except Exception:  # a plist that does not parse fails plutil -lint below
-            named = None
+        except Exception as exc:  # named as what it is, never as a missing UserName (FAA-286 item 16)
+            raise ServiceError("The plist does not parse (%s): write it with launchd_plist." % type(exc).__name__)
         named = named if isinstance(named, str) else None  # a UserName that is not a string names no account
         if named:
             _refuse_held_label(label, plist_path)
@@ -731,7 +772,7 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
                                    "it), or uninstall that one as root first." % (plist_path, installed))
         if named and not _USER_NAME.match(named):
             raise ServiceError("UserName %s is not a macOS short name (%s): launchd takes the account's short name."
-                               % (named, _USER_NAME.pattern))
+                               % (named, USER_NAME_RULE))
         job_uid = _account_uid(named) if named else None
         if named and job_uid is None:
             raise ServiceError("UserName %s is no account of this Mac: launchd would not start the job. Name the account "
@@ -744,6 +785,12 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
             raise ServiceError("A LaunchDaemon needs UserName: without it the job runs as root, keeps its data in root's "
                                "home, and every client refuses root's listener (DEC-0154 HA-2). Write the plist with "
                                "launchd_plist(..., user_name=<the account whose Fabric and agents call it>).")
+        leftover = _leftover_agent(label, named)
+        if leftover is not None:
+            raise ServiceError("%s is a LaunchAgent of label %s: it would start a second copy at %s's login beside this "
+                               "LaunchDaemon. Remove it first (launchd_uninstall as %s; lifecycle reference, The system "
+                               "domain)." % (leftover, label, named, named))
+    existed = plist_path.exists()
     atomic_write(plist_path, plist_bytes, 0o644)
     lint = subprocess.run(["plutil", "-lint", str(plist_path)], capture_output=True, text=True)
     if lint.returncode != 0:
@@ -771,6 +818,16 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
                                "headless Mac after a FileVault restart), so %s does not run jobs: remove the LaunchAgent "
                                "this attempt wrote (launchd_uninstall), then install it as a LaunchDaemon in the system "
                                "domain (a plist in %s with UserName, as root; FAA-278)." % (last, dom, SYSTEM_DAEMONS))
+        if dom == "system":
+            # a plist left in /Library/LaunchDaemons loads at the next boot (FAA-286 item 15): one this call wrote goes
+            if not existed:
+                try:
+                    plist_path.unlink()
+                except OSError:
+                    pass
+            raise ServiceError("launchctl bootstrap failed: %s; %s" % (last, "the plist this call wrote was removed"
+                               if not plist_path.exists() else "%s stays and loads at the next boot: remove it as root"
+                               % plist_path))
         raise ServiceError("launchctl bootstrap failed: %s" % last)
     deadline = time.time() + timeout
     if dom == "system":
@@ -834,6 +891,10 @@ def launchd_uninstall(label: str, plist_path: Path, *, timeout: float = 30.0, pu
                            "remove the data as that user.")
     if dom == "system":
         _refuse_held_label(label, Path(plist_path))  # a bootout would stop another plist's job (FAA-278)
+    holds = _plist_field(Path(plist_path), "Label") if Path(plist_path).exists() else None
+    if holds is not None and holds != label:  # FAA-286 item 9: booting out one job and unlinking another's plist
+        raise ServiceError("%s holds launchd label %s, not %s: nothing was removed. Name the plist of %s, or uninstall %s "
+                           "with its own label." % (plist_path, holds, label, label, holds))
     dirs = instance_dirs(str(service_id), instance) if purge else {}
     target = "%s/%s" % (dom, label)
     _launchctl("bootout", target)

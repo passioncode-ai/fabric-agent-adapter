@@ -20,7 +20,8 @@
 // Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 import http from 'node:http';
-import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED } from './fabric-peer-owner.mjs';
+import net from 'node:net';
+import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED, UNKNOWN, method as tableMethod, owner as ownerOf, refusal, serverEnd } from './fabric-peer-owner.mjs';
 
 export const RETRY_STATUSES = Object.freeze([408, 425, 429, 500, 502, 503, 504]);
 export const IDEMPOTENT_METHODS = Object.freeze(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
@@ -158,6 +159,61 @@ function checkHeaders(headers) {
 
 const LOOPBACK_AGENT = new CheckedAgent();
 
+// Whether a connected socket reached this computer's loopback, by the address it connected to, not by the URL's
+// spelling: a name the hosts file maps to 127.0.0.1, `0.0.0.0` and `[::ffff:127.0.0.1]` arrive here (FAA-260).
+export function peerIsLoopback(address) {
+  const a = String(address ?? '').split('%', 1)[0].toLowerCase();
+  if (a === '::1' || a === '0.0.0.0' || a === '::') return true;
+  const v4 = /^(?:::ffff:)?(\d{1,3})\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.exec(a);
+  if (v4) return v4[1] === '127';
+  const hex = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/.exec(a);
+  return hex !== null && (parseInt(hex[1], 16) >> 8) === 127;
+}
+
+// An http.Agent for plain http to a host not spelled as loopback (`insecure`): when the connected socket's peer is a
+// loopback address, its server end is told as CheckedAgent tells it and refused before a byte is written unless it is
+// this OS account's process (DEC-0154 HA-2; 0.74.0 unit readings 7 and 8, FAA-260). Another peer is used as it is.
+export class PeerCheckedAgent extends http.Agent {
+  constructor({ ask = {}, ...options } = {}) {
+    super(options);
+    this.ask = ask;
+  }
+
+  createConnection(options, callback) {
+    let done = false;
+    const finish = (err, socket) => { if (!done) { done = true; callback(err, socket); } };
+    const port = Number(options.port);
+    const socket = net.connect({ host: options.host, port, noDelay: true, autoSelectFamily: true,
+      ...(options.lookup ? { lookup: options.lookup } : {}) });
+    socket.once('error', (err) => finish(err));
+    socket.once('connect', async () => {
+      if (!peerIsLoopback(socket.remoteAddress)) {
+        socket.removeAllListeners('error');
+        finish(null, socket);
+        return;
+      }
+      socket.pause();
+      let who;
+      try {
+        who = await serverEnd(socket, this.ask);
+      } catch (err) {
+        who = ownerOf(UNKNOWN, { method: tableMethod(), reason: `check: ${err?.name ?? 'Error'}` });
+      }
+      const refused = refusal(who, port, null);
+      if (refused) {
+        socket.destroy();
+        finish(new ListenerRefused(refused[0], `${refused[1]}; nothing was sent`, who));
+        return;
+      }
+      socket.removeAllListeners('error');
+      socket.resume();
+      finish(null, socket);
+    });
+  }
+}
+
+const PLAIN_AGENT = new PeerCheckedAgent();
+
 // Plain http to a loopback host (DEC-0154 HA-2): node:http over a connection checked before a byte is written, no
 // redirect followed, the body read to one byte past maxBytes. fetch cannot hand its socket to the check.
 export function checkedLoopbackTransport({ method, url, headers, body, timeoutS, maxBytes, agent = LOOPBACK_AGENT }) {
@@ -198,12 +254,15 @@ export function checkedLoopbackTransport({ method, url, headers, body, timeoutS,
   });
 }
 
-// The default transport: fetch, no redirects followed, the body read to one byte past maxBytes; plain http to a
-// loopback host goes through checkedLoopbackTransport.
+// The default transport: fetch, no redirects followed, the body read to one byte past maxBytes; plain http goes
+// through checkedLoopbackTransport, its connection checked when it reaches loopback (FAA-260).
 export async function fetchTransport({ method, url, headers, body, timeoutS, maxBytes }) {
   const target = new URL(url);
-  if (target.protocol === 'http:' && isLoopback(target.hostname)) {
-    return checkedLoopbackTransport({ method, url, headers, body, timeoutS, maxBytes });
+  if (target.protocol === 'http:') {
+    // plain http never goes through fetch: a URL spelled as loopback is checked on every connection, any other is
+    // checked when its connected peer is a loopback address (FAA-260)
+    return checkedLoopbackTransport({ method, url, headers, body, timeoutS, maxBytes,
+      ...(isLoopback(target.hostname) ? {} : { agent: PLAIN_AGENT }) });
   }
   const res = await fetch(url, { method, headers, body: body ?? undefined, redirect: 'manual',
     signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutS * 1000))) });

@@ -121,6 +121,11 @@ def check(data):
     require(all(isinstance(v, str) and 0 < len(v) <= 200 for v in (target, viewer)), 'missing_device')
     fallback = data.get('fallback', 'if_absent')
     require(fallback in ('if_absent', 'never'), 'invalid_fallback')
+    # DEC-0154 PL-3 and HA-2 (FAA-251): who listens on http_url's port, as the host read it from the socket table
+    # (fabric_peer_owner's kinds, or check_service.py's foreign-user). A browser opens a raw loopback address only
+    # after that listener is this OS account's; absent, it is unknown.
+    owner = data.get('listener_owner', 'unknown')
+    require(owner in ('this-account', 'another-account', 'system', 'unknown', 'none', 'foreign-user'), 'invalid_listener_owner')
     kind = action.get('kind')
     if kind == 'remote_open':
         require(set(action) <= {'kind', 'device_id', 'service', 'path'}, 'unexpected_action_field')
@@ -134,6 +139,7 @@ def check(data):
         require(set(action) == {'kind', 'url'} and action.get('url') == http, 'not_resolved_http_url')
         require(viewer == target, 'wrong_viewer_device')
         require(state == 'not_installed' and fallback == 'if_absent', 'browser_fallback_forbidden')
+        require(owner == 'this-account', 'listener_not_this_account')
     else:
         raise ValueError('unsupported_dashboard_action')
     return {'ok': True, 'kind': kind}
