@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { CONNECTIONS_EXTENSION_KEY as KEY, connectionsExtension, connectionsRules, connectionsView, dateTime } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-connections.mjs';
+import { CONNECTIONS_EXTENSION_KEY as KEY, connectionsExtension, connectionsRules, connectionsView, dateTime, schemeSpans } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-connections.mjs';
 import { ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
 import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 
@@ -101,5 +101,27 @@ test('the measured IDNA tables hold on this Node (20 or later)', { skip: Number(
   }
   for (const [first, last] of IDNA.ignored) {
     for (const cp of new Set([first, last])) assert.equal(new URL(`https://a${String.fromCodePoint(cp)}b/`).host, 'ab', `U+${cp.toString(16)}`);
+  }
+});
+
+// FAA-322: the URL schemes in a piece are found in linear time, where the old pattern found them.
+test('the scheme scan finds what the old pattern found, in linear time', () => {
+  const OLD = /[a-z][a-z0-9+.-]*:\/\//gi;
+  let seed = 322;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const alphabet = 'aZ1+.-:/ x9';
+  const cases = ['https://a', '1https://x', 'a://b://c', '-.x://', '://', 'a:/b://', 'Ab+c.d-e://f', ''];
+  for (let i = 0; i < 4000; i += 1) {
+    let piece = '';
+    for (let n = Math.floor(rnd() * 25); n > 0; n -= 1) piece += alphabet[Math.floor(rnd() * alphabet.length)];
+    cases.push(piece);
+  }
+  for (const piece of cases) {
+    assert.deepEqual(schemeSpans(piece), [...piece.matchAll(OLD)].map((m) => [m.index, m.index + m[0].length]), piece);
+  }
+  for (const piece of ['a'.repeat(200000), 'a'.repeat(100000) + '://', 'a:'.repeat(100000), ('ab'.repeat(50000) + ':/').repeat(2)]) {
+    const started = Date.now();
+    schemeSpans(piece);
+    assert.ok(Date.now() - started < 5000, piece.slice(0, 12));
   }
 });

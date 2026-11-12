@@ -189,5 +189,31 @@ class Producer(unittest.TestCase):
                              extensions={KEY: {"connections": [{"id": "a", "kind": "nope", "target": "t", "state": "ok"}]}})
 
 
+
+class SchemeScan(unittest.TestCase):
+    """FAA-322: the URL schemes in a piece are found in linear time, at the places the old pattern found them."""
+
+    OLD = __import__("re").compile(r"[a-z][a-z0-9+.-]*://", __import__("re").IGNORECASE | __import__("re").ASCII)
+
+    def test_it_finds_what_the_old_pattern_found(self):
+        import random
+        rnd = random.Random(322)
+        alphabet = "aZ1+.-:/ x9"
+        cases = ["https://a", "1https://x", "a://b://c", "-.x://", "://", "a:/b://", "Ab+c.d-e://f", ""]
+        cases += ["".join(rnd.choice(alphabet) for _ in range(rnd.randint(0, 24))) for _ in range(4000)]
+        for piece in cases:
+            with self.subTest(piece=piece):
+                self.assertEqual(fc._scheme_spans(piece), [(m.start(), m.end()) for m in self.OLD.finditer(piece)])
+
+    def test_a_long_run_with_no_scheme_is_read_in_linear_time(self):
+        import time
+        for piece in ("a" * 200000, "a" * 100000 + "://", "a:" * 100000, ("ab" * 50000 + ":/") * 2):
+            started = time.monotonic()
+            fc._scheme_spans(piece)
+            fc._urls_in(piece)
+            fc._long_run(piece)
+            self.assertLess(time.monotonic() - started, 5.0, piece[:12])
+
+
 if __name__ == "__main__":
     unittest.main()
