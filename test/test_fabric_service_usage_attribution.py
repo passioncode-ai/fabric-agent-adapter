@@ -85,6 +85,16 @@ class ProjectAttribution(unittest.TestCase):
         self.assertEqual(fs.usage_findings(report), [], "the kit's own report passes FAC-SEM-025")
         self.assertNotIn("byProject", fs.usage_report([receipt(cost_usd=1.0)], service_id="example-agent", now=NOW))
 
+    def test_many_task_runs_rounding_up_never_cost_more_than_their_project(self):
+        """Board request f5753c5a (a 15-language localization): each run and the project were rounded to 6 decimals
+        apart, so ten runs rounding up summed past the project and the kit's own report failed FAC-SEM-025. The project
+        now holds at least its runs' rounded sum, so the two agree by construction."""
+        receipts = [receipt(cost_usd=0.1000006, project_id="urn:project:a", task_run_id="run-%02d" % i) for i in range(10)]
+        report = fs.usage_report(receipts, service_id="example-agent", now=NOW)
+        project = report["byProject"][0]
+        self.assertGreaterEqual(project["costUsd"], round(sum(r["costUsd"] for r in project["taskRuns"]), 6))
+        self.assertEqual(fs.usage_findings(report), [])
+
     def test_unmeasured_tokens_are_counted_never_guessed(self):  # DEC-0091
         at = "2026-10-13T09:00:00Z"
         receipts = [fs.make_usage_receipt("openrouter", "model-a", input_tokens=0, output_tokens=0, at=at, tokens_measured=False),

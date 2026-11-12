@@ -5,8 +5,8 @@
 Wave 2 and the first part of wave 3 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. A new kit
 module, `fabric_load` and `fabric-load.mjs` (layer L3). Kit modules change: `fabric_secrets`, `fabric_peer_owner`
 (`1.1.0+kit.4`), `fabric_connections`, `fabric_descriptor`, `fabric_context`, `fabric_supervisors`, `fabric_interop`,
-`fabric_hub`, `fabric_board_slots`, `fabric_board_session`, `fabric_http`, the facade `fabric_service`, and their Node
-twins where they have one.
+`fabric_hub`, `fabric_board_slots`, `fabric_board_session`, `fabric_http`, `fabric_usage`, the facade `fabric_service`,
+and their Node twins where they have one.
 
 ### Added
 
@@ -86,6 +86,11 @@ twins where they have one.
 
 ### Fixed
 
+- **A usage report with many task runs passes its own FAC-SEM-025** (board request `f5753c5a`): each run and its project
+  were rounded to 6 decimals apart, so ten or more runs rounding up summed past the project (2.926432 > 2.926429 on a
+  15-language localization). A run's cost now rounds as before but never above its exact cost, so the runs' sum stays
+  within the project by construction, in both twins. The projects against the days is the contract's own comparison
+  and its fixed tolerance; asked of the contract's owner (FAA-310).
 - **A session that moved into a nested checkout keeps its local registration** (the 0.80.0 seam reading of the
   candidate): FAA-235's one-key rule read a hook's moving `cwd` only, so the Stop and SessionEnd hooks, the deliver
   worker and `watch-mail` took a session registered with `--scope local` at the repository root for unregistered once
