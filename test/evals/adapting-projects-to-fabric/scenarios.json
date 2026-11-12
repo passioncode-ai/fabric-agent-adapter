@@ -257,6 +257,14 @@
         "when the audit has come, carries its optimize proposals into the completion report instead of applying them silently; when it has not, goes ahead and says so in the report",
         "puts no person's or client's name, user content, key or private path into what it sends"
       ]
+    },
+    {
+      "id": "ask-the-organization-catalogue-first",
+      "request": "Adapt our existing reports bot to Fabric. Our organization keeps a private catalogue of agent templates with an architect.",
+      "expected": [
+        "before scaffolding, asks the organization's catalogue first (its architect) for the template, its version, its variant and the known traps",
+        "scaffolds after that ask, from what the answer named when it has come, and carries the template, version, variant and traps into the completion report (or says no answer came)"
+      ]
     }
   ]
 }

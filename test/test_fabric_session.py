@@ -303,6 +303,21 @@ class Hub(Base):
         self.assertEqual(fs.locate_hub(self.root)["state"], "not-a-hub")
         self.assertLess(time.perf_counter() - started, 1.0)
 
+    def test_another_account_s_process_under_the_pid_is_not_verified(self):
+        # FAA-254: EPERM is a process of another OS account under the id hub.json names (a reused pid): never called
+        # running, said as not verified
+        from unittest import mock
+        with mock.patch.object(fs.os, "kill", side_effect=PermissionError(1, "Operation not permitted")):
+            if sys.platform != "win32":
+                self.assertIsNone(fs.pid_alive(4242))
+        self.hub()
+        hub = fs.locate_hub(self.root, alive=lambda pid: None)
+        self.assertEqual(hub["state"], "not-a-hub")
+        self.assertIn("another OS account", hub["reason"])
+        self.assertIn("not verified", hub["reason"])
+        self.assertEqual(fs.locate_hub(self.root, alive=lambda pid: True)["state"], "running")
+        self.assertEqual(fs.locate_hub(self.root, alive=lambda pid: False)["state"], "not-running")
+
     def test_running_hub_and_its_features(self):
         self.hub(features=["session-hooks/1", 3])
         hub = fs.locate_hub(self.root)
@@ -1803,7 +1818,10 @@ class NoServicesLine(Base):
         for said in (context, fs.UNREAD_LINE % 1):  # FAA-205: what waits on the Project is answered in the same turn
             self.assertIn("in the same turn" if said is context else "in this turn", said)
             self.assertIn("the result later", said)
-        self.assertIn("a request a responder should take stays queued", context)
+        self.assertIn("a request your Project's service should take stays queued", context)
+        # FAA-221: both cases, the decline and resend before Fabric 0.3.17 and CO-506's grant at com.enroll from it
+        self.assertIn("Before Fabric 0.3.17 a run Fabric starts on a request no session can take declines it", context)
+        self.assertIn("from 0.3.17 (CO-506) the session's own Project is granted `board.respond` at `com.enroll`", context)
         self.assertNotIn("TOKEN-PATH", done.stdout)
 
     def test_default_services_folder_per_os(self):

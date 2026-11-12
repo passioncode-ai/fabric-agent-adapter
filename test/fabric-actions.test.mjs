@@ -8,7 +8,7 @@ import test from 'node:test';
 import {
   ACTIONS_EXTENSION_KEY as KEY, actionCaller, actionCallRules, actionDecision, operatorDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
 } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-actions.mjs';
-import { ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
+import { PRIMARY_CAPABILITY, ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
 import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 
 const read = (name) => JSON.parse(fs.readFileSync(new URL(name, import.meta.url), 'utf8'));
@@ -306,4 +306,16 @@ test('the caller recorded is the authenticated one or the local floor', () => {
   assert.equal(actionCaller('T1', ''), 'local:T1');
   for (const tier of ['T2', 'T3', null, undefined, 0]) assert.equal(actionCaller(tier), null);
   assert.equal(actionCaller('T0', 7), 'local:T0');
+});
+
+test('the reserved capability project.work is never declared (FAA-244, DEC-0140 PR-1)', () => {
+  assert.equal(PRIMARY_CAPABILITY, 'project.work');
+  const events = { path: '/fabric/v1/events' };
+  const mcp = { path: '/mcp', transport: 'streamable-http', capabilities: [...CAPABILITIES, 'project.work'] };
+  assert.throws(() => wellKnown({ surfaces: { events, mcp } }), (e) => e instanceof ServiceError && /project\.work/.test(e.message));
+  for (const surfaces of [{ events }, { events, mcp }]) {
+    assert.throws(() => wellKnown({ surfaces, actions: [{ ...RELAYED, tool: 'project.work' }] }), ServiceError);
+    assert.throws(() => wellKnown({ surfaces, extensions: { [KEY]: { actions: [{ ...RELAYED, tool: 'project.work' }] } } }), ServiceError);
+  }
+  wellKnown({ surfaces: { events, mcp: { ...mcp, capabilities: [...CAPABILITIES, 'project.workspace'] } } });
 });

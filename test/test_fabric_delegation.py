@@ -648,6 +648,41 @@ class ReviewRegressionTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_a_loopback_key_set_another_account_serves_is_never_read(self):
+        """FAA-255 (DEC-0154 HA-2): the loopback JWKS fetch tells the listener's owner first, as the kit's other
+        loopback reads do; keys another OS account's process serves are never trusted, and it gets nothing."""
+        import http.server
+        from unittest import mock
+        seen = []
+
+        class Keys(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                seen.append(self.path)
+                body = json.dumps(VECTORS["jwks"]).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+        server = http.server.HTTPServer(("127.0.0.1", 0), Keys)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        po = dl._po  # the module the fetch reads the owner through
+        url = "http://127.0.0.1:%d/jwks" % server.server_address[1]
+        try:
+            for owner in (po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "x"), po.Owner(po.UNKNOWN, None, None, "x", "no-row")):
+                with self.subTest(kind=owner.kind), mock.patch.object(po, "server_end", return_value=owner):
+                    with self.assertRaises(ConnectionError) as raised:
+                        dl._fetch(url)
+                    self.assertIn("foreign-user", str(raised.exception))
+                    self.assertIsNone(dl.JwksCache(url).get())
+            self.assertEqual(seen, [])
+            self.assertEqual(dl.JwksCache(url).get(), VECTORS["jwks"])  # this account's listener
+        finally:
+            server.shutdown()
+            server.server_close()
+
     def test_a_failed_read_is_not_retried_on_every_call(self):
         now, calls = [1000.0], []
         def fetch(source):

@@ -66,7 +66,10 @@ export function rawValues(query) {
     if (piece === '') continue;
     const at = piece.indexOf('=');
     const name = [...new URLSearchParams(at < 0 ? piece : piece.slice(0, at)).keys()][0] ?? '';
-    values.set(name, [...(values.get(name) ?? []), at < 0 ? '' : decodeKeepingPlus(piece.slice(at + 1))]);
+    const value = at < 0 ? '' : decodeKeepingPlus(piece.slice(at + 1));
+    const list = values.get(name);
+    if (list) list.push(value); // appended in place: copying the list per piece made a long query quadratic (FAA-245)
+    else values.set(name, [value]);
   }
   return values;
 }

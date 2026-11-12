@@ -292,6 +292,22 @@ class WellKnown(unittest.TestCase):
             with self.subTest(table=repr(table)[:40]), self.assertRaises(ServiceError):
                 well_known(actions=table)
 
+    def test_the_reserved_capability_project_work_is_never_declared(self):
+        # FAA-244, DEC-0140 PR-1 (contract interop.md, the C3.1 amendment): no service serves `project.work` as a tool
+        # or declares it, in surfaces.mcp.capabilities or as an action's tool
+        mcp = {"path": "/mcp", "transport": "streamable-http", "capabilities": CAPABILITIES + ["project.work"]}
+        with self.assertRaises(ServiceError) as raised:
+            well_known(surfaces={"events": {"path": "/fabric/v1/events"}, "mcp": mcp})
+        self.assertIn("project.work", str(raised.exception))
+        for surfaces in ({"events": {"path": "/fabric/v1/events"}}, {"events": {"path": "/fabric/v1/events"}, "mcp": mcp}):
+            with self.subTest(surfaces=sorted(surfaces)), self.assertRaises(ServiceError):
+                well_known(actions=[dict(RELAYED, tool="project.work")], surfaces=surfaces)
+            with self.subTest(ready=True), self.assertRaises(ServiceError):
+                well_known(extensions={KEY: {"actions": [dict(RELAYED, tool="project.work")]}}, surfaces=surfaces)
+        self.assertEqual(fs.PRIMARY_CAPABILITY, "project.work")
+        well_known(surfaces={"events": {"path": "/fabric/v1/events"},  # a longer name is no reservation
+                             "mcp": dict(mcp, capabilities=CAPABILITIES + ["project.workspace"])})
+
     def test_without_a_capability_list_the_tools_are_not_compared(self):
         doc = well_known(actions=[dict(RELAYED, tool="reviews.reject")], surfaces={"events": {"path": "/fabric/v1/events"}})
         self.assertEqual(doc["extensions"][KEY]["actions"][0]["tool"], "reviews.reject")

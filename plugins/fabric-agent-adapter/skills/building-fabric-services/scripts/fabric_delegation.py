@@ -45,6 +45,7 @@ from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
     jcs,
 )
 from fabric_paths import atomic_write as _atomic_write  # noqa: E402 - the kit's private writer (FAA-85)
+import fabric_peer_owner as _po  # noqa: E402 - a loopback key set is read from this account's listener only (FAA-255)
 from fabric_mandate import effect_closure  # noqa: E402,F401 - defined once beside the mandate that reads it too (DEC-0125)
 
 REFUSAL_CODES = (
@@ -672,9 +673,21 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def _opener(deadline: Dict[str, Any]) -> urllib.request.OpenerDirector:
+class _CheckedHTTPConnection(_po.CheckedHTTPConnection):
+    """Plain http, which a key set source allows on loopback only (DEC-0154 HA-2, FAA-255): every connect, a reconnect
+    included, tells the server end's owner and refuses (closed, nothing sent) unless it is this OS account's process,
+    so keys another account's listener serves are never read; built the way urllib builds a connection."""
+
+    def __init__(self, host: str, port: Optional[int] = None, timeout: Any = 10.0, **kwargs: Any) -> None:
+        http.client.HTTPConnection.__init__(self, host, port, timeout=timeout, **kwargs)
+        self.expect_pid = None
+        self.vouch_pid = None  # an issuer's URL is never a process this caller started (FAA-267)
+
+
+def _opener(deadline: Dict[str, Any], direct: bool = False) -> urllib.request.OpenerDirector:
     """No redirect, and a timer that shuts the socket down at the deadline: a socket timeout bounds one read, so an
-    issuer trickling a byte a second would otherwise hold the caller for as long as it likes (finding 13)."""
+    issuer trickling a byte a second would otherwise hold the caller for as long as it likes (finding 13). `direct`:
+    a loopback source never goes through a proxy from the environment, so the owner check reads the URL's own port."""
     def watched(base: type) -> type:
         class Watched(base):  # type: ignore[misc, valid-type]
             def connect(self) -> None:
@@ -695,11 +708,13 @@ def _opener(deadline: Dict[str, Any]) -> urllib.request.OpenerDirector:
 
     class Http(urllib.request.HTTPHandler):
         def http_open(self, req: Any) -> Any:
-            return self.do_open(watched(http.client.HTTPConnection), req)
+            return self.do_open(watched(_CheckedHTTPConnection), req)  # http is loopback only (the source check)
 
     class Https(urllib.request.HTTPSHandler):
         def https_open(self, req: Any) -> Any:
             return self.do_open(watched(http.client.HTTPSConnection), req, context=self._context)
+    if direct:
+        return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect, Http, Https)
     return urllib.request.build_opener(_NoRedirect, Http, Https)
 
 
@@ -709,7 +724,8 @@ def _fetch(source: str) -> Any:
         request = urllib.request.Request(source.partition("#")[0], headers={"Accept": "application/json"})
         deadline: Dict[str, Any] = {"end": time.monotonic() + JWKS_FETCH_SECONDS, "fired": False, "timer": None}
         try:
-            with _opener(deadline).open(request, timeout=JWKS_FETCH_SECONDS) as response:  # https or loopback http only
+            direct = source.lower().startswith("http://")
+            with _opener(deadline, direct).open(request, timeout=JWKS_FETCH_SECONDS) as response:  # https or loopback http only
                 body = b""
                 while len(body) <= 65536 and not deadline["fired"]:
                     chunk = response.read1(65537 - len(body))
@@ -724,6 +740,8 @@ def _fetch(source: str) -> Any:
             raise
         except http.client.HTTPException as exc:  # a garbage status line or headers: the issuer cannot be read
             raise ConnectionError(type(exc).__name__) from None
+        except _po.ListenerRefused as exc:  # FAA-255: another account's listener, or one that cannot be told
+            raise ConnectionError("foreign-user: %s" % exc) from None
         finally:
             if deadline["timer"] is not None:
                 deadline["timer"].cancel()

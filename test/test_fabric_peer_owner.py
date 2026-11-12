@@ -480,6 +480,45 @@ class KitInstaller(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_down_and_foreign_user_are_told_apart_at_every_loopback_spelling(self):
+        """FAA-259: well_known_of answers None when nothing answers and a ForeignUserAnswer when another account's
+        listener holds the port, as the Node wellKnownOf does; FAA-257: an origin spelled localhost, or another
+        loopback address, is read on a checked connection too, never sent unchecked."""
+        sup = importlib.import_module("fabric_supervisors")
+        seen = []
+
+        class WellKnown(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                seen.append(self.path)
+                body = b'{"service": {"id": "example-agent", "instance": "default"}}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), WellKnown)
+        threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+        port = server.server_address[1]
+        try:
+            for origin in ("http://127.0.0.1:%d" % port, "http://localhost:%d" % port):
+                with self.subTest(origin=origin):
+                    self.assertEqual(sup.well_known_of(origin)["service"]["id"], "example-agent")
+                    before = len(seen)
+                    with mock.patch.object(P, "server_end", return_value=P.Owner(P.ANOTHER_ACCOUNT, 502, 9, "x")):
+                        answer = sup.well_known_of(origin)
+                    self.assertIsInstance(answer, sup.ForeignUserAnswer)
+                    self.assertTrue(answer.reason.startswith("foreign-user: "), answer.reason)
+                    self.assertEqual(len(seen), before, "nothing reached another account's listener")
+        finally:
+            server.shutdown()
+            server.server_close()
+        self.assertIsNone(sup.well_known_of("http://127.0.0.1:%d" % port, timeout=0.5), "down is None")
+        self.assertIs(sup.ForeignUserAnswer, importlib.import_module("fabric_service").ForeignUserAnswer)
+        self.assertIs(sup.well_known_of, importlib.import_module("fabric_service").well_known_of)
+
     def test_a_restricted_table_takes_the_installers_own_job_as_proof(self):
         """FAA-267: macOS 27.2 shows an ad-hoc-signed interpreter only its own sockets. The table's answer is
         table-restricted, never foreign-user, and the launchd job the installer started vouches with its pid."""

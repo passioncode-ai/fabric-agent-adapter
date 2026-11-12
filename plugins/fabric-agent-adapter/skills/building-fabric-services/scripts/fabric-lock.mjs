@@ -27,6 +27,9 @@ export class AlreadyRunning extends ServiceError {
 }
 
 export class InstanceLock {
+  /** How many times acquire re-opens service.lock that moved under it before it gives up (FAA-293). */
+  static INODE_RETRIES = 3;
+
   constructor(dataDir) {
     this.path = path.join(dataDir, 'service.lock');
     this.fd = null;
@@ -36,27 +39,12 @@ export class InstanceLock {
   async acquire() {
     ensurePrivateDir(path.dirname(this.path));
     if (process.platform === 'darwin') {
-      const flags = fs.constants.O_RDWR | fs.constants.O_CREAT | O_EXLOCK | fs.constants.O_NONBLOCK;
-      try {
-        this.fd = fs.openSync(this.path, flags, 0o600);
-      } catch (error) {
-        if (error.code === 'EAGAIN' || error.code === 'EWOULDBLOCK') throw new AlreadyRunning(readPid(this.path), this.path);
-        throw error;
+      // FAA-293: a folder swapped under service.lock (a data import) leaves this copy holding a file that is no longer
+      // at the path while another copy holds the one that is. Re-open a bounded number of times, then fail clearly.
+      for (let attempt = 0; attempt < InstanceLock.INODE_RETRIES; attempt += 1) {
+        if (this.acquireDarwinOnce()) return this;
       }
-      try {
-        fs.ftruncateSync(this.fd, 0);
-        fs.writeSync(this.fd, String(process.pid));
-        fs.fsyncSync(this.fd);
-      } catch (error) { // a full disk or an I/O error: let the lock go, or nobody can (the caller drops this object)
-        const fd = this.fd;
-        this.fd = null;
-        try {
-          fs.closeSync(fd);
-        } catch { // a deferred write error (NFS) at the close: the lock still goes, the first error stands
-        }
-        throw error;
-      }
-      return this;
+      throw new ServiceError(`${this.path} kept moving while it was locked (a folder swapped under the data folder?): no copy holds a file that is no longer at its path; start again once the folder is settled.`);
     }
     // Linux: an abstract unix socket; Windows: a named pipe. Each is exclusive, has no file, and dies
     // with the process. The Python kit holds the same name beside its file lock (fabric_service.lock_name).
@@ -88,6 +76,52 @@ export class InstanceLock {
       throw error;
     }
     return this;
+  }
+
+  lockedFileIsAtPath(fd) {
+    let here;
+    try {
+      here = fs.statSync(this.path);
+    } catch (error) {
+      if (error.code === 'ENOENT') return false;
+      throw error;
+    }
+    const held = fs.fstatSync(fd);
+    return here.dev === held.dev && here.ino === held.ino;
+  }
+
+  acquireDarwinOnce() {
+    const flags = fs.constants.O_RDWR | fs.constants.O_CREAT | O_EXLOCK | fs.constants.O_NONBLOCK;
+    try {
+      this.fd = fs.openSync(this.path, flags, 0o600);
+    } catch (error) {
+      if (error.code === 'EAGAIN' || error.code === 'EWOULDBLOCK') throw new AlreadyRunning(readPid(this.path), this.path);
+      throw error;
+    }
+    if (!this.lockedFileIsAtPath(this.fd)) { // another copy may hold the file at the path: re-open that one
+      fs.closeSync(this.fd);
+      this.fd = null;
+      return false;
+    }
+    try {
+      fs.ftruncateSync(this.fd, 0);
+      fs.writeSync(this.fd, String(process.pid));
+      fs.fsyncSync(this.fd);
+    } catch (error) { // a full disk or an I/O error: let the lock go, or nobody can (the caller drops this object)
+      const fd = this.fd;
+      this.fd = null;
+      try {
+        fs.closeSync(fd);
+      } catch { // a deferred write error (NFS) at the close: the lock still goes, the first error stands
+      }
+      throw error;
+    }
+    if (!this.lockedFileIsAtPath(this.fd)) { // swapped while the pid was written: this copy holds nothing real
+      fs.closeSync(this.fd);
+      this.fd = null;
+      return false;
+    }
+    return true;
   }
 
   release() {

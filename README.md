@@ -24,7 +24,9 @@ The skills are `adapting-projects-to-fabric`, `creating-fabric-agents`,
 a terminal that works in a project through Fabric. It finds Fabric (`hub.json`, its `pid`), has the machine's
 lifecycle broker start it when it is down, registers `fabric-mcp` once with no secret, calls `fabric_whoami`
 first, reads the project board (`com.status`, `com.list`, `com.read_ack` only what was read), answers what waits on its
-Project in the same turn with its state (the result later; a request a responder should take stays queued), and asks other
+Project in the same turn with its state (the result later; a request its Project's service should take stays queued; before Fabric 0.3.17 a run Fabric starts
+declines a request no session can take and the asker resends, and from 0.3.17 the session's own Project is granted
+`board.respond` at `com.enroll`, CO-506), and asks other
 Projects only through `com.submit`, asks who is working on what and claims its task before it starts
 (`fabric_work_list`, `fabric_work_claim`, Fabric v0.3.5 and later), links tasks to backlog rows instead of copying them, and
 releases at the end (`fabric_work_release`). `scripts/fabric_session.py status` prints where Fabric stands and one
@@ -40,7 +42,7 @@ uses Fabric (one line pointing at `fabric_whoami` in a folder with no sign of it
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
 project that uses Fabric; in a session Fabric started on a board request (`FABRIC_DISPATCH_WORKFLOW` set) it prints the
 exit contract instead, on the condition that the session's own prompt starts with the dispatch line naming the same
-three, and UserPromptSubmit, which sees that line, confirms the run or says it is none (FAA-201); Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
+three (a `/clear` while another session holds the dispatch is told it is nested, FAA-208), and UserPromptSubmit, which sees that line, confirms the run or says it is none (FAA-201); Stop records each turn's facts (HEAD, files changed, lines added and removed, never content)
 and the board's unread count, and, once the running Fabric takes them (unless `FABRIC_SESSION_NO_REPOSITORIES=1`), the other repositories the turn touched (it then
 reads the last 512 KB of the session transcript (message text and tool output included, which can hold a secret the session displayed; read in memory only), uses only tool names and path arguments, and sends host/owner/name, never a
 local path or text); UserPromptSubmit adds one line only when that count rose, and each reminder Fabric gave on a turn once (a turn `watch-mail` delivered prints there instead); SessionEnd releases what the
@@ -49,7 +51,8 @@ line naming the retro (FAA-206; Fabric's `retro-after-work`, since Fabric 0.3.16
 advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched (except the retro line after a release of finished work and, in one started on a board request, the exit contract and the prompt hook's verdict on its dispatch line, but no unread line or reminder), never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
 kept or sent) and always
 exit 0 once `python3` starts (on Windows, Claude Code runs hooks in Git Bash, or PowerShell without it, where `python3`
-must name Python 3.9 or later; FAA-183). `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks
+must name Python 3.9 or later; FAA-183). `fabric_session.py watch-mail` waits for board mail under a background watcher, `gate-id <request>` prints the
+`commandId` of a request's gate question (the one a dispatched run uses), and `install-host-hooks
 --host codex|kimi|hermes|opencode|openclaw|pi` installs each host's native context bridge (dry run unless `--apply`).
 Codex receives structured SessionStart JSON; Hermes, OpenCode, OpenClaw and Pi use native plugin APIs.
 See the [native host matrix](plugins/fabric-agent-adapter/skills/working-with-fabric/references/native-host-hooks.md)
@@ -204,18 +207,20 @@ With Python 3.9+ and the Claude Code CLI, in a throwaway directory and a tempora
 ```bash
 KIT=plugins/fabric-agent-adapter/skills/building-fabric-services/scripts   # or ~/.agents/skills/building-fabric-services/scripts
 DATA=$(mktemp -d); SERVICES=$(mktemp -d); WORK=$(mktemp -d)
-python3 "$KIT/sample_service.py" serve --port 47190 --data-dir "$DATA" &
-python3 "$KIT/sample_service.py" register --port 47190 --data-dir "$DATA" --services-dir "$SERVICES"
+# A free loopback port, so the sample never collides with a service already running here.
+PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')
+python3 "$KIT/sample_service.py" serve --port "$PORT" --data-dir "$DATA" &
+python3 "$KIT/sample_service.py" register --port "$PORT" --data-dir "$DATA" --services-dir "$SERVICES"
 # The probe exits 0 (no FAIL); only then is the service registered for one client run (listener.owner proves the port
 # is this account's, and the client cannot check it). The token goes in a header, never in argv.
 # On macOS 27.2 run these with Apple's /usr/bin/python3: an ad-hoc-signed Python, such as Homebrew's, sees no other
 # process's sockets (FAA-272).
 python3 "$KIT/check_service.py" sample --services-dir "$SERVICES" && \
-python3 - "$DATA/service.token" "$WORK/mcp.json" <<'EOF'
+python3 - "$DATA/service.token" "$WORK/mcp.json" "$PORT" <<'EOF'
 import json, os, sys
 token = open(sys.argv[1]).read().strip()
 with os.fdopen(os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
-    json.dump({"mcpServers": {"sample": {"type": "http", "url": "http://127.0.0.1:47190/mcp",
+    json.dump({"mcpServers": {"sample": {"type": "http", "url": "http://127.0.0.1:%s/mcp" % sys.argv[3],
                "headers": {"Authorization": "Bearer " + token}}}}, f)
 EOF
 (cd "$WORK" && claude -p "Call the tool mcp__sample__sample_echo with text 'ping' and reply with only the text it returns." \
@@ -230,6 +235,8 @@ the CLI connected to the sample over streamable HTTP, called `sample.echo` and p
 ([record](docs/evidence/runs/2026-11-08-0.77.0-quick-start.md)). The probe prints one line per rule
 (`PASS`, `FAIL` or `NOT_RUN` with its evidence) and exits 1 on any `FAIL`; run it against your
 own service by its id once its installer has written the descriptor.
+The free-port line (FAA-283) was run again on 2026-11-12 from this repository's kit with Claude Code 2.1.299 and
+Apple's `/usr/bin/python3`: a port the system chose, 44 rules, 0 FAIL, `listener.owner` PASS, and `ping`.
 `FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py` repeats the connection check
 (every sample tool listed, no model call) in the test suite.
 

@@ -606,11 +606,19 @@ class BoardRowTests(unittest.TestCase):
 
     TABLE = "| ID | Item | Status | Source |\n|---|---|---|---|\n"
 
-    def test_a_pipe_in_a_cell_is_refused_escaped_or_not(self):
-        for cell in ("`--to me\\|person`", "a|b"):
+    def test_a_bare_pipe_in_a_cell_is_refused(self):
+        found = validate.malformed_board_rows(self.TABLE + "| X-1 | a|b | open | here |\n")
+        self.assertEqual(len(found), 1)
+        self.assertIn("docs/backlog.md:3", found[0])
+
+    def test_cells_are_read_as_the_aggregator_reads_them(self):
+        # FAA-214: fabric-workspace lib/backlog.mjs cells(): a backtick run opens a code span the same run closes, a
+        # `|` inside it is text, and `\\|` anywhere is a literal pipe
+        for cell in ("`--to me\\|person`", "`a|b`", "a\\|b", "``a ` |b``", "`x` and `y|z`"):
+            self.assertEqual(validate.malformed_board_rows(self.TABLE + "| X-1 | %s | open | here |\n" % cell), [], cell)
+        for cell in ("`a", "`a|b` `c", "``a`|b"):  # an unbalanced run swallows the pipes after it, as cells() does
             found = validate.malformed_board_rows(self.TABLE + "| X-1 | %s | open | here |\n" % cell)
             self.assertEqual(len(found), 1, cell)
-            self.assertIn("docs/backlog.md:3", found[0])
 
     def test_a_well_formed_table_passes(self):
         self.assertEqual(validate.malformed_board_rows(self.TABLE + "| X-1 | item | open | here |\n\ntext\n| A | B |\n|---|---|\n| 1 | 2 |\n"), [])
@@ -789,14 +797,47 @@ class CredentialUrlTests(unittest.TestCase):
     def test_the_scope_is_what_the_package_ships(self):
         """package.json `files` decides: a second plugin folder and package.json itself are read, the CHANGELOG is not."""
         files = {"package.json": '{"files": ["bin", "plugins", "CHANGELOG.md", "!**/*.pyc"]}\n',
-                 "plugins/another/x.md": "`%s`\n" % self.SHAPES[0], "CHANGELOG.md": "`%s`\n" % self.SHAPES[0],
+                 "bin/x.js": "ok\n", "plugins/another/x.md": "`%s`\n" % self.SHAPES[0], "CHANGELOG.md": "`%s`\n" % self.SHAPES[0],
                  "README.md": "`%s`\n" % self.SHAPES[0]}
         tmp, root = _tree(files)
         with tmp:
-            self.assertEqual(validate.credential_url_scope(root), ["bin", "plugins", "package.json"])
+            self.assertEqual(validate.credential_url_scope(root), ["bin", "plugins", "package.json", "README.md"])
             problems = validate.credential_url_problems(root)
-        self.assertEqual(len(problems), 1, problems)
+        # npm ships README and LICENSE whatever `files` says (FAA-212), so README.md is read too
+        self.assertEqual(len(problems), 2, problems)
         self.assertIn("plugins/another/x.md:1", problems[0])
+        self.assertIn("README.md:1", problems[1])
+
+    def test_a_files_entry_the_check_cannot_follow_fails(self):
+        """FAA-212: a glob, an entry naming nothing, or no `files` at all (npm then ships the whole tree) is not read
+        literally: each is a finding, never a silently skipped scope."""
+        for manifest, needle in (('{"files": ["bin", "plugins/*/skills"]}', "plugins/*/skills"),
+                                 ('{"files": ["bin", "nowhere"]}', "nowhere"),
+                                 ('{"name": "x"}', "no `files`")):
+            with self.subTest(manifest=manifest):
+                tmp, root = _tree({"package.json": manifest + "\n", "bin/x.js": "ok\n"})
+                with tmp:
+                    problems = validate.credential_url_problems(root)
+                self.assertTrue(any(needle in p and "FAA-212" in p for p in problems), problems)
+
+    def test_a_line_with_no_scheme_says_so(self):
+        """FAA-212 round 5: `key=abcdefgh:u:x@h` has no scheme; the finding must not name `abcdefgh` as one."""
+        tmp, root = _tree({"bin/x.js": "key=abcdefgh:u:x" + self.AT + "h\n", "README.md": "`%s`\n" % self.SHAPES[0]})
+        with tmp:
+            problems = validate.credential_url_problems(root)
+        self.assertEqual(len(problems), 2, problems)
+        self.assertIn("(no scheme)", problems[0])
+        self.assertNotIn("abcdefgh", problems[0])
+        self.assertIn("(scheme 'https')", problems[1])
+
+    def test_pycache_is_left_out(self):
+        tmp, root = _tree({"plugins/p/__pycache__/m.txt": "`%s`\n" % self.SHAPES[0]})
+        with tmp:
+            self.assertEqual(validate.credential_url_problems(root), [])
+
+    def test_validate_repo_runs_the_check(self):
+        import inspect
+        self.assertIn("credential_url_problems()", inspect.getsource(validate.validate_repo))
 
     def test_a_binary_file_is_skipped(self):
         tmp, root = _tree({})

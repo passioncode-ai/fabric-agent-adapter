@@ -218,9 +218,12 @@ leaves a held task still. The working-with-fabric skill's Step 5 carries it; Fab
 
 ## Secrets and confinement
 
-1. **A secret never enters an environment, argv, URL or log a child can read.** Hand it over a
-   pipe or file descriptor, or through a vault runner per command; never print a configuration
-   dump, and never filter one yourself.
+1. **A secret never enters an environment, argv, URL or log a child can read.** The agent's own
+   process may receive its key in its environment from its supervisor or a vault runner (the one
+   rule this page, `models-and-providers.md` and building-fabric-services' LC-21 share); it never
+   passes that key to a child it starts. Scrub the child's environment, and hand a child a secret
+   it needs over a pipe or file descriptor, or through a vault runner per command; never print a
+   configuration dump, and never filter one yourself.
 2. **Confine what an agent runs by the operating system**, per run (filesystem, network, ports),
    and treat prompt rules and command guards as tripwires, not boundaries.
 3. **Fail closed.** When a reduced view or a scope cannot be built, answer an error, never the

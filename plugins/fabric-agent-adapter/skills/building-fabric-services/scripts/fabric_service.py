@@ -22,6 +22,7 @@ from fabric_time import DAY_MS as _DAY_MS, utc_date_ms as _utc_date_ms  # noqa: 
 from fabric_base import (  # noqa: F401
     PROTOCOL,
     EXTENSION_KEY,
+    PRIMARY_CAPABILITY,
     SUPERVISOR_ENV,
     DRAIN_SECONDS,
     _ID,
@@ -319,6 +320,9 @@ from fabric_supervisors import (  # noqa: F401
     launchd_loaded,
     launchd_pid,
     fetch_well_known,
+    well_known_of,
+    job_well_known_of,
+    ForeignUserAnswer,
     _OVERRIDE_ROW,
     launchd_override,
     launchd_install,

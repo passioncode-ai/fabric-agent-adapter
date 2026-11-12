@@ -28,6 +28,8 @@ The normative rules are the Fabric Agent Contract's, at the commit this plugin p
 | **Personal cloud** | the person's own always-on machine in PassionCode's cloud (or the same stack self-hosted), one more machine of their estate | an agent that answers mail at night, a scheduled digest, a bot |
 | **Organization** | the organization's cloud, its members' machines enrolled into it, its own server holding members, grants and usage | a support agent, an internal analyst, an agent the organization bought |
 | **Enterprise** | an organization's dedicated cloud with personal onboarding | the same agents under the enterprise's own boundary |
+| **One computer, a personal and an organization account** | one Mac (or other computer) with two counted OS accounts, the person's own and one an organization owns whole, each running its own Fabric and its own copy of each agent (contract DEC-0154, `docs/specification/service.md`, *Several OS accounts on one computer*) | the same agent once per account: its own port recorded per account and claimed in the computer's shared folder (HA-1), never the other account's; loopback reaches every account, so a caller checks the listener's owner (HA-2) and no door answers loopback without a token (HA-3) |
+| **A member's virtual machine** | a virtual machine under a member's account, enrolled as a device of its own (DEC-0154 HA-4, `docs/specification/devices.md`); it may carry the computer's host label | an agent the member runs apart from the computer's accounts: its own enrollment, secrets and ports; a port forwarder that relays the guest onto loopback makes its callers T2, never token-free |
 
 Every step up is paid as cloud only: the person or the organization pays for the cloud its agents run in, and the
 order says which hosting it holds (`personal-cloud`, `org-cloud`, `enterprise-cloud` in `entitlement/1`). An agent never
@@ -129,6 +131,8 @@ and move only that capability to the cloud.
 - Where does each instance run, and in which context? Write it in the knowledge pack.
 - Does any state, secret, log line or cache key cross contexts? It must not.
 - Which capabilities need the person's machine, and what do they answer when it is off?
+- On a computer with more than one counted OS account, or under a member's virtual machine: a port recorded per
+  account, the listener's owner checked before a token is sent, no token-free loopback door (DEC-0154).
 - Which uptime category is it, A (a cloud host from the first release) or B (local only)? The README names it.
 - Who pays for each call (which grant, which key)? The person's personal key never pays for an organization.
 - If it joins machines or applies the estate record: tokens from stdin or a 0600 file only, revisions verified with

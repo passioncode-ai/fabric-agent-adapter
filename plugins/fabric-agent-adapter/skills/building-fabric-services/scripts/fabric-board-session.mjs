@@ -3,7 +3,7 @@
 // Part of the Node board connector (FAA-65, layer L4); the twin of fabric_board_session.py. Node 20+, no dependency.
 import crypto from 'node:crypto';
 import { Backoff, HubError, normalProject } from './fabric-hub.mjs';
-import { acceptedRevisions, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
+import { PRIMARY_CAPABILITY, acceptedRevisions, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
 import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems } from './fabric-board-shapes.mjs';
 import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, readMandate } from './fabric-board-link.mjs';
 import { HOLD_RETRY_MAX_SECONDS, LEASE_MARGIN_SECONDS, SESSION_CODES, SlotKeeper } from './fabric-board-slots.mjs';
@@ -87,6 +87,8 @@ export class Responder extends SlotKeeper {
     if (typeof admit !== 'function' || typeof handler !== 'function') throw new BoardError('invalid_arguments', 'A responder needs the service\'s own input gate (admit) and a handler.');
     const caps = [...(capabilities ?? [])];
     if (!caps.length || caps.some((c) => typeof c !== 'string' || !CAPABILITY.test(c)) || new Set(caps).size !== caps.length) throw new BoardError('invalid_arguments', 'Name each capability once, [a-z][a-z0-9._-]{1,127}.');
+    // FAA-244: DEC-0140 PR-1, a session's slot, never a service's
+    if (caps.includes(PRIMARY_CAPABILITY)) throw new BoardError('invalid_arguments', `${PRIMARY_CAPABILITY} is a Project's primary responder's, a session's: a service answers the capabilities it declares (DEC-0140 PR-1).`);
     Object.assign(this, { hub, capabilities: caps, credentialFile, handler, admit, observe, emitTo: emit, now, rand });
     this.project = normalProject(projectId);
     // FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; null reads none)
@@ -196,7 +198,7 @@ export class Responder extends SlotKeeper {
     this.session = session;
     const status = await this.status();
     if (missing.length) {
-      this.emit('board.access.needed', 'warning', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Agents & access).`, { notify: true, episode: missing.join(','), capabilities: missing });
+      this.emit('board.access.needed', 'warning', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Settings → Agent access).`, { notify: true, episode: missing.join(','), capabilities: missing });
     }
     this.slots = {};
     await this.recover(status, this.capabilities.filter((c) => grant.capabilities.includes(c)));
@@ -496,7 +498,7 @@ export class Responder extends SlotKeeper {
     if (['not_authorized', 'authority_changed', 'credential'].includes(code)) {
       this.state = 'not-authorized';
       await this.dropSession();
-      this.emit('board.access.needed', 'warning', 'This service may not answer requests for this Project: the operator has to allow it in Fabric (Agents & access). Nothing is claimed until then.', { notify: true, episode: 'access', reason: code });
+      this.emit('board.access.needed', 'warning', 'This service may not answer requests for this Project: the operator has to allow it in Fabric (Settings → Agent access). Nothing is claimed until then.', { notify: true, episode: 'access', reason: code });
     } else if (code === 'held') {
       this.state = 'paused';
       this.emit('board.held', 'info', 'The operator holds new work on this Project; the responder waits and asks again with a growing pause.', { episode: 'held', reason: code });
@@ -508,8 +510,11 @@ export class Responder extends SlotKeeper {
     } else {
       this.state = 'down';
       // A refusal in recovery that left no slot held reconnects (seam 6); one that left some held serves them (seam 7).
-      if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code)) && !keep) await this.dropSession();
-      this.emit('board.down', 'warning', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
+      if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol', 'foreign-user'].includes(code)) && !keep) await this.dropSession();
+      // FAA-252: a port another OS account holds is said as such; nothing was sent there
+      this.emit('board.down', 'warning', code === 'foreign-user'
+        ? 'Fabric\'s board port is held by another OS account\'s process; nothing was sent, and the responder tries again with a growing pause.'
+        : 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
     }
     return wait;
   }

@@ -1,6 +1,7 @@
 """FAA-275: the four skills work with the agents database through one shared reference and one hook each."""
 from __future__ import annotations
 
+import json
 import pathlib
 import unittest
 
@@ -46,6 +47,23 @@ class AgentsDatabase(unittest.TestCase):
             for needle in needles:
                 with self.subTest(skill=name, needle=needle[:40]):
                     self.assertIn(needle, text)
+
+    def test_both_skills_ask_an_organization_catalogue_first_in_neutral_words(self):
+        """Board request 2718ece8: one neutral line, at step 0 and before scaffolding, naming no private base."""
+        line = ("If your organization keeps a private catalogue of agent templates with an architect, ask it first: "
+                "it names the template, version, variant and known traps; this skill runs after it.")
+        create = flat(SKILLS / "creating-fabric-agents" / "SKILL.md")
+        self.assertIn(line, create)
+        self.assertLess(create.index("## Step 0: the intake grill"), create.index(line))
+        self.assertLess(create.index(line), create.index("| Question | The gate |"))
+        adapt = flat(SKILLS / "adapting-projects-to-fabric" / "SKILL.md")
+        self.assertIn(line, adapt)
+        self.assertLess(adapt.index("### 3. Scaffold the provider bundle"), adapt.index(line))
+        self.assertLess(adapt.index(line), adapt.index("python3 <skill-dir>/scripts/adapt_project.py scaffold"))
+        for skill in ("creating-fabric-agents", "adapting-projects-to-fabric"):
+            ids = {s["id"] for s in json.loads((SKILLS.parents[2] / "test" / "evals" / skill / "scenarios.json")
+                                               .read_text(encoding="utf-8"))["scenarios"]}
+            self.assertIn("ask-the-organization-catalogue-first", ids)
 
 
 if __name__ == "__main__":

@@ -73,6 +73,57 @@ class LockTests(unittest.TestCase):
             first.release()
             fs.InstanceLock(Path(temp)).acquire().release()
 
+    @unittest.skipIf(sys.platform == "win32", "a folder holding an open file is not renamed on Windows")
+    def test_a_lock_file_swapped_under_the_path_is_never_held(self):
+        """FAA-293 (a board finding of 2026-11-10): a data import swapped the folder holding service.lock between this
+        copy's open and its flock. The copy locked the old file while another copy held the new one at the path, and
+        both started. acquire checks the locked inode is the file at the path, retries on that file, and is refused."""
+        import fcntl
+        from unittest import mock
+        lock_module = sys.modules[fs.InstanceLock.__module__]
+        with tempfile.TemporaryDirectory() as temp:
+            data = Path(temp) / "data"
+            data.mkdir()
+            real_flock, swapped = fcntl.flock, []
+            holder = {}
+
+            def flock_after_a_swap(fd, op):
+                if not swapped:
+                    swapped.append(True)
+                    data.rename(Path(temp) / "data.old")
+                    data.mkdir()
+                    holder["lock"] = fs.InstanceLock(data).acquire()  # the other copy, on the new file
+                return real_flock(fd, op)
+
+            with mock.patch.object(fcntl, "flock", side_effect=flock_after_a_swap):
+                with self.assertRaises(fs.AlreadyRunning):
+                    fs.InstanceLock(data).acquire()
+            holder["lock"].release()
+            fs.InstanceLock(data).acquire().release()  # with nobody holding the new file, the path is taken
+
+    @unittest.skipIf(sys.platform == "win32", "a folder holding an open file is not renamed on Windows")
+    def test_a_path_that_keeps_moving_is_a_clear_error(self):
+        """FAA-293: a bounded number of re-opens, then an error that names the path, never a lock on a stale file."""
+        import fcntl
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as temp:
+            data = Path(temp) / "data"
+            data.mkdir()
+            real_flock, moves = fcntl.flock, []
+
+            def flock_after_a_move(fd, op):
+                moves.append(True)
+                data.rename(Path(temp) / ("old%d" % len(moves)))
+                data.mkdir()
+                return real_flock(fd, op)
+
+            with mock.patch.object(fcntl, "flock", side_effect=flock_after_a_move):
+                with self.assertRaises(fs.ServiceError) as caught:
+                    fs.InstanceLock(data).acquire()
+            self.assertNotIsInstance(caught.exception, fs.AlreadyRunning)
+            self.assertIn("service.lock", str(caught.exception))
+            self.assertEqual(len(moves), sys.modules[fs.InstanceLock.__module__].InstanceLock.INODE_RETRIES)
+
     def test_a_failed_pid_write_lets_the_lock_go(self):
         """A board finding of 2026-11-03 from a service that vendors the kit: os.ftruncate, os.write or os.fsync raising after the lock was taken
         left it held with no descriptor kept, so release() freed nothing and the same process could not start again."""

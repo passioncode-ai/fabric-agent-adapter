@@ -21,7 +21,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric; observing-products builds nothing, it watches a product.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.78.0"
+VERSION = "0.79.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -621,21 +621,59 @@ def validate_plugin_lifecycle(errors: List[str], plugin: Path) -> None:
                 errors.append("LC-21: a hook command carries a credential; argv is visible to every process")
 
 
+def board_cells(line: str) -> List[str]:
+    """A table row's cells as fabric-workspace `lib/backlog.mjs` `cells()` reads them (FAA-214): `\\|` is a literal
+    pipe wherever it stands, a backtick run opens a code span that only a run of the same length closes, and a `|`
+    inside a code span is text. An unbalanced run keeps the span open to the end of the line."""
+    result: List[str] = []
+    cell, ticks, i = "", 0, 0
+    while i < len(line):
+        c = line[i]
+        if c == "\\" and line[i + 1:i + 2] == "|":
+            cell += "|"
+            i += 2
+            continue
+        if c == "`":
+            n = 1
+            while line[i + n:i + n + 1] == "`":
+                n += 1
+            if not ticks:
+                ticks = n
+            elif ticks == n:
+                ticks = 0
+            cell += "`" * n
+            i += n
+            continue
+        if c == "|" and not ticks:
+            result.append(cell.strip())
+            cell = ""
+        else:
+            cell += c
+        i += 1
+    result.append(cell.strip())
+    if result and result[0] == "":
+        result.pop(0)
+    if result and result[-1] == "":
+        result.pop()
+    return result
+
+
 def malformed_board_rows(text: str) -> List[str]:
-    """Rows of a task table that do not split into its header's columns. The common-backlog aggregator splits a row on
-    every `|`, an escaped `\\|` included, so a cell that holds one breaks the workspace's publication."""
+    """Rows of a task table that do not split into its header's columns, read cell by cell as the common-backlog
+    aggregator reads them (`board_cells`), so a row with a bare `|` in a cell, or an unbalanced backtick run that
+    swallows the pipes after it, fails here before it fails the whole source at workspace sync."""
     problems: List[str] = []
     width = None
     for number, line in enumerate(text.splitlines(), 1):
         if not line.startswith("|"):
             width = None
             continue
-        cells = len(line.strip().strip("|").split("|"))
+        cells = len(board_cells(line))
         if width is None:
             width = cells  # the header row
         elif not re.fullmatch(r"\|[\s:|-]+\|?", line.strip()) and cells != width:
-            problems.append("docs/backlog.md:%d: a task row with %d cells in a table of %d (a `|` inside a cell, escaped or not, splits it)"
-                            % (number, cells, width))
+            problems.append("docs/backlog.md:%d: a task row with %d cells in a table of %d (a bare `|` in a cell, or a "
+                            "backtick run left open, splits it)" % (number, cells, width))
     return problems
 
 
@@ -715,17 +753,62 @@ CREDENTIAL_URL_RECORDS = ("CHANGELOG.md",)
 CREDENTIAL_URL_SCOPE = ("bin", "plugins", "README.md", "SECURITY.md")  # a tree without package.json
 
 
+# npm ships these from the package root whatever `files` says (README and LICENSE in any case and extension).
+NPM_ALWAYS = re.compile(r"(?i)^(readme|licen[sc]e)(\.[^/]*)?$")
+# A name the wide pattern took for a scheme is reported as one only when slashes follow it or it is a scheme a URL
+# with credentials uses; `key=abcdefgh:u:x@h` has none (FAA-212).
+KNOWN_SCHEMES = frozenset(("http", "https", "ws", "wss", "ftp", "ftps", "ssh", "git", "redis", "rediss", "amqp",
+                           "amqps", "mongodb", "postgres", "postgresql", "mysql", "smtp", "smtps", "imap", "imaps", "sftp"))
+
+
 def credential_url_scope(root: Path = ROOT) -> List[str]:
-    """What the npm package ships (package.json `files`, its exclusions aside) but the records."""
+    """What the npm package ships (package.json `files`, its exclusions aside, and what npm always ships) but the
+    records. An entry the check cannot read literally is left to `credential_url_scope_problems`."""
     manifest = root / "package.json"
     if not manifest.is_file():
         return list(CREDENTIAL_URL_SCOPE)
     files = json.loads(manifest.read_text(encoding="utf-8")).get("files") or []
-    return [name for name in files if not name.startswith("!") and name not in CREDENTIAL_URL_RECORDS] + ["package.json"]
+    scope = [name for name in files if not name.startswith("!") and name not in CREDENTIAL_URL_RECORDS
+             and not GLOB_CHARS.search(name)] + ["package.json"]
+    scope += sorted(p.name for p in root.iterdir() if p.is_file() and NPM_ALWAYS.match(p.name) and p.name not in scope
+                    and p.name not in CREDENTIAL_URL_RECORDS)
+    return scope
+
+
+GLOB_CHARS = re.compile(r"[*?\[\]{}]")
+
+
+def credential_url_scope_problems(root: Path = ROOT) -> List[str]:
+    """FAA-212: a `files` entry holding a glob, one naming nothing, or no `files` at all (npm then ships the whole
+    tree) cannot be read literally, so the shipped-file checks would skip what npm ships."""
+    manifest = root / "package.json"
+    if not manifest.is_file():
+        return []
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    if "files" not in data:
+        return ["package.json has no `files`: npm ships the whole tree and the shipped-file checks cannot follow it; "
+                "list what ships (FAA-212)"]
+    problems = []
+    for name in data["files"]:
+        if name.startswith("!"):
+            continue
+        if GLOB_CHARS.search(name):
+            problems.append("package.json `files` entry %r is a glob the shipped-file checks do not expand: name the "
+                            "folder or file (FAA-212)" % name)
+        elif not (root / name).exists():
+            problems.append("package.json `files` entry %r names nothing (FAA-212)" % name)
+    return problems
+
+
+def _scheme_of(found: str) -> str:
+    head = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):([/\\\t]*)", found)
+    if head and (head.group(2) or head.group(1).lower() in KNOWN_SCHEMES):
+        return "scheme %r" % head.group(1)
+    return "no scheme"
 
 
 def credential_url_problems(root: Path = ROOT) -> List[str]:
-    problems: List[str] = []
+    problems: List[str] = credential_url_scope_problems(root)
     for name in credential_url_scope(root):
         top = root / name
         if not top.exists():
@@ -739,10 +822,9 @@ def credential_url_problems(root: Path = ROOT) -> List[str]:
             for lineno, line in enumerate(text.splitlines(), 1):
                 found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
                 if found:  # the scheme alone: a real credential is never repeated into a log
-                    scheme = re.match(r"[A-Za-z][A-Za-z0-9+.-]*", found.group(0)).group(0)
-                    problems.append("%s:%d writes a URL with credentials (scheme %r): name the scheme in angle brackets, "
+                    problems.append("%s:%d writes a URL with credentials (%s): name the scheme in angle brackets, "
                                     "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
-                                    % (path.relative_to(root).as_posix(), lineno, scheme))
+                                    % (path.relative_to(root).as_posix(), lineno, _scheme_of(found.group(0))))
     return problems
 
 

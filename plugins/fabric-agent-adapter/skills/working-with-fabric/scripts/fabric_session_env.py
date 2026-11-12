@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.78.0"
+VERSION = "0.79.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -280,7 +280,9 @@ def read_small(path: Path, cap: int = READ_CAP) -> Optional[str]:
         return None
 
 
-def pid_alive(pid: int) -> bool:
+def pid_alive(pid: int) -> Optional[bool]:
+    """True: a process of this OS account runs under `pid`; False: none does. None (falsy): a process of another
+    account does (EPERM), as when the id hub.json names was reused: not verified, never called running (FAA-254)."""
     if pid <= 0:
         return False
     if sys.platform == "win32":
@@ -298,7 +300,7 @@ def pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
     except PermissionError:
-        return True
+        return None
     except OSError:
         return False
     return True
@@ -324,7 +326,11 @@ def locate_hub(root: Path, alive=pid_alive) -> Dict[str, Any]:
     pid = doc.get("pid")
     if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
         return {"state": "not-a-hub", "reason": "hub.json names no process"}
-    if not alive(pid):
+    live = alive(pid)
+    if live is None:  # FAA-254: another account's process under that id, so not this account's Fabric
+        return {"state": "not-a-hub", "reason": "hub.json names process %d, which runs under another OS account: "
+                "not verified" % pid}
+    if not live:
         return {"state": "not-running", "reason": "hub.json names process %d, which is not running" % pid}
     features = doc.get("features")
     features = [f for f in features if isinstance(f, str)] if isinstance(features, list) else []
@@ -699,7 +705,7 @@ def prune_dispatch_records(env: Optional[Dict[str, str]] = None, now: Optional[f
         records = []
     for record in records:
         try:
-            if now - record.stat().st_mtime > SESSION_STALE_S:
+            if now - record.lstat().st_mtime > SESSION_STALE_S:  # the link's own age: a dangling one goes too (FAA-208)
                 record.unlink()
                 removed += 1
         except OSError:

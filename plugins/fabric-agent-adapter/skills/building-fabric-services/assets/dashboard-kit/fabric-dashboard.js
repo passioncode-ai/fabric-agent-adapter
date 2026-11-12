@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.5 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
+/* fabric-dashboard-kit@1.1.6 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
    Load it same-origin with <script src="fabric-dashboard.js" defer></script>: no inline script, no
    eval, nothing from a CDN. It applies the host's appearance (ED-6, ED-8), folds navigation that
    does not fit into a More menu (ED-3), makes wide boxes keyboard-reachable (ED-4) and keeps
@@ -8,7 +8,7 @@
   'use strict';
 
   var KIT = 'fabric-dashboard-kit';
-  var VERSION = '1.1.5';
+  var VERSION = '1.1.6';
   /* fabric-dashboard-kit:theme-ids:begin */
   var THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 /* fabric-dashboard-kit:theme-ids:end */
@@ -148,6 +148,20 @@
     root.addEventListener('focus', applyAppearance);
   }
 
+  /* ---- resize observers write in the next frame (since 1.1.6) ----
+     A ResizeObserver callback that changes the size of what it watches, or of an ancestor, makes WebKit raise
+     "ResizeObserver loop completed with undelivered notifications". So a callback only schedules the work for the next
+     animation frame, cancelling one already scheduled, and the work itself skips a size it has already laid out. */
+  function nextFrame(work) {
+    var pending = null;
+    var raf = root.requestAnimationFrame;
+    return function () {
+      if (typeof raf !== 'function') { work(); return; }
+      if (pending !== null) root.cancelAnimationFrame(pending);
+      pending = raf.call(root, function () { pending = null; work(); });
+    };
+  }
+
   /* ---- navigation: fold what does not fit into More (ED-3) ---- */
   function foldNav(nav) {
     if (typeof nav.fdRefresh === 'function') { nav.fdRefresh(); return; } // folded already: refit, no second observers
@@ -212,8 +226,16 @@
       }
     }
     layout();
-    if (typeof root.ResizeObserver === 'function') new root.ResizeObserver(function () { layout(); }).observe(nav);
-    else root.addEventListener('resize', layout);
+    // The fit depends on the nav's width only: a callback for a height the fold itself changed lays nothing out.
+    var laidOutWidth = null;
+    var refit = nextFrame(function () {
+      var width = nav.clientWidth;
+      if (width === laidOutWidth) return;
+      laidOutWidth = width;
+      layout();
+    });
+    if (typeof root.ResizeObserver === 'function') new root.ResizeObserver(refit).observe(nav);
+    else root.addEventListener('resize', refit);
     // A page that moves aria-current (its route changed) gets a fresh summary and fit, without telling the kit.
     if (typeof root.MutationObserver === 'function') {
       new root.MutationObserver(layout).observe(nav, { subtree: true, attributes: true, attributeFilter: ['aria-current'] });
@@ -255,12 +277,16 @@
       var header = chrome.querySelector('.fd-header');
       var lift = 0;
       if (height > limit && header) lift = Math.min(Math.ceil(header.getBoundingClientRect().height), height);
-      html.style.setProperty('--fd-chrome-top', lift ? -lift + 'px' : '0px');
-      html.style.setProperty('--fd-chrome-h', Math.max(0, height - lift) + 'px');
+      var top = lift ? -lift + 'px' : '0px';
+      var pinned = Math.max(0, height - lift) + 'px';
+      // An unchanged value is not written again: a write restyles the page and can wake the observer once more.
+      if (html.style.getPropertyValue('--fd-chrome-top') !== top) html.style.setProperty('--fd-chrome-top', top);
+      if (html.style.getPropertyValue('--fd-chrome-h') !== pinned) html.style.setProperty('--fd-chrome-h', pinned);
     }
     set();
-    if (typeof root.ResizeObserver === 'function') new root.ResizeObserver(set).observe(chrome);
-    root.addEventListener('resize', set);
+    var reset = nextFrame(set);
+    if (typeof root.ResizeObserver === 'function') new root.ResizeObserver(reset).observe(chrome);
+    root.addEventListener('resize', reset);
   }
 
   function init() {

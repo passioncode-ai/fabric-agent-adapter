@@ -1,0 +1,1213 @@
+{
+ "schema": "inventory/1-lite",
+ "date": "2026-11-12",
+ "source": "docs/backlog.md at origin/main 8d5bf23d plus origin/rel-0.78.0",
+ "items": [
+  {
+   "id": "FAA-10",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "Reading side shipped in 0.51.0: plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_a2a.py (a2a_surface_findings, a2a_view, agent_card_findings; commit 1c140e5a), its docstring line 5 says serving a card, the binding and a client are not here (FAA-10). No card server, JSON-RPC binding or client exists in the kit.",
+   "remaining": "Serve /.well-known/agent-card.json from the service's capabilities; JSON-RPC binding (message/send, message/stream, tasks/get, tasks/cancel) over the interop job store; outbound client (discover, call, get, cancel) with an origin allowlist and use_secret.py credentials; probe checks; sample serving MCP and A2A; Hermes interop test (needs a Hermes A2A endpoint)."
+  },
+  {
+   "id": "FAA-26",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "passioncode-ai/fabric (ADR-0138 D2b amendment, fabric.agent.create); contract (evals suite format)",
+   "evidence": "Checked 2026-11-12 on fabric origin/main 3ba1201a: docs/adr/0138-* last changed in 22426281 (unchanged); `git grep fabric.agent.create` finds only a plan note (2026-10-19-final-pass.md:20) saying FAA-26 does not block. Still unmet.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-27",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "Fabric (D2, ES256 in ADR-0144) and contract (DEC-0051 ES256 enum, org-countersign/1)",
+   "evidence": "Packing core done in 0.31.0 (FAA-27a). Contract origin/main 8dec888e: schemas/fabric-package.schema.json:443-446 alg enum is still [\"EdDSA\"]; docs/specification/package.md:215 says ES256 joins only when Fabric records D2; Fabric ADR-0144 line 55 still Ed25519 only. Unmet.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-28",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "Organization server (organization edition, passioncode-platform/<organization server>) and Fabric passkey (Stage 3)",
+   "evidence": "bin/fabric-agent-adapter.js:238 PACKAGE_COMMANDS = pack, sign, verify; no publish. Estate record and share grants are in the kit (fabric_estate.py, fabric_share.py), but no org server import endpoint was found in passioncode-platform, <organization server> or <private repo>. Same dependency as FAA-63.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-29",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract (DEC-0039 ES256/DPoP/run amendment, DEC-0030 root run) and Fabric D2",
+   "evidence": "Contract origin/main: DEC-0039 (DECISIONS.md:1428) amended only by DL-23/24 etc. (lines 1596, 1900), no ES256 for delegation; Fabric ADR-0144:55 EdDSA only. Kit already has es256_verify for passkeys (plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_crypto.py:316) but no delegation ES256. Unmet.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-44",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract (catalog shape decision)",
+   "evidence": "Contract origin/main: no decision or spec mentions a package catalog (`git grep -i 'private catalog|catalog/1'` empty). passioncode-platform ADR-0005:71 only fixes the location (В-09). Unmet.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-63",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "Organization cloud import API owner (<organization server> MA-04 / <organization server>)",
+   "evidence": "No import API found in <private repo>, passioncode-platform/docs or <organization server> (<organization server> backlog VES-MARKETPLACE line 131 names MA-04 as the adapter's, still unplanned). Board thread 14ce1f9c not read (board tools excluded).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-64",
+   "class": "partial-done",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract",
+   "evidence": "Fixes shipped in 0.39.1 (92037c3, tag v0.39.1). Question 1 answered by the contract in bbebae6b (#135, inside the pin 18f8d487) and ported: plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_delegation.py:296-304 _chain_of names a node's partner only for a partner actor.",
+   "remaining": "Question 2 (partner in job ownership and idempotency keys) is contract CT-134, still 'open: not decided' on contract main docs/backlog.md:148. Port when decided."
+  },
+  {
+   "id": "FAA-66",
+   "class": "doable",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-67",
+   "class": "obsolete",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Operator rule 2026-11-04 (global CLAUDE.md, Domain routes): every Telegram send goes only through the telegram-gateway.default Fabric service. <local path> README (head abf24618) serves telegram.messages.send/get/search/edit/forward/press and callbacks, with update and approval handling. A kit-level Telegram connector would be a second client the rule forbids; a service calls the gateway's MCP instead.",
+   "remaining": "Close with this reason, or replace by a small doc row: building-fabric-services points services at the gateway's capabilities."
+  },
+  {
+   "id": "FAA-87",
+   "class": "needs-operator",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "release.yml:214 still sets NODE_AUTH_TOKEN from secrets.NPM_TOKEN; `gh secret list` shows NPM_TOKEN (2026-08-27). npm 11.19.1 has `npm trust github`, and this machine's npm is signed in as ssheleg, but `npm trust list @passioncode-ai/fabric-agent-adapter` answers EOTP (one-time password via browser) on 2026-11-12.",
+   "remaining": "Human gate: one npmjs.com browser authentication (OTP). After it an agent runs `npm trust github @passioncode-ai/fabric-agent-adapter --file release.yml --repo passioncode-ai/fabric-agent-adapter --allow-publish`, removes release.yml:214 and the comment lines 146-152, deletes the NPM_TOKEN secret, and verifies on the next tag's run."
+  },
+  {
+   "id": "FAA-98",
+   "class": "doable",
+   "size": "L",
+   "wave": 2,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-103",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "a consuming agent (none known)",
+   "evidence": "No kit implementation: jobCallerKey appears only as a pointer in building-fabric-services/references/interop.md:137. No consumer request seen in repositories under ~/DATA (board not read). Technically doable now in this repo, size L, if the deferral is lifted: contract DEC-0104 and its vectors are at the pin.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-106",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "a consuming agent (none known)",
+   "evidence": "Kit has no relayCallerTier/sealAgentCall. plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_crypto.py has Ed25519 and P-256 verify only, no X25519 or AES-GCM, so the Python HPKE question stands. Technically doable (L to XL) if lifted.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-116",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "FAA-162 (0.55.0) creating-fabric-agents/references/agents-that-answer-people.md; FAA-197 (0.63.0) refused draft out and repair in recipes/support-agent (README.md:15 `repair=`, :60-62 research and hold described). README.md:66-69 lists what the reference names as still missing from the recipe.",
+   "remaining": "Turn record, daily support.quality_daily report, other-vendor model checker that reads the material first, false-state gates, numbers/account state from tools, live-tail re-read, commitments ledger, gap queue, research and hold after a refusal, knowledge client reading `answer`, vendor check at load, answering model in the decision, policy routing first, redacted outbox, a building-fabric-services eval, learning cycle. All in this repo."
+  },
+  {
+   "id": "FAA-124",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "Fabric slice + organization edition (estate records of the organizations, 2026-11-21) and contract CT-127 services",
+   "evidence": "Adapter part done: rehearsal on 0.59.0 docs/reports/2026-11-03-faa-124-pilot-rehearsal/README.md (pack, sign, verify, org: instance, dashboard link pass). Contract main docs/backlog.md CT-127 still open; organization edition date 2026-11-21 not reached.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-126",
+   "class": "doable",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-127",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-129",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-130",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-133",
+   "class": "done",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Wave 2 is on Fabric main (protocolObligations.ts:232-262: work.check-every-three-minutes CO-427 SW-6, operator.told-one-is-told-all CO-426 TO-1). Adapter carries both: working-with-fabric/SKILL.md:168-172 (SW-6) and :214-218 (one approval binds all, OA-1/DEC-0126); creating-fabric-agents/references/resilience-and-autonomy.md:146 (SW-6, via FAA-141, 6fe24e12) and operator-channel-and-repository.md:35 (DEC-0126, 38bad7af).",
+   "remaining": "Optional wording re-read: Fabric's SW-6 text now says nudges are taken by fabric_work_list/fabric_heartbeat answers and turn nudges are shown without taking; SKILL.md:168 should be checked to say the same (likely already, via FAA-142)."
+  },
+  {
+   "id": "FAA-135",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 3,
+   "owner": "",
+   "evidence": "Job step 0.52.0 (38bad7af, fabric_interop.py:516-535); board responder 0.61.0 (spec docs/evidence/specs/2026-11-03-faa-135-board-mandate.md, tests test/test_fabric_board_mandate.py, test/fabric-board-mandate.test.mjs). No identify_agent/identifyAgent anywhere in plugins/ or test/.",
+   "remaining": "identify_agent hook so a per-agent credential's agent id binds the mandate chain."
+  },
+  {
+   "id": "FAA-137",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-143",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-144",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "a kit service that must trust an organization membership (none known)",
+   "evidence": "No verify_org_membership in the kit; pin moved to v0.1.0+2026-11-07.1 (18f8d487) and no kit surface reads membership. Doable (M) if a consumer appears: vendor fixtures/vectors/org-membership.json, port FAC-SEM-145/146 in both twins.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-145",
+   "class": "obsolete",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "A standing record, not work: its own text says a kit consumer of any of org-authority/1, DEC-0131/0133, DEC-0134, DEC-0132 gets its own row. Three repins since (0.57.0 212f03d3, 0.71.0 74160dae, 0.74.0 da8646fa; pin 18f8d487 = v0.1.0+2026-11-07.1) and the register entries stay in the kit (fabric_protocols.py:24); no consumer appeared.",
+   "remaining": "Close with this receipt; keep 'revisit at repin' as a checklist line in the repin procedure instead of an open row."
+  },
+  {
+   "id": "FAA-146",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "passioncode-ai/fabric (agent directory and hub)",
+   "evidence": "Fabric origin/main 3ba1201a apps/desktop/src/main/hubCall.ts:492,606 forwards decision and mandate objects; no directory code lists callee protocols (`git grep protocols` in main/ shows no directory listing). Unmet as far as can be read; kits keep stripping source (0.52.0 D3).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-147",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "a first consumer: a service off the estate's machines that keeps its own token classes",
+   "evidence": "No kit code maps a `personal` token onto a token class (grep DL-29 in plugins: none). Contract main 8dec888e docs/DECISIONS.md:7951 still reads 'the first consumer that keeps token classes maps them as DL-29 says'; it is a MAY (DEC-0130).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-148",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract",
+   "evidence": "Contract main 8dec888e docs/backlog.md: CT-166 'open: filed 2026-10-26', CT-168 'open: filed 2026-10-26'.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-149",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "test/fixtures/kit-mandate-inputs.json has 230 cases (covers 106, documents 80, scopes 13, handOns 9, decisions 22) and none carries a `source` member (counted by script); file last touched c41612e5 (0.51.0).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-150",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "fabric_context.py:14-18 tells a service to pass estate_context=info['context'] itself; no helper hands it back and no test builds the gate from an instance's context (grep estate_context in test/: only test_fabric_estate.py:396,408, which pass it by hand).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-152",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "Fabric (role part)",
+   "evidence": "The condition is met for the branch: contract DEC-0140 PR-3 accepted 2026-10-30 (project-comms.md:845-865) defines a session's role and branch; Fabric v0.3.16 (commit ae19dfd4, CO-459) takes `branch` on fabric_session_observe event turn (apps/desktop/src/main/workTools.ts:112,224,653). The adapter sends no branch (grep branch in plugins/fabric-agent-adapter/skills/working-with-fabric/scripts: none). Role: PR-3 puts it in the host's own session registration, and Fabric's surface takes no role argument yet.",
+   "remaining": "role at enroll waits on Fabric offering a role field"
+  },
+  {
+   "id": "FAA-153",
+   "class": "partial-done",
+   "size": "",
+   "wave": 4,
+   "owner": "Fabric",
+   "evidence": "Question 1 settled by Fabric: CO-466 'resolved 2026-11-02 for the release of 2026-11-05, decided: the claimed task wins' (fabric docs/evidence/specs/2026-08-16-software-fabric-carryover.md CO-466 row, main 3ba1201a); working-with-fabric SKILL.md:150-152 already says link nothing when Fabric chose another parent.",
+   "remaining": "Question 2 (fabric_work_claim with a title bypasses the chain bound) is Fabric CO-480, state 'open' in the same file; update the row to cite CO-466's resolution."
+  },
+  {
+   "id": "FAA-154",
+   "class": "partial-done",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "proposed:true wording and eval done in 0.53.0 (FAA-156; SKILL.md:149-151). Still open: SKILL.md Step 6 example (line ~295) sends {title, source} with no `origin`; Step 5 (line 170) says 'each is given once' for nudges and waiting_for_you alike.",
+   "remaining": "Step 6 example gains origin {kind, ref}; Step 5's once-only sentence limited to nudges; optional pointer from creating-fabric-agents to working-with-fabric Steps 4-5. The CHANGELOG items concern released entries and can be dropped."
+  },
+  {
+   "id": "FAA-161",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "fabric_session_mcp.py:274-295 `_existing_folder`/`_nearest_checkout` call os.path.isdir/lexists in loops with no time check; turn_repositories (297) checks `until` only between paths. The path runs only once Fabric's observe declares `repositories` (Fabric's 2026-11-21 slice; this session's fabric_session_observe schema has no `repositories`), so today it is dormant.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-167",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Fabric's own row now uses the adapter's word: CO-367 (fabric carryover spec, main 3ba1201a) 'the fix is the adapter's hook sending the touched repository's identity ... Accepted 2026-10-27 for the slice of 2026-11-21 (the adapter's a8bdda7a, Fabric's answer d3f9e6fb)'. The board reply on 1f5ee0b5 itself was not read (board tools not used).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-179",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract",
+   "evidence": "Items (1)-(3), (5), (6) done (0.56.0, test_a_job_created_under_another_name_is_read_under_it_at_the_start_and_the_answer). Item (4): fabric_delegation.py:874-877 still answers operator-decision-required with the kit's own data.detail 'mandate-capability-missing'; contract main CT-180 ('MJ-1 names no data.detail for the refusal') is 'open: filed 2026-10-27'.",
+   "remaining": "item (4)"
+  },
+  {
+   "id": "FAA-180",
+   "class": "partial-done",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "(4) done in 0.63.0 (FAA-197). The reference's intro (creating-fabric-agents/references/agents-that-answer-people.md:18-21) now names A2's families, A3, A4, A6 and P1/P3/P5/P6/P7/P8 as left to the sources, which answers (1), (3) and (5) in their 'or stay named as left' form.",
+   "remaining": "(2) creating-fabric-agents SKILL.md Completion format (lines 246-252) asks for no per-item line of that page's checklist; (1)'s 'first reply measured from the person's message' is not named."
+  },
+  {
+   "id": "FAA-181",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "<private repo>",
+   "evidence": "`gh pr view 70 -R <private repo>` on 2026-11-12: state OPEN, headRefOid f882358e3fb9627f6edb20db3981818912a9844c, mergeCommit null.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-182",
+   "class": "doable",
+   "size": "M",
+   "wave": 4,
+   "owner": "",
+   "evidence": "Spot checks show items open: (3) support_agent.py:573-576 docstring still lists three Client keywords and 'except those the config already sets'; (9) partly superseded: the description is now 355 characters (FAA-291, 0.78.0) and still names no answers-people row; no positive trigger eval for a support bot (test/evals/creating-fabric-agents/triggers.json has only a negative support case, line 28). ReentryError has a test (test_support_agent_recipe.py:430); whether it fails with a plain Lock was not run.",
+   "remaining": "items (1)-(8), (10)-(16) as written; (9) only the eval half"
+  },
+  {
+   "id": "FAA-183",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "a Windows machine with Claude Code signed in (the operator's Windows install)",
+   "evidence": "hooks.json still runs `python3 -S ...` for all six hooks; 0.56.0 documented the requirement (CHANGELOG:1238). The fix needs a Claude Code run on Windows (Git Bash and PowerShell); hosted CI holds no model credential and ~/.ssh/config names no Windows host.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-184",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "turn_paths (fabric_session_mcp.py:219-270) calls bash_paths(command, cwd) per call with the session folder each time; no carry of the previous call's cd (grep carry/last_cd: none). session-hooks.md:87 still says 'Until FAA-184 lands'.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-185",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract",
+   "evidence": "Contract main src/mandate.ts:169 still compares `call.spendUsd > scope.perCallMaxUsd` with no finite check, and docs/backlog.md has no row on a non-finite spend (grep finite/NaN/FAA-139).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-186",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "(4) done in 0.56.0 (BashPaths.test_a_subshell_or_pipe_cd_does_not_move_the_base). (1) still open: fabric_interop.py:936 reads self.jobs.private(id) a second time with no UnknownJob guard. (2) sample_service.py:502 picks the join bound from one read of board.current. (3) fabric_board_slots.py:167 pops the key on idempotency_window_expired with no com.status refresh.",
+   "remaining": "(1), (2), (3)"
+  },
+  {
+   "id": "FAA-187",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "(13) and (17) closed in 0.56.0 per the row (test_check_url_reads_a_url_with_whitespace_at_its_ends_as_urllib_sends_it, test_a_base_url_ending_in_a_line_break_is_sent_without_it). Spot checks open: (4) check_dashboard_link.py still holds SECRET_VALUE (6 occurrences); (15) fabric_delegation.py:623 `_loopback` beside fabric_http.py:209 `_is_loopback`.",
+   "remaining": "items (1)-(12), (14)-(16), (18)-(31); (29) is a Fabric Dashboards row to file"
+  },
+  {
+   "id": "FAA-188",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Part 1 done in 0.58.0 (b04af2bb, c593c61e; fabric_source_check.py, test_source_check). Part 2's condition is met: contract CT-194 'done 2026-11-07: DEC-0149 accepted ... released v0.1.0+2026-11-07.2'. The adapter pin is v0.1.0+2026-11-07.1 (fabric-contract.lock.json 18f8d487), and the adoption is already its own row FAA-261 (docs/backlog.md:277), with FAA-270.",
+   "remaining": "part 2 = FAA-261: repin to >= v0.1.0+2026-11-07.2 and lay down fabric.source.json (fabric-source/1); close FAA-188 into FAA-261"
+  },
+  {
+   "id": "FAA-189",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "Spot checks open: (3) fabric_session_env.py:418-419 returns Path(FABRIC_SERVICES_DIR) without expanduser; (1) fabric_provider.py:323 stem uses flags=re.S; (7) test/validate.py:753 CONTRACT_GATE matches only a one-line skipUnless; (12) provider-entry.md:44 still says 'never quotes a value'. (11)'s blocker CT-189 is done (DEC-0147, 2026-11-02).",
+   "remaining": "all 12; (4) is other owners' re-vendoring; (5)/(9) win32 warning until Fabric > v0.3.15 is the floor"
+  },
+  {
+   "id": "FAA-190",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "104 numbered items; 11 marked closed inline ((7),(9),(21),(34),(37),(40),(43),(50),(64),(74),(94)). Spot checks open: (1) fabric_source_check.py:271,470 run JWT_SHAPE over whole lines with no cap; (2)/(12) it still reads fabric_secrets' private _BEARER_INSIDE and _long_secret (:217,277,283).",
+   "remaining": "about 93 items, mostly source-check detector edges (fail closed) and test-coverage gaps"
+  },
+  {
+   "id": "FAA-192",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "30 items; (20) closed inline. Spot checks open: (4) creating-fabric-agents/references/source-and-instance.md:53-56 still says `../<agent>-data` with no base; (6) the HTTPServer FQDN 'connects time out' symptom is absent from the references.",
+   "remaining": "29 items; (1) waits on the operator's decision whether the private cloud template may be named"
+  },
+  {
+   "id": "FAA-194",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "40 items; (1),(21),(24),(37) closed inline ((1): both kits refuse a provider manifest only when not an object or costPresets differ). (3) needs a real-client scenario run: `claude` is on PATH, but test/evals/run_evals.py runs trigger evals only.",
+   "remaining": "36 items: board move-back during long jobs (2),(11),(28), com.status reads per moved slot (5), scenario evals' real-client runs (3), prose pins (4), (38) NaN in manifest_problems"
+  },
+  {
+   "id": "FAA-196",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "fabric-agent-contract (CT-205); operator (item 3)",
+   "evidence": "100 items; closed inline include (4) (fabric-workspace PR #607 merged 5a1ce61), (9),(10),(11),(17),(20),(25),(100). (5) waits contract CT-205, still 'open' on contract main; (3) is a decision for the operator or contract owner.",
+   "remaining": "about 92 items: resume-path mandate checks (1), real-client eval runs (2), mandate edges (14),(18); (3) needs-operator; (5) blocked on CT-205"
+  },
+  {
+   "id": "FAA-198",
+   "class": "done",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Shipped in 0.62.0: cc946b21 (write_descriptor/register_remote refuse a new descriptor without source.repository, rewrite warns, check_service rule descriptor.source-repository), merged aabe21d7 (PR #231), npm 0.62.0 2026-11-04. Tests DescriptorTests.test_a_new_install_names_its_repository_and_a_reinstall_without_it_warns, test_the_probe_names_a_missing_repository. Board notices sent (docs/handoffs/2026-11-04-0.62.0.md 'Published': owners in thread 78ffb125, bde4737e answered, eb8925e7, b3fba08b).",
+   "remaining": "close the row with this receipt (its status still says open)"
+  },
+  {
+   "id": "FAA-199",
+   "class": "done",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Shipped in 0.62.0: f629a62a (sample and recipe declare extensions/connections/0.1, check_service well-known.connections NOT_RUN when absent, adapting step, scenario service-names-its-repository-and-connections), merged aabe21d7. Tests test_the_sample_declares_what_it_uses, test_it_declares_its_models_as_connections, test_connections_fac_sem_127. Owner notice in board thread 78ffb125 (handoff 2026-11-04-0.62.0.md Published).",
+   "remaining": "close the row with this receipt"
+  },
+  {
+   "id": "FAA-200",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "57 items; closed inline (11),(17),(20),(22),(30). Spot check open: (1) fabric_auth.py:415-420 writes the token file before write_descriptor warns on a rewrite.",
+   "remaining": "about 52 items: (1) token/descriptor write order, (2) session-start notice in this checkout, (13) three copies of the repository-match rule, (37),(54) source.repository host and authority edges, (43),(47) docs; (3) a public-repo name sweep"
+  },
+  {
+   "id": "FAA-201",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 2,
+   "owner": "Observatory (failed status on observatory_checkpoint_write); contract owner (DEC-0158); Fabric (take-back code)",
+   "evidence": "Released in v0.63.0 (bbcdc8c8): dispatch detection, exit contract DISPATCH_CONTRACT (plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session_cli.py:141-172), dispatch_holder/dispatch_cleared_from (:328-403), references/on-demand-session.md; tests test/test_fabric_session_dispatch.py. Later extended by FAA-215/219/224/241 (v0.68.0-v0.72.0). Observatory OBS-323 done in 0.34.0 (project-observatory-open-source docs/backlog.md) but the live observatory_checkpoint_write schema still enumerates only in_progress|done|blocked (no failed); memory.checkpoint.write (memory/0.1) does",
+   "remaining": "(a) contract step 6 still says 'blocked ... (failed once Observatory takes it, OBS-323)': OBS-323 shipped without failed on observatory_checkpoint_write; decide whether memory.checkpoint.write (which takes failed) is the door, or keep blocked; (b) an untrusted-hook case in test/native/codex_hooks.py; (c) one measured real-client run of the nine dispatch scenarios (FABRIC_REAL_CLIENT=1) recorded under docs/evidence/evals; (d) Windows measurement; (e) Fabric's take-back and DEC-0158 (on-demand sessions, contract branch agent/ct215-on-demand-20261108, proposed, paused per CT-287) are external."
+  },
+  {
+   "id": "FAA-202",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "Fabric (CO-496, a new ADR replacing ADR-0127); contract owner (DEC-0157); the analytics owner (event names, endpoint)",
+   "evidence": "No analytics notice/switch in the templates (no hit for a usage switch in creating-fabric-agents/building-fabric-services). Fabric CO-496 still open (fabric docs/evidence/specs/2026-08-16-software-fabric-carryover.md row CO-496: open); ADR-0127 'No usage count leaves before the person has answered the switch' still accepted (fabric docs/adr/README.md:113), no replacing ADR (next free ADR-0194). Contract DEC-0157 (CT-216, anonymous usage and error data) only proposed on branch agent/ct216-usage-data-v2, paused (contract CT-287).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-204",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract owner (DEC-0159 / CT-218)",
+   "evidence": "Contract CT-218 'in progress: proposed on branch agent/ct218-local-cloud-v2, not on main; see CT-287' (fabric-agent-contract origin/main docs/backlog.md); DEC-0159 rounds 1-15 not clean, round 16 next (docs/handoffs/README.md). Nothing in the adapter's skills for the form yet.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-206",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 4,
+   "owner": "",
+   "evidence": "Part 1 released v0.64.0 (8eec4815): PostToolUse retro hook, test/test_fabric_session_retro.py. DEC-0153 pinned since v0.71.0 (74160dae), fabric-ops-digest registered in fabric_protocols.py:19 and fabric-protocols.mjs:12, references/protocol.md:66. No digest module in building-fabric-services/scripts (no fabric_ops_digest.py / fabric-ops-digest.mjs).",
+   "remaining": "Part 2: a kit module (Python and Node twins) that folds a service's own log into ops.digest.hourly@1 / ops.digest.daily@1 (counts by event, class, code; OD-2 op names via the tag's OP_NAME/OP_NAME_MAX; hours only when the service saw itself in them; closed hours written before missed days are folded), listed in kit.json; the hooks' error classes stay with FAA-202 (blocked)."
+  },
+  {
+   "id": "FAA-208",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Still present at main e74bd858: dispatch_cleared_from (fabric_session_cli.py:333-336), dispatch_holder take-over and FileExistsError branch (:358-391) and dispatch_held_elsewhere (:416-419) catch ValueError only, not RecursionError (only the reader at :459 catches it); folder.mkdir in dispatch_holder raises FileExistsError when `dispatch` is a file and the FileExistsError branch reads it as an existing record; prune_dispatch_records uses record.stat() (fabric_session_env.py:690-707), which follows links.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-209",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "test/test_source_check.py:186-191 still bounds the crafted-input scan with assertLess(time.perf_counter() - start, 5); row records failures on 2026-11-05 and at 0.70.0/0.72.0 heads under load.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-210",
+   "class": "partial-done",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "Done in v0.67.0 (055de14d, PR #243): BOM, 4 MiB byte cap (HOOK_INPUT_CAP), dashboard-kit notice UTF-8 read, retro line naming insights/, launched-session exceptions. Still open at main: check_dashboard_link.py (3 byte-identical copies, md5 a23c4858) reads sys.stdin.read(65537) as locale text (line 138); PostToolUse reads isError only at the top (fabric_session_cli.py:482); CHANGELOG.md:640 record wording.",
+   "remaining": "Read check_dashboard_link.py stdin as bytes decoded utf-8-sig (all three copies); tests pinning the exact depth bound, the prompt hook's dispatch verdict under a code page and a Cyrillic cwd; a plugin-served Fabric seen live (needs a live plugin Fabric); the 0.64.0 CHANGELOG line is a record and stays."
+  },
+  {
+   "id": "FAA-212",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "test/validate.py:717-723 credential_url_scope reads package.json files literally (no glob, no README/LICENSE, fallback scope when no files key); only test/test_validate.py:796 covers the shape; no __pycache__ filter or validate_repo wiring test; scheme extraction at :741 takes the first token.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-214",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "test/validate.py:623-638 malformed_board_rows splits on every '|' and its docstring says the aggregator splits an escaped pipe; fabric-workspace origin/main lib/backlog.mjs cells() (lines 31-40) treats backtick runs as code spans and reads \\| as a literal pipe.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-215",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 1,
+   "owner": "Fabric and Switchboard for the external half",
+   "evidence": "Done in v0.68.0 (eb811609, PR #245): step 6 waits for the board to take the complete, observed: true in steps 4/5, error rule with com.progress, insights/. Still in DISPATCH_CONTRACT at main (fabric_session_cli.py:141-172): step 3 names only 'left accepted by an earlier run', no in_progress one; step 4 'failed_known (observed: true) saying so'; step 6 '(failed once Observatory takes it, OBS-323)' although OBS-323 shipped without failed on observatory_checkpoint_write; step 3 'declining until CO-506 (resend then)' although Fabric shipped CO-506 in v0.3.17 (027cb809 grantOwnProjectRespond, tag v",
+   "remaining": "Contract wording: step 3 an in_progress request left by an earlier run (com.reconcile path), step 4 'with the state it observed', step 6 pointer, the CO-506 clause now that Fabric 0.3.17 grants the own Project at com.enroll, all under Hermes' 4000-character budget; external asks: Fabric to carry a run's notes into its take-back, Switchboard and Fabric packet constraint to gain a not_authorized branch (board thread 1add3c03)."
+  },
+  {
+   "id": "FAA-216",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "adapting-projects-to-fabric/references/provider-entry.md:67,69 still say 'the release after v0.3.15, CO-479'; building-fabric-services/references/board.md:305 says 'Fabric 0.3.15 has none'. CO-479 shipped in Fabric v0.3.16 (fabric CHANGELOG at v0.3.16 line 73); latest Fabric is v0.3.19 (2026-11-11) and still has no DEC-0140 PR-2 slot move in apps/ (only PR-1, PR-3 hits).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-217",
+   "class": "partial-done",
+   "size": "S",
+   "wave": 2,
+   "owner": "the estate insights spec owner (ADR-0188 owner, Fabric) and Observatory (OBS-331 part c)",
+   "evidence": "references/session-hooks.md:40-50 now cites the shape as provisional until ADR-0188's owner fixes it and names insights/ in the data folder or <name>-data/ (since 0.64.0/0.67.0, 8eec4815, 055de14d). Observatory OBS-331 part c (the insights reader) still open (project-observatory-open-source docs/backlog.md). Observatory's own insights/2026-11.jsonl rows carry evidence and audience.",
+   "remaining": "Align the required-field list (evidence, audience) and the kind market with the insights spec owner, or keep the provisional note; tell Observatory about <name>-data/insights/ for OBS-331 part c; tests: the dashboard-kit notice speaking in a launched session, the preamble under 4000 characters (doable S)."
+  },
+  {
+   "id": "FAA-218",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "No CLAUDE_CONFIG_DIR or SWITCHBOARD_CLAUDE_SOURCE_DIR handling anywhere in bin/ or plugins/ (grep). bin/fabric-agent-adapter.js:123,143,146,199 use os.homedir()/.claude; fabric_session_env.py:360 reads home/.claude.json only. The launcher's rule exists: passioncode origin/main lib/launcher.js:43-52 claudeFolders (read: CLAUDE_CONFIG_DIR or ~/.claude; write: SWITCHBOARD_CLAUDE_SOURCE_DIR in a Switchboard home), claudeJson at :67.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-219",
+   "class": "done",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Done in v0.68.0 (eb811609, PR #245, tag v0.68.0): step 3 of DISPATCH_CONTRACT (fabric_session_cli.py:151-153) and references/on-demand-session.md:84-110 implement Fabric's option (b) (no slot, no work, one com.reply decline at slot absent generation 0, close done once answered); eval a-dispatched-run-whose-enroll-is-refused (test/evals/working-with-fabric/scenarios.json:600). The row's own status says done; close it. Note: the 'until CO-506' wording is now stale (Fabric v0.3.17 ships CO-506), tracked under FAA-215/221.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-220",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "project-board.md 'When nobody answers' step 3 has no machine-trust gate (no ADR-0176/trust hit in the section) and says 'do not cancel it' (line ~39 of the section), while fabric-workspace origin/main knowledge/agents-first.md step 3 requires protocol.machine trust 'mine' (ADR-0176) and has the asker com.cancel its own request with 'done by the asker' after adapting.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-221",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "PREAMBLE still says 'a request a responder should take stays queued' (fabric_session_cli.py:77); README.md:27 the same; working-with-fabric SKILL.md:125 'leave a responder'...; SKILL.md at 4688 words (budget 4750). Fabric v0.3.17 now grants the session's own Project board.respond at com.enroll (CO-506, 027cb809), which changes what 'stays queued' should say.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-222",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "project-board.md:144 and scenarios.json:605 say 'no service ever held'; on-demand-session.md:84 says 'Project ever enrolled' and that the entry is there; project-board.md:158 attribution line follows the decline paragraph; CHANGELOG 0.68.0 lacks the interactive-session sentence (a record).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-223",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "'Agents & access' remains in fabric_board_session.py:261,552, fabric-board-session.mjs:199,499, building-fabric-services/references/board.md:29 and the pin test/test_fabric_board.py:409; Fabric's AGENTS.md:180 says 'Agent access' and Fabric apps/ no longer use 'Agents & access' outside one test.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-224",
+   "class": "done",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Done in v0.69.0 (820a2644, PR #248), published as v0.69.1: DISPATCH_CONTRACT step 3 asks fabric_question_ask {kind: access, about: board.gate.<capability>, commandId} (fabric_session_cli.py:153), gate_id uuid5 (:309-313), `fabric_session.py gate-id` (:828); tests test_fabric_session_dispatch.py:453 test_a_declined_request_asks_the_operator_once_per_request and :478 test_gate_id_prints_the_contracts_command_id. Close the row.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-225",
+   "class": "blocked-external",
+   "size": "M",
+   "wave": 2,
+   "owner": "fabric-agent-contract owner (DEC-0160 / CT-228)",
+   "evidence": "write_descriptor still refuses only a port another descriptor of the same account declares. DEC-0154 accepted and pinned (fabric-contract.lock.json commit 18f8d487 = v0.1.0+2026-11-07.1), but the claim file's schema and port-choice reference are DEC-0160 (CT-228), proposed only on contract branch agent/ct228-port-claim-20261108, paused (CT-287: rounds 1-4 folded, uncommitted worktree edits).",
+   "remaining": "Doable now as a slice: refuse a port another OS account listens on, using fabric_peer_owner.pick_listener/read_table (already in the kit). The recorded port per account and the sticky-folder claim wait on DEC-0160."
+  },
+  {
+   "id": "FAA-227",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "DEC-0154 HA-2 makes a server's refusal of another account's peer a MUST and is in the pin (18f8d487). Client side done in v0.74.0 (da8646fa, FAA-226: fabric_http.py:348-388 foreign-user). fabric_peer_owner.peer(sock) exists (fabric_peer_owner.py:835-841) and a Node twin fabric-peer-owner.mjs, but LoopbackHTTPServer (fabric_descriptor.py:87-98) does not call it; no verify_request in the kit.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-228",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 0,
+   "owner": "contract owner for CT-234 / DEC-0161 (revisit only)",
+   "evidence": "Implemented on branch origin/rel-0.78.0 (FAA-278 'done 2026-11-08 in 0.78.0': LaunchDaemon in /Library/LaunchDaemons with UserName, system/<label> status without root; FAA-228 marked done there) but rel-0.78.0 is not merged: 19 commits ahead and 12 behind main, no PR (gh pr list --head rel-0.78.0 empty); main also carries a different 0.78.0 (83aa72a4, FAA-297). Contract CT-234 (G8) open; DEC-0161 proposed only on branch agent/ct288-system-domain-20261108.",
+   "remaining": "Reconcile rel-0.78.0 with main (both claim version 0.78.0), open and land its PR, release; revisit when contract CT-234/DEC-0161 land."
+  },
+  {
+   "id": "FAA-229",
+   "class": "done",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Done in v0.69.0 (820a2644), published v0.69.1: fabric_bin_candidates puts ~/Applications first (fabric_session_env.py:178-196), another_users_copy (:221-254); tests test_fabric_session.py:258 test_another_users_copy_outside_home_is_skipped and :2163 test_a_registered_copy_of_another_user_is_named. rel-0.78.0 already closes it ('done 2026-11-06 in 0.69.1').",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-230",
+   "class": "blocked-external",
+   "size": "M",
+   "wave": 2,
+   "owner": "fabric-agent-contract owner (DEC-0160 / CT-228)",
+   "evidence": "No recipe in creating-fabric-agents (references list: no machine/port recipe; no placement.json hit anywhere in plugins). DEC-0154 accepted (recorded port per OS account) but the port-choice reference with vectors is DEC-0160 (CT-228), proposed on a paused branch.",
+   "remaining": "Doable slice now: the recipe's other two parts (refuse to start when Observatory's placement record names another machine, via fabric_context's placement check; keys only from the user's own vault). The port part waits on DEC-0160."
+  },
+  {
+   "id": "FAA-232",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "another_users_copy is called only from status (fabric_session_cli.py:726,739) and fabric_bin_candidates; no session-start, worker or watch-mail path checks the registered command's owner.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-233",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "status reports codex_registered(env) as a boolean only (fabric_session_cli.py:718,790) and checks another_users_copy only for the Claude registration (:726); Kimi and native hosts are not read.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-234",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "claude_registration reads home/.claude.json only (fabric_session_env.py:354-360); no CLAUDE_CONFIG_DIR support anywhere in the plugin.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-235",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "Measured 2026-11-12 with Claude Code 2.1.299 under a throwaway HOME: `claude mcp add --scope local` run in <repo>/sub/deeper keys projects[<git root>]; run in a non-git folder keys projects[<cwd>]; `claude mcp list` from a non-git child of that folder and from a nested git repo under the registered repo shows no fabric entry. `claude_registration` (working-with-fabric/scripts/fabric_session_env.py:368-372) walks every ancestor, so it reports a local registration Claude Code does not apply in those two cases.",
+   "remaining": "Record the measurement and narrow the lookup to the git toplevel (or cwd outside git)."
+  },
+  {
+   "id": "FAA-236",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Still open on main e74bd858: .github/workflows/validate.yml Windows job runs test_fabric_session.py but not test_fabric_session_dispatch.py (lines ~171-195); `gate-id` is parsed before argparse (fabric_session_cli.py:828-833) so --help omits it; README names no gate-id; test only in test/test_fabric_session_dispatch.py:478.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-237",
+   "class": "done",
+   "size": "",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Shipped in v0.70.0 (tag at fe282af5, PR #252): fabric_session_env.py:166-176 (launcher_folder, only that folder), fabric_session_cli.py:731-732,782 (administrator's copy named); tests test_the_launchers_one_folder_is_the_only_place, test_roots_copy_is_named_the_administrators, test_status_names_the_administrators_copy (test/test_fabric_session.py:222,238,2279). rel-0.78.0's backlog already marks it done; main's row still says open.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-238",
+   "class": "doable",
+   "size": "M",
+   "wave": 3,
+   "owner": "Project Observatory (OBS-360)",
+   "evidence": "The row's wait is met in substance: Observatory's V2 spec (project-observatory main, docs/runs/2026-11-06-studio-org/specs/V2.md:155-250 and §8 ~385-400) names `vault.py receive PROJECT ENV NAME --from-command -- <door>`, agrees the door prints the DEC-0111 envelope and never writes another store, and records the exit codes 0/2/3/4/5 (transport only retryable). OBS-360 itself is not built (no `receive` in tools/vault.py on main c560f34e). DEC-0111 is inside the adapter's pin 18f8d487.",
+   "remaining": "Formal condition (Observatory's PR naming command and fields on the board) unmet; build against V2 and DEC-0111 now."
+  },
+  {
+   "id": "FAA-239",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "main fabric_session_cli.py:700-770: status ignores a relative or `~` PASSIONCODE_APPLICATIONS silently (launcher_folder returns None, fabric_session_env.py:169-175) and does not flag a registration outside the launcher's folder; no test covers either.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-240",
+   "class": "doable",
+   "size": "S",
+   "wave": 2,
+   "owner": "",
+   "evidence": "Items still open on main: no linux launcherFolder test (only darwin, test_fabric_session.py:2349); `occupied` recomputed (fabric_session_cli.py:739); tests stub only env_module.fabric_bin_candidates (test_fabric_session.py:266-267); eval scenarios.json:594 lacks 'starting with /'; administrator label unqualified (fabric_session_cli.py:782).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-242",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "test/fixtures/contract/vendor_vectors.mjs:12-16 still says 'Needs Node 24 or later (type stripping)'; this machine runs Node v26.10.0 where the row reports the failure.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-243",
+   "class": "doable",
+   "size": "M",
+   "wave": 4,
+   "owner": "",
+   "evidence": "org-index check_private.py --json on main e74bd858 (terms not printed): 53 P1 hits (was 46): docs 47, CHANGELOG.md 3 (lines 562, 1643, 1762), test 2, plugins 1 (building-fabric-services/assets/dashboard-kit/fabric-button.js:160). No release-checklist step runs the check (grep check_private finds only backlog rows).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-244",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "No `project.work` anywhere in building-fabric-services/scripts or references (grep empty on main); pinned contract 18f8d487 DECISIONS.md:8478 (DEC-0140 PR-1) and CONTEXT.md:211 reserve it.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-245",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "main fabric-secrets.mjs:63-71 still builds `[...(values.get(name) ?? []), ...]` per piece; fabric-button.js:66-75 uses concat per piece; Python twin linear (fabric_secrets.py:112).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-246",
+   "class": "partial-done",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Done: (2),(3),(6) in 0.73.0 (row text); (7) fabric-workspace origin/main knowledge/agents-first.md:100-112 now carries the DEC-0152 SA-6 slot rule instead of 'leave it and tell the person'.",
+   "remaining": "(1) fabric-workspace knowledge/agents-first.md:178 and knowledge/integration.md:23 still say 'typed secret'; (4) CHANGELOG 0.71.0 `about` bullet; (5) building-fabric-services/references/board.md:305 names Fabric 0.3.15 (Fabric is now v0.3.19); (8) working-with-fabric/references/on-demand-session.md:7 still defines Fabric's main as 0.3.16 plus CO-409 while Fabric released v0.3.17 to v0.3.19."
+  },
+  {
+   "id": "FAA-248",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "Fabric (CO-519) for the closing route",
+   "evidence": "No 'moot' or equivalent sentence in working-with-fabric SKILL.md or references/project-board.md (grep empty). Fabric CO-519 ('about settles no question yet') is open, due 2026-11-21 (fabric carry-over spec line 534); Fabric has no question-close tool.",
+   "remaining": "The doc part is doable now; having a later run close the question waits on Fabric CO-519 or a close tool."
+  },
+  {
+   "id": "FAA-249",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract (CT-250) and the organization server's roles",
+   "evidence": "Gates still answer operator-decision-required (row cites fabric_actions.py:209, working-with-fabric SKILL.md:323). Contract CT-250 on origin/main 753c5093: 'in progress: the design is on main' (evidence/plans/2026-11-12-ct250-authority-levels.md, org-membership/2 with an architect), not decided; no DEC for it in DECISIONS.md.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-250",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "Open on main: check_service_channel_agent.py:75-78 uses unicodedata categories plus _IGNORABLE only (Unicode 13 on 3.9); line 21 imports private `_url_parts` from fabric_secrets; no NOT_RUN catch for a missing schema file around Probe.run; test_contract_revisions.py has no channel-agent schema entry.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-251",
+   "class": "doable",
+   "size": "M",
+   "wave": 3,
+   "owner": "",
+   "evidence": "All three check_dashboard_link.py copies take no listener owner and allow a browser fallback only on `not_installed` (building-fabric-services/scripts/check_dashboard_link.py:113,130); no 'this-account' handling.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-252",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "fabric_board_link.py:54-56,87-88 map every HubError to BoardError('unreachable', 'a write may have been stored'); no 'foreign' in fabric_board_session.py or the Node twins.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-253",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "main fabric_supervisors.py:139-160 systemd_install and :224-248 task_install return after restart/Run with no well-known poll; launchd_install (:392-396) polls. rel-0.78.0 changes launchd only.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-254",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "pid_alive in working-with-fabric/scripts/fabric_session_env.py counts EPERM as alive; SKILL.md Step 0 'Fabric is up' reads hub.json and the pid only (row).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-255",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "fabric_delegation.py:706-721 `_fetch` opens loopback http through urllib with no listener-owner check (fabric_http's checked connection is not used).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-256",
+   "class": "doable",
+   "size": "M",
+   "wave": 3,
+   "owner": "",
+   "evidence": "No Windows owner-check timing under docs/evidence (row); the nightly Windows job exists in validate.yml.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-257",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "No 'foreign' in fabric_openrouter.py or fabric-openrouter.mjs (grep empty); launchd origin check spelled only http://127.0.0.1 (row, fabric_supervisors.py:314-331).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-258",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "Pin is 18f8d487 = contract tag v0.1.0+2026-11-07.1; CT-254 is done and released in v0.1.0+2026-11-07.3 (1705d0f3); .4 (de8c0a7f), .5 and v0.1.0+2026-11-08.1 (93e7db16) exist. Kit reports PEER_OWNER_VERSION 1.1.0+kit.3 (fabric_peer_owner.py:113); Observatory's peer_owner is now 1.3.1 (project-observatory-open-source observatory/engine/peer_owner.py:151; OBS-384 1.3.0, OBS-386 1.3.1). DEC-0161 (rel-0.78.0's FAA-288) not on contract main.",
+   "remaining": "Repin and reconcile; coordinate the version line with Observatory on the board."
+  },
+  {
+   "id": "FAA-259",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "main fabric_supervisors.py:339 `_read_well_known` holds the reason, but :367 `fetch_well_known` returns Optional[dict] (None for both down and foreign-user); Node wellKnownOf answers ForeignUserAnswer (row). rel-0.78.0 rewrites launchd_install heavily, so this edit conflicts with that branch.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-260",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "Spot checks on main show the items open: (5) fabric_peer_owner.py:124 still says 'about 4,800'; (11) check_service.py:215-224 compares origin strings for descriptor.port-claim; (15) SECURITY.md:40 and references/protocol.md:222 still name pcblist_n; (4) test/test_real_client.py has no listener.owner. (10) is partly covered: check_service_rules.py:157,207 catch RecursionError on two body paths, the well-known fetch path unverified.",
+   "remaining": "All 16 items, (10) possibly in part."
+  },
+  {
+   "id": "FAA-261",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "DEC-0149 released in contract tag v0.1.0+2026-11-07.2 (fabb7a90, DECISIONS.md:9122); the pause on new tasks lifted 2026-11-07; no fabric.source.json or fabric-source/1 anywhere under plugins/ (git grep empty). Contract CT-207 (the adapter's adoption) open.",
+   "remaining": "Needs the repin (FAA-258) first."
+  },
+  {
+   "id": "FAA-263",
+   "class": "partial-done",
+   "size": "S",
+   "wave": 0,
+   "owner": "",
+   "evidence": "Done on branch origin/rel-0.78.0 b9503d17 ('SKILL.md headroom (FAA-263)'): building-fabric-services 4600, working-with-fabric 4598 words. That branch is unmerged (merge-base 2c0b1b18, no open PR). On main e74bd858: 4663 and 4688 words, headroom 87 and 62 against validate.py:410's 4750, below the row's 150.",
+   "remaining": "Land rel-0.78.0 (or re-apply its moves on main) so both skills keep at least 150 words of headroom on main."
+  },
+  {
+   "id": "FAA-264",
+   "class": "doable",
+   "size": "L",
+   "wave": 4,
+   "owner": "<private repo> / support quality standard owner (for items 3, 7, 8, 15, 30, 36, 49)",
+   "evidence": "Open on main: e.g. (1) support_agent.py:58 `_CITATION` up to 64 without colon vs :61 `_ID` with colon up to 128; (10) check_reply exists only in Python (recipes/support-agent/support_agent.py, no .mjs twin).",
+   "remaining": "52 follow-ups; most are in-repo doc/test edits, but (3),(7),(8),(15),(30),(36) and (49) are questions for the support-quality / <private repo> standard owners."
+  },
+  {
+   "id": "FAA-265",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 3,
+   "owner": "agents database owner (one-source question only)",
+   "evidence": "WIP commit 2d9f2abe on origin/faa-265-template-schema (2026-11-08): five JSON Schemas in creating-fabric-agents/schemas/template/, scripts/template_check.py (491 lines), test/test_template_check.py (17 tests), fixture test/fixtures/templates/example-agent/, references/agent-templates.md, a scenario eval. Not on main (main has no template_check.py). The branch is stacked on rel-0.78.0's 4 LaunchDaemon commits, which are themselves not on main.",
+   "remaining": "Rebase the WIP onto main (main's 0.78.0 is a different release than rel-0.78.0: version collision), finish and release; move communication-agent-template.md into its folder; the relation to the agents database's templates (provenance.template, FAA-275) is decided with the database's owner (external)."
+  },
+  {
+   "id": "FAA-268",
+   "class": "doable",
+   "size": "M",
+   "wave": 3,
+   "owner": "",
+   "evidence": "No recipes/dashboard-only on main (recipes/ holds only support-agent). write_descriptor (fabric_descriptor.py:479) checks the kit's older port claim; HA-1's claim file is not written (lifecycle.md:90-93, protocol.md:246) and waits on contract CT-228 (open: claim-file schema owed).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-269",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "Project Observatory (OBS-378) and contract (CT-259)",
+   "evidence": "fabric_events.py:53 writes activity events but no North Star unit event exists.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-270",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "DEC-0149 accepted, but the adapter pin 18f8d487 (= v0.1.0+2026-11-07.1) has no schemas/fabric-source.schema.json (git ls-tree; it appears at v0.1.0+2026-11-08.1). bin/fabric-agent-adapter.js has no `new` command; no fabric.source.json anywhere in plugins/.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-271",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "Project Observatory (security role definition); FAA-265 in-repo",
+   "evidence": "The parts exist separately: check_service.py, fabric_source_check.py, the private-terms check; template_check.py only on the WIP branch.",
+   "remaining": "An `admit` wrapper chaining those checks could be built after FAA-265 without waiting (S)."
+  },
+  {
+   "id": "FAA-272",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "0.76.0 documents the limit (CHANGELOG Known limits, references/protocol.md); fabric_peer_owner.py:137 TABLE_RESTRICTED and the vouch at :940.",
+   "remaining": "fabric_hub.py:236 and fabric-hub.mjs:205 still raise foreign-user and drop the reason; no own table-restricted code in probe/hub/fabric_http; the lsof -u own-socket proof is not implemented (no `-u` in either peer_owner twin). FAA-292 (peer_owner 1.3.1 libproc) is the second candidate."
+  },
+  {
+   "id": "FAA-273",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 2,
+   "owner": "",
+   "evidence": "0.77.0 CHANGELOG lines 71-80: items 13, the selectors half of 11, 16, 18; item 7 in 0.76.0.",
+   "remaining": "Items 1-6, 8-10, 12, 14-15, 17, 19-25 and the do-not-cache-None half of 11; e.g. item 4 is still live: parse_lsof_listeners uses port.isdigit() (fabric_peer_owner.py:279-287)."
+  },
+  {
+   "id": "FAA-274",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "working-with-fabric/references/on-demand-session.md:224 names `claude -p`/`codex exec` helpers but no bypass flag; `dangerously` appears nowhere in plugins/ or test/ on main.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-277",
+   "class": "partial-done",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "Item 9 eased by FAA-291 (b82e1d2f): SKILL.md now 4688 (working-with-fabric) and 4663 (building-fabric-services) words vs 4748/4744, cap 4750 (test/validate.py:410).",
+   "remaining": "Items 1-8: RETRO_LINE (fabric_session_cli.py:424) still omits agents-db.contribute; the 'already a Fabric Project' test; the accepted-request cancel note; the warn/warning docstrings; the peer-owner timing tests; SECURITY/README/SKILL-CARD wording."
+  },
+  {
+   "id": "FAA-279",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "fabric_context.py:42 EXIT_CONTEXT_REFUSED = 78, _refuse exits at once; fabric_supervisors.py:295-296 KeepAlive True, ThrottleInterval 10 (same on main and rel-0.78.0); the lock's supervised back-off exists only for exit 75 (fabric_lock.py:290-321, lifecycle.md:132).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-280",
+   "class": "doable",
+   "size": "M",
+   "wave": 3,
+   "owner": "",
+   "evidence": "remote-placement.md:31,70-72,122-124: one auth.tokenFile and one token per descriptor, rotation by re-running registerRemote on 'the operator's computer'.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-281",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "creating-fabric-agents/references/resilience-and-autonomy.md:221 'A secret never enters an environment'; models-and-providers.md:100,110,126 and lifecycle.md:70 (LC-21) read keys from the environment.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-282",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "operator-channel-and-repository.md lines 7-20: each agent's own Telegram bot (contract DEC-0034, OC-11); no word on a shared messaging gateway or a single poller.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-283",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "README.md:207,208,218 hard-code port 47190; where-agents-run.md has no multi-user Mac or member VM text (grep empty).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-284",
+   "class": "doable",
+   "size": "M",
+   "wave": 3,
+   "owner": "",
+   "evidence": "No SSH, headless or two-machine guidance in working-with-fabric SKILL.md or references (grep for ssh/headless/another machine finds only remote URL parsing in session-hooks.md:82).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-285",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract (CT-251) and the operator",
+   "evidence": "share grants (DEC-0086) and peer share (PS-3, DEC-0142) are in the kit today; nothing to align until CT-251 lands.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-286",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "All 24 items concern rel-0.78.0's LaunchDaemon code (fabric_supervisors launchd_domain: 11 hits on rel-0.78.0, 0 on main). rel-0.78.0 (19 commits ahead, no PR) is unmerged, and main's own unreleased 0.78.0 (tailnet, observing-products, FAA-291) carries the same version number: kit.json and package.json say 0.78.0 on both.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-287",
+   "class": "partial-done",
+   "size": "",
+   "wave": 3,
+   "owner": "Fabric (coordinator) and the lifecycle broker's owner",
+   "evidence": "Fabric Dashboards done: FD-180 merged e03f792 (2026-11-12, plistIsDaemon in packages/service-host/src/space-daemons.ts), FD-181 03ecc1a names the domain.",
+   "remaining": "Fabric and the lifecycle broker: no LaunchDaemons handling in fabric apps/desktop/src on main (git grep empty). Also the adapter's own LaunchDaemon installer (FAA-278) is only on rel-0.78.0, not main."
+  },
+  {
+   "id": "FAA-288",
+   "class": "blocked-external",
+   "size": "",
+   "wave": "blocked",
+   "owner": "fabric-agent-contract (DEC-0161, CT-284)",
+   "evidence": "The kit's three checks are on rel-0.78.0 only.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-289",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "The pin 18f8d487 has src/agent-network.ts:108-186 (jobCallerKey, nextQueuedJob, admitJob, queueStatusMessage, readQueuePosition, FAC-SEM-132/133) and fixtures service-load*.json; the kit has none (interop.md:130-137, FAA-103 open).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-292",
+   "class": "doable",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "Kit is peer_owner 1.1.0+kit.3 (fabric_peer_owner.py:113). Observatory main observatory/engine/peer_owner.py is 1.3.1 (line 151), sha256 b3831e5f...26b5 matches the row, libproc via proc_pidfdinfo.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-293",
+   "class": "doable",
+   "size": "M",
+   "wave": 2,
+   "owner": "",
+   "evidence": "No fstat/st_ino in fabric_lock.py or fabric-lock.mjs (grep empty).",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-294",
+   "class": "blocked-external",
+   "size": "",
+   "wave": 2,
+   "owner": "fabric-agent-contract (CT-286)",
+   "evidence": "",
+   "remaining": "Item (4) (a background routine fails its run when writing its result fails) is contract-independent and doable now (S) in resilience-and-autonomy.md and the kit's job/routine helpers."
+  },
+  {
+   "id": "FAA-295",
+   "class": "doable",
+   "size": "S",
+   "wave": 1,
+   "owner": "",
+   "evidence": "Observatory side done: PR #437 merged 2026-11-05; observatory/engine/memory_redact.py:63-64 KEEP holds board-request|board-thread|fabric-project but not board-message. Adapter text still says the packet redacts them: working-with-fabric/references/on-demand-session.md:60-61.",
+   "remaining": ""
+  },
+  {
+   "id": "FAA-296",
+   "class": "partial-done",
+   "size": "S",
+   "wave": 1,
+   "owner": "Fabric (fabric-mcp), fix CO-563",
+   "evidence": "Cause: fabric-mcp answered the first tools/list while the session was still being admitted with fabric_whoami alone, and Claude Code under -p reads the list once and ignores notifications/tools/list_changed (Fabric apps/desktop/src/main/fabricMcp.ts:402-407, ENROLL_WAIT_MS). Not the plugin's hooks (they restrict no tools) and not Switchboard (no allowedTools/strict-mcp in its code). Fabric fixed it on main 780022af (2026-11-11 14:55), CHANGELOG Unreleased; latest Fabric release v0.3.19 predates it; not yet verified live (Fabric's 0.3.20 verification plan, CO-564 item 1).",
+   "remaining": "Adapter: name the symptom and the minimum Fabric version (the release carrying CO-563, 0.3.20) in working-with-fabric and the dispatch exit contract; optional read-only fallback board command over McpStdio (fabric_session_mcp.py:387) for older Fabric."
+  },
+  {
+   "id": "FAA-298",
+   "class": "partial-done",
+   "size": "L",
+   "wave": 3,
+   "owner": "",
+   "evidence": "Provider pause and caller read exist since 0.36.0 (FAA-56, CT-55/DEC-0087): JobStore.pause (fabric_interop.py:452), pause_message (fabric_interop_rules.py:523), read_job_pause (:192); notify events (fabric_events.py:51,78).",
+   "remaining": "A helper that on a hold sends one notify event per hold naming caller, work, reason and free time; a scoped-lift record (operator words, amount or window, auto fallback); a check_service.py rule. The structured `waiting {reason,since,until,message}` field is outside the pinned closed job schema (interop-job.schema.json additionalProperties false), so it must ride statusMessage's pause grammar or go to the contract."
+  }
+ ]
+}

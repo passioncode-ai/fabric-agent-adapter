@@ -4,6 +4,7 @@ removed without touching what the operator turned off; release pruning (LC-15). 
 from __future__ import annotations
 
 import http.client
+import ipaddress
 import json
 import os
 import plistlib
@@ -383,6 +384,29 @@ def launchd_pid(label: str, domain: Optional[str] = None) -> Optional[int]:
     return None
 
 
+def _loopback_host(host: Optional[str]) -> bool:
+    """Whether `host` (urlsplit's hostname: lower-case, no brackets) names this machine: localhost, 127/8 or ::1."""
+    if not host:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+class ForeignUserAnswer:
+    """A refused listener (DEC-0154 HA-2), as `well_known_of` answers it: never a document, whatever keys a service's JSON
+    carries. `reason` starts with `foreign-user` or `table-restricted` (the Node twin's class, FAA-259)."""
+
+    def __init__(self, reason: str) -> None:
+        self.reason = reason
+
+    def __repr__(self) -> str:
+        return "ForeignUserAnswer(%r)" % self.reason
+
+
 def _read_well_known(origin: str, timeout: float = 2.0,
                      vouch_pid: Optional[int] = None) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """(the well-known answer or None, why the listener was refused or None). A loopback origin is read only on a
@@ -391,10 +415,16 @@ def _read_well_known(origin: str, timeout: float = 2.0,
     table hides other processes. `vouch_pid`, the pid of a launchd job this
     caller started, proves the listener when the socket table hides other processes (FAA-267)."""
     parts = urllib.parse.urlsplit(origin)
-    if parts.scheme == "http" and parts.hostname == "127.0.0.1" and parts.port:
-        conn = _po.CheckedHTTPConnection("127.0.0.1", parts.port, timeout=timeout, vouch_pid=vouch_pid)
+    try:
+        port = parts.port
+    except ValueError:  # a port out of range
+        port = None
+    if parts.scheme == "http" and port and _loopback_host(parts.hostname):
+        # every loopback spelling (127.0.0.1, another 127/8 address, localhost, [::1]) goes on a checked connection,
+        # never the unchecked way (FAA-257)
+        conn = _po.CheckedHTTPConnection(parts.hostname, port, timeout=timeout, vouch_pid=vouch_pid)
         try:
-            conn.request("GET", "/.well-known/fabric-service", headers={"Host": "127.0.0.1:%d" % parts.port})
+            conn.request("GET", "/.well-known/fabric-service", headers={"Host": parts.netloc.rpartition("@")[2]})
             response = conn.getresponse()
             return (json.loads(response.read().decode()) if response.status == 200 else None), None
         except _po.ListenerRefused as exc:
@@ -514,8 +544,22 @@ def _read_job_well_known(origin: str, job_pid: int, job_uid: Optional[int] = Non
 
 def fetch_well_known(origin: str, timeout: float = 2.0) -> Optional[Dict[str, Any]]:
     """The well-known answer at `origin`, or None: nothing answers, the answer is not JSON, or the listener is not this
-    OS account's process (DEC-0154 HA-2)."""
+    OS account's process (DEC-0154 HA-2). `well_known_of` tells the last two apart."""
     return _read_well_known(origin, timeout)[0]
+
+
+def well_known_of(origin: str, timeout: float = 2.0, vouch_pid: Optional[int] = None) -> Any:
+    """The well-known answer at `origin` as the Node `wellKnownOf` gives it (FAA-259): the document; None when nothing
+    answers or the answer is not JSON (down); a `ForeignUserAnswer` when the listener is another OS account's process or
+    its owner cannot be told. So a status reads HA-2's order: down, foreign-user, foreign, status."""
+    doc, why = _read_well_known(origin, timeout, vouch_pid=vouch_pid)
+    return ForeignUserAnswer(why) if why else doc
+
+
+def job_well_known_of(origin: str, job_pid: int, job_uid: Optional[int] = None, timeout: float = 2.0) -> Any:
+    """As `well_known_of`, for a LaunchDaemon whose job `job_pid` (running as `job_uid`) must hold the listener."""
+    doc, why = _read_job_well_known(origin, job_pid, job_uid)
+    return ForeignUserAnswer(why) if why else doc
 
 
 _OVERRIDE_ROW = re.compile(r'^\s*"([^"]+)"\s*=>\s*(\S+)\s*\Z')
@@ -593,7 +637,9 @@ def _refuse_held_label(label: str, plist_path: Path) -> None:
 
 def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin: str,
                     service_id: str, instance: str = "default", timeout: float = 40.0,
-                    force_enable: bool = False, domain: Optional[str] = None) -> Dict[str, Any]:
+                    force_enable: bool = False, domain: Optional[str] = None,
+                    fetch_well_known: Optional[Callable[..., Any]] = None,
+                    fetch_job_well_known: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
     """Write + lint the plist, bootout and WAIT for unload, bootstrap (retry EIO 5), then
     poll the well-known document until it answers with this identity.
 
@@ -606,7 +652,13 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
     A plist in ``/Library/LaunchDaemons`` (or ``domain="system"``) is a LaunchDaemon in launchd's system domain, started
     at boot with no login (FAA-278): only root installs it, refused before anything is written otherwise, and the
     answer counts only when launchd's own job accepted the connection (its ``UserName``, not the installer, owns it).
-    A ``gui/<uid>`` bootstrap with no GUI session (SSH, a headless Mac after a FileVault restart) says so."""
+    A ``gui/<uid>`` bootstrap with no GUI session (SSH, a headless Mac after a FileVault restart) says so.
+
+    ``fetch_well_known(origin, vouch_pid=...)`` and ``fetch_job_well_known(origin, job_pid, job_uid)`` read the answer as
+    ``well_known_of`` and ``job_well_known_of`` do (the document, None, or a ``ForeignUserAnswer``); a caller may inject
+    its own, as the Node ``launchdInstall`` takes ``fetchWellKnown`` (FAA-259)."""
+    read_answer = fetch_well_known or (lambda origin_, vouch_pid=None: well_known_of(origin_, vouch_pid=vouch_pid))
+    read_job = fetch_job_well_known or job_well_known_of
     plist_path = Path(plist_path)
     dom = launchd_domain(plist_path, domain)
     which = "system" if dom == "system" else None
@@ -685,9 +737,10 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
         foreign = None
         while time.time() < deadline:
             job = launchd_pid(label, "system")
-            doc, why = _read_job_well_known(origin, job, job_uid) if job else (None, None)
+            doc = read_job(origin, job, job_uid) if job else None
+            why = doc.reason if isinstance(doc, ForeignUserAnswer) else None
             foreign = why or foreign  # the last refusal stays the reason while launchd shows no pid
-            if _answers(doc, service_id, instance):
+            if not why and _answers(doc, service_id, instance):
                 return doc
             time.sleep(0.5)
         loaded = ("; the job stays loaded and its plist starts it again at boot: as root, `launchctl bootout system/%s` "
@@ -702,10 +755,11 @@ def launchd_install(label: str, plist_path: Path, plist_bytes: bytes, *, origin:
                            % (origin, service_id, instance, timeout, loaded))
     foreign = vouch = None
     while time.time() < deadline:
-        doc, foreign = _read_well_known(origin, vouch_pid=vouch)
+        doc = read_answer(origin, vouch_pid=vouch)
+        foreign = doc.reason if isinstance(doc, ForeignUserAnswer) else None
         if foreign and foreign.startswith(_po.TABLE_RESTRICTED):
             vouch = launchd_pid(label)  # only a restricted table needs the job's pid (FAA-267)
-        if _answers(doc, service_id, instance):
+        if not foreign and _answers(doc, service_id, instance):
             return doc
         time.sleep(0.5)
     if foreign:

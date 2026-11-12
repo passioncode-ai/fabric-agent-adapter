@@ -30,6 +30,8 @@ export class BoardSession {
     try {
       return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout > 0 ? timeout : this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
     } catch (e) {
+      // FAA-252: another OS account's process holds the port; nothing was sent
+      if (e instanceof HubError && e.code === 'foreign-user') throw new BoardError('foreign-user', 'The hub\'s port is held by another OS account\'s process; nothing was sent.', true);
       if (e instanceof HubError) throw new BoardError('unreachable', 'Fabric\'s hub did not answer; a write may have been stored, so send it again with the same idempotency key.', true);
       throw e;
     }

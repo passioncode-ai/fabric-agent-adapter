@@ -157,3 +157,62 @@ test('a refit keeps keyboard focus, aria-current="false" is not current, and fol
     await browser.close();
   }
 });
+
+// A finding on kit 1.1.5 from a service's dashboard: at 390 px WebKit raised "ResizeObserver loop completed with undelivered
+// notifications", because the nav's observer laid the bar out (moving items and resizing the nav) inside its own
+// callback and the chrome's wrote --fd-chrome-h and --fd-chrome-top there. Since 1.1.6 both run in the next animation
+// frame and skip a size they already laid out: no observer callback writes, and no loop error is raised.
+test('the kit\'s resize observers write nothing inside their callbacks, from 360 to 640 px', { skip }, async () => {
+  const browser = await webkit.launch();
+  try {
+    const p = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const errors = [];
+    p.on('pageerror', (e) => errors.push(e.message));
+    await p.addInitScript(() => {
+      window.__inside = 0;
+      window.__writes = [];
+      const Native = window.ResizeObserver;
+      window.ResizeObserver = class extends Native {
+        constructor(callback) {
+          super((entries, observer) => { window.__inside += 1; try { callback(entries, observer); } finally { window.__inside -= 1; } });
+        }
+      };
+      const setProperty = CSSStyleDeclaration.prototype.setProperty;
+      CSSStyleDeclaration.prototype.setProperty = function (name, value, priority) {
+        if (window.__inside && /^--fd-chrome/.test(name)) window.__writes.push(name);
+        return setProperty.call(this, name, value, priority);
+      };
+      for (const method of ['insertBefore', 'appendChild']) {
+        const native = Node.prototype[method];
+        Node.prototype[method] = function (...args) {
+          if (window.__inside && this.closest && this.closest('.fd-nav')) window.__writes.push(`nav.${method}`);
+          return native.apply(this, args);
+        };
+      }
+    });
+    await p.route('http://kit.test/**', (route) => {
+      const name = new URL(route.request().url()).pathname.slice(1) || 'demo.html';
+      const type = name.endsWith('.css') ? 'text/css' : name.endsWith('.html') ? 'text/html' : 'text/javascript';
+      return route.fulfill({ contentType: `${type}; charset=utf-8`, body: fs.readFileSync(path.join(KIT, name), 'utf8') });
+    });
+    await p.goto('http://kit.test/');
+    await p.waitForSelector('.fd-nav--fold');
+    for (let width = 360; width <= 640; width += 10) {
+      for (const height of [844, 420]) {
+        await p.setViewportSize({ width, height });
+        await settle(p);
+      }
+    }
+    await p.setViewportSize({ width: 390, height: 844 });
+    await settle(p);
+    await settle(p);
+    const after = await p.evaluate(() => ({ writes: [...new Set(window.__writes)], chrome: getComputedStyle(document.documentElement).getPropertyValue('--fd-chrome-h').trim() }));
+    assert.deepEqual(after.writes, [], 'an observer callback wrote');
+    assert.deepEqual(errors.filter((m) => /ResizeObserver/.test(m)), []);
+    assert.match(after.chrome, /^[0-9]+px$/, 'the chrome height is still measured');
+    const s = await state(p);
+    assert.deepEqual(s.clipped, [], 'and the bar still fits');
+  } finally {
+    await browser.close();
+  }
+});

@@ -125,11 +125,43 @@ its acceptance does not authorize or deliver it. Enforce grants/dedup/expiry in
 the transport. Unknown or failed host status produces no executable local action.
 A separately labelled copyable link for diagnosis is not an open action.
 
-Add this check to the generated project's dashboard completion/notification
-renderer before delivery. A raw-HTTP primary action with an available host is the
-negative fixture; a valid native action is the positive one. Keep diagnostics
-separate. This gate checks structured actions, not arbitrary prose: a CLI invocation
-or instructions alone do not prove all final answers from every agent are filtered.
+The gate is **agent-side**: the agent runs it from this skill's directory before it
+delivers an action. It is never copied into the generated project and never run by
+that project's CI: the adapter's versioned plugin folder has no stable path there, so
+its result in a project's pipeline would always be NOT_RUN. A raw-HTTP primary action
+with an available host is the gate's negative fixture; a valid native action is the
+positive one. Keep diagnostics separate. This gate checks structured actions, not
+arbitrary prose: a CLI invocation or instructions alone do not prove all final answers
+from every agent are filtered.
+
+The generated project pins the same negative fixture in its own test suite, without
+calling the gate: a test that renders its completion and notification output with an
+available host and fails when a raw loopback `http_url` or a legacy `open?service=`
+link appears in it. The snippet is self-contained; `render` stands for the project's
+own renderer:
+
+```python
+import re
+import unittest
+
+RAW_LOOPBACK = re.compile(r"https?://(?:127\.0\.0\.1|localhost|\[::1\])")
+LEGACY = "fabric-dashboards://open?service="
+RESOLVED = {"service": "example-agent.default",
+            "open_link": "fabric-dashboards://service/example-agent.default?path=%2Fdashboard",
+            "http_url": "http://127.0.0.1:47195/dashboard"}
+
+
+def render(resolved, host_state):  # replace with the project's completion/notification renderer
+    raise NotImplementedError
+
+
+class RenderedDashboardLinks(unittest.TestCase):
+    def test_rendered_output_has_no_raw_loopback_or_legacy_link(self):
+        out = render(RESOLVED, host_state="available")
+        self.assertIn(RESOLVED["open_link"], out)
+        self.assertIsNone(RAW_LOOPBACK.search(out), out)
+        self.assertNotIn(LEGACY, out)
+```
 
 ## Degradation
 

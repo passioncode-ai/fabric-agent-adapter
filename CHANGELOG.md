@@ -1,5 +1,89 @@
 # Changelog
 
+## 0.79.0 (2026-11-12)
+
+The first release of the backlog sweep of 2026-11-12 (plan and inventory of the 134 open rows:
+`docs/evidence/specs/2026-11-12-backlog-waves-plan.md`). The contract pin stays `18f8d487`. Kit modules change:
+`fabric_lock`, `fabric_base`, `fabric_delegation`, `fabric_descriptor`, `fabric_supervisors`, `fabric_board_link`,
+`fabric_board_slots`, `fabric_board_session`, `fabric_openrouter`, the facade `fabric_service`, their Node twins, and
+`fabric-secrets.mjs`. The dashboard kit moves to 1.1.6.
+
+### Added
+
+- **creating and adapting: an organization's catalogue first** (the project board's request `2718ece8`). One neutral
+  line at step 0 of creating-fabric-agents and before scaffolding in adapting-projects-to-fabric: a private catalogue
+  of agent templates with an architect is asked first for the template, version, variant and known traps; the skill
+  runs after it. Scenario `ask-the-organization-catalogue-first` in both skills.
+
+### Changed
+
+- **working-with-fabric reads against Fabric v0.3.19.** The session-start preamble, the README and SKILL.md say both
+  cases: before Fabric 0.3.17 a dispatched run declines a request no session can take and the asker resends; from
+  0.3.17 the session's own Project is granted `board.respond` at `com.enroll` (CO-506) (FAA-221). The exit contract's
+  decline names the refusal's reason, takes over an `in_progress` request an earlier run left, and reads board ids
+  from the dispatch line first; the Observatory packet's board refs are the fallback (FAA-215, FAA-295).
+  `references/on-demand-session.md` and `board.md` name the Fabric releases as they are (FAA-246, FAA-216), and a
+  helper a run starts itself uses the runner's bypass flag with the task's limits set at launch (FAA-274).
+- **"When nobody answers"** runs only on a machine whose trust is `mine` (ADR-0176), and the asker cancels its own
+  request after adapting (FAA-220). One phrase for a never-held slot, and a gate question is moot once its request is
+  answered or taken (FAA-222, FAA-248).
+- **creating-fabric-agents: completion lines for an agent that answers people**, one per checklist item (a file and a
+  test, or `NOT_RUN`), the first reply measured from the person's message (FAA-180).
+- **One rule for a secret in a child's environment**: the agent's own process may hold its key from its supervisor or
+  a vault runner; a child it starts never gets it (FAA-281).
+- **Operator channel through the estate's gateway**: where the estate runs a messaging gateway the operator chose, the
+  channel sends through it; a polling token has one poller across machines (`poller-elsewhere`); the contract's
+  own-bot form (DEC-0034) is unchanged (FAA-282).
+- **README quick start picks a free port**; `where-agents-run.md` adds one computer with a personal and an
+  organization account and a member's virtual machine (DEC-0154) (FAA-283).
+- **The dashboard link gate is agent-side**, and a generated project pins a negative fixture in its own test (FAA-129).
+- **The shipped-file check follows npm** (`test/validate.py`): a `files` entry with a glob, one naming nothing, or no
+  `files` at all is a finding; README and LICENSE are read because npm ships them regardless; a line with no scheme
+  says so. Tests pin `__pycache__`, the wiring into `validate_repo`, and the kit's `older` and `modified` verdicts
+  without release tags (FAA-212).
+
+### Fixed
+
+- **The instance lock never holds a file that is no longer at its path** (FAA-293, a board finding of 2026-11-10).
+  After `flock` (Python) or the `O_EXLOCK` open (Node on macOS), and again after the pid is written, `acquire`
+  compares the locked inode with the file at the path; on a mismatch it re-opens up to
+  `InstanceLock.INODE_RETRIES` (3) times, then fails with an error naming the path. A data import that swapped the
+  data folder no longer lets two copies start.
+- **The dashboard kit's resize observers write in the next frame** (dashboard kit 1.1.6, a board finding of
+  2026-11-12): the nav's observer laid the bar out inside its callback and the chrome's wrote `--fd-chrome-h` and
+  `--fd-chrome-top` there, so WebKit raised "ResizeObserver loop completed with undelivered notifications" at 390 px.
+  Both schedule their work with `requestAnimationFrame` (cancelling the previous frame), the nav refits only when its
+  width changed, the chrome writes a property only when its value changed; a WebKit test pins that no callback writes.
+- **Another OS account's listener is never read as ours**: the delegation verifier reads a loopback key set only from
+  this account's listener (FAA-255); the OpenRouter connector stops at once on a loopback base URL another account
+  holds, without trying the fallback model (FAA-257); a board session maps a hub port another account holds to
+  `foreign-user`, never `unreachable` (FAA-252); Python's `well_known_of` and `job_well_known_of` tell down from
+  `foreign-user` as Node's `wellKnownOf` does, and an origin spelled `localhost`, another 127/8 address or `[::1]` is
+  read on a checked connection (FAA-259, FAA-257); a hub pid another account's process holds is "not verified",
+  never running (FAA-254).
+- **The reserved capability `project.work`** is refused by both kits in `surfaces.mcp.capabilities`, as an action's
+  tool and by the board responder (DEC-0140 PR-1) (FAA-244).
+- The provider entry's URI check uses the RFC 3986 class the descriptor check uses: a byte-order mark, a zero-width
+  space, a non-ASCII path and an IDN host are refused (FAA-127).
+- The dispatch record survives a hooks folder damaged by hand: `RecursionError` reads as unreadable, a `dispatch`
+  file is a folder that cannot be written, prune ages a record by its own `lstat` (FAA-208).
+- `test/validate.py` reads board rows cell by cell as the workspace aggregator does: code spans and escaped pipes
+  (FAA-214). The Node credential detector and the dashboard kit's button append values in place, linear like the
+  Python twin (FAA-245). The source check's linear-time tests measure a ratio, not the wall clock (FAA-209).
+- The board kit sends the operator to Fabric's Settings → Agent access (FAA-223); `vendor_vectors.mjs` names the
+  command that works, the contract's `tsx` at the pin (FAA-242).
+- Step 6's `fabric_task_create` example carries the required `origin` (FAA-154).
+- A dispatched Claude Code run that sees only `fabric_whoami` is named as Fabric's CO-563 (fixed in the Fabric release
+  after v0.3.19) and says so in its exit report instead of claiming the board was read (FAA-296).
+- `fabric_session.py --help` and the README list `gate-id`, and the Windows job runs the dispatch tests (FAA-236).
+- `provider-entry.md` and the provider writer's message name Fabric v0.3.16 for CO-479 (FAA-216).
+
+### Upgrading
+
+- A service that vendors the kit updates its copies with `fabric_kit.py install` (the changed modules are named
+  above); a dashboard that vendors the dashboard kit takes 1.1.6. `launchd_install` takes injected readers
+  (`fetch_well_known=`, `fetch_job_well_known=`) as Node's `launchdInstall` takes `fetchWellKnown`.
+
 ## 0.78.0 (2026-11-12)
 
 The contract pin stays `18f8d487`. Kit modules change: a new `fabric_tailnet` and `fabric-tailnet.mjs` (layer L0); `fabric_supervisors` and `fabric-supervisors.mjs`, and the facades

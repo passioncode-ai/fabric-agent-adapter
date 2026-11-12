@@ -47,5 +47,26 @@ class RepositoryCredential(unittest.TestCase):
                     self.assertFalse(secrets.repository_password(value))
 
 
+class RawValues(unittest.TestCase):
+    """FAA-245: raw_values reads a query in linear time, the Node twin (fabric-secrets.mjs rawValues) the same."""
+
+    def test_the_values_of_a_name_keep_their_order(self):
+        secrets = load(COPIES[0])
+        self.assertEqual(secrets.raw_values("a=1&b=x+y&a=2&a&=v&a=%zz"), {"a": ["1", "2", "", "%zz"], "b": ["x+y"], "": ["v"]})
+
+    def test_many_pieces_of_one_name_are_read_in_linear_time(self):
+        import time
+        secrets = load(COPIES[0])
+        queries = {n: "a=b&" * n for n in (10000, 40000)}
+        best = {}
+        for _ in range(3):  # each size's fastest of three, measured in turn (FAA-209's rule)
+            for n in (10000, 40000):
+                started = time.perf_counter()
+                secrets.raw_values(queries[n])
+                best[n] = min(best.get(n, float("inf")), time.perf_counter() - started)
+        self.assertEqual(len(secrets.raw_values(queries[40000])["a"]), 40000)
+        self.assertLess(best[40000] / max(best[10000], 1e-9), 9)
+
+
 if __name__ == "__main__":
     unittest.main()

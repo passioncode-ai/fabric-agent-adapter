@@ -26,8 +26,10 @@ skill's business (working-with-fabric, `references/project-board.md`).
 
 A **request** is addressed to a Project and one of its capabilities (`video.render`), never to a service. One
 **responder slot** exists per Project and capability; a service holds it under a **`board.respond` grant** the
-operator gives in Fabric (Agents & access): callee `fabric`, capability `board.respond`, resource
-`board:<project id>/<capability>`. A pid, a descriptor or a localhost origin authorizes nothing.
+operator gives in Fabric (Settings → Agent access): callee `fabric`, capability `board.respond`, resource
+`board:<project id>/<capability>`. A pid, a descriptor or a localhost origin authorizes nothing. The capability is
+never `project.work`: DEC-0140 PR-1 reserves it for a Project's primary responder, a coding session, and `Responder`
+refuses it with `invalid_arguments` (FAA-244).
 
 1. Ask once, through the hub's door: `HubClient().request_board_access(agent_id, project_id, [capability], reason)`
    (`requestBoardAccess`). Keep the answer's `pollSecret` in memory or a 0600 file.
@@ -37,8 +39,9 @@ operator gives in Fabric (Agents & access): callee `fabric`, capability `board.r
 3. Each connection joins with `fabric.board.join {projectId}` (`join_board` / `joinBoard`). It re-reads `hub.json`,
    checks the pid it names is alive, tells the owner of the door's listener from the socket table (DEC-0154 HA-2:
    another OS account's process, or one whose owner cannot be told, is `HubError` code `foreign-user`, retryable, with
-   nothing sent; a retry never clears a restricted macOS table, `table-restricted` in protocol.md, FAA-272), and only then sends the credential (a session already running maps that refusal, as any transport
-   failure, to `board.down` with reason `unreachable` until FAA-252). A missing grant is `HubError` code
+   nothing sent; a retry never clears a restricted macOS table, `table-restricted` in protocol.md, FAA-272), and only then sends the credential (a session already running carries that refusal as `BoardError` code
+   `foreign-user`, one of `SESSION_CODES`, to `board.down` with reason `foreign-user` and a sentence that says nothing
+   was sent, never `unreachable`'s "a write may have been stored", FAA-252). A missing grant is `HubError` code
    `not_authorized` whose `data.ask` holds the arguments to ask with.
 
 ## Wiring it into the service
@@ -302,7 +305,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
 - The operator may move the slot back to this session in Fabric (DEC-0140 PR-2), which this client cannot hear. No
-  Fabric release offers the operator's move yet (Fabric 0.3.15 has none: the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
+  Fabric release through v0.3.19 (2026-11-11) offers the operator's move (the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
   so today every move is another session taking the slot and take-back is the route back; the check below is ready
   for the move. While
   a slot is moved the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the

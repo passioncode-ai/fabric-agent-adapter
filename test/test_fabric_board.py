@@ -395,6 +395,21 @@ class FailureTests(Conversation):
         self.assertEqual(self.tools().count("com.complete"), 1)
         self.assertEqual(self.checkpoint(), {})
 
+    def test_the_reserved_primary_capability_is_refused(self):
+        # FAA-244, DEC-0140 PR-1: `project.work` is a Project's primary responder's, a session's, never a service's
+        with self.assertRaises(fb.BoardError) as raised:
+            self.responder(capabilities=["video.render", "project.work"])
+        self.assertEqual(raised.exception.code, "invalid_arguments")
+        self.assertIn("project.work", str(raised.exception))
+
+    def test_a_foreign_user_hub_port_is_said_as_its_own_reason(self):
+        # FAA-252: board.down carries foreign-user, never unreachable's "a write may have been stored"
+        r = self.responder()
+        r._fault(fb.BoardError("foreign-user", "nothing was sent", True))
+        down = [e for e in self.events if e[0] == "board.down"]
+        self.assertEqual(down[-1][3]["data"]["value"]["reason"], "foreign-user")
+        self.assertIn("another OS account", down[-1][2])
+
     def test_authority_changed_stops_claiming_and_says_what_to_ask(self):
         r = self.responder()
         r.step()
@@ -406,7 +421,8 @@ class FailureTests(Conversation):
         self.assertNotIn("com.accept", self.tools())
         kinds = [e for e in self.events if e[0] == "board.access.needed"]
         self.assertTrue(kinds and kinds[0][3]["notify"])
-        self.assertIn("Agents & access", kinds[0][2])
+        self.assertIn("Settings → Agent access", kinds[0][2])
+        self.assertNotIn("Agents & access", kinds[0][2])
 
     def test_no_grant_at_join_backs_off(self):
         self.hub.grant = False
@@ -2730,6 +2746,29 @@ class SampleWiringTests(unittest.TestCase):
         svc.board_take_back = lambda c, r=None: sample.Service.board_take_back(svc, c, r)
         with self.assertRaises(sample.fi.InteropError):
             sample.Service.board_take_back_tool(svc, {"capability": "video.render"}, NS(record=None))
+
+    def test_a_hub_port_another_account_holds_is_foreign_user_never_unreachable(self):
+        """FAA-252: the transport's foreign-user (nothing sent) is carried as its own code, never "a write may have been
+        stored"; the responder says board.down with that reason."""
+        class Grant:
+            origin = "http://127.0.0.1:1"
+            capabilities = []
+
+            def bearer(self):
+                return "b" * 43
+
+        def refused(*a, **k):
+            raise fh.HubError("foreign-user", "The hub's port is not held by this OS account's process; nothing was sent.", True)
+        session = fb.BoardSession(Grant(), post=refused)
+        with self.assertRaises(fb.BoardError) as raised:
+            session.open()
+        self.assertEqual((raised.exception.code, raised.exception.retryable), ("foreign-user", True))
+        self.assertNotIn("may have been stored", str(raised.exception))
+        session.mcp_session = "s-1"
+        with self.assertRaises(fb.BoardError) as raised:
+            session.call("com.status", {})
+        self.assertEqual(raised.exception.code, "foreign-user")
+        self.assertIn("foreign-user", importlib.import_module("fabric_board_slots").SESSION_CODES)
 
     def test_close_reads_an_answer_it_cannot_parse_as_no_release(self):
         """0.56.0 seam r5: a post shim whose DELETE answer is not a status is no release, as the Node twin reads it."""

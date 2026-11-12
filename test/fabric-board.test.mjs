@@ -275,6 +275,13 @@ test('lease_expired while working stops the handler; accepted work comes back by
   assert.deepEqual(h.checkpoint(), {});
 });
 
+test('the reserved primary capability project.work is refused (FAA-244, DEC-0140 PR-1)', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  assert.throws(() => h.responder({ capabilities: ['video.render', 'project.work'] }),
+    (e) => e.code === 'invalid_arguments' && /project\.work/.test(e.message));
+});
+
 test('authority_changed stops claiming; no epoch fails closed; another protocol revision is schema-unsupported', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);
@@ -286,6 +293,8 @@ test('authority_changed stops claiming; no epoch fails closed; another protocol 
   await r.step();
   assert.equal(r.state, 'not-authorized');
   assert.ok(h.events.find((e) => e[0] === 'board.access.needed')[3].notify);
+  assert.match(h.events.find((e) => e[0] === 'board.access.needed')[2], /Settings → Agent access/);
+  assert.doesNotMatch(h.events.find((e) => e[0] === 'board.access.needed')[2], /Agents & access/);
   const hub2 = await fakeHub(t);
   const h2 = harness(hub2);
   await hub2.control({ op: 'set', values: { status_epoch: false } });
