@@ -184,7 +184,9 @@ path, line and kind, never repeating a value, and changes nothing. Then move eac
 instance value into the instance configuration outside the repository, read through a named variable with a neutral
 default and a committed `*.example`; a key into the secret store, named only. Run the check again until it exits 0; it is a floor under the owner's review, not a secret scanner.
 A value already committed stays in Git history: say so; a fresh history is the owner's act (no history rewrite, no
-force-push).
+force-push). Then lay down the source manifest, `fabric.source.json` (DEC-0149): `scripts/adapt_project.py source
+<project-root> --dry-run` proposes it, the author narrows `include` and names each key and store as a slot, and the
+check reads the source under it (the reference, *The source manifest*).
 
 ### 5. Make probes safe and meaningful
 

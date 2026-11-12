@@ -509,9 +509,71 @@ const FOLDER_MESSAGES = {
   'provider-manifest': 'provider-manifest: the provider manifest must be a JSON object, and when it carries costPresets fabric.package.json must carry the same costPresets (copy them; pack does not)',
 };
 
+/**
+ * The agent's source manifest (contract DEC-0149, `fabric-source/1`): when the folder carries one, `pack` writes
+ * `secrets[]` from its secret slots and `state[]` from its store slots' paths, and FAC-SEM-160 holds them equal.
+ */
+export const SOURCE_FILE = 'fabric.source.json';
+
+function sourceManifest(files) {
+  if (!files.has(SOURCE_FILE)) return undefined;
+  const source = parseStrict(files.get(SOURCE_FILE), SOURCE_FILE);
+  if (source.format !== 'fabric-source/1') throw new PackageError(`${SOURCE_FILE} is not a fabric-source/1 manifest (its format member).`);
+  return source;
+}
+
+/** `secrets[]` from the secret slots (name, purpose, optional) and `state[]` from the store slots (path, purpose). */
+export function sourceMembers(source) {
+  const secrets = [];
+  const state = [];
+  for (const slot of objects(source.slots)) {
+    if (slot.kind === 'secret' && isString(slot.name)) secrets.push({ name: slot.name, purpose: slot.purpose, ...(slot.optional === true ? { optional: true } : {}) });
+    else if (slot.kind === 'store' && isString(slot.path)) state.push({ path: slot.path, purpose: slot.purpose });
+  }
+  return { secrets, state };
+}
+
+/**
+ * FAC-SEM-160 (contract `sourcePackageFindings`): the package's secrets[] are the source's secret slots, by name and
+ * optional; its state[] paths are the store slots' paths when state[] holds any entry.
+ */
+export function sourcePackageFindings(source, pkg) {
+  if (!isObject(source) || !isObject(pkg)) return [];
+  const out = [];
+  const flag = (instancePath, message) => out.push({ code: 'FAC-SEM-160', instancePath, message });
+  const slots = objects(source.slots);
+  const secrets = new Map(slots.filter((s) => s.kind === 'secret' && isString(s.name)).map((s) => [s.name, s.optional === true]));
+  const stores = new Set(slots.filter((s) => s.kind === 'store' && isString(s.path)).map((s) => s.path));
+  const packaged = (Array.isArray(pkg.secrets) ? pkg.secrets : []).flatMap((e, i) => (isObject(e) ? [[e, i]] : []));
+  const names = new Set(packaged.map(([e]) => e.name));
+  for (const name of secrets.keys()) if (!names.has(name)) flag('/package/secrets', `the source's secret slot ${name} is not in the package's secrets[]`);
+  for (const [entry, index] of packaged) {
+    if (!isString(entry.name) || !secrets.has(entry.name)) flag(`/package/secrets/${index}/name`, `secrets[${index}] is no secret slot of the source`);
+    else if (secrets.get(entry.name) !== (entry.optional === true)) flag(`/package/secrets/${index}/optional`, `secrets[${index}] is ${secrets.get(entry.name) ? '' : 'not '}optional in the source`);
+  }
+  if (!Array.isArray(pkg.state) || pkg.state.length === 0) return out;
+  const paths = new Set(objects(pkg.state).map((e) => e.path));
+  for (const p of stores) if (!paths.has(p)) flag('/package/state', "a store slot's path of the source is not in the package's state[]");
+  pkg.state.forEach((entry, index) => {
+    if (isObject(entry) && (!isString(entry.path) || !stores.has(entry.path))) flag(`/package/state/${index}/path`, `state[${index}] is no store slot of the source`);
+  });
+  return out;
+}
+
+function sourceProblems(pkg, files) {
+  if (!files.has(SOURCE_FILE)) return [];
+  try {
+    return sourcePackageFindings(sourceManifest(files), pkg).map((p) => ({ ...p, rule: p.code }));
+  } catch (error) {
+    if (!(error instanceof PackageError)) throw error;
+    return [{ rule: 'source', instancePath: '/files', message: error.message }];
+  }
+}
+
 function allProblems(pkg, files) {
   return [
     ...schemaProblems(pkg).map((p) => ({ ...p, rule: 'schema' })),
+    ...sourceProblems(pkg, files),
     ...pathProblems(pkg).map((p) => ({ ...p, rule: 'path' })),
     ...packageFindings(pkg).map((p) => ({ ...p, rule: p.code })),
     ...checkPackageFolder(pkg, files).map((p) => ({ rule: 'folder', problem: p.problem, instancePath: p.path, message: FOLDER_MESSAGES[p.problem] ?? p.problem })),
@@ -532,7 +594,22 @@ export function pack(folder, { apply = false } = {}) {
     throw new PackageError(`Write ${PACKAGE_FILE} in the folder first: schema, kind, id, version, publisher, licence and, for an agent, resultSignal and evals with its receipt. pack fills in agentRef, files[] and digest.`);
   }
   const draft = parseStrict(files.get(PACKAGE_FILE), PACKAGE_FILE);
+  const source = sourceManifest(files);
+  const written = [];
+  if (source !== undefined) {
+    // DEC-0149: secrets[] and state[] come from the source manifest's slots; an empty state[] is a copy without state.
+    const members = sourceMembers(source);
+    if (members.secrets.length > 0 || Object.hasOwn(draft, 'secrets')) {
+      Object.defineProperty(draft, 'secrets', { value: members.secrets, enumerable: true, writable: true, configurable: true });
+      written.push('secrets[]');
+    }
+    if (members.state.length > 0 && !(Array.isArray(draft.state) && draft.state.length === 0)) {
+      Object.defineProperty(draft, 'state', { value: members.state, enumerable: true, writable: true, configurable: true });
+      written.push('state[]');
+    }
+  }
   const { pkg, notes } = compose(draft, files);
+  if (written.length > 0) notes.push(`${written.join(' and ')} written from ${SOURCE_FILE}`);
   const problems = allProblems(pkg, files);
   const suite = isObject(pkg.evals) ? pkg.evals.suite : undefined;
   if (isString(suite) && files.has(suite) && problems.some((p) => p.instancePath === '/evals/receipt/suite')) notes.push(`the suite packed is ${sha256Of(files.get(suite))}: run it again and write that receipt`);

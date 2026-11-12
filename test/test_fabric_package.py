@@ -272,6 +272,36 @@ class PackTests(unittest.TestCase):
         pkg["resultSignal"]["says"] += "x"
         self.assertEqual([p["instancePath"] for p in fp.schema_problems(pkg)], ["/resultSignal/says"])
 
+    def test_pack_writes_secrets_and_state_from_the_source_manifest(self):
+        """FAA-261, DEC-0149: with fabric.source.json in the folder, secrets[] are its secret slots (name, purpose,
+        optional) and state[] its store slots' paths; FAC-SEM-160 refuses a package whose members differ."""
+        write_agent(self.root, secrets=[{"name": "OTHER_KEY", "purpose": "a slot the source does not declare"}])
+        source = {"format": "fabric-source/1", "include": ["lib/", "bin/", "skills/", "evals/"], "slots": [
+            {"name": "MAIL_OAUTH", "kind": "secret", "purpose": "Reads the mailbox the digest summarises"},
+            {"name": "BOARD_TOKEN", "kind": "secret", "purpose": "Posts to the board", "optional": True},
+            {"name": "DIGESTS", "kind": "store", "purpose": "Digests already written", "path": "digests"},
+            {"name": "SUPERVISOR_LABEL", "kind": "config", "purpose": "This installation's launchd label"}]}
+        (self.root / "fabric.source.json").write_text(json.dumps(source))
+        answer = fp.pack(self.root, apply=True)
+        self.assertTrue(answer["ok"], answer["problems"])
+        self.assertIn("secrets[] and state[] written from fabric.source.json", answer["notes"])
+        pkg = json.loads((self.root / fp.PACKAGE_FILE).read_text())
+        self.assertEqual(pkg["secrets"], [{"name": "MAIL_OAUTH", "purpose": "Reads the mailbox the digest summarises"},
+                                          {"name": "BOARD_TOKEN", "purpose": "Posts to the board", "optional": True}])
+        self.assertEqual(pkg["state"], [{"path": "digests", "purpose": "Digests already written"}])
+        self.assertIn("fabric.source.json", [f["path"] for f in pkg["files"]])
+        # a package edited by hand after packing no longer matches its source: FAC-SEM-160, and the digest moves too
+        pkg["secrets"][1].pop("optional")
+        self.assertEqual([p["instancePath"] for p in fp.source_package_findings(source, pkg)], ["/package/secrets/1/optional"])
+        # an empty state[] is a copy packed without state, and it is kept
+        write_agent(self.root, state=[])
+        answer = fp.pack(self.root)
+        self.assertTrue(answer["ok"], answer["problems"])
+        self.assertEqual(answer["package"]["state"], [])
+        (self.root / "fabric.source.json").write_text(json.dumps({"format": "fabric-source/2", "include": ["lib/"]}))
+        with self.assertRaisesRegex(fp.PackageError, "not a fabric-source/1 manifest"):
+            fp.pack(self.root)
+
     def test_pack_drops_old_signatures(self):
         write_agent(self.root, signatures=[{"role": "publisher", "alg": "EdDSA", "kid": "x", "sig": "AA"}])
         answer = fp.pack(self.root)

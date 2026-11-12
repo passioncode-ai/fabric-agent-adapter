@@ -159,6 +159,9 @@ run it with the owner's list of their own strings, or record that none was given
 
 ## Step 3: scaffold the provider bundle
 
+For a project that does not exist yet, one command writes this step's bundle with the source manifest and the
+placement guard: `npx @passioncode-ai/fabric-agent-adapter new <folder> --id <agent-id>` ([new-agent.md](references/new-agent.md)).
+
 Reuse the sibling skill's scaffolder against the new skeleton with the profile chosen at
 step 0:
 
@@ -170,6 +173,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   --schema-base <immutable-base-uri> --effect <class> \
   [--idempotency required|supported|none] [--cost-preset <id> <max-usd> "<label>" ... --default-cost-preset <id>]
 ```
+
+The source manifest comes with the bundle: `adapt_project.py source <project-root>` lays down `fabric.source.json`
+(DEC-0149) with the kit's slots, and the source check reads the source under it ([the source and the
+instance](references/source-and-instance.md), *The source manifest*).
 
 The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
 does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
