@@ -442,7 +442,25 @@ _REPOSITORY_AUTHORITY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
 #: boundary, so composed after a separator look-behind it would miss a key after `-`, `.` or `_`.
 _REPOSITORY_KEYS = r"sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}"
 _KEY_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))(?:%s)" % _REPOSITORY_KEYS)
-_JWT_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))%s" % JWT_SHAPE.pattern)
+
+
+def jwt_at_a_word(text: str) -> bool:
+    """Whether JWT_SHAPE matches at a word's start: the text's start, or after a `.`, `_` or `-` (FAA-321). Read in one
+    pass, as jwt_spans: the look-behind expression backtracked from every such `eyJ` of a long run, quadratic in it.
+    Every `eyJ` of one run shares that run's end and a shorter first segment, so only a run's first `eyJ` at a word's
+    start is tried; an `eyJ` that is not at one is passed over, since a later one of its run may be."""
+    at = text.find("eyJ")
+    while at >= 0:
+        if at and text[at - 1] not in "._-":
+            at = text.find("eyJ", at + 1)
+            continue
+        one = _URL_BASE64_RUN.match(text, at + 3).end()
+        if one - at - 3 >= 2 and text[one:one + 1] == ".":
+            two = _URL_BASE64_RUN.match(text, one + 1).end()
+            if two - one - 1 >= 2 and text[two:two + 1] == ".":
+                return True
+        at = text.find("eyJ", one)
+    return False
 
 
 def repository_name(piece: str) -> bool:
@@ -450,7 +468,7 @@ def repository_name(piece: str) -> bool:
     key's or JWT's shape (`sk-`, `ghp_`, `xoxb-`, `AKIA`, `eyJ`) at its start or after a `.`, `_` or `-` (0.62.0
     readings 9 and 10), so a letters-only key is still a key while `task-pipeline-dashboard`, which holds an `sk-` shape
     inside a word, is a name."""
-    return bool(_REPOSITORY_NAME.match(piece)) and not _KEY_AT_A_WORD.search(piece) and not _JWT_AT_A_WORD.search(piece)
+    return bool(_REPOSITORY_NAME.match(piece)) and not _KEY_AT_A_WORD.search(piece) and not jwt_at_a_word(piece)
 
 
 def ascii_decoded(text: str) -> str:

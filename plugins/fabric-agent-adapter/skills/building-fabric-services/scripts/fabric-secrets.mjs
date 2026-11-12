@@ -124,12 +124,25 @@ const REPOSITORY_AUTHORITY = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
 // boundary, so composed after a separator look-behind it would miss a key after `-`, `.` or `_`.
 const REPOSITORY_KEYS = 'sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}';
 const KEY_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))(?:${REPOSITORY_KEYS})`);
-const JWT_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))${JWT_SHAPE.source}`);
+/** Whether JWT_SHAPE matches at a word's start: the text's start, or after a `.`, `_` or `-` (FAA-321), read in one
+ * pass as jwtSpans: only a run's first `eyJ` at a word's start is tried (fabric_secrets.jwt_at_a_word). */
+export function jwtAtAWord(text) {
+  for (let at = text.indexOf('eyJ'); at >= 0;) {
+    if (at > 0 && !'._-'.includes(text[at - 1])) { at = text.indexOf('eyJ', at + 1); continue; }
+    const one = runEnd(text, at + 3);
+    if (one - at - 3 >= 2 && text[one] === '.') {
+      const two = runEnd(text, one + 1);
+      if (two - one - 1 >= 2 && text[two] === '.') return true;
+    }
+    at = text.indexOf('eyJ', one);
+  }
+  return false;
+}
 const SPECIAL_QUERY = /^(?:https?|wss?|ftp|file):/i; // whose query also encodes `'`, as the URL standard does
 
 /** Whether a path segment reads as a repository's name: lower case, or letters with no digit, with no provider key's
  * or JWT's shape at its start or after a `.`, `_` or `-` (0.62.0 readings 9 and 10), so a letters-only key is a key. */
-export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_A_WORD.test(piece) && !JWT_AT_A_WORD.test(piece);
+export const repositoryName = (piece) => REPOSITORY_NAME.test(piece) && !KEY_AT_A_WORD.test(piece) && !jwtAtAWord(piece);
 
 /** Every `%XX` escape of an ASCII character decoded, the rest as written (fabric_secrets.ascii_decoded, readings 11). */
 export const asciiDecoded = (text) => text.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));

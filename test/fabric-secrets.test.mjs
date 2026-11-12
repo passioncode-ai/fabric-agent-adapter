@@ -2,7 +2,7 @@
 // (fabric_secrets.raw_values) and the contract's src/secret-shape.ts do since fcdb7ccb (FAA-245).
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { JWT_SHAPE, hasJwt, jwtSpans, rawValues, secretArgument, secretUrl, secretValue } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-secrets.mjs';
+import { JWT_SHAPE, hasJwt, jwtAtAWord, jwtSpans, rawValues, repositoryName, secretArgument, secretUrl, secretValue } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-secrets.mjs';
 
 // How much longer work(large) takes than work(small): each size's fastest of three runs, measured in turn, so a
 // loaded machine slows both (FAA-209's rule: a ratio of two sizes, never a wall-clock bound).
@@ -61,4 +61,29 @@ test('a long run of JWT starts is read in linear time (FAA-313)', () => {
     // four times the text costs about four times as much; the regular expression cost sixteen
     assert.ok(growth((n) => read(texts[n]), 4000, 16000) < 9, read.name);
   }
+});
+
+// FAA-321: repositoryName reads a JWT's shape at a word's start (the segment's start, or after `.`, `_` or `-`) in one
+// pass: the answers of the old look-behind expression, in linear time (the Python twins:
+// test/test_fabric_secrets_word_jwt.py).
+test('jwtAtAWord answers as the look-behind expression does (FAA-321)', () => {
+  const start = 'ey' + 'J';
+  const old = new RegExp(`(?:^|(?<=[._-]))${JWT_SHAPE.source}`);
+  const texts = ['', '@', '@ab.cd.', '@ab.cd.ef', 'x-@ab.cd.ef', 'x@ab.cd.ef', 'a@xx-@ab.cd.e', 'a@xx_@ab.cd.e', 'a@xx.@ab.cd.e',
+    '@a.bc.d', '-@@ab.cd.e', 'q@ab.c.@cd.ef.g', '@ab..cd', '_@ab.cd', 'a.@ab.cd.ef.@gh.ij.kl', '--@ab.cd.ef--'].map((c) => c.replaceAll('@', start));
+  const parts = [start, 'e', 'y', 'J', 'a', '_', '-', '.', 'b', 'Q'];
+  let seed = 321;
+  const next = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed; };
+  for (let i = 0; i < 4000; i += 1) {
+    let text = '';
+    for (let n = next() % 15; n > 0; n -= 1) text += parts[next() % parts.length];
+    texts.push(text);
+  }
+  for (const text of texts) assert.equal(jwtAtAWord(text), old.test(text), text);
+});
+
+test('a long segment of word starts is read in linear time (FAA-321)', () => {
+  const segments = { 4000: ('ey' + 'J-').repeat(4000), 16000: ('ey' + 'J-').repeat(16000) };
+  assert.equal(repositoryName(segments[16000]), true);
+  assert.ok(growth((n) => repositoryName(segments[n]), 4000, 16000) < 9);
 });
