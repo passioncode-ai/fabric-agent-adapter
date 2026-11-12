@@ -37,11 +37,15 @@ Every hook reads at most 4 MiB of its input (`HOOK_INPUT_CAP`) as UTF-8 bytes: a
 that is no UTF-8 reads as U+FFFD, and a payload over the cap is read as nothing (FAA-210, since 0.67.0; 0.64.0 to
 0.66.0 counted 1 MiB of bytes and read a BOM as nothing).
 
-An insight/1 line is one JSON object per line with seven required fields, `schema` `"insight/1"`, `id`, `at` (UTC),
-`agent`, `kind` (in use: `lesson`, `finding`, `metric`, `pattern`, `tool`), `title` and `body`, and usually
-`evidence` (a list), `tags`, `audience`, `numbers` and `next`; it never holds a value. Fabric's ADR-0188 §5 names
-insight/1 without a shape; this is the shape in use across the estate's insight files (one JSONL file a month),
-stated here provisionally until ADR-0188's owner fixes it. A session writes them in the project's `insights/` folder,
+An insight/1 line is one JSON object per line with nine required fields, as the insights specification the estate's
+collector reads states them (FAA-217): `schema` `"insight/1"`, `id` (`<agent>-<yyyymmdd>-<n>`), `at` (UTC), `agent`,
+`kind` (`lesson`, `finding`, `metric`, `pattern`, `tool`, `market`), `title` (at most 160 characters), `body` (at most
+1200 characters), `evidence` (a list of one or more: `file:line`, a command and its output, a link, a run id) and
+`audience` (`internal`, `public-maybe` or `public`); optional `numbers` (each with what it measures and its source),
+`tags`, `next` and `supersedes` (the id of a row it corrects; a row is never rewritten). An insight without evidence is
+not written, and the collector counts a row without evidence or with an unknown kind as a problem. It never holds a
+value, a person's name or a client's text. Fabric's ADR-0188 §5 names insight/1 without a shape; this is the shape
+the specification's owner keeps. A session writes them in the project's `insights/` folder,
 one JSONL file a month, the place Observatory named for its reader (OBS-331, board thread `f7758225`): in the
 project's data folder when it has one or the repository is public, else in the repository, never inside a public one
 (Observatory's own copy rule keeps `insights/` out of a public copy): a public repository with no data folder yet gets

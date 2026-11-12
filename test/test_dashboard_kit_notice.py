@@ -123,6 +123,24 @@ class Notice(unittest.TestCase):
         self.assertEqual((done.returncode, done.stdout), (0, ""))
         self.assertEqual(self.calls(), [], "it looks at nothing")
 
+    def test_a_session_fabric_launched_still_hears_the_line(self):
+        # FAA-217: AGENTS.md, hooks.json and the CHANGELOG say the notice speaks in a session Fabric launched (only one
+        # started on a board request silences it); the launch marker and signals are read by name only
+        self.own()
+        names = ("FABRIC_LAUNCHED_SESSION", "FABRIC_ACP_SESSION", "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT")
+        saved = {name: os.environ.get(name) for name in names}
+        os.environ.update({name: "1" for name in names})
+        try:
+            done, _ = self.notice()
+        finally:
+            for name, value in saved.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+        self.assertEqual(done.returncode, 0)
+        self.assertIn("example-agent.default (this repository) is built from fabric-dashboard-kit 0.9.0", done.stdout)
+
     def test_a_malformed_dispatch_workflow_does_not_silence_the_line(self):
         # 0.63.0 unit reading 6: the notice reads the workflow as the session hooks do, well formed or not at all
         self.own()

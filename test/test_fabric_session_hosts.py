@@ -135,3 +135,30 @@ class KimiStale(HostInstallers):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PreambleBound(unittest.TestCase):
+    def test_the_preamble_stays_under_hermes_4000_characters_for_every_host(self):
+        # FAA-217: Hermes' context plugin takes at most 4000 characters (MAX_CONTEXT_CHARS); the dispatch contract is
+        # held under it in test_fabric_session_dispatch, the ordinary preamble here
+        for host in fs.HOSTS.values():
+            with self.subTest(host=host):
+                self.assertLess(len(fs.PREAMBLE.format(host=host)), 4000)
+                self.assertLess(len(fs.POINTER.format(host=host)), 4000)
+
+
+class InsightShape(unittest.TestCase):
+    def test_the_insight_shape_is_the_estates_spec(self):
+        # FAA-217: the estate's insights specification requires evidence and audience and has the kind market; its
+        # collector counts a row without evidence or with an unknown kind as a problem
+        doc = Path(__file__).resolve().parents[1] / "plugins/fabric-agent-adapter/skills/working-with-fabric/references/session-hooks.md"
+        text = " ".join(doc.read_text(encoding="utf-8").split())
+        shape = text.split("An insight/1 line is", 1)[1].split("**A resumed session", 1)[0]
+        for words in ("nine required fields", "`schema` `\"insight/1\"`", "`id` (`<agent>-<yyyymmdd>-<n>`)",
+                      "`at` (UTC)", "`agent`", "`title` (at most 160 characters)", "`body` (at most 1200 characters)",
+                      "`evidence` (a list of one or more", "`audience` (`internal`, `public-maybe` or `public`)",
+                      "`lesson`, `finding`, `metric`, `pattern`, `tool`, `market`", "`numbers`", "`tags`", "`next`",
+                      "`supersedes`", "An insight without evidence is not written", "the insights specification"):
+            self.assertIn(words, shape, words)
+        self.assertNotIn("seven required fields", shape)
+        self.assertNotIn("provisionally", shape)
