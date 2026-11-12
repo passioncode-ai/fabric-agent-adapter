@@ -2,6 +2,11 @@
 
 Only isolated, reviewed synthetic hooks are trusted, through hooks/list +
 config/batchWrite. No global trust edit, bypass flag, login or model request.
+
+FAA-201 (b): the same hook left untrusted (no batchWrite) is listed `untrusted`
+and never runs: no hook/started or hook/completed reaches the client while the
+turn runs, so a dispatched Codex run whose home does not trust the plugin's hook
+gets no exit contract from it (on-demand-session.md).
 """
 import json
 import os
@@ -15,7 +20,7 @@ import threading
 import time
 
 
-def probe(text):
+def probe(text, trust=True):
     with tempfile.TemporaryDirectory(prefix='fabric-codex-native-') as directory:
         root=Path(directory); home=root/'home';home.mkdir();codex=home/'.codex';codex.mkdir();cwd=root/'project';cwd.mkdir()
         hook=root/'hook.py';hook.write_text('print('+repr(text)+')\n')
@@ -50,8 +55,11 @@ def probe(text):
             hooks=listed['data'][0]['hooks'];assert len(hooks)==1,listed
             h=hooks[0]
             assert h['command']==command,h
-            request('config/batchWrite',{'edits':[{'keyPath':'hooks.state','mergeStrategy':'upsert','value':{h['key']:{'trusted_hash':h['currentHash']}}}],'reloadUserConfig':True})
-            listed=request('hooks/list',{'cwds':[str(cwd)]});assert listed['data'][0]['hooks'][0]['trustStatus']=='trusted',listed
+            if not trust:
+                status=h.get('trustStatus');assert status!='trusted',h
+            else:
+                request('config/batchWrite',{'edits':[{'keyPath':'hooks.state','mergeStrategy':'upsert','value':{h['key']:{'trusted_hash':h['currentHash']}}}],'reloadUserConfig':True})
+                listed=request('hooks/list',{'cwds':[str(cwd)]});assert listed['data'][0]['hooks'][0]['trustStatus']=='trusted',listed
             thread=request('thread/start',{'cwd':str(cwd),'ephemeral':True,'approvalPolicy':'never','sandbox':'read-only'})
             request('turn/start',{'threadId':thread['thread']['id'],'input':[{'type':'text','text':'offline hook fixture'}]})
             deadline=time.monotonic()+12
@@ -60,6 +68,9 @@ def probe(text):
                 try:events.append(q.get(timeout=.5))
                 except queue.Empty:pass
             completed=[e['params'] for e in events if e.get('method')=='hook/completed']
+            if not trust:
+                return {'trustStatus':status,'hook_events':[e for e in events if str(e.get('method','')).startswith('hook/')],
+                        'methods':sorted({str(e.get('method')) for e in events})}
             assert completed, {'methods':[e.get('method') for e in events]}
             return completed
         finally:
@@ -70,6 +81,10 @@ def probe(text):
 if __name__=='__main__':
     before=probe('[fabric-agent-adapter] native fixture')
     after=probe(json.dumps({'hookSpecificOutput':{'hookEventName':'SessionStart','additionalContext':'[fabric-agent-adapter] native fixture'}}))
+    untrusted=probe(json.dumps({'hookSpecificOutput':{'hookEventName':'SessionStart','additionalContext':'[fabric-agent-adapter] native fixture'}}),trust=False)
+    assert untrusted['trustStatus']=='untrusted',untrusted
+    assert untrusted['hook_events']==[],untrusted
+    assert 'turn/started' in untrusted['methods'],untrusted
     before_run=before[0]['run']; after_run=after[0]['run']
     assert before_run['status']=='failed'
     assert before_run['entries']==[{'kind':'error','text':'hook returned invalid session start JSON output'}]
@@ -78,4 +93,5 @@ if __name__=='__main__':
     print(json.dumps({'host':'codex','baseline_status':before_run['status'],
                       'baseline_error':before_run['entries'][0]['text'],
                       'corrected_status':after_run['status'],'context_received':True,
+                      'untrusted_status':untrusted['trustStatus'],'untrusted_hook_events':0,
                       'real_model_calls':0,'provider':'closed loopback fixture'},indent=2))

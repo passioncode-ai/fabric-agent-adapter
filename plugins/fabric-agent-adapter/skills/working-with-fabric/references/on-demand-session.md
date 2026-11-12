@@ -49,7 +49,9 @@ launched (a run shown in Fabric's console). In Claude Code the prompt hook, whic
 the run, or that it is none; in Codex and Kimi, which have no prompt hook, the session checks its first line itself. A resumed or compacted session prints nothing. The plugin's hooks reach a Claude Code
 run Switchboard starts (its isolated home carries the operator's plugins). A Codex run gets the adapter's hook only when
 the person installed it with `install-host-hooks` and that run's `CODEX_HOME` trusts it: Codex runs a `hooks.json` hook
-only when the home's own `config.toml` trusts it (measured with codex-cli 0.165.0). Switchboard links the person's
+only when the home's own `config.toml` trusts it (measured with codex-cli 0.165.0; `test/native/codex_hooks.py` runs
+the same hook trusted and untrusted: untrusted, Codex lists it `untrusted` and sends no hook event while the turn
+runs, FAA-201 (b)). Switchboard links the person's
 `hooks.json` into its isolated homes, and since 0.7.8 carries the person's trust in that
 file into the home's `config.toml`, never a hook changed after it was trusted. Where the person has not trusted the
 hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exit contract alone tells a Codex run.
