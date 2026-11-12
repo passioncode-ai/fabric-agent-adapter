@@ -86,6 +86,10 @@ the binding's refusals (`a2a.surface`, `a2a.card`, `a2a.interface`, `a2a.task-no
 `a2a.method-not-found`); `a2a.task-states` runs only with a message the service names as safe to send, since any
 message may start real work. An interface that answers 401 without `--key-env` makes the binding rows NOT_RUN.
 
+It is a command of its own, not a part of `check_service.py`: that probe's `a2a.card` reads the public card with no
+Authorization header and never calls the card's interfaces (D5), while this one calls the interface with the
+interface's own key. Run both for a service that serves A2A.
+
 ## Not here yet
 
 - The interop test against a live Hermes A2A endpoint (`a2a_discover`, `a2a_call`): it waits for a Hermes A2A endpoint
