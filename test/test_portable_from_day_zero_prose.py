@@ -36,7 +36,7 @@ class PortableFromDayZero(unittest.TestCase):
         for words in ("**A** when a capability must answer while the owner's machine is off or asleep",
                       "a cloud host from its first release, Heroku unless a reason names another",
                       "the cloud Fabric-server template once that template's repository exists",
-                      "**B** when nothing needs it then: a local service only, no cloud",
+                      "**B** when nothing needs it then: local only, no cloud",
                       "through that agent's MCP or API", "The README names the category"):
             self.assertIn(words, uptime, words)
         data = one_row("creating-fabric-agents/SKILL.md", "**Whose data does it keep?**")
@@ -77,15 +77,15 @@ class PortableFromDayZero(unittest.TestCase):
             reference = flat(skill + "/references/source-and-instance.md")
             self.assertIn("[The data home and its kind](#the-data-home-and-its-kind)", reference)
             for words in ("**The data has a home of its own from the first commit: `<agent>-data`.**",
-                          "`<AGENT>_DATA_DIR` names it (its default is `../<agent>-data`)",
+                          "`<AGENT>_DATA_DIR` names it (its default is `../<agent>-data`, resolved against the checkout's root",
                           "a separate private repository named `<agent>-data`, never to the source's repository",
                           "never connects to the original's", "When in doubt, the kind is U.",
                           "**Every release runs the transfer audit.**",
                           "`check <clean-copy> --every-file` on a clean copy of what Git would commit",
                           "never the checkout itself, whose ignored configuration and dependency folders",
                           # 0.59.0 product r1: the holder's LICENSE meets the owner's list
-                          "The `LICENSE` is the other: its copyright line names the holder, which is authorship and "
-                          "travels with the source", "no other file of the owner's is",
+                          "The one owner's file named this way is the `LICENSE` (a file, never a folder exception): its "
+                          "copyright line names the holder, which is authorship and travels with the source", "no other file of the owner's is",
                           "its real-trace corpus and replay samples live in the data home",
                           # 0.59.0 seam r2: a host that does not keep its disk
                           "the data home is a durable store the same variable names",

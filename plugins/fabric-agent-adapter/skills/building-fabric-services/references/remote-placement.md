@@ -17,7 +17,9 @@ DEC-0019, at the commit this skill pins. This page is the how-to.
 
 It is, when it runs outside the operator's computer and the operator wants it in Fabric beside
 the local services: a hosted dashboard, an agent on a server, a bot's web console. It keeps the
-same objects (well-known document, events feed, login code) at the same paths.
+same objects (well-known document, events feed, login code) at the same paths. An uptime A agent (one that answers
+while the owner's computer is off, creating-fabric-agents' grill) is one from its first release: its keys are the
+platform's secrets, set from Observatory or the person's secret manager, never Observatory's local vault at run time.
 
 ## The descriptor
 
@@ -73,6 +75,13 @@ watch the gate fail.
   time (`tokenMatches`). A service registered from more than one host holds one token per host
   ([Registered from several hosts](#registered-from-several-hosts)).
 - **Session key**: 32 random bytes, a separate secret; rotating it signs every operator out.
+- **The data folder on a disk that does not persist**: set `FABRIC_DATA_HOME` to an absolute folder on the platform's
+  durable volume, and `service_dirs` / `serviceDirs` put the data folder there (`<home>/<id>`, an instance
+  `<home>/<id>.<instance>`); logs and cache stay on the local disk. With no durable volume, keep the data in a
+  durable store (a database, an object store) and nothing of value in the folder. A relative value is refused.
+- **A slow resolver**: `http.server.HTTPServer` resolves its host's FQDN between `bind()` and `listen()`, so on a host
+  with a slow or missing resolver the port is bound and connects time out; serve with the kit's server, never a bare
+  `HTTPServer`.
 - **Codes and sessions**: `MemoryCodeStore`: a restart forgets every outstanding code, so none
   can be replayed, and every session record, so a deploy signs the operator out (DEC-0039: the
   server keeps each session's last use and logout). The host signs in again on the page's `401`.

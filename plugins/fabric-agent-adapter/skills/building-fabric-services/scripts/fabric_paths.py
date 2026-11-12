@@ -38,23 +38,35 @@ def services_dir() -> Path:
     return Path(base) / "passioncode-fabric/services"
 
 
+def _durable(service_id: str, dirs: Dict[str, Path]) -> Dict[str, Path]:
+    """FABRIC_DATA_HOME (FAA-192): an absolute folder on a durable volume holds the data folder, `<home>/<id>`, on a host
+    whose own disk does not persist; logs and cache stay where the OS puts them. A relative value is refused."""
+    value = os.environ.get("FABRIC_DATA_HOME")
+    if not value:
+        return dirs
+    if not os.path.isabs(value):
+        raise ServiceError("FABRIC_DATA_HOME is an absolute folder on a durable volume.")
+    return dict(dirs, data=Path(value) / service_id)
+
+
 def service_dirs(service_id: str) -> Dict[str, Path]:
-    """State lives outside code: data+config, logs and cache in per-user OS directories."""
+    """State lives outside code: data+config, logs and cache in per-user OS directories (the data folder under
+    FABRIC_DATA_HOME when it is set)."""
     _require_id(service_id)
     home = Path.home()
     if sys.platform == "darwin":
-        return {
+        return _durable(service_id, {
             "data": home / "Library/Application Support" / service_id,
             "logs": home / "Library/Logs" / service_id,
             "cache": home / "Library/Caches" / service_id,
-        }
+        })
     if sys.platform == "win32":
         data = _local_app_data() / service_id
-        return {"data": data, "logs": data / "Logs", "cache": data / "Cache"}
+        return _durable(service_id, {"data": data, "logs": data / "Logs", "cache": data / "Cache"})
     data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local/share") / service_id
     state = Path(os.environ.get("XDG_STATE_HOME") or home / ".local/state") / service_id
     cache = Path(os.environ.get("XDG_CACHE_HOME") or home / ".cache") / service_id
-    return {"data": data, "logs": state / "logs", "cache": cache}
+    return _durable(service_id, {"data": data, "logs": state / "logs", "cache": cache})
 
 
 def instance_dirs(service_id: str, instance: str = "default") -> Dict[str, Path]:
@@ -69,6 +81,9 @@ def instance_dirs(service_id: str, instance: str = "default") -> Dict[str, Path]
     folder, personal = "%s.%s" % (service_id, instance), service_dirs(service_id)
     if sys.platform == "win32":
         data = personal["data"].parent / folder
+        if os.environ.get("FABRIC_DATA_HOME"):  # logs and cache stay on the local disk, beside the default's
+            local = personal["logs"].parent.parent / folder
+            return {"data": data, "logs": local / "Logs", "cache": local / "Cache"}
         return {"data": data, "logs": data / "Logs", "cache": data / "Cache"}
     if sys.platform == "darwin":
         return {key: path.parent / folder for key, path in personal.items()}

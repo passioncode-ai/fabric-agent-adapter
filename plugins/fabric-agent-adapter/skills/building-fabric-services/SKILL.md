@@ -428,7 +428,7 @@ this estate needs.
   explicitly in the plist; never copy the whole shell environment into it.
 - A plist pointing at a worktree or checkout breaks when it moves: point it at a release.
 - `http.server.HTTPServer` resolves its FQDN between `bind()` and `listen()`: with a slow
-  resolver (a macOS CI runner, a Mac offline) the port is bound but silent. Use `fs.LoopbackHTTPServer`.
+  resolver (a macOS CI runner, a Mac offline) the port is bound but silent: connects time out. Use `fs.LoopbackHTTPServer`.
 - `logging.basicConfig` called twice: the second is a no-op and the log stays empty. Configure logging once, in
   the entry point.
 - Hand-made `.plist.bak` files in `~/Library/LaunchAgents` are never cleaned up; keep

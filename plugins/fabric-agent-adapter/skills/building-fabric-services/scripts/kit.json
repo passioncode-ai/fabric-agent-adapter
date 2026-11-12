@@ -78,7 +78,7 @@
     "fabric_base",
     "fabric_platform"
    ],
-   "sha256": "8a1ee742f80f436e9f28c61b4f049a9545de2a9e0d66bfc61faa6ee5d1ba3734"
+   "sha256": "b274c0104b3b2a6207757241aa8e6116585010c688e3978fbed9920256ac99ca"
   },
   {
    "module": "fabric_estate_rules",
@@ -643,7 +643,7 @@
     "fabric-base",
     "fabric-platform"
    ],
-   "sha256": "aa630d611e748a899e7043480f4a4e46b444f2e15ff945f30c2fbef21c1ceea5"
+   "sha256": "ab7f1386b2d3910a1cf806339790f3ef990b4553bd48eca077f738255e703a32"
   },
   {
    "module": "fabric-estate-rules",
@@ -7143,7 +7143,7 @@
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
    "fabric_base.py": "d8c67f345e30332cce3664af77b0e6e07cd477b78c961ac009e9efee1be7e1b2",
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",
-   "fabric_paths.py": "8a1ee742f80f436e9f28c61b4f049a9545de2a9e0d66bfc61faa6ee5d1ba3734",
+   "fabric_paths.py": "b274c0104b3b2a6207757241aa8e6116585010c688e3978fbed9920256ac99ca",
    "fabric_estate_rules.py": "8b36a7f4108d9c2b1fb38c8bff344778c807bed631a99b4a563ecb0a49c10b1c",
    "fabric_estate.py": "0737ae1d1bb12586bae49de1f15ef1348bc207b5007cced9dad4c55bb5870874",
    "fabric_mandate.py": "fb19ce5359606bd6e3352ab02b2a12f49605ec6e5c49b55cce1f79c831325044",
@@ -7192,7 +7192,7 @@
    "fabric-crypto.mjs": "038e03689701e3c9721a1e7f8e0a4d02a52d6a5d1661b0dc84035edc3ebbfcf6",
    "fabric-base.mjs": "1a804bfc3ec5d2479ffc39d3c8d67b056b72af836e1b88102881f9ff632f1901",
    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",
-   "fabric-paths.mjs": "aa630d611e748a899e7043480f4a4e46b444f2e15ff945f30c2fbef21c1ceea5",
+   "fabric-paths.mjs": "ab7f1386b2d3910a1cf806339790f3ef990b4553bd48eca077f738255e703a32",
    "fabric-estate-rules.mjs": "7476be71174aa5b1026134f2b335abf647feaa55584e2f9de8618e3054aa8e1e",
    "fabric-estate.mjs": "e8a2e62d2313121e6cb502f6e6abad94d1d546a44b4d9b3ce2be29e7808e8cf3",
    "fabric-mandate.mjs": "b70f3de03a659e60bba7b5a0580b3582825cd7b8a8e30a28c79621919ec5b7bb",

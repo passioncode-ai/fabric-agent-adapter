@@ -54,7 +54,11 @@ source under it.
 
 - **The data has a home of its own from the first commit: `<agent>-data`.** For an agent that is not a kit service it
   is a folder beside the checkout, never inside it, and `<AGENT>_DATA_DIR` names it (its default is
-  `../<agent>-data`); a kit service keeps the kit's folders above. When the owner keeps the data in Git, it goes to a
+  `../<agent>-data`, resolved against the checkout's root, the folder that holds the agent's source, never the working
+  directory). Two sibling checkouts, and a second context's instance from the same checkout (an organization's beside
+  the personal one), would share that default: each sets its own `<AGENT>_DATA_DIR` (`../<agent>-data.<instance>`), so
+  no copy reads another's data. A kit service keeps the kit's folders above, and on a host whose disk does not persist
+  `FABRIC_DATA_HOME` moves its data folder onto a durable volume (building-fabric-services, the remote placement). When the owner keeps the data in Git, it goes to a
   separate private repository named `<agent>-data`, never to the source's repository. On a cloud host that does not
   keep its disk across a restart (Heroku and the like, an uptime A agent's default), the data home is a durable store
   the same variable names (a database, an object store, that private repository); the folder and the kit's folders
@@ -183,7 +187,8 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   repository is not read; `--every-file` and a folder outside Git read its files, its `.git` left out. An exception line (`!`) is refused, since what it would
   bring back would go unread. Name the files, or a folder that holds
   only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
-  exception), and say why on the line above. The `LICENSE` is the other: its copyright line names the holder, which is
+  exception), and say why on the line above. The one owner's file named this way is the `LICENSE` (a file, never a
+  folder exception): its copyright line names the holder, which is
   authorship and travels with the source, so when the holder is on the owner's list the licence file is named in the ignore
   file by its own path (`LICENSE`, `LICENSE.md`) with that reason (`# the copyright holder is authorship and travels with the source`); no other file of the
   owner's is. A file `pack` refuses by its name cannot ship in a package: a public

@@ -32,6 +32,8 @@
     {"query": "Create a new Fabric agent with a dashboard whose AGENTS.md says pages open only in Fabric Dashboards.", "shouldTrigger": true},
     {"query": "Создай нового агента Fabric так, чтобы его потом можно было передать как исходник, без моих данных.", "shouldTrigger": true},
     {"query": "Scaffold a portable Fabric agent whose source carries no instance data.", "shouldTrigger": true},
-    {"query": "Сделай агента, который отвечает пользователям в чате поддержки и обрабатывает лидов, по шаблону Fabric.", "shouldTrigger": true}
+    {"query": "Сделай агента, который отвечает пользователям в чате поддержки и обрабатывает лидов, по шаблону Fabric.", "shouldTrigger": true},
+    {"query": "Create a Fabric-compatible support bot that answers our customers' questions in chat from the help center.", "shouldTrigger": true},
+    {"query": "Build a new Fabric agent that replies to app store reviews for us.", "shouldTrigger": true}
   ]
 }

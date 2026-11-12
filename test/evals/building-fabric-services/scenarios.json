@@ -749,6 +749,19 @@
         "keeps the model and source keys in environment variables use_secret.py run fills, and the model spend under fabric_openrouter's ceiling with receipts",
         "keeps a phrased sentence only when every number in it is one the code computed"
       ]
+    },
+    {
+      "id": "a-support-service-routes-a-persons-categories-first",
+      "trap": "the agent lets the model see refund and account-recovery requests and counts its HANDOFF as a knowledge gap, keeps the customer's address and card number in the outbox, or ships a same-vendor fallback that fails on every call",
+      "request": "Wire the support-agent recipe into example-agent's service: refunds and account recovery always go to our staff.",
+      "expected": [
+        "sets the recipe's policy ({\"refund\": [...], \"recovery\": [...]}) so such a message is a policy:<category> hand-off before any lookup or model call, counted as policy, never inability",
+        "keeps the outbox redacted (support_agent.redact), and redacts and prunes its own store when it passes on_handoff",
+        "uses a fallback of another vendor, which the recipe checks when the agent is built",
+        "keeps knowledge ids a citation can name (no colon, at most 64)",
+        "catches ReentryError before RecipeError in its capability handler and answers it as the service's own fault",
+        "reads creating-fabric-agents' agents-that-answer-people.md for the parts the recipe lacks (turn record, daily report, other-vendor checker, commitments ledger, gap queue)"
+      ]
     }
   ]
 }

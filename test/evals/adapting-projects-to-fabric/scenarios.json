@@ -265,6 +265,16 @@
         "before scaffolding, asks the organization's catalogue first (its architect) for the template, its version, its variant and the known traps",
         "scaffolds after that ask, from what the answer named when it has come, and carries the template, version, variant and traps into the completion report (or says no answer came)"
       ]
+    },
+    {
+      "id": "an-existing-answering-agent-is-compared-with-the-template",
+      "trap": "the agent moves an existing support bot's data into a new data home or runs the new-agent transfer audit unasked, or adapts the bot without comparing it with the communication agent template",
+      "request": "Adapt our existing example-agent support bot to Fabric; it already answers customers in chat.",
+      "expected": [
+        "runs fabric_source_check.py and moves instance values out of the source, keeping the bot's data where it is unless the owner asks to move it",
+        "does not impose the new-agent data home or the per-release transfer audit unasked",
+        "compares the bot part by part with creating-fabric-agents' communication agent template and agents-that-answer-people.md, and lists each missing part as a finding in the report"
+      ]
     }
   ]
 }

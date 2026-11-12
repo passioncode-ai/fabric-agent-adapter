@@ -17,8 +17,9 @@ practices arrive with [PR #70](https://github.com/ssheleg/agent-stack/pull/70), 
 merges. The standard says how such an agent is measured; the practices say what worked and what failed. This page
 lists parts that have a check, and the check that proves each; it leaves to the sources the standard's A2 families and
 per-channel targets, A3 (the rubric), A4 (the judge and its calibration), A6 (answer first, the queue's SLA, a safe
-default) and the rest of its checks that caught real defects, and the practices' other items of P1, P3, P5, P6, P7 and
-P8. Read both sources before you design the reply pipeline. The kit's support-agent recipe (building-fabric-services,
+default) and the rest of its checks that caught real defects, its weekly assessment loop, P4's other lane rules (the
+classifier's closed output schema, the writer as the strongest model the latency allows, the fallback writer's
+triggers, the switch rule), and the practices' other items of P1, P3, P5, P6, P7 and P8. Read both sources before you design the reply pipeline. The kit's support-agent recipe (building-fabric-services,
 `recipes/support-agent/`) is one draft-and-check step of such an agent, not the agent: used alone it hands the message
 to a person at the first refusal; with a repairing `on_handoff` it rewrites a refused draft once (`repair=`, a
 spent repair being `fallback: true`: a second refusal, a declined repair or no knowledge on the retry; a `model:*`
@@ -44,7 +45,8 @@ outage during the repair is a plain hand-off), and research and the hold stay th
   on its log line and on any copy a person reads. The turn stores its outcome (answered, general guidance, not covered,
   handed off, small talk, limit, error), the hand-off reason and category, the latency, the knowledge revision the
   answer used, and whether the channel accepted the reply. Conversation text stays inside the agent, redacted, for at
-  most 30 days. Check: a test that a turn without a trace id, or with an outcome outside the list, is refused.
+  most 30 days. Check: a test that a turn without a trace id, or with an outcome outside the list, is refused, and a
+  test that conversation text past 30 days is gone and that what is kept carries no address, number or key.
 - **The agent publishes one `support.quality_daily` per closed UTC day and channel** (A5) on its events feed
   (`/fabric/v1/events`; building-fabric-services, `references/events-and-notifications.md`): counts and codes only, the
   judge model and rubric version, and `notMeasured` naming every family not computed that day. A metric not measured is
@@ -58,7 +60,10 @@ outage during the repair is a plain hand-off), and research and the hold stay th
   every reader of the feed it knows of has adopted DEC-0144: the producer then re-publishes its copy from DEC-0144's
   bytes (CT-188), and leaves the calibration out when the judge or the rubric changed after the labelled week. A
   reader validates against its own pinned copy, never one fetched by `$id`: the bytes under the unchanged `$id`
-  widened. Check: the producer's day passes `make_event` and validates against the producer's pinned copy of the
+  widened. At the contract repin to DEC-0144 (FAA-176), a producer that pinned its own copy keeps its URI in
+  `data.schema` and re-publishes that URI's bytes from DEC-0144's: since the `$id` did not change and the bytes only
+  widened, every day the older copy accepted still validates, so a reader needs no window of two URIs (this page's
+  rule, not the contract's words). Check: the producer's day passes `make_event` and validates against the producer's pinned copy of the
   schema; a planted day that writes 0 for a family not computed fails; and a test runs every `notMeasured` name the
   producer can emit through the published name pattern, iterating the producer's own list.
 
@@ -66,8 +71,8 @@ outage during the repair is a plain hand-off), and research and the hold stay th
 
 - **A table of lanes** (P4): classifier, writer, fallback writer, checker, research, judge. The checker is another
   vendor than the writer; the judge is another vendor than both, at temperature 0, on an open-vendor model where it
-  reads what people wrote. Declare them as classes in the profile, where each lane's fallback is another vendor than its
-  primary ([models and providers](models-and-providers.md)); per turn the router picks the checker against the model
+  reads what people wrote. Name each lane's catalogue models in the profile, narrowed by the classes the spend policy
+  or grant holds (`modelClasses`), where each lane's fallback is another vendor than its primary ([models and providers](models-and-providers.md)); per turn the router picks the checker against the model
   that actually drafted, a fallback writer included ([resilience and
   autonomy](resilience-and-autonomy.md#model-answers-are-untrusted-until-accepted), item 3). A lane that reads what
   people wrote has an open-vendor route (DEC-0083). Check: the config loader refuses a fallback that shares its own
@@ -110,8 +115,8 @@ outage during the repair is a plain hand-off), and research and the hold stay th
   the judge's sample. Check: the daily report counts a hand-off under hand-offs, and the judge's sample builder leaves
   templated replies out.
 - **Hand-offs are counted by cause** (P3): `policy`, `inability` and `infrastructure` apart, so the largest number names
-  what to fix. A hold after a checker or model outage, or at the research time cap, is `infrastructure`; only a hold
-  after a refusal on the material is `inability`. Check: a checker outage produces `infrastructure` hand-offs and holds,
+  what to fix. A hold after a checker or model outage, or at the research time cap, is `infrastructure` (this page's
+  reading of P3, not the sources' words); only a hold after a refusal on the material is `inability`. Check: a checker outage produces `infrastructure` hand-offs and holds,
   never `inability`.
 - **A commitments ledger** (P3): every "I will pass this on and come back" is a row with an owner and a due date; the
   week's report counts promises made and closed. Check: a reply that promises to come back without a ledger row is
@@ -126,7 +131,7 @@ outage during the repair is a plain hand-off), and research and the hold stay th
 - **Every abstention and every inability, a hold on the material included, becomes a gap in a queue** (P7), restated
   without personal data and grouped by meaning. When a gap closes, the client asks again and rewrites the held answer
   only once the new answer is confident. Check: a closed gap whose new answer comes back with `answer: false` leaves the
-  hold in place, and a hold after a checker outage opens no gap.
+  hold in place, and a hold after a checker outage opens no gap (this page's reading of P7, not the sources' words).
 
 ## Reading the events feed
 

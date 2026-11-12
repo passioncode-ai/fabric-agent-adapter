@@ -51,13 +51,15 @@ record, which, not `decisions.jsonl` (one line per message id decided), counts t
 `on_handoff` again, so the repair step bounds its retries (one repair is the practices') and passes any further
 hand-off to the person's channel. A copy of `support_agent.py` made before 0.55.0 takes no `on_handoff` in
 `from_config` and hangs on such a call (`grep -c ReentryError support_agent.py` prints 0 for it; `fabric_kit.py
-status` covers the kit modules only): copy it again. The recipe also lacks three parts of such an agent: the Lookup
+status` covers the kit modules only): copy it again. The recipe also lacks two parts of such an agent: the Lookup
 (shared words, best three) is a relevance rule of its own, where the agent reads the knowledge service's per-item
-`answer` flag and puts small closed rule sets into the prompt whole; `from_config` accepts a same-vendor fallback,
-refused only per call as `model:config`; and the decision does not record which model answered, so fallback recoveries
-are not counted. The recipe hands off nothing for `policy`: the calling service routes the categories a person must
-handle (refunds, unbans, account recovery) before it calls the recipe, or a model's `HANDOFF` on them is counted as a
-false knowledge gap. Count its hand-offs by cause: a failed check is a refusal for the agent to repair, research and
+`answer` flag and puts small closed rule sets into the prompt whole; and the decision does not record which model
+answered, so fallback recoveries are not counted. A fallback of the writer's own vendor is refused when the agent is
+built (`RecipeError`), not per call. **A person's categories come first** (since 0.83.0): `policy` (a config key, or
+`policy=` on `SupportAgent`) maps each category a person must handle to the words that name it
+(`{"refund": ["refund", "money back"], "recovery": ["recover my account"]}`); a message holding one is a hand-off
+`policy:<category>` before any lookup or model call, so a refund is never a false knowledge gap. Count `policy:*`
+as `policy`, never `inability`. Count its hand-offs by cause: a failed check is a refusal for the agent to repair, research and
 hold, and only a hold on the material counts as `inability` (a hold after an outage or at the research time cap is
 `infrastructure`); `unsupported:amount` is a money reason, never researched, and so is `unsupported:number` unless the
 refused `draft` shows the number is not a price; `no-knowledge` and `model-unsure` are `inability`;
@@ -99,7 +101,8 @@ python3 <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/s
   install <service>/support --lang py --module fabric_openrouter --module fabric_usage --module fabric_paths \
   --module fabric_connections
 cp <adapter>/plugins/fabric-agent-adapter/skills/building-fabric-services/recipes/support-agent/support_agent.py <service>/support/
-python3 <adapter>/.../fabric_kit.py status <service>/support      # current, older or modified, per file
+python3 <adapter>/.../fabric_kit.py status <service>/support      # the kit modules: current, older or modified
+# support_agent.py is not a kit module: compare it with the recipe's copy (diff) after each adapter release
 ```
 
 ## The knowledge file as a source
@@ -137,7 +140,8 @@ FAC-SEM-162 to 165 (rule `channel-agent.declaration`).
 
 | Key | Meaning |
 |---|---|
-| `knowledge` | the knowledge file: `{"entries": [{"id", "question", "answer", "tags"}]}`, ids unique |
+| `knowledge` | the knowledge file: `{"entries": [{"id", "question", "answer", "tags"}]}`, ids unique and citable (no colon, at most 64) |
+| `policy` | optional: `{category: [words]}`, the categories a person handles, routed before the lookup and the model |
 | `knowledgeMaxAgeSeconds` | optional: the knowledge file is then a source with an age and a last good version (above) |
 | `stateDir` | the decisions (`decisions.jsonl`), the handoff outbox (`handoffs.jsonl`) and the usage ledger (`usage.jsonl`) |
 | `model`, `fallback` | two models of different vendors; a lane that reads what customers write runs on an open-vendor model (DEC-0083) |
@@ -169,15 +173,26 @@ Exit 1 on a broken config or knowledge file. A missing key is not a crash: the m
 From a service's capability handler, build the agent once with `support_agent.from_config(path)` and call
 `agent.answer(message_id, text, task_run_id=...)`; pass `on_handoff=` to `from_config` or `SupportAgent` to route
 handoffs to the operator's channel instead of the outbox file. A handoff carries the customer's text as `question` and
-its time as `at`.
+its time as `at`. The handler catches `ReentryError` before `RecipeError` (it is a subclass) and answers it as the
+service's own fault, never the caller's: a retry of the same message id would pay for its draft again. From inside
+`on_handoff` on the same thread, `agent.prune(...)` completes (the agent's lock is reentrant, held by a test), while
+`agent.answer(...)` is refused with `ReentryError` before any input check, so even a bad id or an empty text there is a
+`ReentryError`.
 
-## Retention: the outbox keeps what customers wrote
+A Node agent (the communication template's) runs the same checks with `support-agent.mjs`: `checkReply(draft, question,
+given, {maxChars, sources})`, the twin of `check_reply`, answers every case in
+`test/fixtures/support-check-reply-cases.json` as Python does. Knowledge ids are what a citation can name: letters,
+digits, `.`, `_` and `-`, at most 64; an entry whose id has a colon or is longer is refused at load (map it).
 
-Every handoff row in `handoffs.jsonl` holds the customer's own message, which can carry an email address, a phone
-number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy states, at most
-30 days for an agent that answers people (the standard's A1). A1 also asks for the text redacted: the outbox keeps it
-as written, and `prune` takes any `--keep-days`, so such an agent passes an `on_handoff` that redacts what it stores,
-which replaces the outbox, and keeps 30 days or fewer. A refused `draft`, which can echo what the customer wrote,
+## Retention: the outbox keeps what customers wrote, redacted
+
+Every handoff row in `handoffs.jsonl` holds the customer's message as `question`, redacted since 0.83.0: `redact()`
+replaces an email address, a card number, a phone number or other long digit run, and a long key-shaped run with a
+marker (`[email]`, `[card]`, `[number]`, `[secret]`) before the row is written (the standard's A4 and A9). The rest
+stays until it is pruned. Choose a retention the product's privacy policy states, at most 30 days for an agent that
+answers people (the standard's A1). An agent that passes its own `on_handoff` replaces the outbox and keeps its own
+store: it redacts what it stores (`support_agent.redact` is there to call) and prunes that store itself, since `prune`
+covers only `handoffs.jsonl` and `decisions.jsonl`. A refused `draft`, which can echo what the customer wrote,
 reaches the returned decision and an `on_handoff` the agent passes, never a file: neither `decisions.jsonl` nor the
 default outbox stores it. A capability handler returns the decision without it: a kit job's result is written to
 the job's file (`fabric_interop`'s job store), so pass `draft` only to the repair step. Prune on a schedule:
