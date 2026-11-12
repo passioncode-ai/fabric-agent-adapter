@@ -2,8 +2,11 @@
 
 ## 0.80.0 (2026-11-12)
 
-Wave 2 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. Kit modules change: `fabric_secrets`,
-`fabric_descriptor`, `fabric_http`, the facade `fabric_service`, and their Node twins.
+Wave 2 and the first part of wave 3 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. A new kit
+module, `fabric_load` and `fabric-load.mjs` (layer L3). Kit modules change: `fabric_secrets`, `fabric_peer_owner`
+(`1.1.0+kit.4`), `fabric_connections`, `fabric_descriptor`, `fabric_context`, `fabric_supervisors`, `fabric_interop`,
+`fabric_hub`, `fabric_board_slots`, `fabric_board_session`, `fabric_http`, the facade `fabric_service`, and their Node
+twins where they have one.
 
 ### Added
 
@@ -26,8 +29,33 @@ Wave 2 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. Ki
 - A recorded working-with-fabric trigger run: 38 of 44 with haiku, above the 85 % gate, USD 0.0122
   (`docs/evidence/evals/2026-11-12-trigger-run.md`, FAA-130); six misses follow FAA-291's shorter description (FAA-305).
 
+- **The call queue and load reference functions of DEC-0104** (FAA-289): `fabric_load.py` and `fabric-load.mjs`,
+  exported by both facades: `jobCallerKey`, `nextQueuedJob`, `admitJob`, `queueStatusMessage`, `readQueuePosition` as
+  the contract's `src/agent-network.ts` answers them at the pin, FAC-SEM-131 to FAC-SEM-133, the `service-load/1` and
+  `extensions/load/0.1` shapes, and `loadExtension`. Both twins are held to `test/fixtures/contract/load-vectors.json`,
+  written by `make_load_vectors.mjs` from the contract's own vectors, fixtures and functions.
+- **A dashboard-only service recipe** (FAA-268, `recipes/dashboard-only/`): an installer with `--id` and `--folder`,
+  a JSON last line and an idempotent repeat, and a runnable entry `check_service.py` passes; the HA-1 claim file waits
+  on contract CT-228.
+- **A key-delivery door template** (FAA-238, `recipes/key-delivery-door/`): it prints one `fabric-credential-envelope/1`
+  line, writes into no store, and exits as Observatory's `receive --from-command` reads it; built against Observatory's
+  V2 spec until OBS-360 ships. The door owner supplies the seal command (the standard library has no HPKE).
+- `context_gate_options` / `contextGateOptions` hand an instance's context and its pin's issuer to the delegation gate:
+  an organization instance refuses a token signed by the personal hub key (FAA-150).
+- working-with-fabric: `references/remote-sessions.md`, a session over SSH with no GUI login (never start Fabric, the
+  login is the human gate) and one Project worked on from two machines (two boards, ids never cross) (FAA-284).
+
 ### Changed
 
+- `remote-placement.md`: a cloud service registered from several hosts keeps one token per host, and revoking one ends
+  only its sessions (FAA-280).
+- The Python connections reader refuses a non-ASCII host where every Node from 20 to 26 refuses it, with tables measured
+  by `test/fixtures/idna/make_idna_tables.mjs` (no host any Node accepts is refused, over 3,573,756 hosts) (FAA-98).
+- The kit's mandate inputs carry 19 hostile `source` shapes, the vectors regenerated at the pin (FAA-149).
+- `systemd_install` and `task_install` poll the installed answer when given `origin`, as `launchd_install` does
+  (FAA-253). A supervised `fabric_context` refusal waits the lock's back-off before it exits 78, so `KeepAlive` no
+  longer respawns it every 10 s (FAA-279).
+- Hub and `fabric_http` refusals carry the listener owner's reason, and a restricted table is not retryable (FAA-272).
 - **working-with-fabric finds Claude Code's files where `CLAUDE_CONFIG_DIR` points** (and Switchboard's source folder),
   with the launcher's folder rule; the installer reads the same place (FAA-218, FAA-234). A local Claude Code
   registration is read as Claude Code applies it, keyed by the git root or the folder itself outside git, measured
@@ -54,6 +82,11 @@ Wave 2 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. Ki
 
 ### Fixed
 
+- A refused job answer is named from one read of the job; the responder's shutdown says whether it drains; an epoch
+  refusal reads `com.status` before the retry (FAA-186). Provider stems read as the contract reads them, `~` in
+  `FABRIC_SERVICES_DIR` is expanded, contract-gated tests are found by `ast` (FAA-189). The channel-agent rule agrees
+  with the contract on Python 3.9 and answers NOT_RUN without its schema (FAA-250). ASCII digits only, a header-only
+  netstat reads as a restricted table, a hung `launchctl` no longer escapes (FAA-273).
 - The release waits 20 minutes, not 10, for the registry to serve a new version: 0.79.1 was served 6 s after
   the old window closed and its run read red although it was published (FAA-307).
 - The dashboard link gate reads its handoff as UTF-8 bytes, drops a byte-order mark, caps it at 64 KiB and refuses a
