@@ -61,7 +61,7 @@ async function fakeHub(t) {
     assert.equal(seen.length, 1, 'the handler ran once');
     return seen[0];
   };
-  return { data, events, runOne, options, seen };
+  return { data, events, runOne, options, seen, control };
 }
 
 test('FAA-135: a trusted request from a declared Project carries its mandate', async (t) => {
@@ -93,6 +93,45 @@ test('FAA-135: identifyAgent binds the sender\'s agent id; null binds nothing, a
   assert.equal(none, null);
   assert.deepEqual(asked, [], 'asked only when a mandate travelled');
   assert.throws(() => new fb.Responder(h.options({ identifyAgent: 'lead-agent' })), (e) => e.code === 'invalid_arguments');
+});
+
+// FAA-196 (1): the resume path (a transferred request run again from a fresh com.get) reads the mandate as the first
+// path does, and none from a message read back under another digest or address, said by its code alone.
+async function resumed(t, tamper) {
+  const h = await fakeHub(t);
+  const { request } = await h.control({ op: 'queue', capability: 'video.render', text: body(JSON.stringify(mandate())), provenance: 'trusted' });
+  await new fb.Responder(h.options({ handler: () => new Promise(() => {}) })).step(); // dies inside the work
+  await h.control({ op: 'end-sessions' });
+  const second = new fb.Responder(h.options());
+  if (tamper) {
+    const call = second.call.bind(second);
+    second.call = async (tool, args) => {
+      const answer = await call(tool, args);
+      if (tool === 'com.get') tamper(answer);
+      return answer;
+    };
+  }
+  await second.step();
+  assert.equal(h.seen.length, 1, 'the handler ran again on the resume path');
+  assert.ok(request);
+  return { h, got: h.seen[0] };
+}
+
+test('FAA-196 (1): a resumed request reads its mandate as the first path does', async (t) => {
+  const { h, got: [m, covered] } = await resumed(t);
+  assert.deepEqual(m, mandate());
+  assert.equal(covered.ok, true);
+  assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread'), []);
+});
+
+test('FAA-196 (1): a resumed request read back under another digest or address carries no mandate', async (t) => {
+  for (const [tamper, reason] of [[(a) => { a.digest = `sha256:${'0'.repeat(64)}`; }, 'digest-mismatch'],
+    [(a) => { a.request = { ...a.request, capability: 'video.cut' }; }, 'not-addressed']]) {
+    const { h, got: [m, covered] } = await resumed(t, tamper);
+    assert.equal(m, null);
+    assert.equal(covered, null);
+    assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread').map((e) => e[3].data.value.reason), [reason]);
+  }
 });
 
 test('FAA-135: the personal board takes any trusted sender', async (t) => {

@@ -345,6 +345,19 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     return answer
 
 
+def read_back_problem(message: Any, entry: Dict[str, Any], project: str) -> Optional[str]:
+    """Why a message read back with com.get is not the request a claim took (the first path refuses it, a resume reads
+    no mandate from it, FAA-196 (1)): `digest-mismatch` (another digest than the claim's), `not-addressed` (not this
+    request, capability and Project), else None."""
+    if not isinstance(message, dict) or message.get("digest") != entry["digest"]:
+        return "digest-mismatch"
+    req = message.get("request")
+    if not isinstance(req, dict) or req.get("id") != entry["request"] or req.get("capability") != entry["capability"] \
+            or req.get("target") != project:
+        return "not-addressed"
+    return None
+
+
 def sender_agent(identify_agent: Optional[Callable[[Any], Optional[str]]], sender: Any, mandate: Any = True) -> Optional[str]:
     """FAA-135: the agent id the service's identify_agent(sender) names for a request's sender (the board's verified
     `{project, principal}`), read as the interop kit reads its own hook (`identified_agent`): None is none, an agent id

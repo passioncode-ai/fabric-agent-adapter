@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { Backoff, HubError, normalProject } from './fabric-hub.mjs';
 import { PRIMARY_CAPABILITY, acceptedRevisions, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
 import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems } from './fabric-board-shapes.mjs';
-import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, readMandate, senderAgent } from './fabric-board-link.mjs';
+import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, readBackProblem, readMandate, senderAgent } from './fabric-board-link.mjs';
 import { HOLD_RETRY_MAX_SECONDS, LEASE_MARGIN_SECONDS, SESSION_CODES, SlotKeeper } from './fabric-board-slots.mjs';
 
 export { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD }; // re-exported: callers import them from here since 0.40.0
@@ -653,13 +653,13 @@ export class Responder extends SlotKeeper {
       revision: receipt.request.revision, step: 'claimed', keys: {}, effect: false };
     this.checkpoint.put(entry);
     const message = await this.call('com.get', { message: entry.message });
-    const req = isObj(message) ? message.request : null;
-    if (message.digest !== entry.digest) {
+    const problem = readBackProblem(message, entry, this.project);
+    if (problem === 'digest-mismatch') {
       this.checkpoint.drop(entry.request);
       this.emit('board.request.skipped', 'warning', 'A claimed request was not accepted: the message read back carries another digest than the claim. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'digest-mismatch' });
       return;
     }
-    if (!isObj(req) || req.id !== entry.request || req.capability !== capability || req.target !== this.project) {
+    if (problem) {
       this.checkpoint.drop(entry.request);
       this.emit('board.request.skipped', 'warning', 'A claimed request was not accepted: it is not addressed to this Project and capability. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'not-addressed' });
       return;
@@ -706,8 +706,9 @@ export class Responder extends SlotKeeper {
     return true;
   }
 
-  async runWork(entry, request) {
-    const { mandate, unread } = readMandate(request, this.mandateFrom, this.agentId);
+  async runWork(entry, request, problem = null) {
+    let { mandate, unread } = readMandate(request, this.mandateFrom, this.agentId);
+    if (problem && (mandate !== null || unread)) [mandate, unread] = [null, problem]; // FAA-196 (1): another message than accepted
     if (unread) { // by its code alone: the block holds the operator's words
       this.emit('board.request.mandate_unread', 'warning', `Request ${entry.request} carries a mandate the kit does not read (${unread}); it is worked without one.`, { request: entry.request, reason: unread });
     }
@@ -727,7 +728,7 @@ export class Responder extends SlotKeeper {
       return;
     }
     const message = await this.call('com.get', { message: entry.message });
-    await this.runWork(entry, new BoardRequest(message, entry.capability));
+    await this.runWork(entry, new BoardRequest(message, entry.capability), readBackProblem(message, entry, this.project));
   }
 
   /**

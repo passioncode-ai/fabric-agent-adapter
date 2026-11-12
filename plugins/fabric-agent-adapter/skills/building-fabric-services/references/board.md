@@ -131,6 +131,10 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   than 4300 digits on every Python (the kit refuses it there, as `int_max_str_digits` does from 3.11 and
   the 3.8.14, 3.9.14 and 3.10.7 security releases; a limit configured
   lower, `PYTHONINTMAXSTRDIGITS` on a Python that has one, refuses an integer longer than it).
+- A request transferred to a new session runs again from a fresh `com.get`. Its mandate is read only when the message
+  read back carries the digest the claim took and names this request, capability and Project, as the first claim
+  checks; otherwise it is worked without one, and `board.request.mandate_unread` names `digest-mismatch` or
+  `not-addressed` (FAA-196 (1)).
 - The handler gets `ctx.mandate` (the one block without `source`, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
   acts in one, since a call naming none is not limited by the mandate's `projects`; both are read failing closed, as

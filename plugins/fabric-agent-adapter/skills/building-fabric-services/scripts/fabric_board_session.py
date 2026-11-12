@@ -675,15 +675,14 @@ class Responder(SlotKeeper):
                  "revision": receipt["request"]["revision"], "step": "claimed", "keys": {}, "effect": False}
         self.checkpoint.put(entry)
         message = self._call("com.get", {"message": entry["message"]})
-        req = message.get("request") if isinstance(message, dict) else None
-        if message.get("digest") != entry["digest"]:
+        problem = _link.read_back_problem(message, entry, self.project)
+        if problem == "digest-mismatch":
             self.checkpoint.drop(entry["request"])
             self._emit("board.request.skipped", "warning", "A claimed request was not accepted: the message read back carries "
                        "another digest than the claim. Nothing was done; the claim lapses.", request=entry["request"],
                        capability=capability, reason="digest-mismatch")
             return
-        if not isinstance(req, dict) or req.get("id") != entry["request"] or req.get("capability") != capability \
-                or req.get("target") != self.project:
+        if problem:
             self.checkpoint.drop(entry["request"])
             self._emit("board.request.skipped", "warning", "A claimed request was not accepted: it is not addressed to this "
                        "Project and capability. Nothing was done; the claim lapses.", request=entry["request"],
@@ -730,8 +729,10 @@ class Responder(SlotKeeper):
         self.checkpoint.put(entry)
         return True
 
-    def _run(self, entry: Dict[str, Any], request: BoardRequest) -> None:
+    def _run(self, entry: Dict[str, Any], request: BoardRequest, problem: Optional[str] = None) -> None:
         mandate, unread = _link.read_mandate(request, self.mandate_from, self.agent_id)
+        if problem and (mandate is not None or unread):  # FAA-196 (1): a resume read back another message than accepted
+            mandate, unread = None, problem
         if unread:  # by its code alone: the block holds the operator's words
             self._emit("board.request.mandate_unread", "warning", "Request %s carries a mandate the kit does not read (%s); "
                        "it is worked without one." % (entry["request"], unread), request=entry["request"], reason=unread)
@@ -758,7 +759,7 @@ class Responder(SlotKeeper):
             self._complete(entry)
             return
         message = self._call("com.get", {"message": entry["message"]})
-        self._run(entry, BoardRequest(message, entry["capability"]))
+        self._run(entry, BoardRequest(message, entry["capability"]), _link.read_back_problem(message, entry, self.project))
 
     def _fenced(self, op: str, entry: Dict[str, Any], key: str, extra: Optional[Dict[str, Any]] = None,
                 apply: Optional[Callable[[Dict[str, Any]], None]] = None) -> Optional[Dict[str, Any]]:

@@ -100,6 +100,71 @@ class BoardMandateTests(Conversation):
         with self.assertRaises(fb.BoardError):
             self.responder(agent_id="example-agent", mandate_from={OTHER_PROJECT}, identify_agent="lead-agent")
 
+    def _resumed(self, tamper=None, read_back=None):
+        """FAA-196 (1): a first responder accepts the request and dies inside the work; a second one takes the slot over,
+        the request is transferred and the handler runs again from a fresh com.get (the resume path)."""
+        import threading
+        inside, never = threading.Event(), threading.Event()
+        self.addCleanup(never.set)
+
+        def first(request, ctx):
+            inside.set()
+            never.wait(10)
+            raise fb.Stopped()
+        self.outcome = first
+        self.rid = self.board.queue("video.render", text=body(json.dumps(mandate())))
+        args = dict(agent_id="example-agent", mandate_from={OTHER_PROJECT}, wall=lambda: WALL)
+        self.responder(spawn=lambda fn: threading.Thread(target=fn, daemon=True).start(), **args).step()
+        self.assertTrue(inside.wait(5))
+        self.hub.control({"op": "end-sessions"})
+        if tamper:
+            tamper(self.board.requests[self.rid])
+        self.seen.clear()
+        self.events.clear()
+        self.outcome = self._record
+        second = self.responder(**args)
+        if read_back:
+            call = second._call
+
+            def tampered(tool, arguments):
+                answer = call(tool, arguments)
+                if tool == "com.get":
+                    read_back(answer)
+                return answer
+            second._call = tampered
+        second.step()
+        self.assertEqual(self.board.requests[self.rid]["state"], "completed")
+        self.assertEqual(len(self.seen), 1, "the handler ran again on the resume path")
+        return self.seen[0]
+
+    def _record(self, request, ctx):
+        self.seen.append((ctx.mandate, ctx.mandate_covers({"capability": "video.render", "effect": "draft"}), None))
+        return {"state": "completed", "summary": "Rendered."}
+
+    def test_a_resumed_request_reads_its_mandate_as_the_first_path_does(self):
+        got, covered, _ = self._resumed()
+        self.assertEqual(got, mandate())
+        self.assertTrue(covered["ok"])
+        self.assertEqual([e for e in self.events if e[0] == "board.request.mandate_unread"], [])
+
+    def test_a_resumed_request_read_back_under_another_digest_carries_no_mandate(self):
+        """FAA-196 (1): the first path accepts only the message it claimed (its digest, its Project and capability); a
+        resume reads the body again, so a body read back under another digest or address is worked without its mandate,
+        said by its code alone."""
+        def other_digest(request):
+            request["message_digest"] = "sha256:" + "0" * 64
+        got, covered, _ = self._resumed(other_digest)
+        self.assertIsNone(got)
+        self.assertIsNone(covered)
+        said = [e for e in self.events if e[0] == "board.request.mandate_unread"]
+        self.assertEqual([e[3]["data"]["value"]["reason"] for e in said], ["digest-mismatch"])
+        self.tearDown()
+        self.setUp()
+        got, covered, _ = self._resumed(read_back=lambda answer: answer.update(request=dict(answer["request"], capability="video.cut")))
+        self.assertIsNone(got)
+        said = [e for e in self.events if e[0] == "board.request.mandate_unread"]
+        self.assertEqual([e[3]["data"]["value"]["reason"] for e in said], ["not-addressed"])
+
     def test_the_personal_board_takes_any_trusted_sender(self):
         got, covered, _ = self.run_one(body(json.dumps(mandate())), mandate_from="personal-board")
         self.assertTrue(covered["ok"])

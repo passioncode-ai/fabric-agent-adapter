@@ -291,6 +291,18 @@ export function covers(mandate, call, agentId, wall, caller = null, callerAgent 
 }
 
 /**
+ * Why a message read back with com.get is not the request a claim took (the first path refuses it, a resume reads no
+ * mandate from it, FAA-196 (1)): `digest-mismatch` (another digest than the claim's), `not-addressed` (not this
+ * request, capability and Project), else null.
+ */
+export function readBackProblem(message, entry, project) {
+  if (!isObj(message) || message.digest !== entry.digest) return 'digest-mismatch';
+  const req = message.request;
+  if (!isObj(req) || req.id !== entry.request || req.capability !== entry.capability || req.target !== project) return 'not-addressed';
+  return null;
+}
+
+/**
  * FAA-135: the agent id the service's identifyAgent(sender) names for a request's sender (the board's verified
  * `{project, principal}`), read as identifiedAgent reads a hook's answer: null or undefined is none, an agent id is that
  * id, anything else, or a hook that throws, is UNREADABLE_AGENT, which no chain holds. Asked only when a mandate
