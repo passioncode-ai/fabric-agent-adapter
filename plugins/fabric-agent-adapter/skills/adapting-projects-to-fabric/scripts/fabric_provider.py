@@ -255,7 +255,7 @@ def write_provider_entry(entry: Dict[str, Any], directory: Optional[Path] = None
         # re-pins (CT-192), so the writer does not emit it yet.
         raise ProviderError("The manifest's name follows a backslash, which a reader that has not re-pinned to DEC-0145 refuses (CT-192). "
                             "Write the path with / before the name: ~/.../fabric-agent.json, which every Fabric release reads, or "
-                            "C:/.../fabric-agent.json, which Fabric reads only after v0.3.15 (its repin, CO-479).")
+                            "C:/.../fabric-agent.json, which Fabric reads only from v0.3.16 (its repin, CO-479).")
     problems = manifest_problems(entry)
     if problems:
         raise ProviderError("Provider entry is invalid: %s." % "; ".join(problems))
