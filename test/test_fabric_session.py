@@ -1108,13 +1108,21 @@ class TurnNudges(Active):
         self.assertEqual(self.prompt(), "Fabric reminder: One.\nFabric reminder: Two.")
 
     def test_fabric_s_own_sentence_is_printed_as_given(self):
-        # The shape Fabric 0.3.14 answers (board e94ec9c0, release/0.3.14 b63dedb6): {recorded, seq, nudges?}, and
-        # every `says` starts with "Fabric:", so it gets no second tag.
+        # The shape Fabric 0.3.14 answers (board e94ec9c0; re-read at the tag v0.3.14, 7e43dc03, FAA-143): {recorded,
+        # seq, nudges?}, and every `says` starts with "Fabric:" (shared/abandonedSweep.ts nudgeText), so no second tag.
         self.answer({"recorded": True, "seq": 7, "nudges": [
             {"kind": "claim-lapsed", "says": "Fabric: your claim on task 12 lapsed; claim it again or let it go.",
              "task_id": "t12"}]})
         self.turn()
         self.assertEqual(self.prompt(), "Fabric: your claim on task 12 lapsed; claim it again or let it go.")
+
+    def test_the_notes_name_the_fabric_tag_they_were_read_against(self):
+        # FAA-143 item 5: the nudge notes follow Fabric's tag v0.3.14 (7e43dc03), not its release branch
+        notes = " ".join((SKILL / "references/session-hooks.md").read_text(encoding="utf-8").split())
+        for said in ("`v0.3.14`, `7e43dc03`", "within an hour", "at most five", "`repeated: true`",
+                     "starts every `says` with `Fabric:`"):
+            self.assertIn(said, notes)
+        self.assertEqual(fs.MAX_NUDGES, 5, "Fabric's TURN_NUDGES_MAX at v0.3.14")
 
     def test_a_full_pending_list_logs_what_it_dropped(self):
         self.answer({"nudges": [{"kind": "k", "says": "n%d" % i} for i in range(fs.MAX_NUDGES)]})

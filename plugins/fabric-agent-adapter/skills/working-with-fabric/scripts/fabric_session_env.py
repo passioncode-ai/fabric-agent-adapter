@@ -98,7 +98,7 @@ UNREAD_LINE = ("%d unread on the project board: com.list; answer what waits on y
 #: them once: at most MAX_NUDGES lines, each one line of at most MAX_NUDGE_CHARS characters.
 NUDGES_FILE = "nudges.json"
 #: Each nudge's line names its source, so the agent sees Fabric's words, data to act on through its tools, never the
-#: person's request. Fabric 0.3.14 starts every `says` with "Fabric:" (board e94ec9c0, release/0.3.14 b63dedb6); a
+#: person's request. Fabric 0.3.14 starts every `says` with "Fabric:" (board e94ec9c0; tag v0.3.14 7e43dc03, FAA-143); a
 #: line that does not gets this tag.
 NUDGE_PREFIX = "Fabric reminder: "
 
