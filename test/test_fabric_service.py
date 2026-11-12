@@ -691,14 +691,48 @@ class DocumentTests(unittest.TestCase):
                 if argv[0] != "launchctl":
                     return real_run(argv, **kw)
                 asked.append(argv)
+                if argv[2].split("/")[0] not in loaded:
+                    return subprocess.CompletedProcess(argv, 113, "", "Could not find service")
                 return subprocess.CompletedProcess(argv, 0, "%s = {\n\tpid = 4242\n}\n" % argv[2], "")
-            with mock.patch.object(sup, "SYSTEM_DAEMONS", daemons), mock.patch.object(checker.sys, "platform", "darwin"), \
-                    mock.patch.object(checker.shutil, "which", return_value="/bin/launchctl"), \
-                    mock.patch.object(checker.subprocess, "run", side_effect=launchctl):
-                p.lifecycle_rules()
-            verdict = {r["rule"]: r for r in p.results}["lifecycle.one-copy"]
-            self.assertEqual(asked, [["launchctl", "print", "system/a.b.c"]])
-            self.assertEqual(verdict["verdict"], "PASS", verdict)
+            gui = "gui/%d/a.b.c" % os.getuid()
+            # FAA-286 items 6 and 17: the plist's domain first, then the other one, which must not hold a second copy;
+            # the gui branch reads a LaunchAgents plist the same way
+            agent = Path(tmp) / "LaunchAgents" / "a.b.c.plist"
+            agent.parent.mkdir()
+            agent.write_bytes(fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"), stdout_path=Path("/tmp/l")))
+            for where, loaded, first, want in ((plist, {"system"}, "system/a.b.c", "PASS"),
+                                               (plist, {"system", "gui"}, "system/a.b.c", "FAIL"),
+                                               (agent, {"gui"}, gui, "PASS"),
+                                               (agent, {"gui", "system"}, gui, "FAIL"),
+                                               (agent, {"system"}, gui, "FAIL")):
+                with self.subTest(plist=where.parent.name, loaded=sorted(loaded)):
+                    d["lifecycle"]["plist"] = str(where)
+                    p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
+                    p.wk = {"process": {"pid": 4242}}
+                    asked.clear()
+                    with mock.patch.object(sup, "SYSTEM_DAEMONS", daemons), \
+                            mock.patch.object(checker.sys, "platform", "darwin"), \
+                            mock.patch.object(checker.shutil, "which", return_value="/bin/launchctl"), \
+                            mock.patch.object(checker.subprocess, "run", side_effect=launchctl):
+                        p.lifecycle_rules()
+                    verdict = {r["rule"]: r for r in p.results}["lifecycle.one-copy"]
+                    self.assertEqual(asked[0], ["launchctl", "print", first])
+                    self.assertEqual(verdict["verdict"], want, verdict)
+                    if want == "FAIL" and len(loaded) == 2:
+                        self.assertIn("two copies", verdict["evidence"])
+
+    def test_the_probe_fails_a_launch_daemon_plist_without_user_name_or_with_a_tilde_command(self):
+        """FAA-286 items 22 and 23: a LaunchDaemon without UserName runs as root; its `~` command is root's home."""
+        rules = load("check_service_rules")
+        body = {"Label": "a.b.c", "RunAtLoad": True, "KeepAlive": True}
+        self.assertTrue(any("without UserName" in p for p in rules.plist_problems(body, "a.b.c", system=True)))
+        self.assertEqual(rules.plist_problems(body, "a.b.c"), [], "a LaunchAgent runs as its user")
+        named = dict(body, UserName="agentuser")
+        self.assertEqual(rules.plist_problems(named, "a.b.c", system=True, commands={"update": ["/opt/x/update"]}), [])
+        tilde = rules.plist_problems(named, "a.b.c", system=True, commands={"update": ["~/bin/update"], "doctor": ["/x"]})
+        self.assertEqual(len(tilde), 1)
+        self.assertIn("commands.update starts with ~", tilde[0])
+        self.assertEqual(rules.plist_problems(named, "a.b.c", commands={"update": ["~/bin/update"]}), [])
 
 
 class LiveServiceTests(unittest.TestCase):

@@ -338,6 +338,7 @@ from fabric_supervisors import (  # noqa: F401
     _launchctl,
     _domain,
     SYSTEM_DAEMONS,
+    USER_NAME_RULE,
     launchd_domain,
     launchd_loaded,
     launchd_pid,

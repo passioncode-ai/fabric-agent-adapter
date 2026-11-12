@@ -189,6 +189,7 @@ export {
   taskUninstall,
   launchdPlist,
   SYSTEM_DAEMONS,
+  USER_NAME_RULE,
   launchdDomain,
   wellKnownOf,
   jobWellKnownOf,

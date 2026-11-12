@@ -80,7 +80,7 @@ import fabric_connections as fcn  # noqa: E402
 from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
-from check_service_rules import ForeignUser, PORT_RULES_UNREAD, listener_owner_verdict, port_claim_verdict  # noqa: E402 - DEC-0154 HA-2
+from check_service_rules import ForeignUser, PORT_RULES_UNREAD, in_launch_daemons, listener_owner_verdict, other_domain_copy, port_claim_verdict  # noqa: E402 - DEC-0154 HA-2
 
 Result = Dict[str, str]
 
@@ -152,8 +152,8 @@ class Probe:
         self.results.append({"rule": rule, "verdict": verdict, "evidence": evidence})
 
     def request(self, method: str, path: str, headers: Optional[Dict[str, str]] = None,
-                body: Optional[bytes] = None, timed: Optional[List[float]] = None) -> Tuple[int, Dict[str, str], bytes]:
-        """`timed` gets the ms from after a local connect and its owner check to the last byte (unit reading 11)."""
+                body: Optional[bytes] = None) -> Tuple[int, Dict[str, str], bytes]:
+        """`connected_at`: when a local connect and its owner check ended, so the answer is timed from there (r11)."""
         if self.remote:
             context = ssl.create_default_context(cafile=self.ca_file) if self.ca_file else ssl.create_default_context()
             if self.connect:
@@ -168,16 +168,12 @@ class Probe:
             base = {"Host": "127.0.0.1:%d" % self.port}
         base.update(headers or {})
         try:
-            started = time.perf_counter()
-            if timed is not None and not self.remote:
+            if not self.remote:
                 conn.connect()
-                started = time.perf_counter()
+                self.connected_at = time.perf_counter()
             conn.request(method, path, body=body, headers=base)
             resp = conn.getresponse()
-            answer = resp.status, merge_headers(resp.getheaders()), resp.read()
-            if timed is not None:
-                timed.append((time.perf_counter() - started) * 1000)
-            return answer
+            return resp.status, merge_headers(resp.getheaders()), resp.read()
         except po.ListenerRefused as exc:
             raise ForeignUser("foreign-user: %s" % exc) from None
         finally:
@@ -250,7 +246,9 @@ class Probe:
         try:
             timings = []
             for _ in range(3):
-                status, headers, body = self.request("GET", "/.well-known/fabric-service", protected, timed=timings)
+                started = self.connected_at = time.perf_counter()
+                status, headers, body = self.request("GET", "/.well-known/fabric-service", protected)
+                timings.append((time.perf_counter() - max(started, self.connected_at)) * 1000)
         except OSError as exc:
             if self.remote:
                 self.add_no_token(no_token, None)
@@ -811,7 +809,7 @@ class Probe:
         except (OSError, ValueError) as exc:
             self.add("lifecycle.plist", "FAIL", "cannot read %s: %s" % (plist_path, exc))
             return
-        problems = plist_problems(plist, life.get("label"), self.token)
+        problems = plist_problems(plist, life.get("label"), self.token, system=in_launch_daemons(plist_path), commands=self.d.get("commands"))
         self.add("lifecycle.plist", "FAIL" if problems else "PASS", "; ".join(problems) or "%s: RunAtLoad, KeepAlive, no secrets" % plist_path.name)
         marker = marker_problem(plist)
         self.add("lifecycle.supervisor-marker", "FAIL" if marker else "PASS",
@@ -831,6 +829,9 @@ class Probe:
             self.add("lifecycle.one-copy", "FAIL", "launchd job %s is not loaded in %s" % (life.get("label"), domain))
         elif not match:
             self.add("lifecycle.one-copy", "FAIL", "launchd job loaded but not running")
+        elif other_domain_copy(life.get("label"), domain):  # loaded in both domains: two copies (FAA-286 item 6)
+            self.add("lifecycle.one-copy", "FAIL", "launchd job %s is loaded in %s and in %s: two copies; uninstall one"
+                     % (life.get("label"), domain, other_domain_copy(life.get("label"), domain)))
         else:
             same = int(match.group(1)) == served
             self.add("lifecycle.one-copy", "PASS" if same else "FAIL",

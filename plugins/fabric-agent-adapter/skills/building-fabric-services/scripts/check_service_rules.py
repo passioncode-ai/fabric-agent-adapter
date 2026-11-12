@@ -22,6 +22,7 @@ import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
 from fabric_secrets import ascii_decoded, repository_name, secret_argument  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
+import fabric_supervisors as _sup  # noqa: E402 - where a LaunchDaemon's plist lives (FAA-278)
 import socket  # noqa: E402
 
 
@@ -134,9 +135,37 @@ import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 
 
-def plist_problems(plist: dict, label: object, token: object = None) -> list:
-    """What makes a service's launchd job unfit to stay up: identity, restart, secrets."""
+def other_domain_copy(label: object, domain: str) -> Optional[str]:
+    """The other launchd domain when it also has job `label` loaded, a second copy (FAA-286 item 6), else None."""
+    other = ("gui/%d" % os.getuid()) if domain == "system" else "system"
+    try:
+        out = subprocess.run(["launchctl", "print", "%s/%s" % (other, label)], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return other if out.returncode == 0 else None
+
+
+def in_launch_daemons(plist_path: Path) -> bool:
+    """Whether a plist sits in /Library/LaunchDaemons, where launchd loads it at boot as a LaunchDaemon (FAA-278)."""
+    folder = re.sub(r"^/{2,}", "/", str(Path(os.path.abspath(str(plist_path))).parent))
+    return folder.lower() == str(_sup.SYSTEM_DAEMONS).lower()  # the supervisors' own, which a test may point elsewhere
+
+
+def plist_problems(plist: dict, label: object, token: object = None, *, system: bool = False,
+                   commands: object = None) -> list:
+    """What makes a service's launchd job unfit to stay up: identity, restart, secrets. A LaunchDaemon (`system`) also
+    needs UserName, or it runs as root (FAA-286 item 22), and its descriptor's commands an absolute path, since a
+    `~` would be root's home when the job's update runs as root (item 23)."""
     problems = []
+    if system and not (isinstance(plist.get("UserName"), str) and plist.get("UserName")):
+        problems.append("a LaunchDaemon without UserName runs as root, and every client refuses root's listener "
+                        "(DEC-0154 HA-2)")
+    if system and isinstance(commands, dict):
+        for name, argv in sorted(commands.items()):
+            first = argv[0] if isinstance(argv, list) and argv else argv
+            if isinstance(first, str) and first.startswith("~"):
+                problems.append("commands.%s starts with ~, which is root's home for a LaunchDaemon: write the absolute "
+                                "path" % name)
     if plist.get("Label") != label:
         problems.append("Label %r" % plist.get("Label"))
     if plist.get("RunAtLoad") is not True:

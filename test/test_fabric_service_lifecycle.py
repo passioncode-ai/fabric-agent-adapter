@@ -644,8 +644,11 @@ class LaunchdSystemDomainTests(unittest.TestCase):
 
     def setUp(self):
         self.sup = sys.modules["fabric_supervisors"]
-        # The system domain is macOS's; on Linux CI the refusals and fakes still run as if on a Mac.
-        platform = mock.patch.object(self.sup.sys, "platform", "darwin")
+        # The system domain is macOS's; on Linux CI the refusals and fakes still run as if on a Mac. Only the supervisors
+        # module sees darwin (FAA-286 item 20): its `sys` is a view, so no other module or thread reads a patched
+        # platform.
+        darwin = type("DarwinSys", (), {"platform": "darwin", "__getattr__": lambda _, name: getattr(sys, name)})()
+        platform = mock.patch.object(self.sup, "sys", darwin)
         platform.start()
         self.addCleanup(platform.stop)
         # The plists name a neutral account; on this machine it maps to the uid the tests' own server runs as.
@@ -728,6 +731,79 @@ class LaunchdSystemDomainTests(unittest.TestCase):
                                    service_id="example-agent", timeout=1, domain="system")
         self.assertIn("is not this LaunchDaemon's", str(caught.exception))
         self.assertIn("pid 999999", str(caught.exception))
+
+    def test_a_domain_name_is_no_plist_path(self):  # FAA-286 item 18
+        for name in ("system", "gui", "gui/501"):
+            with self.subTest(name=name), self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_domain(name)
+            self.assertIn("is a launchd domain, not a plist path", str(caught.exception))
+
+    def test_a_folder_the_domain_contradicts_is_refused_before_anything(self):  # FAA-286 items 14 and 21
+        agents = Path(self.temp.name) / "LaunchAgents"
+        agents.mkdir()
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, agents / (self.label + ".plist"), self.body(user_name="agentuser"),
+                                   origin=self.web.origin, service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("LaunchAgents folder", str(caught.exception))
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, Path("/Library/LaunchDaemons/%s.plist" % self.label), self.body(),
+                                   origin=self.web.origin, service_id="example-agent", timeout=1, domain="gui")
+            self.assertIn("loads at boot as a LaunchDaemon", str(caught.exception))
+            self.assertEqual(fake.state["calls"], [])
+        self.assertFalse((agents / (self.label + ".plist")).exists())
+
+    def test_a_plist_that_does_not_parse_is_named_so(self):  # FAA-286 item 16
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, b"<?xml version='1.0'?><!DOCTYPE x [<!ENTITY a 'b'>]><plist>",
+                                   origin=self.web.origin, service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("does not parse", str(caught.exception))
+            self.assertNotIn("needs UserName", str(caught.exception))
+            self.assertEqual(fake.state["calls"], [])
+
+    def test_a_leftover_launch_agent_of_the_label_is_refused(self):  # FAA-286 item 6
+        home = Path(self.temp.name) / "home"
+        (home / "Library" / "LaunchAgents").mkdir(parents=True)
+        leftover = home / "Library" / "LaunchAgents" / (self.label + ".plist")
+        leftover.write_bytes(self.body())
+        account = type("Account", (), {"pw_dir": str(home), "pw_uid": os.getuid()})()
+        with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0), \
+                mock.patch("pwd.getpwnam", return_value=account):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("second copy", str(caught.exception))
+            self.assertFalse(self.plist.exists())
+            self.assertNotIn("bootstrap", fake.verbs())
+
+    def test_a_system_bootstrap_that_fails_removes_the_plist_it_wrote(self):  # FAA-286 item 15
+        with FakeLaunchd(bootstrap_error="Bootstrap failed: 5: Input/output error"), \
+                mock.patch.object(self.sup.os, "geteuid", return_value=0), mock.patch.object(self.sup.time, "sleep"):
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("the plist this call wrote was removed", str(caught.exception))
+            self.assertFalse(self.plist.exists())
+            self.plist.write_bytes(self.body(user_name="agentuser"))  # one that was there before stays, and is named
+            with self.assertRaises(fs.ServiceError) as caught:
+                fs.launchd_install(self.label, self.plist, self.body(user_name="agentuser"), origin=self.web.origin,
+                                   service_id="example-agent", timeout=1, domain="system")
+            self.assertIn("stays and loads at the next boot", str(caught.exception))
+            self.assertTrue(self.plist.exists())
+
+    def test_an_uninstall_naming_another_labels_plist_is_refused(self):  # FAA-286 item 9
+        other = throwaway_label()
+        self.plist.write_bytes(fs.launchd_plist(other, ["/bin/echo", "1"], working_directory=Path(self.temp.name),
+                                                stdout_path=Path(self.temp.name) / "service.log"))
+        for domain in (None, "system"):
+            with self.subTest(domain=domain), FakeLaunchd(loaded=[self.label, other]) as fake, \
+                    mock.patch.object(self.sup.os, "geteuid", return_value=0):
+                with self.assertRaises(fs.ServiceError) as caught:
+                    fs.launchd_uninstall(self.label, self.plist, domain=domain)
+                self.assertIn("holds launchd label %s, not %s" % (other, self.label), str(caught.exception))
+                self.assertNotIn("bootout", fake.verbs())
+            self.assertTrue(self.plist.exists())
 
     def test_a_purge_of_a_launch_daemon_is_refused(self):
         with FakeLaunchd() as fake, mock.patch.object(self.sup.os, "geteuid", return_value=0):
@@ -890,6 +966,8 @@ class LaunchdSystemDomainTests(unittest.TestCase):
             fs.launchd_install(self.label, self.plist, plistlib.dumps(named), origin=self.web.origin,
                                service_id="example-agent", timeout=1, domain="system")
         self.assertIn("is not a macOS short name", str(caught.exception))
+        self.assertIn(self.sup.USER_NAME_RULE, str(caught.exception))  # FAA-286 item 13: words, never a regex
+        self.assertNotIn("\\Z", str(caught.exception))
         self.assertFalse(self.plist.exists())
 
     def test_a_refusal_after_bootstrap_says_the_job_stays_loaded(self):
