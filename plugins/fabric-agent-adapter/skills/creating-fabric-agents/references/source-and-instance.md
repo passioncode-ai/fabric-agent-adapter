@@ -7,8 +7,8 @@ first commit, so that its owner can hand the source over later without rewriting
 by itself: handing over, a new remote, a push or a change of visibility stays the owner's act, each time (a personal
 agent stays private until its owner says so about that act).
 
-The format of a source manifest, export and import is the contract's to decide (CT-194). What follows does not depend
-on it.
+The format of a source manifest, export and import is the contract's: DEC-0149 (`fabric-source/1`, its `source.md`) at
+the pin; the kit lays down `fabric.source.json` under FAA-261. What follows does not depend on it.
 
 ## Contents
 
@@ -42,7 +42,7 @@ on it.
 - **Fixtures on neutral ids.** A test that needs a home folder, an owner or an account uses `example`, `example-agent`,
   `owner@example.com` or a one-letter home, and a credential-shaped test value says it is synthetic
   (`sk-test-not-a-key`) or is assembled at run time.
-- **Two names stay in the source until the contract decides (CT-194).** A service's supervisor label is the agent's
+- **Two names stay in the source until the kit reads DEC-0149 on them (FAA-261; the contract's CT-194).** A service's supervisor label is the agent's
   own name, reverse-DNS on the publisher's domain (`com.example.example-agent`), and `AGENTS.md` names it (LC-09):
   never the owner's account or name. A provider's `createdBy` names the publisher; until one is chosen it
   keeps the scaffold's sentinel, and a person's name or account is never written there. The adapter moves both when the
