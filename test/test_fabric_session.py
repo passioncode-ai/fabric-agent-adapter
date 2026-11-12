@@ -1508,6 +1508,29 @@ class OriginNames(unittest.TestCase):
                 self.assertIsNone(MCP.parse_origin(url))
 
 
+class RepositoryRule(unittest.TestCase):
+    def test_the_hooks_repository_rule_is_the_kits(self):
+        """FAA-200 (13): the session hooks keep their own copy of the repository-match rule (a working-with-fabric
+        script imports no kit module), so it answers as the kit's two (dashboard_kit and check_service_rules) do on
+        every spelling of a remote the three are given."""
+        scripts = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"
+        sys.path.insert(0, str(scripts))
+        kits = [importlib.import_module("dashboard_kit").same_repository,
+                importlib.import_module("check_service_rules").same_repository]
+        env = sys.modules["fabric_session_env"]
+        hooks = lambda a, b: bool(a and b) and env._repository_key(a) == env._repository_key(b)
+        spellings = ["git@github.com:example-org/example-agent.git", "https://github.com/example-org/example-agent",
+                     "HTTPS://GitHub.com/Example-Org/Example-Agent.git/", "ssh://git@github.com/example-org/example-agent.git",
+                     "github.com/example-org/example-agent", "https://user@github.com/example-org/example-agent",
+                     "git+ssh://git@github.com/example-org/example-agent", " github.com/example-org/example-agent ",
+                     "https://github.com/example-org/other-agent", "git@gitlab.com:example-org/example-agent.git",
+                     "https://github.com/example-org/example-agent.github", "", "github.com/example-org"]
+        for a in spellings:
+            for b in spellings:
+                with self.subTest(a=a, b=b):
+                    self.assertEqual({kit(a, b) for kit in kits} | {hooks(a, b)}, {kits[0](a, b)})
+
+
 class BashPaths(unittest.TestCase):
     def turn(self, *commands, cwd="/work"):
         """turn_paths over a turn of Bash calls, in order (FAA-184)."""

@@ -565,7 +565,9 @@ def checkout_root(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[P
 
 
 def _repository_key(url: str) -> str:
-    """One spelling of a remote: scheme, user, `.git` and case dropped; `git@host:a/b` is `host/a/b`."""
+    """One spelling of a remote: scheme, user, `.git` and case dropped; `git@host:a/b` is `host/a/b`. The kit's rule
+    (dashboard_kit and check_service_rules `same_repository`), copied because a session script imports no kit module;
+    test_fabric_session.RepositoryRule holds the three equal (FAA-200 (13))."""
     url = url.strip().lower()
     url = re.sub(r"^git@([^:]+):", r"\1/", url)
     url = re.sub(r"^[a-z+]+://", "", url)
