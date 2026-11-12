@@ -52,6 +52,18 @@ dashboard kit 1.1.7.
 - A flaky test drew a SAS signature without a digit about once in 1500 runs, a shape the long-run rule excludes by its
   definition; it now draws one in the rule's shape.
 
+- **What the 0.82.0 seam reading found, fixed before the release**: Python's credential readers
+  (`fabric_secrets.url_refused` and its copy, `fabric_connections._whatwg_parts`, `check_service_channel_agent.url_parts`)
+  refuse a URL whose empty host is followed by `:`, with or without a port, as `new URL` does (`foo://:/?token=...`;
+  four shared vectors in both suites). `adapt_project`'s LC-21 gates read a stored URL's credential without the host
+  check, so a password in a manifest or `plugin.json` URL is found whatever its host. Every other reader of the JWT rule
+  reads it in one pass too (`fabric_source_check`, `fabric_connections` and its Node twin, the three
+  `check_dashboard_link.py` copies, `fabric-button.js`). Python `pid_alive` on Windows (`fabric_hub`,
+  `fabric_session_env`) answers None when OpenProcess is refused with access denied, as Node's EPERM does. The README
+  states the preamble's request rule; the exit contract's closing checkpoint names its `status` again (done if
+  completed, blocked if failed_known); the hub and HTTP docstrings say a missing row on macOS is `table-restricted`.
+  New rows FAA-320 to FAA-323.
+
 ### Added
 
 - **`fabric_peer_owner.py listener <port> [--json]`** and **`fabric-peer-owner.mjs listener <port>`** print the
