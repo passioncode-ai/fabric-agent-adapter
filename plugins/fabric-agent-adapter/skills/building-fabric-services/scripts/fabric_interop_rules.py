@@ -589,8 +589,8 @@ _SENTINEL = ("=?base64?", "?=")
 
 def encode_header_value(value: str) -> str:
     """A body value as an HTTP header value, by MCP 2026-07-28 Streamable HTTP "Value Encoding": as
-    it is when it is printable ASCII without leading or trailing whitespace, otherwise — and for a
-    plain value that itself looks like the sentinel — `=?base64?<base64 of its UTF-8>?=`."""
+    it is when it is printable ASCII without leading or trailing whitespace, otherwise (and for a
+    plain value that itself looks like the sentinel) `=?base64?<base64 of its UTF-8>?=`."""
     plain = (all(0x20 <= ord(c) <= 0x7E for c in value) and value == value.strip(" ")
              and not (value.startswith(_SENTINEL[0]) and value.endswith(_SENTINEL[1])))
     if plain:
