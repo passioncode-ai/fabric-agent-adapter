@@ -61,8 +61,12 @@ _URL = re.compile(URL_PATTERN)
 _MANIFEST = re.compile(MANIFEST_PATTERN[:-1] + r"\Z")
 # The manifest's name after a backslash: valid since DEC-0145, but no writer emits it until every reader accepts it.
 _MANIFEST_AFTER_BACKSLASH = re.compile(r"\\fabric-agent\.json\Z")
-# format: uri (RFC 3986 absolute URI): a scheme, a colon, then no whitespace or control character.
-_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:[^\s\x00-\x1f\x7f]+\Z")
+# format: uri (RFC 3986 absolute URI) as ajv-formats reads it: RFC 3986 characters only (unreserved, reserved and %HH),
+# the class the service kit's descriptor check uses (fabric_descriptor `_SOURCE_URI`, 0.49.3); a byte-order mark, a
+# zero-width space, a non-ASCII path or an IDN host is refused (FAA-127).
+_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9._~:/?#@!$&'()*+,;=-]|%[0-9A-Fa-f]{2})+\Z")
+# Brackets belong to an IP-literal host only (RFC 3986 3.2.2); the literal is set aside before the character check.
+_IP_LITERAL = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@\[\]]*@)?)\[[0-9A-Fa-f:.vV]+\]")
 # format: date-time (RFC 3339).
 _TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})\Z")
 FIELDS = {"protocol", "id", "providerId", "name", "summary", "manifest", "run", "source", "installedAt", "installedBy", "extensions"}
@@ -145,11 +149,14 @@ def validate_provider_entry(entry: Any) -> List[str]:
         source = entry["source"]
         if not isinstance(source, dict) or not set(source) <= {"repository"}:
             problems.append("source is {repository?}")
+        elif "repository" in source and isinstance(source["repository"], str) and (
+                _URI_PASSWORD.match(source["repository"]) or _secrets.repository_credential(source["repository"])):
+            # FAA-120, as the service kit: a repository is named, never reached with a credential in its URI. Said
+            # before the character check, so a password beside a character the URI class refuses (a backslash, as
+            # git reads one) is still named a credential (FAA-127).
+            problems.append("source.repository carries no password or credential: it names the repository")
         elif "repository" in source and not _is_uri(source["repository"]):
             problems.append("source.repository is an absolute URI")
-        elif "repository" in source and (_URI_PASSWORD.match(source["repository"]) or _secrets.repository_credential(source["repository"])):
-            # FAA-120, as the service kit: a repository is named, never reached with a credential in its URI.
-            problems.append("source.repository carries no password or credential: it names the repository")
     if not isinstance(entry["installedAt"], str) or not _TIMESTAMP.fullmatch(entry["installedAt"]):
         problems.append("installedAt is an RFC 3339 date-time")
     if not isinstance(entry["installedBy"], str) or not 1 <= len(entry["installedBy"]) <= 200:
@@ -161,7 +168,7 @@ def validate_provider_entry(entry: Any) -> List[str]:
 
 
 def _is_uri(value: Any) -> bool:
-    return isinstance(value, str) and bool(_URI.fullmatch(value))
+    return isinstance(value, str) and bool(_URI.fullmatch(_IP_LITERAL.sub(r"\1h", value, count=1)))
 
 
 def _run_problems(run: Any) -> List[str]:
