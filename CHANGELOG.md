@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.80.0 (2026-11-12)
+
+Wave 2 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. Kit modules change: `fabric_secrets`,
+`fabric_descriptor`, `fabric_http`, the facade `fabric_service`, and their Node twins.
+
+### Added
+
+- **Three working rules in working-with-fabric and in a new agent's template** (the contract owner's board request
+  `bfc0e14e`, relaying the operator's words of 2026-11-12): the task's context is settled before the first act that
+  crosses contexts (`personal`, `org:<orgId>`), asked once when no source settles it, recorded in the handoff and never
+  posted to a board thread, following contract CT-292's draft (TC-1 to TC-6) until its DEC lands, the one exception to
+  "do not ask" (`references/task-context.md`, FAA-299); a wait is not a stop: each wait has its condition, owner, next
+  action and watcher, `fabric_heartbeat` carries `waitingOn`, a turn ends with one line per open wait
+  (`references/waits.md`, FAA-300); clean up after yourself: merged worktrees and branches, `git fetch --prune`, unique
+  commits archived under `refs/archive/<date>/`, `git ls-files` checked before a folder goes (`references/cleanup.md`,
+  FAA-301). creating-fabric-agents carries the three in `references/working-rules.md`. Six scenario evals and
+  `test/test_working_rules_prose.py`.
+- **A service install refuses a port another OS account listens on** (FAA-225, its port part), read with
+  `fabric_peer_owner`; a port of this account, the system or nobody, or an unreadable table, still passes. The claim
+  file waits on contract DEC-0160.
+- creating-fabric-agents: an agent on its own machine refuses to start where Observatory's `placement.json` places it
+  elsewhere, starts with no file, reports `placement-unreadable`, and takes keys only from its machine's vault
+  (`where-agents-run.md`, FAA-230's placement and vault parts).
+- A recorded working-with-fabric trigger run: 38 of 44 with haiku, above the 85 % gate, USD 0.0122
+  (`docs/evidence/evals/2026-11-12-trigger-run.md`, FAA-130); six misses follow FAA-291's shorter description (FAA-305).
+
+### Changed
+
+- `test/validate.py` searches the shipped files for a provider token shape, a private key block and a home path, and
+  every shipped script that writes `<https>` carries its legend (FAA-212).
+- The insight/1 shape follows the estate's spec: `evidence` and `audience` are required, and the kind `market`
+  exists (`session-hooks.md`, FAA-217).
+- `dashboard-links.md`: the `unsupported` host state takes no browser fallback, by the operator's rule; macOS never
+  reports it (FAA-137).
+- `resilience-and-autonomy.md`: a routine whose result write fails exits non-zero and never logs success (FAA-294,
+  item 4).
+
+### Fixed
+
+- The dashboard link gate reads its handoff as UTF-8 bytes, drops a byte-order mark, caps it at 64 KiB and refuses a
+  deep document plainly, so a Cyrillic handoff passes under any code page (FAA-210).
+
 ## 0.79.1 (2026-11-12)
 
 0.79.0 was tagged and never published: its release run (43176165810) failed two jobs, so `release` and `publish` were
