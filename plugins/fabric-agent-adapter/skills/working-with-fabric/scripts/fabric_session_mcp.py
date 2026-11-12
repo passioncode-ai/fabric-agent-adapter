@@ -269,6 +269,9 @@ def turn_paths(transcript: Any, cwd: Path, until: Optional[float] = None) -> Lis
                 calls.append(block)
     found: List[str] = []
     left = BASH_BYTES
+    # FAA-184: Claude Code keeps the Bash folder between calls while it stays inside the session's folder, so a call is
+    # read against the folder the one before it ended in; one outside, or one not known, is the session's folder again
+    folder = cwd
     for block in reversed(calls):
         if until is not None and time.monotonic() >= until:
             break
@@ -276,11 +279,16 @@ def turn_paths(transcript: Any, cwd: Path, until: Optional[float] = None) -> Lis
         if name in CHANGING_TOOLS:
             value = arguments.get(CHANGING_TOOLS[name])
             named = [os.path.normpath(os.path.join(str(cwd), value))] if isinstance(value, str) and value else []
-        elif name == "Bash" and isinstance(arguments.get("command"), str) and left > 0 \
-                and any(word in arguments["command"].lower() for word in ("cd", "git", "pushd")):  # GIT.EXE on Windows
+        elif name == "Bash" and isinstance(arguments.get("command"), str) \
+                and any(word in arguments["command"].lower() for word in ("cd", "git", "pushd", "popd")):  # GIT.EXE on Windows
+            if left <= 0:
+                folder = cwd  # not read: where it left the shell is not known
+                continue
             command = arguments["command"][:left]
             left -= len(command)
-            named = bash_paths(command, cwd)
+            ends: List[Optional[str]] = []
+            named = bash_paths(command, folder, ends=ends)
+            folder = Path(ends[-1]) if ends and ends[-1] and _inside(ends[-1], cwd) else cwd
         else:
             continue
         for path in named:
@@ -289,6 +297,15 @@ def turn_paths(transcript: Any, cwd: Path, until: Optional[float] = None) -> Lis
                 if len(found) >= MAX_CANDIDATES:
                     return found
     return found
+
+
+def _inside(folder: str, root: Path) -> bool:
+    """Whether `folder` is `root` or under it, as the host's paths compare (case-blind on Windows)."""
+    try:
+        common = os.path.commonpath([os.path.normcase(folder), os.path.normcase(str(root))])
+    except ValueError:  # another drive, or a relative path
+        return False
+    return common == os.path.normcase(str(root))
 
 
 def _existing_folder(path: str) -> Optional[str]:

@@ -1476,6 +1476,34 @@ class OriginNames(unittest.TestCase):
 
 
 class BashPaths(unittest.TestCase):
+    def turn(self, *commands, cwd="/work"):
+        """turn_paths over a turn of Bash calls, in order (FAA-184)."""
+        with tempfile.TemporaryDirectory() as base:
+            transcript = Path(base) / "t.jsonl"
+            transcript.write_text("\n".join(json.dumps(e) for e in [prompt_entry()] + [
+                tool_entry("Bash", command=c) for c in commands]) + "\n")
+            return MCP.turn_paths(str(transcript), Path(cwd))
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX paths")
+    def test_the_folder_a_call_ends_in_is_the_next_calls(self):
+        # FAA-184: Claude Code keeps the Bash folder between calls inside the session's folder, so a relative -C in a
+        # later call is read against the folder an earlier call moved to
+        self.assertEqual(self.turn("cd /work/other", "git -C ../x log"), ["/work/other", "/work/x"])
+        self.assertEqual(self.turn("cd /work/other && make", "ls", "git -C ../x log"), ["/work/other", "/work/x"],
+                         "a call with no cd or git keeps the folder")
+        # a folder outside the session's: Claude Code goes back to the session's folder for the next call
+        self.assertEqual(self.turn("cd /elsewhere/a", "git -C ../x log"), ["/elsewhere/a", "/x"])
+        # an unknown folder (a relative cd, popd) resets to the session's folder
+        self.assertEqual(self.turn("cd /work/other", "cd sub", "git -C ../x log"), ["/work/other", "/x"])
+        self.assertEqual(self.turn("cd /work/other", "popd", "git -C ../x log"), ["/work/other", "/x"])
+        # a cd in a subshell or a pipeline moves nothing past its call
+        self.assertEqual(self.turn("(cd /work/other)", "git -C ../x log"), ["/work/other", "/x"])
+        self.assertEqual(self.turn("cd /work/other | cat", "git -C ../x log"), ["/work/other", "/x"])
+        self.assertEqual(MCP.bash_paths("cd /work/a; cd /work/b", Path("/work"), ends=[]), ["/work/a", "/work/b"])
+        ends = []
+        MCP.bash_paths("cd /work/a; (cd /work/b", Path("/work"), ends=ends)
+        self.assertEqual(ends, [None], "an unclosed subshell: not known")
+
     def test_cd_to_an_absolute_path_and_git_dash_c(self):
         cwd = Path("/work/start")
         got = MCP.bash_paths("cd /a/b && git -C ../c -c core.x=y status; (cd /d) | git --no-pager -C /e log -C "
@@ -1768,7 +1796,7 @@ class TurnRepositories(Base):
         """0.56.0 seam r6: on Windows `GIT.EXE -C` runs git and bash_paths reads it, so the prefilter passes it too."""
         seen = []
         self.write_transcript([prompt_entry(), tool_entry("Bash", command=r"C:\Git\cmd\GIT.EXE -C C:\work status")])
-        with mock.patch.object(MCP, "bash_paths", side_effect=lambda command, cwd: seen.append(command) or []):
+        with mock.patch.object(MCP, "bash_paths", side_effect=lambda command, cwd, ends=None: seen.append(command) or []):
             MCP.turn_paths(str(self.transcript), self.repo)
         self.assertEqual(seen, [r"C:\Git\cmd\GIT.EXE -C C:\work status"])
 

@@ -84,9 +84,12 @@ dropped; a nested group stays in `owner`, and on a self-hosted ssh remote `owner
 before the repository's name, which may hold a user name). The repository of the session's folder when the turn ends (the Stop payload's `cwd`; any checkout of it: a worktree, a clone), a repository whose `origin`
 is missing or does not parse, and a second checkout of one repository are not named; at most 10. No local path leaves the hook; a
 missing or unreadable transcript names none and is no error. The list can miss a repository (FAA-174): in a turn whose
-entries pass 512 KB, an edit that large tool output pushed out of the tail is not named. Until FAA-184 lands it can also
-name a wrong one: Claude Code keeps the Bash folder between calls, and a relative `git -C` in a later call is read
-against the session's folder, not the folder an earlier call moved to. Turn the read off (FAA-160)
+entries pass 512 KB, an edit that large tool output pushed out of the tail is not named. Claude Code keeps the Bash folder between calls while it
+stays inside the session's folder, so each Bash call is read against the folder the one before it left the shell in
+(FAA-184): an absolute `cd` inside the session's folder carries to the next call, and a folder outside it, or one not
+known here (a relative `cd`, `popd`, a call past the cap), is the session's folder again. A `cd` into a folder Claude
+Code allows outside the session's (an added working directory) is read as reset, so a relative `git -C` after it can
+still name a wrong repository. Turn the read off (FAA-160)
 with `FABRIC_SESSION_NO_REPOSITORIES=1` in the environment, or a file named `no-repositories` in the hooks' folder:
 the turn's facts are still sent, without `repositories` (any value of the variable but empty or `0` turns it off; the
 file sits in a cache folder a cleaner may empty, so the variable, set in Claude Code's settings `env`, is the lasting form:
