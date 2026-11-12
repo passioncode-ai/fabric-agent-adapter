@@ -115,6 +115,32 @@ class DashboardLinksTest(unittest.TestCase):
         legacy = 'fabric-dashboards://open?service=example-agent.default'
         self.assertIn(legacy, [v['input'].get('url') for v in groups[0]['links'] if v['expected']])
 
+    def test_the_gate_is_agent_side_and_the_project_pins_its_own_fixture(self):  # FAA-129
+        doc = (SKILLS / 'building-fabric-services/references/dashboard-links.md').read_text(encoding='utf-8')
+        gate = doc.split('## Portable output gate', 1)[1].split('## Degradation', 1)[0]
+        flat = ' '.join(gate.split())
+        for words in ('The gate is **agent-side**', 'never run by that project\'s CI', 'would always be NOT_RUN',
+                      'pins the same negative fixture in its own test suite, without calling the gate'):
+            self.assertIn(words, flat, words)
+        snippet = gate.split('```python', 1)[1].split('```', 1)[0]
+        self.assertNotIn('check_dashboard_link', snippet)
+        open_link = 'fabric-dashboards://service/example-agent.default?path=%2Fdashboard'
+        renderers = {
+            'native': (lambda resolved, host_state: 'Done. Open: ' + resolved['open_link'], True),
+            'raw-http': (lambda resolved, host_state: 'Done. Open: ' + resolved['http_url'], False),
+            'both': (lambda resolved, host_state: resolved['open_link'] + ' or http://localhost:47195/', False),
+            'legacy': (lambda resolved, host_state: open_link + ' fabric-dashboards://open?service=example-agent.default', False),
+        }
+        for name, (render, ok) in renderers.items():
+            with self.subTest(renderer=name):
+                space = {}
+                exec(compile(snippet, 'dashboard-links.md', 'exec'), space)
+                space['render'] = render
+                test = space['RenderedDashboardLinks']('test_rendered_output_has_no_raw_loopback_or_legacy_link')
+                result = unittest.TestResult()
+                test.run(result)
+                self.assertEqual(result.wasSuccessful(), ok, result.failures or result.errors)
+
     def test_shared_payload_is_self_contained_and_identical(self):
         for relative in ['scripts/check_dashboard_link.py', 'references/dashboard-links.md']:
             contents = [(SKILLS / name / relative).read_bytes() for name in ['building-fabric-services', 'creating-fabric-agents', 'adapting-projects-to-fabric']]

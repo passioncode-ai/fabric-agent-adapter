@@ -57,6 +57,8 @@ and say in the report which skill was missing.
 
 No file is created until every row has an answer. An answer of "later" fails the grill.
 
+If your organization keeps a private catalogue of agent templates with an architect, ask it first: it names the template, version, variant and known traps; this skill runs after it.
+
 Once the grill names the capability and its consumer, consult the [agents database](references/agents-database.md): `agents-db.consult` on the
 board (or, with a grant, its scan tool over the source projects), and build from the template it names.
 
@@ -248,7 +250,9 @@ file and a test per line, or `NOT_RUN` where the agent has no such stage.
 Report: capability, consumer, profile with the step-0 grill answers; the knowledge pack
 and which traps became fixtures; created files; contract version and commit; the gate
 table with `PASS`, `FAIL`, `NOT_RUN`, or `NOT_VERIFIED`; remaining placeholders; the
-operator channel answer (step 6); the template it was built from (the database's id and version, the communication template prompt, or none); and the exact next command. Never summarize the outcome as
+operator channel answer (step 6); the template it was built from (the database's id and version, the communication template prompt, or none); for an agent that answers people, one line per item of
+the *Checklist* in [agents that answer people](references/agents-that-answer-people.md), each with a file and a test or `NOT_RUN`, its
+first-reply time measured from the person's message; and the exact next command. Never summarize the outcome as
 "Fabric-compatible" unless every required admission gate passed against the real provider.
 
 ## Agent pages open only in Fabric Dashboards
@@ -262,9 +266,10 @@ host's `open` and `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-o
 `not_installed` host; an installed host that failed to open is reported, never replaced by HTTP.
 Links carry no token or login code.
 
-The agent's `AGENTS.md` carries this as its dashboard rule block, and its checks run the adapter's link gate
-(`scripts/check_dashboard_link.py` from this skill's own directory; it is not copied into the project) on every
-completion and notification action before delivery:
+The agent's `AGENTS.md` carries this as its dashboard rule block; the agent runs the adapter's link gate
+(`scripts/check_dashboard_link.py` from this skill's own directory, an agent-side gate never copied into the project or
+run by its CI) on every completion and notification action before delivery, and the project's own test pins the
+negative fixture:
 [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case.
 Headless agents need no dashboard.
 

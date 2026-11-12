@@ -100,6 +100,7 @@ is unavailable, continue only through local structure and mark exact schema vali
 
 ### 3. Scaffold the provider bundle
 
+If your organization keeps a private catalogue of agent templates with an architect, ask it first: it names the template, version, variant and known traps; this skill runs after it.
 Before scaffolding, ask the [agents database](references/agents-database.md) for an audit of the project
 (`agents-db.audit`) and carry its `optimize` proposals into the completion report.
 Load [provider bundle](references/provider-bundle.md) before creating or mapping files.
@@ -290,9 +291,10 @@ host's `open` and `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-o
 `not_installed` host; an installed host that failed to open is reported, never replaced by HTTP.
 Links carry no token or login code.
 
-The agent's `AGENTS.md` carries this as its dashboard rule block, and its checks run the adapter's link gate
-(`scripts/check_dashboard_link.py` from this skill's own directory; it is not copied into the project) on every
-completion and notification action before delivery:
+The agent's `AGENTS.md` carries this as its dashboard rule block; the agent runs the adapter's link gate
+(`scripts/check_dashboard_link.py` from this skill's own directory, an agent-side gate never copied into the project or
+run by its CI) on every completion and notification action before delivery, and the project's own test pins the
+negative fixture:
 [dashboard links](references/dashboard-links.md) has the block, the gate's input and the remote case.
 Headless agents need no dashboard.
 

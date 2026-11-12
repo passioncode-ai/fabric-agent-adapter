@@ -299,6 +299,14 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
         self.assertIn("reaches back only as far as the producer's feed keeps", reference)
         self.assertNotIn("the template carries", reference)
 
+    def test_the_completion_report_has_a_line_per_checklist_item(self):  # FAA-180 (2)
+        completion = section("creating-fabric-agents", "Completion format")
+        for words in ("for an agent that answers people, one line per item of the *Checklist* in [agents that answer people](references/agents-that-answer-people.md)",
+                      "each with a file and a test or `NOT_RUN`",
+                      "first-reply time measured from the person's message"):
+            self.assertIn(words, completion, words)
+        self.assertIn("## Checklist", text(REFERENCE))
+
     def test_the_daily_report_is_the_contracts_payload(self):  # an-agent-that-answers-people (expected 2); DEC-0144
         # FAA-176 (0.57.0, pin 3830a33): the contract has carried support-quality-daily.schema.json since DEC-0095, and
         # DEC-0144 widened it with a judge's calibration, which a producer carries only once its readers adopted it.

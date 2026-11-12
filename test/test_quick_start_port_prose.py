@@ -1,0 +1,35 @@
+"""FAA-283: the README quick start picks a free port, and where-agents-run.md covers a shared computer and a member VM."""
+from __future__ import annotations
+
+import pathlib
+import re
+import unittest
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+WHERE = ROOT / "plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/where-agents-run.md"
+
+
+class QuickStartPort(unittest.TestCase):
+    def test_the_quick_start_uses_one_free_port_everywhere(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        mcp = readme.split("### MCP", 1)[1].split("```", 2)[1]
+        self.assertIn("PORT=$(python3 -c 'import socket;s=socket.socket();s.bind((\"127.0.0.1\",0));"
+                      "print(s.getsockname()[1])')", mcp)
+        self.assertIn('serve --port "$PORT"', mcp)
+        self.assertIn('register --port "$PORT"', mcp)
+        self.assertIn('"$WORK/mcp.json" "$PORT" <<\'EOF\'', mcp)
+        self.assertIn('"http://127.0.0.1:%s/mcp" % sys.argv[3]', mcp)
+        self.assertIsNone(re.search(r"--port \d|127\.0\.0\.1:\d", mcp), "no port is hard-coded")
+
+    def test_where_agents_run_has_the_shared_computer_and_the_member_vm(self):
+        text = " ".join(WHERE.read_text(encoding="utf-8").split())
+        for words in ("| **One computer, a personal and an organization account** |", "(contract DEC-0154",
+                      "its own port recorded per account", "(HA-1)", "(HA-2)", "(HA-3)",
+                      "| **A member's virtual machine** |", "DEC-0154 HA-4", "its callers T2, never token-free",
+                      "a port recorded per account, the listener's owner checked before a token is sent"):
+            self.assertIn(words, text, words)
+        self.assertNotIn("\u2014", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

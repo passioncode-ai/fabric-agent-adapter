@@ -204,18 +204,20 @@ With Python 3.9+ and the Claude Code CLI, in a throwaway directory and a tempora
 ```bash
 KIT=plugins/fabric-agent-adapter/skills/building-fabric-services/scripts   # or ~/.agents/skills/building-fabric-services/scripts
 DATA=$(mktemp -d); SERVICES=$(mktemp -d); WORK=$(mktemp -d)
-python3 "$KIT/sample_service.py" serve --port 47190 --data-dir "$DATA" &
-python3 "$KIT/sample_service.py" register --port 47190 --data-dir "$DATA" --services-dir "$SERVICES"
+# A free loopback port, so the sample never collides with a service already running here.
+PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')
+python3 "$KIT/sample_service.py" serve --port "$PORT" --data-dir "$DATA" &
+python3 "$KIT/sample_service.py" register --port "$PORT" --data-dir "$DATA" --services-dir "$SERVICES"
 # The probe exits 0 (no FAIL); only then is the service registered for one client run (listener.owner proves the port
 # is this account's, and the client cannot check it). The token goes in a header, never in argv.
 # On macOS 27.2 run these with Apple's /usr/bin/python3: an ad-hoc-signed Python, such as Homebrew's, sees no other
 # process's sockets (FAA-272).
 python3 "$KIT/check_service.py" sample --services-dir "$SERVICES" && \
-python3 - "$DATA/service.token" "$WORK/mcp.json" <<'EOF'
+python3 - "$DATA/service.token" "$WORK/mcp.json" "$PORT" <<'EOF'
 import json, os, sys
 token = open(sys.argv[1]).read().strip()
 with os.fdopen(os.open(sys.argv[2], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
-    json.dump({"mcpServers": {"sample": {"type": "http", "url": "http://127.0.0.1:47190/mcp",
+    json.dump({"mcpServers": {"sample": {"type": "http", "url": "http://127.0.0.1:%s/mcp" % sys.argv[3],
                "headers": {"Authorization": "Bearer " + token}}}}, f)
 EOF
 (cd "$WORK" && claude -p "Call the tool mcp__sample__sample_echo with text 'ping' and reply with only the text it returns." \
@@ -230,6 +232,8 @@ the CLI connected to the sample over streamable HTTP, called `sample.echo` and p
 ([record](docs/evidence/runs/2026-11-08-0.77.0-quick-start.md)). The probe prints one line per rule
 (`PASS`, `FAIL` or `NOT_RUN` with its evidence) and exits 1 on any `FAIL`; run it against your
 own service by its id once its installer has written the descriptor.
+The free-port line (FAA-283) was run again on 2026-11-12 from this repository's kit with Claude Code 2.1.299 and
+Apple's `/usr/bin/python3`: a port the system chose, 44 rules, 0 FAIL, `listener.owner` PASS, and `ping`.
 `FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py` repeats the connection check
 (every sample tool listed, no model call) in the test suite.
 

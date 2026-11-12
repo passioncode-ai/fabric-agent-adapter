@@ -25,6 +25,16 @@ unless addressed (`/command@ThisBot`, a reply to its own message or a press of i
 bare `/command` in a group is not addressed), and a channel nobody receives on is `degraded`
 (`receiver-missing`). Say so in the proposal when the operator means to bind a shared group.
 
+Where the estate runs a messaging gateway service the operator chose for sending (one service every
+agent sends through, holding its own grants and allowlist), the channel sends through that gateway
+and does not call the messenger itself; the agent's own bot above is the contract's form (DEC-0034,
+OC-11) and the form used where no such gateway runs. A bot token read by polling (Telegram
+`getUpdates`) has exactly one poller across every machine: a second poller on the same token gets
+`409 Conflict` and the two take each other's updates. Check placement before polling: the instance
+on the machine the estate's placement record names for the agent polls, an instance on any other
+machine does not poll and reports `degraded` with the reason (`poller-elsewhere`), and a test starts a
+second instance placed elsewhere and sees it stay off the token.
+
 Record the answer (`accepted`, `declined` or `later`) in the agent's state and in its conformance
 report, and do not ask again; an agent that serves `surfaces.operatorChannel` also shows it as
 `proposal` in its status document. Creating the bot and putting its token into the secret store
@@ -57,9 +67,9 @@ For a PassionCode.ai repository, the agent's repository follows the organization
   and a `CLAUDE.md` whose first line is `@AGENTS.md`.
 
 Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
-(pages open only in Fabric Dashboards; the block is in `references/dashboard-links.md`), and its
-checks run the adapter's link gate (`scripts/check_dashboard_link.py` from the skill's own directory, not a copy in
-the project).
+(pages open only in Fabric Dashboards; the block is in `references/dashboard-links.md`); the agent runs the
+adapter's link gate (`scripts/check_dashboard_link.py` from the skill's own directory, agent-side, never a copy in the
+project or a step of its CI), and the project's own test pins the gate's negative fixture (the same reference).
 
 org-index `scripts/check_format.py` reports 0 findings for it before it is called done. An agent
 someone builds for themselves is not a PassionCode.ai repository: its licence is its owner's

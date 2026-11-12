@@ -278,6 +278,15 @@
         "names the template in the completion report, or says none was found",
         "an agent that answers store reviews also reads references/communication-agent-template.md and keeps its first-release parts (turn record, support.quality_daily) whatever the database template says"
       ]
+    },
+    {
+      "id": "ask-the-organization-catalogue-first",
+      "request": "Create a fabric-compatible agent that summarises our sales calls. Our organization keeps a private catalogue of agent templates with an architect.",
+      "expected": [
+        "at step 0, before the rest of the grill and before any file, asks the organization's catalogue first (its architect) for the template, its version, its variant and the known traps",
+        "runs the grill and the build after that ask, building from the template the answer names when it has come, and records the template's id and version (or says no answer came)",
+        "names no private catalogue, repository or person in the agent's public files"
+      ]
     }
   ]
 }
