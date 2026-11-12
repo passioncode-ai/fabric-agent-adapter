@@ -181,6 +181,9 @@ jobs:
       - name: The session hooks on Windows (FAA-72)
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_session.py" -v
+      - name: The dispatched session's hooks and gate-id on Windows (FAA-236)
+        if: ${{ !cancelled() }}
+        run: python -m unittest discover -s test -p "test_fabric_session_dispatch.py" -v
       - name: The source check on Windows (FAA-188)
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_source_check.py" -v
