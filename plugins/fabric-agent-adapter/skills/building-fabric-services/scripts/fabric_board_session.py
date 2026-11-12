@@ -3,7 +3,6 @@ accept the exact digest, effect, progress, complete; stop when fenced). The sess
 in fabric_board_link and are re-exported here. Part of the board connector (FAA-65, layer L4)."""
 from __future__ import annotations
 
-import inspect
 import json
 import random
 import re
@@ -28,6 +27,8 @@ from fabric_board_link import (  # noqa: E402,F401 - re-exported: callers import
     BoardSession,
     Checkpoint,
     PERSONAL_BOARD,
+    notice_subject as _notice_subject,
+    takes_subject as _takes_subject,
 )
 from fabric_board_slots import (  # noqa: E402,F401 - the slot records (FAA-155, FAA-163); the constants re-exported
     HOLD_RETRY_MAX_SECONDS,
@@ -60,8 +61,6 @@ TERMINAL = frozenset(["completed", "failed_known", "cancelled", "expired"])
 NOT_OURS = frozenset(["queued", "claimed", "answered"])
 
 
-
-
 class WorkContext:
     """What a handler may do while it works: `progress(note)` posts a note on the request's thread (and renews the
     lease); `begin_effect(summary)` must be called (and must return) before the handler spends or acts outside
@@ -70,12 +69,12 @@ class WorkContext:
     `mandate_covers(call)` whether it covers a call (`mandate_covers`' answer), None when none travelled."""
 
     def __init__(self, responder: "Responder", entry: Dict[str, Any], mandate: Optional[Dict[str, Any]] = None,
-                 caller: Optional[str] = None):
-        self._responder, self._entry, self.mandate, self._caller = responder, entry, mandate, caller
+                 caller: Optional[str] = None, caller_agent: Optional[str] = None):
+        self._responder, self._entry, self.mandate, self._caller, self._agent = responder, entry, mandate, caller, caller_agent
         self.stopped = threading.Event()
 
     def mandate_covers(self, call: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        return _link.covers(self.mandate, call, self._responder.agent_id, self._responder.wall, self._caller)
+        return _link.covers(self.mandate, call, self._responder.agent_id, self._responder.wall, self._caller, self._agent)
 
     def progress(self, note: Optional[str] = None) -> None:
         if self.stopped.is_set():
@@ -100,33 +99,6 @@ class _Work:
 Handler = Callable[[BoardRequest, WorkContext], Dict[str, Any]]
 
 
-
-def _notice_subject(value: Dict[str, Any], project: str, episode: Optional[str] = None) -> Dict[str, str]:
-    """A notice's subject (`{type, id}`): its request, else its capability, else its episode (a cause such as a block's
-    code, so two causes are two episodes for a host, seam r31), else the Project."""
-    for kind, given in (("request", value.get("request")), ("capability", value.get("capability")), ("episode", episode)):
-        if isinstance(given, str) and 0 < len(given) <= 128:
-            return {"type": kind, "id": given}
-    return {"type": "project", "id": project}
-
-
-def _takes_subject(emit: Callable[..., Any]) -> bool:
-    """Whether an emit's signature names a `subject` parameter, as JsonlEventLog.append does. Any other emit (one with
-    only **kwargs, which may forward them to a sink without it or set its own, or one whose signature cannot be read)
-    is called as 0.55.0 called it, without one (0.56.0 unit r33). A subject already bound into the emit, as with
-    functools.partial(log.append, subject=...), stands.
-
-    The signature is the emit's own, not a wrapped function's: a functools.wraps forwarder that sets its own subject
-    would otherwise be passed a second one (0.56.0 unit r34). Nothing here raises, so a notice never stops the
-    responder."""
-    try:
-        params = inspect.signature(emit, follow_wrapped=False).parameters.values()
-        return any(p.name == "subject" and p.kind is not inspect.Parameter.VAR_KEYWORD
-                   and (p.default is inspect.Parameter.empty or p.default is None) for p in params)
-    except Exception:  # noqa: BLE001 - an unreadable signature (or a default that raises) is called without one
-        return False
-
-
 class Responder(SlotKeeper):
     """One service's responder for one Project and one or more capabilities, one request at a time.
 
@@ -142,9 +114,11 @@ class Responder(SlotKeeper):
                  emit: Optional[Callable[..., Any]] = None, service: str = "service",
                  now: Callable[[], float] = time.monotonic, rand: Callable[[], float] = random.random,
                  spawn: Optional[Callable[[Callable[[], None]], Any]] = None, session_factory: Optional[Callable[..., BoardSession]] = None,
-                 agent_id: Optional[str] = None, mandate_from: Any = None, wall: Callable[[], float] = time.time):
-        if admit is None or handler is None:
-            raise BoardError("invalid_arguments", "A responder needs the service's own input gate (admit) and a handler.")
+                 agent_id: Optional[str] = None, mandate_from: Any = None, wall: Callable[[], float] = time.time,
+                 identify_agent: Optional[Callable[[Dict[str, Any]], Optional[str]]] = None):
+        if admit is None or handler is None or not (identify_agent is None or callable(identify_agent)):
+            raise BoardError("invalid_arguments", "A responder needs the service's own input gate (admit) and a handler; "
+                             "identify_agent, when given, is a function of the sender (FAA-135).")
         caps = list(capabilities)
         if not caps or any(not isinstance(c, str) or not _CAPABILITY.fullmatch(c) for c in caps) or len(set(caps)) != len(caps):
             raise BoardError("invalid_arguments", "Name each capability once, [a-z][a-z0-9._-]{1,127}.")
@@ -152,8 +126,10 @@ class Responder(SlotKeeper):
             raise BoardError("invalid_arguments", "%s is a Project's primary responder's, a session's: a service answers "
                              "the capabilities it declares (DEC-0140 PR-1)." % _fs.PRIMARY_CAPABILITY)
         self.hub, self.project = hub, _hub._project(project_id)
-        #: FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; None reads none).
+        #: FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; None reads none), and
+        #: bind its chain with the agent id identify_agent names for the sender (asked only when a mandate travelled).
         self.mandate_from, self.agent_id, self.wall = _link.mandate_options(agent_id, mandate_from), agent_id, wall
+        self.identify_agent = identify_agent
         self.capabilities = caps
         self.credential_file, self.handler, self.admit, self.observe = Path(credential_file), handler, admit, observe
         self.checkpoint = Checkpoint(Path(checkpoint_file))
@@ -759,7 +735,8 @@ class Responder(SlotKeeper):
         if unread:  # by its code alone: the block holds the operator's words
             self._emit("board.request.mandate_unread", "warning", "Request %s carries a mandate the kit does not read (%s); "
                        "it is worked without one." % (entry["request"], unread), request=entry["request"], reason=unread)
-        ctx = WorkContext(self, entry, mandate, request.sender.get("project") if isinstance(request.sender, dict) else None)
+        sender = request.sender if isinstance(request.sender, dict) else {}
+        ctx = WorkContext(self, entry, mandate, sender.get("project"), _link.sender_agent(self.identify_agent, sender, mandate))
         work = _Work(entry, request, ctx)
         work.renewed_at = self.now()
         self.current = work

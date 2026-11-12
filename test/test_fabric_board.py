@@ -2504,6 +2504,13 @@ class SampleWiringTests(unittest.TestCase):
             # two blocking causes are two subjects, so a host shows the second within the first's cooldown
             subjects = [session._notice_subject({}, PROJECT, code) for code in ("no-epoch", "checkpoint")]
             self.assertEqual(subjects, [{"type": "episode", "id": "no-epoch"}, {"type": "episode", "id": "checkpoint"}])
+            # FAA-187 (26): a positional-only `subject` cannot take the keyword the responder passes, so such an emit is
+            # called without one (the notice goes); positional-or-keyword and keyword-only subjects take it
+            namespace: dict = {}
+            exec("def positional(kind, level, text, subject=None, /, **kw):\n    return kw\n", namespace)
+            self.assertFalse(session._takes_subject(namespace["positional"]))
+            self.assertTrue(session._takes_subject(lambda kind, level, text, subject=None: None))
+            self.assertTrue(session._takes_subject(lambda kind, level, text, *, subject=None: None))
         # The longest notice keeps its last instruction with the longest capability a Project accepts (128 characters).
         slots = (scripts / "fabric_board_slots.py").read_text(encoding="utf-8")
         start = slots.index('"The %s slot on this Project moved')

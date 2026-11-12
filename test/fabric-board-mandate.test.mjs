@@ -74,6 +74,27 @@ test('FAA-135: a trusted request from a declared Project carries its mandate', a
   assert.equal(outside.data.detail, 'outside-mandate: capability');
 });
 
+test('FAA-135: identifyAgent binds the sender\'s agent id; null binds nothing, anything else fails closed', async (t) => {
+  const heard = [];
+  const cases = [[(sender) => { heard.push(sender); return 'lead-agent'; }, 'ok'], [() => null, 'ok'], [() => undefined, 'ok'],
+    [() => 'other-agent', 'mandate-not-for-this-call'], [() => 'Lead Agent', 'mandate-not-for-this-call'],
+    [() => { throw new Error('the agent registry is down'); }, 'mandate-not-for-this-call']];
+  for (const [identifyAgent, want] of cases) {
+    const h = await fakeHub(t);
+    const [got, covered] = await h.runOne(body(JSON.stringify(mandate())), { identifyAgent });
+    assert.notEqual(got, null);
+    assert.equal(covered.ok ? 'ok' : covered.data.detail, want, String(identifyAgent));
+  }
+  assert.equal(heard[0].project, OTHER_PROJECT);
+  assert.deepEqual([heard[0].principal.kind, heard[0].principal.provenance], ['agent', 'trusted']);
+  const asked = [];
+  const h = await fakeHub(t);
+  const [none] = await h.runOne(body('{"frames": 24}'), { identifyAgent: (sender) => { asked.push(sender); return 'lead-agent'; } });
+  assert.equal(none, null);
+  assert.deepEqual(asked, [], 'asked only when a mandate travelled');
+  assert.throws(() => new fb.Responder(h.options({ identifyAgent: 'lead-agent' })), (e) => e.code === 'invalid_arguments');
+});
+
 test('FAA-135: the personal board takes any trusted sender', async (t) => {
   const h = await fakeHub(t);
   const [, covered] = await h.runOne(body(JSON.stringify(mandate())), { mandateFrom: fb.PERSONAL_BOARD });

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { HubError, MCP_PROTOCOL_VERSION, postMcp, toolAnswer } from './fabric-hub.mjs';
 import { atomicWrite, ensurePrivateDir } from './fabric-service.mjs';
 import { BoardError, RESPOND_TOOLS, isObj, refusalProblems } from './fabric-board-shapes.mjs';
-import { UNREADABLE_PROJECT, mandateSpend } from './fabric-interop-rules.mjs'; // FAA-139
+import { UNREADABLE_AGENT, UNREADABLE_PROJECT, identifiedAgent, mandateSpend } from './fabric-interop-rules.mjs'; // FAA-139, FAA-135
 import { isAgentId, mandateCovers } from './fabric-mandate.mjs';
 import { formatRfc3339 } from './fabric-time.mjs';
 
@@ -263,7 +263,7 @@ export function readMandate(request, mandateFrom, agentId) {
  * absent (an inherited, non-enumerable, getter or Proxy member included); the rest of the call is never touched. A
  * getter whose value changes is answered on its one read.
  */
-export function covers(mandate, call, agentId, wall, caller = null) {
+export function covers(mandate, call, agentId, wall, caller = null, callerAgent = null) {
   if (mandate == null || agentId == null) return null;
   if (call !== null && typeof call === 'object' && !Array.isArray(call)) {
     const read = {};
@@ -284,8 +284,25 @@ export function covers(mandate, call, agentId, wall, caller = null) {
   } catch { // finite but outside the dates a clock can name
     now = '';
   }
-  const answer = mandateCovers({ mandate, tier: 'T1', now, self: agentId, call });
+  const inputs = { mandate, tier: 'T1', now, self: agentId, call };
+  if (callerAgent !== null && callerAgent !== undefined) inputs.callerAgent = callerAgent; // FAA-135
+  const answer = mandateCovers(inputs);
   return answer.recordAs ? { ok: true, recordAs: { ...answer.recordAs, caller } } : answer;
+}
+
+/**
+ * FAA-135: the agent id the service's identifyAgent(sender) names for a request's sender (the board's verified
+ * `{project, principal}`), read as identifiedAgent reads a hook's answer: null or undefined is none, an agent id is that
+ * id, anything else, or a hook that throws, is UNREADABLE_AGENT, which no chain holds. Asked only when a mandate
+ * travelled (`mandate` not null).
+ */
+export function senderAgent(identifyAgent, sender, mandate = true) {
+  if (identifyAgent == null || mandate == null) return null;
+  try {
+    return identifiedAgent(identifyAgent(sender));
+  } catch {
+    return UNREADABLE_AGENT; // the service's own hook: fail closed
+  }
 }
 
 /** The responder's opt-in, checked: answers `mandateFrom` as the responder keeps it (a Set or the string). */

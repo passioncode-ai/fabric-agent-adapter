@@ -68,6 +68,38 @@ class BoardMandateTests(Conversation):
         self.assertFalse(outside["ok"])
         self.assertEqual(outside["data"]["detail"], "outside-mandate: capability")
 
+    def test_identify_agent_binds_the_senders_agent_id(self):
+        """FAA-135: identify_agent(sender) names the agent id of the request's sender the service authenticated (the
+        board's trusted principal); the mandate's chain must hold it before this agent. None binds nothing, as before;
+        an id the registry refuses, or a hook that raises, binds an id no chain holds (fail closed)."""
+        heard = []
+
+        def boom(sender):
+            raise RuntimeError("the agent registry is down")
+        cases = [(lambda sender: heard.append(sender) or "lead-agent", "ok"), (lambda sender: None, "ok"),
+                 (lambda sender: "other-agent", "mandate-not-for-this-call"),
+                 (lambda sender: "Lead Agent", "mandate-not-for-this-call"), (boom, "mandate-not-for-this-call")]
+        for hook, want in cases:
+            with self.subTest(want=want, hook=hook):
+                self.seen.clear()
+                self.tearDown()
+                self.setUp()
+                got, covered, _ = self.run_one(body(json.dumps(mandate())), identify_agent=hook)
+                self.assertIsNotNone(got)
+                self.assertEqual("ok" if covered.get("ok") else covered["data"]["detail"], want)
+        self.assertEqual(heard[0]["project"], OTHER_PROJECT)
+        self.assertEqual((heard[0]["principal"]["kind"], heard[0]["principal"]["provenance"]), ("agent", "trusted"))
+
+    def test_identify_agent_is_asked_only_when_a_mandate_travelled(self):
+        heard = []
+        got, covered, _ = self.run_one(body('{"frames": 24}'), identify_agent=lambda sender: heard.append(sender) or "lead-agent")
+        self.assertIsNone(got)
+        self.assertEqual(heard, [])
+
+    def test_identify_agent_must_be_callable(self):
+        with self.assertRaises(fb.BoardError):
+            self.responder(agent_id="example-agent", mandate_from={OTHER_PROJECT}, identify_agent="lead-agent")
+
     def test_the_personal_board_takes_any_trusted_sender(self):
         got, covered, _ = self.run_one(body(json.dumps(mandate())), mandate_from="personal-board")
         self.assertTrue(covered["ok"])

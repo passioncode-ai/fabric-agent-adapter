@@ -145,7 +145,12 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   spend; all five are read up front, whatever the scope limits, so a member that raises raises to the handler (in
   Python a `KeyError` reads as not named), and a Python mapping's default, a `defaultdict`'s
   included, is read as named, the `defaultdict` gaining the key): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
-  board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
+  board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it), unless the
+  service passes `identify_agent=` (Node `identifyAgent`, FAA-135): a function of the request's sender (`{project,
+  principal}`, as the board verified it) answering the agent id the service authenticates for it, or None; asked only
+  when a mandate travelled, its agent id must be the one before `agent_id` in the chain, and an id the registry
+  refuses, an answer that is not a string or a hook that raises fails closed (`mandate-not-for-this-call`), as
+  [interop](interop.md) reads `identify_agent`; and the
   responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`; one that returns a value
   that is not a finite number answers `{"fault": "now-unreadable"}`; a clock that raises passes its error to the handler). It answers `{"ok": True, "recordAs": {by, via: "mandate", task,
   chain, caller}}` (`caller` the sender Project, as MD-3 records it; a sender that names no Project is never read), a
@@ -411,7 +416,7 @@ account's does, where limited query access alone would have read it as running (
 message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,
-admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time)`
+admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time, identify_agent=None)`
 with `step()`, `run(stop, drain)`, `shutdown(drain)`, `take_back(capability)`; `WorkContext.progress(note)`,
 `.begin_effect(summary)`, `.stopped`, `.mandate`, `.mandate_covers(call)`; `PERSONAL_BOARD`; `BoardSession(grant)`;
 `Checkpoint(path)`; `comms_canonical(value)`, `comms_digest(operation, value)`, `receipt_problems(value, op)`,
@@ -422,4 +427,4 @@ effect_began)`, `self_check()`; `BoardError`, `Stopped`.
 Node: the same names in camelCase (`locateHub(root, {alive, estate, now})`, `new HubClient(root, {alive, timeout,
 estate, post})`, `new Responder({...})` with async `step()`, `run({signal, drain})`, `shutdown(drain)`,
 `takeBack(capability)`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`, `ctx.mandate`, `ctx.mandateCovers(call)`;
-the options `agentId`, `mandateFrom` and `wall` (milliseconds); `selfCheck()`). Both kits read and write the same checkpoint file.
+the options `agentId`, `mandateFrom`, `wall` (milliseconds) and `identifyAgent`; `selfCheck()`). Both kits read and write the same checkpoint file.
