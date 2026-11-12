@@ -121,6 +121,11 @@ test('JwksCache follows DL-15: ten minutes, an unknown kid re-read at most once 
   const file = path.join(tempDir('jwks-'), 'jwks.json');
   fs.writeFileSync(file, JSON.stringify(V.jwks));
   assert.deepEqual(await new d.JwksCache(file).get('estate-new'), V.jwks);
+  // FAA-194 (39): NaN and Infinity are no JSON; the Python twin refuses them as JSON.parse does.
+  for (const constant of ['NaN', 'Infinity', '-Infinity']) {
+    fs.writeFileSync(file, `${JSON.stringify(V.jwks).slice(0, -1)}, "x": ${constant}}`);
+    assert.equal(await new d.JwksCache(file).get('estate-new'), null, constant);
+  }
 });
 
 test('the gate refuses in the DL-19 shape and never echoes the token', async () => {

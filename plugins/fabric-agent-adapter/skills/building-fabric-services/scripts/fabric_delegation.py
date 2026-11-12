@@ -734,7 +734,7 @@ def _fetch(source: str) -> Any:
                     body += chunk
             if deadline["fired"] or time.monotonic() > deadline["end"]:
                 raise TimeoutError("the key set did not arrive within %s s" % JWKS_FETCH_SECONDS)
-            return json.loads(body[:65536])
+            return json.loads(body[:65536], parse_constant=_no_constant)  # NaN is no JSON, as JSON.parse reads it (FAA-194)
         except urllib.error.HTTPError as exc:
             exc.close()
             raise
@@ -745,7 +745,7 @@ def _fetch(source: str) -> Any:
         finally:
             if deadline["timer"] is not None:
                 deadline["timer"].cancel()
-    return json.loads(Path(source).expanduser().read_text())
+    return json.loads(Path(source).expanduser().read_text(), parse_constant=_no_constant)
 
 
 class JwksCache:

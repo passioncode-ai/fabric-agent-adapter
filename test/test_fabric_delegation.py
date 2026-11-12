@@ -326,6 +326,14 @@ class JwksCacheTests(unittest.TestCase):
             self.assertEqual(dl.JwksCache(str(path)).get("estate-new"), VECTORS["jwks"])
             path.write_text("[]")
             self.assertIsNone(dl.JwksCache(str(path)).get("estate-new"))
+            # FAA-194 (39): NaN and Infinity are not JSON; the Node twin's JSON.parse refuses them, so this kit does too.
+            for constant in ("NaN", "Infinity", "-Infinity"):
+                with self.subTest(constant=constant):
+                    keys = json.loads(json.dumps(VECTORS["jwks"]))
+                    path.write_text(json.dumps(keys)[:-1] + ', "x": %s}' % constant)
+                    with self.assertRaises(ValueError):
+                        dl._fetch(str(path))
+                    self.assertIsNone(dl.JwksCache(str(path)).get("estate-new"))
 
 
 class GateTests(unittest.TestCase):
