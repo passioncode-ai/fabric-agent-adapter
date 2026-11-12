@@ -36,7 +36,10 @@ const instant = (value, name) => {
 const reasonOk = (reason, what) => {
   if (!HOLD_REASONS.includes(reason)) throw new ServiceError(`A ${what}'s reason is one of ${HOLD_REASONS.join(', ')}.`);
 };
-const squash = (text) => String(text).split(/\s+/).filter(Boolean).join(' ');
+// One run of ECMAScript's whitespace, written out as fabric_secrets.JS_SPACE is, the class both twins squash with
+// (FAA-316): Python's str.split() also takes U+001C to U+001F and U+0085 and not U+FEFF.
+const SPACES = /[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+/g;
+const squash = (text) => String(text).replace(SPACES, ' ').replace(/^ | $/g, '');
 
 /** A held job's statusMessage; the message is shortened, never refused, to fit 500 characters. */
 export function waitingMessage(reason, since, until = null, message = null) {
@@ -50,7 +53,7 @@ export function waitingMessage(reason, since, until = null, message = null) {
     const squashed = squash(message);
     const room = MAX_STATUS_MESSAGE - head - codePoints(text) - ': '.length;
     if (squashed && room > 0) {
-      text += ': ' + (codePoints(squashed) <= room ? squashed : [...squashed].slice(0, room - 3).join('').trimEnd() + '...');
+      text += ': ' + (codePoints(squashed) <= room ? squashed : [...squashed].slice(0, room - 3).join('').replace(/ $/, '') + '...');
     }
   }
   return pauseMessage(until === null ? { text } : { resetsAt: until, text });
@@ -86,7 +89,7 @@ export function holdSentence(caller, work, reason, until) {
 }
 
 function text(value, name, high = 200) {
-  if (typeof value !== 'string' || !value.trim() || value.length > high) throw new ServiceError(`${name} is a text of 1 to ${high} characters.`);
+  if (typeof value !== 'string' || !squash(value) || value.length > high) throw new ServiceError(`${name} is a text of 1 to ${high} characters.`);
   if (secretValue(value)) throw new ServiceError(`${name} looks like a credential; a hold names callers and work, never a secret.`);
   return squash(value);
 }
