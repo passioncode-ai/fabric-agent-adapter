@@ -105,7 +105,8 @@ service. Load it after the stylesheet, with ids only:
   Fabric* on a Russian page, or the page's `data-label-open`);
   `--ink` on `--panel` with an `--edge` boundary, the pairs the themes are measured on.
 - **Links (FL-1…FL-6):** built with the kit's port of the contract's `buildFabricLink`; a value outside the grammar
-  (or one shaped like a credential) means no button, never a bad link. A press opens a view in Fabric and starts
+  (or one shaped like a credential, by the contract's DEC-0151 detector as the kit's `fabric-secrets.mjs` reads it, since
+  1.1.7) means no button, never a bad link. A press opens a view in Fabric and starts
   nothing (FB-8).
 - **The host (FB-6):** when the host's `fabric_button` cookie says `owner=host`, the page hides its own button.
 - **Fabric absent (FB-5):** when the cookie says `fabric=absent`, or `data-fabric="absent"`, or when the page is still

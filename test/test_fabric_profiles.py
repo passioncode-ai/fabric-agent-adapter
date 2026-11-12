@@ -20,6 +20,21 @@ check = load("check_service")
 VECTORS = json.loads((Path(__file__).resolve().parent / "fixtures/contract/profile-vectors.json").read_text())
 
 
+#: FAA-309: a URL whose host or port `new URL` refuses is no URL, in both twins (fabric-profiles.test.mjs holds the same
+#: list, measured with Node's own `new URL`): its user information and parameters are not read, as the Node twin reads
+#: them; the host goes through the IDNA reading fabric_connections took in FAA-98.
+URL_HOSTS = tuple(("secret_url", value, expected) for value, expected in (
+    ("https://u:pw@ex\u00a0ample.com/", False), ("https://u:pw@b\u00fccher.example/", True),
+    ("https://h.example\u00a0/?token=abc", False), ("https://u:pw@ex%C2%A0ample.com/", False),
+    ("https://u:pw@h:99999/", False), ("https://u:pw@/x", False), ("https://u:pw@h:8a/", False),
+    ("foo://u:pw@h\u00a0/", True), ("foo://u:pw@h x/", False), ("file://ex\u00a0ample/x?token=abc", False),
+    ("https:u:pw@ex\u00a0ample.com", False), ("https://u:pw@[::1/", False),
+    ("https://u:pw@\uff11\uff12\uff17.\uff10.\uff10.\uff11/", True), ("https://u:pw@1.2.3.999/", False),
+    ("foo://u:pw@[zz]/", False), ("foo://u:pw@:80/", False), ("foo://:@/?token=abc", False), ("https://u:pw@h:/", True),
+    ("https://u:pw@%zz/", False), ("https://u:pw@h%41/", True), ("https://u:pw@a\u200db/", False),
+    ("https:///?token=abc", False), ("https://u:pw@[::1]:8080/", True)))
+
+
 def decode(text):
     return bytes.fromhex(text).decode("utf-8")
 
@@ -75,7 +90,7 @@ class SecretShapeTests(unittest.TestCase):
                  ("secret_url", "https://h.example/?q=caf\u00e9", False),
                  # unit r9: file is a special scheme too, so its query encodes `'`
                  ("secret_url", "file:///x?x=%zz'" + ("A1b" * 13)[:38], True),
-                 ("secret_url", "FILE://h/x?x=%zz'" + ("A1b" * 13)[:38], True))
+                 ("secret_url", "FILE://h/x?x=%zz'" + ("A1b" * 13)[:38], True)) + URL_HOSTS
         for module in (secrets_mod, adapting):
             for name, value, expected in cases:
                 with self.subTest(name, value=ascii(value)[:30], module=module.__name__):

@@ -8,7 +8,18 @@
     {"input": {"reason": "money", "since": "2026-11-12T09:00:00Z", "message": "  the month's   USD 100 is spent  "},
      "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z: the month's USD 100 is spent"},
     {"input": {"reason": "caller-share", "since": "2026-11-12T09:00:00Z", "until": "2026-11-12T10:00:00Z", "message": ""},
-     "statusMessage": "quota-exhausted until 2026-11-12T10:00:00Z: waiting caller-share since 2026-11-12T09:00:00Z"}
+     "statusMessage": "quota-exhausted until 2026-11-12T10:00:00Z: waiting caller-share since 2026-11-12T09:00:00Z"},
+    {"about": "FAA-316: ECMAScript's whitespace in both twins; U+001C is no space and stays",
+     "input": {"reason": "money", "since": "2026-11-12T09:00:00Z", "message": "a\u001cb  c"},
+     "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z: a\u001cb c"},
+    {"about": "FAA-316: U+0085 is no space and stays",
+     "input": {"reason": "money", "since": "2026-11-12T09:00:00Z", "message": "\u0085a\u0085 b\u0085"},
+     "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z: \u0085a\u0085 b\u0085"},
+    {"about": "FAA-316: U+FEFF is a space and squashes; a message of it alone is none",
+     "input": {"reason": "money", "since": "2026-11-12T09:00:00Z", "message": "\ufeffa\ufeff\ufeffb\ufeff"},
+     "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z: a b"},
+    {"input": {"reason": "money", "since": "2026-11-12T09:00:00Z", "message": "\ufeff"},
+     "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z"}
   ],
   "refuse": [
     {"reason": "rate", "since": "2026-11-12T09:00:00Z"},

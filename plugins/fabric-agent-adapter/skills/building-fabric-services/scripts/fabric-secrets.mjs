@@ -122,7 +122,8 @@ export function repositoryPassword(value) {
 
 // A repository's parameters, read as fabric_secrets.secret_url reads them, by hand: `new URL`
 // refuses a host it cannot parse and a special scheme written without `//` (`https:host/r?access_token=...`), where
-// the Python twin still reads them (0.62.0 readings 8 and 9, FAA-200 (17)).
+// the Python twin's repository_credential reads them too (0.62.0 readings 8 and 9, FAA-200 (17)); its secret_url, like
+// secretUrl, refuses such a URL since FAA-309.
 function repositoryParts(head, tail) {
   const text = tail.replace(/[\x00-\x20]+$/, '').replace(/[\t\n\r]/g, '');
   const hash = text.indexOf('#');

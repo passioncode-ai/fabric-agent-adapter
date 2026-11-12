@@ -723,6 +723,41 @@ class DocumentTests(unittest.TestCase):
                     if want == "FAIL" and len(loaded) == 2:
                         self.assertIn("two copies", verdict["evidence"])
 
+    def test_the_second_copy_of_a_launch_daemon_is_looked_for_in_its_user_names_gui_domain(self):
+        """FAA-317: a LaunchDaemon whose UserName is another account has its leftover LaunchAgent in that account's
+        gui/<uid>; the probe asks there first, then in its own gui/<uid>. Every launchctl call is a fake."""
+        rules = load("check_service_rules")
+        sup = sys.modules["fabric_supervisors"]
+        own = "gui/%d" % getattr(os, "getuid", lambda: 0)()
+        named = "gui/%d" % 7777
+        for loaded, want in (({named}, named), ({own}, own), (set(), None)):
+            asked = []
+
+            def launchctl(argv, **kw):
+                asked.append(argv[2])
+                return subprocess.CompletedProcess(argv, 0 if argv[2].rsplit("/", 1)[0] in loaded else 113, "", "")
+            with self.subTest(loaded=sorted(loaded)), \
+                    mock.patch.object(sup, "_account_uid", side_effect=lambda name: 7777 if name == "agentuser" else None), \
+                    mock.patch.object(rules.subprocess, "run", side_effect=launchctl):
+                self.assertEqual(rules.other_domain_copy("a.b.c", "system", "agentuser"), want)
+                self.assertEqual(asked[0], named + "/a.b.c", "the UserName's domain first")
+        with mock.patch.object(sup, "_account_uid", return_value=None), \
+                mock.patch.object(rules.subprocess, "run", side_effect=lambda argv, **kw: subprocess.CompletedProcess(
+                    argv, 0 if argv[2] == own + "/a.b.c" else 113, "", "")):
+            self.assertEqual(rules.other_domain_copy("a.b.c", "system", "nosuchuser"), own, "an unknown account: our own")
+            self.assertEqual(rules.other_domain_copy("a.b.c", "system"), own, "no UserName: our own")
+        with mock.patch.object(rules.subprocess, "run", side_effect=lambda argv, **kw: subprocess.CompletedProcess(
+                argv, 0 if argv[2] == "system/a.b.c" else 113, "", "")):
+            self.assertEqual(rules.other_domain_copy("a.b.c", own, "agentuser"), "system")
+
+    def test_the_probe_reads_launch_daemons_with_the_supervisors_rule(self):
+        """FAA-317: in_launch_daemons is fabric_supervisors._in_daemons, imported, not a copy."""
+        rules = load("check_service_rules")
+        sup = sys.modules["fabric_supervisors"]
+        with mock.patch.object(sup, "_in_daemons", return_value=True) as stub:
+            self.assertTrue(rules.in_launch_daemons(Path("anywhere.plist")))
+        stub.assert_called_once()
+
     def test_the_probe_fails_a_launch_daemon_plist_without_user_name_or_with_a_tilde_command(self):
         """FAA-286 items 22 and 23: a LaunchDaemon without UserName runs as root; its `~` command is root's home."""
         rules = load("check_service_rules")
