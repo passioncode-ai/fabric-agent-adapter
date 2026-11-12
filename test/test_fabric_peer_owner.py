@@ -480,6 +480,15 @@ class KitInstaller(unittest.TestCase):
             server.shutdown()
             server.server_close()
 
+    def test_a_loopback_origin_with_the_default_port_is_never_read_unchecked(self):
+        """The 0.79.0 seam reading: an origin with no port (http's 80) or an explicit :80 goes on a checked connection in
+        both twins, never through urllib."""
+        sup = importlib.import_module("fabric_supervisors")
+        with mock.patch.object(sup.urllib.request, "urlopen", side_effect=AssertionError("read unchecked")):
+            for origin in ("http://127.0.0.1:80", "http://127.0.0.1", "http://localhost:80"):
+                with self.subTest(origin=origin):
+                    sup._read_well_known(origin, timeout=0.5)
+
     def test_down_and_foreign_user_are_told_apart_at_every_loopback_spelling(self):
         """FAA-259: well_known_of answers None when nothing answers and a ForeignUserAnswer when another account's
         listener holds the port, as the Node wellKnownOf does; FAA-257: an origin spelled localhost, or another

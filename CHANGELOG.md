@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.79.1 (2026-11-12)
+
+0.79.0 was tagged and never published: its release run (43176165810) failed two jobs, so `release` and `publish` were
+skipped. 0.79.1 is 0.79.0 with these fixes, and is the release that ships it. Kit modules change: `fabric-peer-owner.mjs`,
+`fabric_supervisors` and `fabric-supervisors.mjs`, `fabric_board_session`, `fabric_board_slots` and their Node twins.
+
+### Fixed
+
+- **A checked connection to `localhost` reaches a listener on 127.0.0.1 under Node 18** (the `floors` job). Node 18
+  connects to the first address only, and `localhost` resolves to `::1` first on Linux, so `checkedSocket` (and every
+  loopback read made through it: `wellKnownOf`, the key set, the OpenRouter connector) found nothing where Python and
+  Node 20 and later try every address. It now passes `autoSelectFamily: true`. Reproduced on Node 22 with
+  `--no-network-family-autoselection`: the test fails without the change and passes with it.
+- **The Windows job runs what passes there** (the `windows` job). 0.79.0 ran the whole of
+  `test_fabric_session_dispatch.py` on Windows for the first time (FAA-236): the parsing, `gate-id` and damaged-folder
+  tests pass, and twelve `Hooks` tests fail (the dispatch record's holder and `/clear` across processes). The job runs
+  the whole file again: the twelve were ten tests of the POSIX `/clear` take-over, which `dispatch_holder` turns off on
+  Windows by design (now skipped there with the reason), one file read with the code page (now UTF-8), and one real
+  defect: when `os.fdopen` raised, the descriptor stayed open, Windows refused to remove the empty record, and the
+  run was told it was nested and never did its request. The descriptor is closed first (FAA-302).
+- **`foreign-user` no longer drops a lost call's record** (the 0.79.0 seam reading): 0.79.0's new board code
+  (FAA-252) reached two places that keep a lost call's state and read it as a refusal. The reply probe
+  (`_replied_before`, `repliedBefore`) and a lost enroll's asking record (`_replay`, `replay`) now stay, as for
+  `unreachable`, so a reply is never sent twice. Both twins, a test in each.
+- **A loopback origin with no port, or `:80`, is read on a checked connection** in both twins: Node's `new URL`
+  drops the default port and read `http://127.0.0.1:80` unchecked; Python read a portless origin unchecked.
+- `references/delegation.md` says what a restricted socket table does to a loopback key set and the way round.
+
+### Changed
+
+- 0.79.0's FAA-293 line is narrower than it read: the inode check closes the race between two copies starting at once.
+  A folder swapped under a copy already running is not caught yet (FAA-303).
+
+### Upgrading
+
+- `fabric_delegation` (and `fabric-delegation.mjs`) imports `fabric_peer_owner` since 0.79.0: update with
+  `fabric_kit.py install`, which brings it along, never a hand copy of the one file.
+
 ## 0.79.0 (2026-11-12)
 
 The first release of the backlog sweep of 2026-11-12 (plan and inventory of the 134 open rows:

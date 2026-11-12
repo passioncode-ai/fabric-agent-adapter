@@ -416,7 +416,7 @@ def _read_well_known(origin: str, timeout: float = 2.0,
     caller started, proves the listener when the socket table hides other processes (FAA-267)."""
     parts = urllib.parse.urlsplit(origin)
     try:
-        port = parts.port
+        port = parts.port or (80 if parts.scheme == "http" else None)  # no port is http's 80, as in the Node twin
     except ValueError:  # a port out of range
         port = None
     if parts.scheme == "http" and port and _loopback_host(parts.hostname):

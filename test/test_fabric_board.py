@@ -1480,6 +1480,34 @@ class MovedBackTwoCapabilitiesTests(Conversation):
         self.assertEqual(self.board.requests[render]["state"], "completed")
 
 
+class ForeignUserIsNotARefusalTests(Conversation):
+    """The 0.79.0 seam reading: `foreign-user` (FAA-252: the hub port is another account's, nothing was sent) used to
+    arrive as `unreachable`. It says nothing about an earlier call whose answer was lost, so the two places that keep a
+    lost call's record must keep it, as they do for `unreachable`, never read it as the board's refusal."""
+
+    def test_the_replied_before_probe_is_kept(self):
+        r = self.responder()
+        entry = {"request": "r1", "generation": 2, "attempt": "a2", "digest": "d", "revision": 3,
+                 "probe": {"key": "k.reply.1", "generation": 1, "attempt": "a1", "digest": "d", "revision": 2}}
+        with mock.patch.object(r, "_call", side_effect=fb.BoardError("foreign-user", "the hub port is another account's")), \
+                mock.patch.object(r, "_reply_extra", return_value={}), mock.patch.object(r, "_fence", return_value={}), \
+                mock.patch.object(r.checkpoint, "put") as put:
+            with self.assertRaises(fb.BoardError) as cm:
+                r._replied_before(entry)
+        self.assertEqual(cm.exception.code, "foreign-user")
+        self.assertIn("probe", entry, "the probe stays for the next try")
+        self.assertNotIn("replied", entry)
+        put.assert_not_called()
+
+    def test_a_lost_enroll_keeps_its_asking_record(self):
+        r = self.responder()
+        held = {"project": "p", "generation": 1, "asking": {"op": "com.enroll", "args": {"capability": "video.render"}}}
+        with mock.patch.object(r, "_call", side_effect=fb.BoardError("foreign-user", "the hub port is another account's")), \
+                mock.patch.object(r, "_note") as note:
+            with self.assertRaises(fb.BoardError):
+                r._replay("video.render", dict(held), 1)
+        note.assert_not_called()
+
 class MovedSlotTests(Conversation):
     """FAA-155 (contract DEC-0140 PR-2; CT-174, CT-175): a slot the operator moves to another session stays moved. The
     responder records the generation it held; once com.status shows it moved past, it ends its claims there, leaves its

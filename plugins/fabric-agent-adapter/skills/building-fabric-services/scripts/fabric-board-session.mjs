@@ -377,7 +377,8 @@ export class Responder extends SlotKeeper {
     try {
       this.receipt('com.reply', await this.call('com.reply', { ...this.replyExtra(entry), fence: this.fence({ ...entry, generation, attempt, digest, revision }, key) }));
     } catch (e) {
-      if (['unreachable', 'session-ended', 'authority_changed', 'not_authorized', 'not_available', 'capacity_exceeded'].includes(e.code) || !(e instanceof BoardError)) throw e;
+      // foreign-user: nothing was sent now, so whether the old reply was stored is unknown (0.79.0 seam reading)
+      if (['unreachable', 'foreign-user', 'session-ended', 'authority_changed', 'not_authorized', 'not_available', 'capacity_exceeded'].includes(e.code) || !(e instanceof BoardError)) throw e;
       replied = false;
     }
     if (replied) entry.replied = true;

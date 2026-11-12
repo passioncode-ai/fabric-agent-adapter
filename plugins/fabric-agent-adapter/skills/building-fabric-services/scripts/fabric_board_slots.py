@@ -78,7 +78,7 @@ class SlotKeeper:
                 if _is_int(generation, 1) and (answer.get("repeated") is True or not moved):
                     rest = {"project": self.project, "generation": generation}
             except BoardError as exc:
-                if exc.code in ("unreachable", "session-ended"):
+                if exc.code in ("unreachable", "session-ended", "foreign-user"):  # foreign-user: the earlier ask is unknown
                     raise
                 if exc.code == "idempotency_window_expired":
                     rest = {}  # a retired epoch refuses even a repeat: unknown, so no record (a first start, never a move)
