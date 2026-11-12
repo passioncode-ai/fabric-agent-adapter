@@ -205,13 +205,20 @@ class Service:
         # (events-and-notifications.md, "Writing an event"; 0.56.0 product r34).
         # The route in words; the tokens by and via, with the caller, in data (product r35).
         act = record if isinstance(record, dict) else {}
+        via = act.get("via") if isinstance(act.get("via"), str) else None  # a via that is no string names none (FAA-187 (25))
         how = {"dashboard": " on this service's page", "relayed-instruction": " through an agent they told",
-               "mandate": " under a standing mandate"}.get(act.get("via"), "")
+               "mandate": " under a standing mandate", "approval": " with an approval they signed",
+               "elicitation": " answering this service's question"}.get(via or "", "")
+        who = "An approver" if via == "approval" else "The operator"  # an approval is the approver's act (FAA-187 (28))
         value = {"capability": capability, **{k: act[k] for k in ("by", "via", "caller") if isinstance(act.get(k), str)}}
-        data = {"schema": fbd.EVENT_SCHEMA, "value": value}
-        extra = {} if fs.feed_data_problems(data) else {"data": data}  # a caller the feed refuses never undoes the answer
-        self.log.append("board.slot.returned", "info", "The operator took the %s slot back%s; the service enrolls once the "
-                        "other session lets it go." % (capability, how),
+        extra = {}
+        for kept in (value, {k: v for k, v in value.items() if k != "caller"}):  # the caller alone dropped first (24)
+            data = {"schema": fbd.EVENT_SCHEMA, "value": kept}
+            if not fs.feed_data_problems(data):  # data the feed refuses never undoes the answer
+                extra = {"data": data}
+                break
+        self.log.append("board.slot.returned", "info", "%s took the %s slot back%s; the service enrolls once the "
+                        "other session lets it go." % (who, capability, how),
                         subject={"type": "capability", "id": capability}, **extra)
         return {"capability": capability, "moved": False}
 
@@ -437,8 +444,9 @@ def make_handler(svc: Service):
                 try:
                     body = json.loads(self.rfile.read(length) or b"{}")
                     # The event names who decided, as the tool's does: the operator, at the dashboard (0.56.0 seam r7).
+                    # caller: a machine id, as the tool records one (FAA-187 (31)): the operator's signed-in dashboard session
                     return self._send(200, svc.board_take_back(body.get("capability") if isinstance(body, dict) else None,
-                                                               {"by": "operator", "via": "dashboard", "caller": "the signed-in page"}))
+                                                               {"by": "operator", "via": "dashboard", "caller": "dashboard:session"}))
                 except (ValueError, RecursionError, fs.ServiceError, fbd.BoardError) as exc:
                     return self._send(400, {"error": str(exc)})
             if url.path == "/api/emit":

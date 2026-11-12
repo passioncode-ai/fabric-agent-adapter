@@ -2758,6 +2758,8 @@ class SampleWiringTests(unittest.TestCase):
             returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
             self.assertIn("on this service's page", returned[-1]["text"], "the page's take-back names the route in words (seam r7)")
             self.assertEqual({k: returned[-1]["data"]["value"][k] for k in ("by", "via")}, {"by": "operator", "via": "dashboard"})
+            # FAA-187 (31): the page records a machine id as its caller, as the tool does, never prose
+            self.assertEqual(returned[-1]["data"]["value"]["caller"], "dashboard:session")
             self.assertEqual(returned[-1]["subject"], {"type": "capability", "id": "sample.echo"}, "the moved slot's subject (product r35)")
             status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
             self.assertEqual((status, json.loads(said)), (200, {"capability": "sample.echo", "moved": False}),
@@ -2823,8 +2825,21 @@ class SampleWiringTests(unittest.TestCase):
                 answer = svc.board_take_back("sample.echo", {"by": "operator", "via": "relayed-instruction", "caller": "x" * 501})
             self.assertEqual(answer, {"capability": "sample.echo", "moved": False})
             last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
-            self.assertNotIn("data", last)
+            # FAA-187 (24): only the caller is dropped; by and via stay in data
+            self.assertEqual(last["data"]["value"], {"capability": "sample.echo", "by": "operator", "via": "relayed-instruction"})
             self.assertIn("through an agent they told", last["text"])
+            # FAA-187 (25), (28): a via that is no string names no route (and never raises after the take-back); an
+            # approval is an approver's act, an elicitation the operator's answer, each in its own words
+            for record, words in (({"by": "operator", "via": ["dashboard"]}, "The operator took the sample.echo slot back; "),
+                                  ({"by": "person:example", "via": "approval", "caller": "remote:x"},
+                                   "An approver took the sample.echo slot back with an approval they signed"),
+                                  ({"by": "operator", "via": "elicitation", "caller": "local:T1"},
+                                   "The operator took the sample.echo slot back answering this service's question")):
+                with mock.patch.object(svc.board, "take_back"), mock.patch.object(svc, "board_moved", return_value=["sample.echo"]):
+                    svc.board_take_back("sample.echo", record)
+                last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
+                self.assertTrue(last["text"].startswith(words), last["text"])
+                self.assertNotIn("person:example", last["text"], "the approver's id is a machine id: data only")
             again = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
                                        "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
             self.assertEqual(again["structuredContent"], {"capability": "sample.echo", "moved": False},
