@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import http.server
+import ipaddress
 import json
 import os
 import re
@@ -113,6 +114,16 @@ def connection_refusal(owner: Any, mode: str = "refuse") -> Optional[str]:
     return None
 
 
+def is_loopback_peer(client_address: Any) -> bool:
+    """Whether an accepted connection's peer address is a loopback one (127.0.0.0/8, ::1, or either IPv4-mapped): the
+    only peers whose owner can be another account of this computer (DEC-0154 HA-2). An address that cannot be read
+    counts as loopback, so its owner is still read from the table."""
+    try:
+        return ipaddress.ip_address(fabric_peer_owner.norm_host(str(client_address[0]))).is_loopback
+    except Exception:
+        return True
+
+
 class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
     """ThreadingHTTPServer for a loopback service: threads are daemons, and the bind asks
     no resolver. HTTPServer.server_bind() calls socket.getfqdn() between bind() and listen();
@@ -123,7 +134,9 @@ class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
     connection's own thread, before the handler reads a byte (DEC-0154 HA-2's server side, FAA-227). `peer_check`
     (`PEER_CHECKS`) decides which owners are closed unread; a served handler finds its peer's owner with
     `self.server.peer_owner()`. A refusal writes one line to stderr with the owner's kind, uid and pid and nothing the
-    peer sent (`peer_refused`), and counts in `peer_refusals`."""
+    peer sent (`peer_refused`), and counts in `peer_refusals`. The check applies to loopback peers only: a peer at
+    another address (a service bound to 0.0.0.0) is no local account, so its table is not read and it is served under
+    `refuse` and `strict` alike, with `peer_owner()` None."""
 
     daemon_threads = True
     peer_check = "refuse"
@@ -150,7 +163,7 @@ class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
 
     def finish_request(self, request: Any, client_address: Any) -> None:
         owner = None
-        if self.peer_check != "off":
+        if self.peer_check != "off" and is_loopback_peer(client_address):
             try:
                 owner = self.peer_reader(request)
             except Exception as exc:  # a reader that fails is an owner nobody can tell, never a crash of the server

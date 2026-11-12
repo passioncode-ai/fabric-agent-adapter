@@ -7,7 +7,7 @@ import path from 'node:path';
 import { credentialName, repositoryCredential, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 import { ID, INSTANCE, LOCAL_PATH, PRIMARY_CAPABILITY, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
-import { ANOTHER_ACCOUNT, SYSTEM, THIS_ACCOUNT, UNKNOWN, owner as peerOwnerOf, peer as peerOfSocket } from './fabric-peer-owner.mjs'; // L0: who listens on a port and who connected (DEC-0154 HA-2, FAA-225, FAA-227)
+import { ANOTHER_ACCOUNT, SYSTEM, THIS_ACCOUNT, UNKNOWN, normHost, owner as peerOwnerOf, peer as peerOfSocket } from './fabric-peer-owner.mjs'; // L0: who listens on a port and who connected (DEC-0154 HA-2, FAA-225, FAA-227)
 import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
 import { ACTIONS_EXTENSION_KEY, actionsExtension, actionsExtensionRules } from './fabric-actions.mjs';
@@ -351,6 +351,17 @@ export function connectionRefusal(owner, mode = 'refuse') {
   return null;
 }
 
+/** Whether a connection's peer address is a loopback one (127.0.0.0/8, ::1, or either IPv4-mapped): the only peers
+ * whose owner can be another account of this computer (DEC-0154 HA-2). An address that cannot be read counts as
+ * loopback, so its owner is still read from the table. The twin of fabric_descriptor.py's is_loopback_peer. */
+export function isLoopbackPeer(address) {
+  if (typeof address !== 'string') return true;
+  const host = normHost(address);
+  if (net.isIPv4(host)) return host.split('.')[0] === '127';
+  if (net.isIPv6(host)) return host === '::1';
+  return true;
+}
+
 const connectionOwners = new WeakMap();
 
 /** The owner of the peer behind an HTTP request's socket (`req.socket`) a loopbackServer served, or null. */
@@ -363,6 +374,8 @@ export function connectionOwner(socket) {
  * `peerCheck` serves is handed to `httpServer` (never listened on itself), which then reads the request; a refused one
  * is destroyed unread, counted in `peerRefusals`, and reported to `onRefused(owner, reason)` (default: one line on
  * stderr with the owner's kind, uid and pid). Handlers find their peer's owner with `connectionOwner(req.socket)`.
+ * The check applies to loopback peers only: a peer at another address (a server bound to 0.0.0.0) is no local
+ * account, so its table is not read and it is served under `refuse` and `strict` alike, with no owner.
  * Close the returned server to stop accepting; `httpServer.closeAllConnections()` ends the served ones. */
 export function loopbackServer(httpServer, { peerCheck = 'refuse', peer = peerOfSocket, onRefused } = {}) {
   connectionRefusal(null, peerCheck);
@@ -370,7 +383,7 @@ export function loopbackServer(httpServer, { peerCheck = 'refuse', peer = peerOf
     `fabric: refused a loopback peer (${reason}, uid ${who?.uid ?? 'None'}, pid ${who?.pid ?? 'None'}) before reading it (DEC-0154)\n`));
   const gate = net.createServer({ pauseOnConnect: true }, async (socket) => {
     let who = null;
-    if (peerCheck !== 'off') {
+    if (peerCheck !== 'off' && isLoopbackPeer(socket.remoteAddress)) {
       try {
         who = await peer(socket);
       } catch (err) {

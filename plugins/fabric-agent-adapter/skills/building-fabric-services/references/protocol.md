@@ -255,7 +255,10 @@ each accepted connection's peer (`peer`) before a byte of the request is read, i
 while the socket is still paused. `peer_check` / `peerCheck` (`PEER_CHECKS`): `refuse`, the default, closes a peer of
 another OS account unread and serves the rest; `strict` also refuses an owner nobody can tell (a restricted table
 included) and a system account other than root (uid 0, which can read every account's files anyway and installs a
-LaunchDaemon; a Windows service account is refused); `off` reads no table. Use `strict` for a dashboard, an MCP
+LaunchDaemon; a Windows service account is refused); `off` reads no table. The check applies to loopback peers
+(127.0.0.0/8, `::1`, either IPv4-mapped): HA-2 is about another account of this computer, so a peer at any other
+address (a service bound to `0.0.0.0`) is served under `refuse` and `strict` alike without a table read, and its
+owner is none (`peer_owner()` None, `connectionOwner` null); such a peer is never T0 or T1. Use `strict` for a dashboard, an MCP
 surface or a token-free door on a computer with several counted accounts, where the interpreter sees the whole
 table (Apple's `/usr/bin/python3`, not an ad-hoc-signed one on macOS 27.2). A refusal writes one line on stderr
 (kind, uid, pid, never the peer's bytes); a handler finds its peer's owner with `self.server.peer_owner()` or

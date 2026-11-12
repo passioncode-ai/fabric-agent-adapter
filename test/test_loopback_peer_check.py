@@ -41,11 +41,15 @@ class Seen(http.server.BaseHTTPRequestHandler):
 
 
 class Serving:
-    def __init__(self, who, mode=None):
+    def __init__(self, who, mode=None, seen_at=None):
         reader = (lambda sock: who) if not callable(who) else who
 
         class Server(D.LoopbackHTTPServer):
             peer_reader = staticmethod(reader)
+
+            def get_request(self):  # a real connection, reported at `seen_at` (a peer off loopback, as a 0.0.0.0 bind has)
+                sock, address = super().get_request()
+                return sock, (address if seen_at is None else seen_at)
 
         self.server = Server(("127.0.0.1", 0), Seen, **({} if mode is None else {"peer_check": mode}))
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -133,6 +137,32 @@ class Live(unittest.TestCase):
         with Serving(boom, "off") as server:
             self.assertEqual(get(server), 200)
         self.assertEqual(Seen.calls, [None])
+
+    def test_a_peer_off_loopback_is_served_without_reading_the_table(self):
+        # 0.81.0 seam reading: HA-2 is about loopback peers; the owner of a peer at another address is no local account,
+        # so its table read (about 10 ms) is skipped and it is served under refuse and strict alike, unlabelled
+        for seen_at in (("192.0.2.7", 40000), ("2001:db8::7", 40000, 0, 0), ("::ffff:10.0.0.1", 40000, 0, 0)):
+            for mode in (None, "strict"):
+                read = []
+
+                def reader(sock):
+                    read.append(sock)
+                    return owner(P.ANOTHER_ACCOUNT, 502)
+                with Serving(reader, mode, seen_at) as server:
+                    self.assertEqual(get(server), 200, (seen_at, mode))
+                self.assertEqual(read, [], (seen_at, mode))
+                self.assertEqual(Seen.calls, [None])
+                self.assertEqual(server.peer_refusals, 0)
+
+    def test_a_loopback_peer_in_any_spelling_is_still_read(self):
+        for seen_at in (("127.0.0.1", 1), ("127.8.9.10", 1), ("::1", 1, 0, 0), ("::ffff:127.0.0.1", 1, 0, 0),
+                        ("not an address", 1), ("", 0)):
+            with redirect_stderr(io.StringIO()), Serving(owner(P.ANOTHER_ACCOUNT, 502), None, seen_at) as server:
+                with self.assertRaises((http.client.HTTPException, ConnectionError, OSError)):
+                    get(server)
+            self.assertEqual(server.peer_refusals, 1, seen_at)
+        self.assertTrue(D.is_loopback_peer(("127.0.0.1", 1)))
+        self.assertFalse(D.is_loopback_peer(("10.1.2.3", 1)))
 
     def test_the_default_reader_is_the_socket_table(self):
         # A real connection of this process: the owner the table gives is this account's, or unknown where the table is
