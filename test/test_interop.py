@@ -348,10 +348,6 @@ class McpServerTests(unittest.TestCase):
         self.assertIsNotNone(fi.parse_traceparent(result["_meta"]["traceparent"]))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class McpStandardHeaderTests(unittest.TestCase):
     """MCP 2026-07-28 Streamable HTTP: Mcp-Method on every request, Mcp-Name on tools/call,
     prompts/get and resources/read; a server rejects a mismatch (the official server SDK answers
@@ -1536,3 +1532,7 @@ class JobApprovalStepTests(unittest.TestCase):
                 said = fi.action_refusal_tool_result(fa.action_decision(inputs))
                 self.assertEqual(said["structuredContent"]["error"]["code"], "operator-decision-required")
                 self.assertEqual(said["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")
+
+
+if __name__ == "__main__":  # at the end, so running the file directly runs every class (FAA-196 (12))
+    unittest.main()
