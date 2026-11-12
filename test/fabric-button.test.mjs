@@ -25,6 +25,28 @@ function load() {
 }
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+// FAA-314 (dashboard kit 1.1.7): the button's credential checks answer the contract's own vectors, as the kit's
+// fabric-secrets.mjs does: DEC-0151's SECRET_VALUE (canonical-case prefixes after a boundary, `Bearer ` only at the
+// start), not the earlier, broader detector.
+test('the button reads a credential as the contract does (DEC-0151, FAA-314)', () => {
+  const fb = load();
+  const secrets = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/profile-vectors.json'), 'utf8')).secrets;
+  const decode = (hex) => Buffer.from(hex, 'hex').toString('utf8');
+  let read = 0;
+  for (const name of ['secretValue', 'credentialName']) {
+    for (const c of secrets[name]) {
+      assert.equal(fb[name](decode(c.inputHex)), c.expected, `${name}(${JSON.stringify(decode(c.inputHex).slice(0, 40))})`);
+      read += 1;
+    }
+  }
+  assert.ok(read >= 40, `read ${read} vectors`);
+  // The earlier detector refused these; DEC-0151 does not (a prefix in another case, a key inside a word).
+  for (const value of ['SK-' + 'a1B2'.repeat(6), 'xsk-' + 'a1B2'.repeat(6), 'GHP_' + 'a'.repeat(24)]) assert.equal(fb.secretValue(value), false, value);
+  assert.equal(fb.secretValue('Bearer abc'), true);
+  assert.equal(fb.secretValue('x ghp_' + 'a'.repeat(24)), true);
+  assert.ok(SOURCE.startsWith('/* fabric-dashboard-kit@1.1.7 '), 'the kit that carries the change is 1.1.7');
+});
+
 test('every link the contract parses, the button parses the same way (FL-1…FL-5)', () => {
   const fb = load();
   assert.ok(VECTORS.parse.length >= 40);
