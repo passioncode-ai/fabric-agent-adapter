@@ -152,7 +152,9 @@ For provider bundles the adapting skill helps an agent author:
   admission, and project binding;
 - keep the agent's source apart from its instance data, with `scripts/fabric_source_check.py check`, which reports a
   home path, a credential-shaped value or a string from the owner's list by path, line and kind and never repeats it
-  (FAA-188).
+  (FAA-188); under the source manifest `fabric.source.json` (contract DEC-0149, `fabric-source/1`, which
+  `scripts/adapt_project.py source` proposes) it reads the source the manifest names with the contract's tree check
+  (FAA-261), and `pack` writes the package's `secrets[]` and `state[]` from its slots.
 
 The skill never treats generated files as admission. Fabric contract `0.1.0` does not
 yet ship the host registry/runtime needed to connect and authorize a live provider.
@@ -300,6 +302,7 @@ python3 "$SKILL_DIR/scripts/adapt_project.py" scaffold /path/to/project \
   --effect none
 python3 "$SKILL_DIR/scripts/adapt_project.py" check /path/to/project \
   --contract /path/to/fabric-agent-contract --json
+python3 "$SKILL_DIR/scripts/adapt_project.py" source /path/to/project --dry-run   # propose fabric.source.json
 ```
 
 Pack, sign and verify an agent as a `fabric-package/1` folder (contract DEC-0050, DEC-0051; nothing is written without

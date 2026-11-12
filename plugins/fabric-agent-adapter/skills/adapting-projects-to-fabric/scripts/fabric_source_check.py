@@ -44,6 +44,12 @@ shorter than three characters ignored, matched without regard to case. A list in
 is refused: it would travel with the source. The summary says whether Git chose the files or every file was read.
 Under a locale whose file-system encoding is not UTF-8 the check restarts itself in Python's UTF-8 mode, so a name,
 an argument and a file are read in one encoding. Standard library only.
+
+Under a source manifest (DEC-0149, FAA-261): when ROOT holds `fabric.source.json`, the manifest decides what is source
+and the contract's tree check reads it (fabric_source_tree.py, held to the contract's vectors): blocking findings exit
+1, warnings alone (`email`, `link-outside`, `no-license`, `unused-exclude`, `excluded-by-fold`) exit 0, a source file
+not read exits 2; each finding names its path, line and column, never the text found. `.fabric-source-ignore` and
+`--exclude` are not read there.
 """
 # Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
@@ -72,6 +78,8 @@ try:
     _STEP = "fabric_source_ignore"
     from fabric_source_ignore import (  # noqa: E402,F401 - how the ignore lines are read, beside this file
         IGNORE_FILE, CheckError, _as_bytes, _glob, _ignored, _line, _readable_glob, ignore_globs)
+    _STEP = "fabric_source_restart"
+    from fabric_source_restart import _interpreter, _interpreter_flags, _keep_console, _utf8_restart  # noqa: E402,F401
     _STEP = "fabric_source_homes"
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
@@ -717,6 +725,13 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         files, mode = _walk_files(root, unreadable, PACK_REFUSES), "walk"
     elif not files:  # not a checkout, Git refused it, or a folder Git ignores or holds nothing of: read what is there
         files, mode = _walk_files(root, unreadable, WALK_SKIP, dependencies), "walk"
+    if os.path.lexists(str(root / "fabric.source.json")):  # DEC-0149: the manifest decides (fabric_source_tree.py)
+        wrote, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the tree adds no .pyc
+        try:
+            import fabric_source_tree  # noqa: E402 - beside this file; imported here, since it imports this one
+        finally:
+            sys.dont_write_bytecode = wrote
+        return fabric_source_tree.check_folder(root, files, mode, entries, unreadable, dependencies)
     findings: List[Dict[str, object]] = []
     read = 0
     skipped = {"binary": 0, "unreadable": len(unreadable), "excluded": 0, "nested": 0, "dependencies": len(dependencies)}
@@ -895,6 +910,8 @@ def run(argv: Optional[List[str]] = None) -> int:
     except CheckError as exc:
         print("fabric_source_check.py: %s" % exc, file=sys.stderr)
         return 2
+    if result.get("manifest"):  # under fabric.source.json: its own report (fabric_source_tree.print_run)
+        return sys.modules["fabric_source_tree"].print_run(result, entries, list_path is not None, args.json, _print)
     findings = result["findings"]
     skipped = result["skipped"]
     listed = sum(1 for e in entries if e and not e.startswith(HOME_ENTRY))
@@ -927,55 +944,6 @@ def run(argv: Optional[List[str]] = None) -> int:
     if findings:
         return 1
     return 0 if complete else 2
-
-
-def _utf8_restart(encoding: str, utf8_mode: int, executable: str, argv: List[str]) -> Optional[List[bytes]]:
-    """The command that restarts the check in Python's UTF-8 mode, or None when it needs none. Under a locale whose
-    file-system encoding is not UTF-8 (ISO-8859-1, KOI8-R, a C locale with UTF-8 mode off), a name, an argument and a
-    file's text would each be read in its own encoding; in UTF-8 mode all three are, and a byte that is not UTF-8 stays
-    that byte. Windows names are UTF-16 and need none. The arguments go back as the bytes they came in. An empty list:
-    a restart is needed and no interpreter is known (the caller exits 2 rather than read in two encodings)."""
-    if os.name == "nt" or utf8_mode or encoding.lower().replace("_", "-") in ("utf-8", "utf8"):
-        return None
-    if not executable:
-        return []
-    return [os.fsencode(executable), b"-X", b"utf8"] + [os.fsencode(a) for a in argv]
-
-
-def _interpreter() -> str:
-    """The running interpreter: Linux's `/proc/self/exe`, which no PATH or working folder can stand in for (Python 3.9
-    may take a `./python3` of the working folder as sys.executable), else sys.executable, which may be empty."""
-    try:
-        return os.readlink("/proc/self/exe")
-    except (OSError, AttributeError):
-        return sys.executable or ""
-
-
-def _interpreter_flags(flags: object, xoptions: Dict[str, object]) -> List[str]:
-    """The interpreter's own options, rebuilt where sys.orig_argv is missing (Python 3.9), so a restart keeps `-I`."""
-    out: List[str] = []
-    if getattr(flags, "isolated", 0):
-        out.append("-I")
-    else:
-        out += ["-E"] * bool(getattr(flags, "ignore_environment", 0)) + ["-s"] * bool(getattr(flags, "no_user_site", 0))
-    out += ["-S"] * bool(getattr(flags, "no_site", 0)) + ["-B"] * bool(getattr(flags, "dont_write_bytecode", 0))
-    if getattr(flags, "optimize", 0):
-        out.append("-" + "O" * int(getattr(flags, "optimize")))
-    for key, value in xoptions.items():
-        if key not in ("utf8", "fabric_console"):
-            out += ["-X", key if value is True else "%s=%s" % (key, value)]
-    return out
-
-
-def _keep_console(xoptions: Dict[str, object]) -> None:
-    """After a restart, write the console's own encoding again (the parent named it in `-X fabric_console=`)."""
-    console = xoptions.get("fabric_console")
-    if isinstance(console, str):
-        for stream in (sys.stdout, sys.stderr):
-            try:
-                stream.reconfigure(encoding=console, errors="backslashreplace")  # type: ignore[union-attr]
-            except (AttributeError, LookupError, ValueError):
-                pass
 
 
 if __name__ == "__main__":

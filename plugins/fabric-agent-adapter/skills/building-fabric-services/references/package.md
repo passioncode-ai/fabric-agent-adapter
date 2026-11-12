@@ -42,6 +42,14 @@ python3 scripts/fabric_package.py pack <folder>           # a dry run: the packa
 python3 scripts/fabric_package.py pack <folder> --apply   # writes fabric.package.json when nothing is wrong
 ```
 
+When the folder carries the agent's source manifest, `fabric.source.json` (contract DEC-0149, `fabric-source/1`), `pack`
+writes `secrets[]` from its `secret` slots (name, purpose and `optional`) and `state[]` from its `store` slots' paths,
+says so in its notes, and lists the manifest in `files[]` like any other file; `pack`, `sign` and `verify` refuse a
+package whose `secrets[]` or `state[]` differ from the slots (FAC-SEM-160). An author's `state: []` is a copy packed
+without state and is kept. A manifest that is no `fabric-source/1` object is refused. The manifest's own rules and the
+tree check under it are the source check's (`references/source-and-instance.md` of adapting-projects-to-fabric, *The
+source manifest*).
+
 Run `adapting-projects-to-fabric/scripts/fabric_source_check.py check <folder> --every-file` on the folder you pack first (a floor under your own
 review, not a secret scanner): a package carries
 the source, and the instance (the owner's paths, keys, strings) stays out of it (`references/source-and-instance.md` of

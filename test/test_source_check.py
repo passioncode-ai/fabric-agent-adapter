@@ -815,7 +815,8 @@ class WhatIsRead(Tree):
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
-        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_source_homes.py", "fabric_secrets.py"):
+        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_source_homes.py", "fabric_source_restart.py",
+                     "fabric_secrets.py"):
             shutil.copy(SCRIPTS / name, tools / name)
         self.git("init", "-q")
         self.git("add", "-A")
@@ -1463,7 +1464,7 @@ class Refusals(Tree):
         self.assertIn("1 home name(s) declared", out)
 
     def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
-        siblings = ("fabric_source_ignore.py", "fabric_source_homes.py", "fabric_secrets.py")
+        siblings = ("fabric_source_ignore.py", "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py")
         for missing in siblings:  # reading 38, seam: each sibling left behind in turn
             tools = self.tmp / ("tools-" + missing)
             tools.mkdir()

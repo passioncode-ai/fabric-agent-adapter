@@ -25,7 +25,8 @@ and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` lo
 that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`; job limits per DEC-0087), and checks the estate record, share grants and the estate ceremonies (`fabric_estate.py`, `fabric_share.py`, `fabric_ceremonies.py` and their Node twins).
 Agents that are not services get a `fabric-provider/0.1` entry from
 `adapting-projects-to-fabric/scripts/fabric_provider.py`; `fabric_source_check.py` beside it finds an agent's instance
-data in its source tree without repeating it (FAA-188). The fourth, `working-with-fabric`, is the
+data in its source tree without repeating it (FAA-188), under the source manifest `fabric.source.json` with the
+contract's tree check (`fabric_source_tree.py`, held to `test/fixtures/contract/source-vectors.json`, FAA-261). The fourth, `working-with-fabric`, is the
 other side: a coding agent opened outside Fabric working in a project through it (Fabric 0.4.0 REQ-07),
 with the plugin's Claude Code session hooks (`scripts/fabric_session.py`, COM-04). The fifth, `observing-products`,
 puts an agent on a standing watch over one product (observer mode, FAA-290): the channel inventory

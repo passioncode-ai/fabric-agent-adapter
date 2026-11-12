@@ -488,6 +488,98 @@ def scaffold_project(root: Path, args: argparse.Namespace) -> Dict[str, Any]:
     }
 
 
+# #region source-manifest: fabric.source.json (contract DEC-0149, fabric-source/1; FAA-261)
+SOURCE_FILE = "fabric.source.json"
+_SLOT_NAME = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
+#: Instance data never named in include: the repository, credentials by their name, dependency and build folders.
+_NOT_SOURCE = re.compile(r"\.git|\.env(\..*)?|.*\.(pem|key|p12|pfx|jks|keystore|token|credential)|node_modules|\.venv|venv|"
+                         r"__pycache__|dist|build|\.DS_Store|" + re.escape(SOURCE_FILE), re.IGNORECASE)
+#: The slots the kit names for every agent: the provider's createdBy and, for a service, its supervisor label and port
+#: are instance data (FAA-188 part 2); the placement record is the operator's infrastructure, read at start.
+PUBLISHER_SLOT = {"name": "PUBLISHER_URI", "kind": "config",
+                  "purpose": "provider.createdBy: the publisher's URI; the source keeps the scaffold's sentinel"}
+PLACEMENT_SLOT = {"name": "PLACEMENT_RECORD", "kind": "endpoint", "optional": True,
+                  "purpose": "Project Observatory's placement record (observatory-placement/1), read at start"}
+SERVICE_SLOTS = (
+    {"name": "SUPERVISOR_LABEL", "kind": "config",
+     "purpose": "the launchd label, systemd unit or Scheduled Task this installation runs under (LC-09)"},
+    {"name": "SERVICE_PORT", "kind": "config", "purpose": "the loopback port recorded for this OS account (DEC-0154 HA-1)"},
+)
+
+
+def _parse_slot(text: str, kind: str) -> Dict[str, Any]:
+    parts = text.split(":", 2 if kind == "store" else 1)
+    if len(parts) != (3 if kind == "store" else 2) or not _SLOT_NAME.match(parts[0]) or not parts[-1].strip():
+        raise AdaptationError("--%s takes %s" % (kind, "NAME:PATH:PURPOSE" if kind == "store" else "NAME:PURPOSE"))
+    slot = {"name": parts[0], "kind": kind, "purpose": parts[-1].strip()}
+    if kind == "store":
+        slot["path"] = parts[1]
+    if _secrets.secret_value(slot["purpose"]):
+        raise AdaptationError("a slot is named, never filled: --%s %s holds a value shaped like a credential" % (kind, parts[0]))
+    return slot
+
+
+def source_manifest(include: Sequence[str], description: Optional[str] = None, secrets: Sequence[str] = (),
+                    stores: Sequence[str] = (), service: bool = False, provider: bool = True) -> Dict[str, Any]:
+    """A fabric-source/1 manifest: include as given (sorted, default deny), the kit's slots, the slots named."""
+    manifest: Dict[str, Any] = {"format": "fabric-source/1"}
+    if description:
+        manifest["description"] = description
+    manifest["include"] = sorted(dict.fromkeys(include))
+    slots = [_parse_slot(t, "secret") for t in secrets] + [_parse_slot(t, "store") for t in stores]
+    slots += ([dict(PUBLISHER_SLOT)] if provider else []) + [dict(PLACEMENT_SLOT)]
+    slots += [dict(s) for s in SERVICE_SLOTS] if service else []
+    names = [s["name"] for s in slots]
+    if len(set(names)) != len(names):
+        raise AdaptationError("a slot is named twice")
+    manifest["slots"] = slots
+    return manifest
+
+
+def _top_level(root: Path) -> List[str]:
+    """The project's top-level entries as include paths: what Git would commit, else what a walk finds; a folder with
+    a trailing /. Instance data by its name is left out."""
+    names: List[str] = []
+    try:
+        listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                                capture_output=True, timeout=60)
+        if listed.returncode == 0:
+            names = [os.fsdecode(n) for n in listed.stdout.split(b"\0") if n]
+    except (OSError, subprocess.SubprocessError):
+        names = []
+    if not names:
+        names = [_relative(path, root) for path in _files(root)]
+    tops = []
+    for name in names:
+        head, _, rest = name.partition("/")
+        if not _NOT_SOURCE.fullmatch(head):
+            tops.append(head + "/" if rest else head)
+    return sorted(dict.fromkeys(tops))
+
+
+def write_source_manifest(root: Path, args: argparse.Namespace) -> Dict[str, Any]:
+    """`source`: lay down fabric.source.json from the project's top-level entries. An existing one is the owner's and
+    is kept unless --force; --dry-run writes nothing."""
+    if not root.is_dir():
+        raise AdaptationError("project path is not a directory: %s" % root)
+    provider = (root / "fabric-agent.json").is_file()
+    manifest = source_manifest(_top_level(root), args.description, args.secret, args.store, args.service, provider)
+    target = root / SOURCE_FILE
+    exists = os.path.lexists(str(target))
+    result = {"project": str(root.resolve()), "manifest": manifest, "exists": exists}
+    if args.dry_run:
+        result["dryRun"] = True
+        return result
+    if exists and not args.force:
+        raise AdaptationError("%s exists: it is the owner's; --dry-run shows the proposal, --force replaces it" % SOURCE_FILE)
+    target.write_text(_json_text(manifest), encoding="utf-8")
+    result["written"] = SOURCE_FILE
+    result["next"] = ("Review include (default deny), name every key and store as a slot, then run "
+                      "fabric_source_check.py check on the project (exit 0).")
+    return result
+# #endregion
+
+
 def _load_json(path: Path, errors: List[str]) -> Optional[Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -834,6 +926,17 @@ def build_parser() -> argparse.ArgumentParser:
     scaffold.add_argument("--dry-run", action="store_true", help="print the planned writes and a unified diff of each existing path; write nothing")
     scaffold.add_argument("--json", action="store_true")
 
+    source = sub.add_parser("source", help="lay down fabric.source.json, the agent's source manifest (DEC-0149)")
+    source.add_argument("project", type=Path)
+    source.add_argument("--description", help="what the agent is, in plain words")
+    source.add_argument("--secret", action="append", default=[], metavar="NAME:PURPOSE", help="a key the agent reads by name; repeat")
+    source.add_argument("--store", action="append", default=[], metavar="NAME:PATH:PURPOSE",
+                        help="a data store relative to the data folder (it becomes the package's state[]); repeat")
+    source.add_argument("--service", action="store_true", help="a kit service: its supervisor label and port are slots")
+    source.add_argument("--force", action="store_true", help="replace an existing fabric.source.json")
+    source.add_argument("--dry-run", action="store_true", help="print the proposal; write nothing")
+    source.add_argument("--json", action="store_true")
+
     check = sub.add_parser("check", help="check generated structure and optional pinned schema")
     check.add_argument("project", type=Path)
     check.add_argument("--contract", type=Path)
@@ -848,6 +951,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result = inspect_project(args.project)
         elif args.command == "scaffold":
             result = scaffold_project(args.project, args)
+        elif args.command == "source":
+            result = write_source_manifest(args.project, args)
         else:
             result = check_project(args.project, args.contract)
         if result.get("dryRun") and not args.json:

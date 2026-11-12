@@ -171,6 +171,10 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   [--idempotency required|supported|none] [--cost-preset <id> <max-usd> "<label>" ... --default-cost-preset <id>]
 ```
 
+The source manifest comes with the bundle: `adapt_project.py source <project-root>` lays down `fabric.source.json`
+(DEC-0149) with the kit's slots, and the source check reads the source under it ([the source and the
+instance](references/source-and-instance.md), *The source manifest*).
+
 The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
 does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
 
