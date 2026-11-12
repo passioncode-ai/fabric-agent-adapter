@@ -52,6 +52,9 @@ class BoardSession:
                              timeout=timeout if timeout is not None and timeout > 0 else self.timeout,
                              method=method, protocol_version=self.protocol_version if self.mcp_session else None)
         except _hub.HubError as exc:
+            if exc.code == "foreign-user":  # FAA-252: another OS account's process holds the port; nothing was sent
+                raise BoardError("foreign-user", "The hub's port is held by another OS account's process; nothing was sent.",
+                                 True) from exc
             raise BoardError("unreachable", "Fabric's hub did not answer; a write may have been stored, so send it again with "
                              "the same idempotency key.", True) from exc
 

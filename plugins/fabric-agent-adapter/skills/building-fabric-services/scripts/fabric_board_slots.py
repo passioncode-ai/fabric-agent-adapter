@@ -20,7 +20,7 @@ HOLD_RETRY_MAX_SECONDS = 900.0
 #: Refusals that are about the board session, not one capability: they end recovery and go to the responder's fault.
 SESSION_CODES = frozenset(["unreachable", "session-ended", "not_authorized", "authority_changed", "credential", "no-epoch",
                            "schema-unsupported", "checkpoint", "receipt-shape", "idempotency_conflict", "not-running",
-                           "not-a-hub", "hub-unavailable", "protocol", "not_available"])
+                           "not-a-hub", "hub-unavailable", "protocol", "not_available", "foreign-user"])
 
 _whole = lambda v: int(v) if isinstance(v, float) and v.is_integer() else v  # noqa: E731 - 2.0 is 2, as Node reads it
 

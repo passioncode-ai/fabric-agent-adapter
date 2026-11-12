@@ -51,7 +51,12 @@ carry a credential. Only `doctor` and `update` are commands a host may run.
 **Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
 authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's,
 on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers; a
-LaunchDaemon's root installer reads it as *The system domain* says).
+LaunchDaemon's root installer reads it as *The system domain* says). `well_known_of(origin)` / `wellKnownOf(origin)` read
+it so a status tells HA-2's order apart: None / null when nothing answers (`down`), a `ForeignUserAnswer` whose
+`reason` starts `foreign-user` or `table-restricted`, else the document; `fetch_well_known` keeps answering None for
+both (FAA-259). Every loopback spelling of an origin (`127.0.0.1`, another `127/8` address, `localhost`, `[::1]`) is read
+on a checked connection (FAA-257). `launchd_install` takes an injected reader, `fetch_well_known=` and
+`fetch_job_well_known=`, as the Node `launchdInstall` takes `fetchWellKnown` and `fetchJobWellKnown`.
 `status` is `starting`, `ready`, `degraded` or `stopping`; `degraded` is always present, and an empty list asserts
 full health. A process that cannot serve does not answer, and a host derives `down`. An install or upgrade polls
 that document until `service.id` matches (at most 40 s) before it calls the service started (the launchd installers;

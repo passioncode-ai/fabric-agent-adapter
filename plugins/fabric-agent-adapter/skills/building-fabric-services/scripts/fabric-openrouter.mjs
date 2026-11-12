@@ -277,6 +277,9 @@ export class Client {
         }
         attempts.push({ model: current, status: result.status, outcome: result.outcome });
         if (result.answer) return { ...result.answer, attempts };
+        if (result.outcome === 'foreign-user') { // FAA-257: the fallback would go to the same refused listener
+          throw new OpenRouterError('The base URL\'s port is held by another OS account\'s process, or its owner cannot be told; nothing was sent (DEC-0154 HA-2)', { kind: 'foreign-user', attempts });
+        }
         if (Object.values(STOP_AT_ONCE).includes(result.outcome)) {
           throw new OpenRouterError(`OpenRouter refused the key or the request (${result.status})`, { kind: result.outcome, attempts });
         }
@@ -299,6 +302,7 @@ export class Client {
         // may have been billed (a cut connection looks like a refused one from here): counted, never as $0
         this.ledger.record(this.unmeasured(asked, taskRunId, worst));
       }
+      if (err.kind === 'foreign-user') return { outcome: 'foreign-user', status: err.status }; // nothing sent, nothing billed (FAA-257)
       return { outcome: ['connection', 'timeout'].includes(err.kind) ? 'retry' : 'refused', status: err.status };
     }
     const { status } = response;

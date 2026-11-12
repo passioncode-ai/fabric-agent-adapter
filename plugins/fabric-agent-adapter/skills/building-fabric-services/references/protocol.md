@@ -157,6 +157,9 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   `auth.delegation {issuer, jwks}` is then required. With `own` or `delegation` the descriptor's
   token is not an MCP credential: a host and the probe never call `/mcp` with it as a caller.
   The kits verify them with `fabric_delegation` / `fabric-delegation.mjs` ([delegation](delegation.md)).
+- `surfaces.mcp.capabilities` and an action's `tool` never name `project.work` (`PRIMARY_CAPABILITY`): DEC-0140 PR-1
+  reserves it for a Project's primary responder, a session, and no service serves or declares it. `build_well_known`
+  / `buildWellKnown` refuse it with `ServiceError` (FAA-244); a longer name such as `project.workspace` is not reserved.
 
 ## Events page: `GET /fabric/v1/events?after=<cursor>&limit=<n>`
 

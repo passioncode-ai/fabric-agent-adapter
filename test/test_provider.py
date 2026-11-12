@@ -226,6 +226,19 @@ class SchemaParityTests(unittest.TestCase):
                        "bot:fixture@github.com:example-org/r#://", "https:u@h/o/r/x://y"):  # a user is an authority's (readings 7, 8)
             self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": opaque})), [], opaque)
 
+    def test_a_uri_is_rfc_3986_characters_as_the_contract_reads_it(self):
+        # FAA-127: ajv-formats `uri` refuses a byte-order mark, a zero-width space, a non-ASCII path and an IDN host;
+        # the service kit's descriptor check has used the RFC 3986 class since 0.49.3.
+        for bad in ("\ufeffhttps://agents.example/providers/x", "https://agents.example/\u200bx",
+                    "https://agents.example/caf\u00e9", "https://b\u00fccher.example/x", "https://agents.example/a b"):
+            self.assertNotEqual(fp.validate_provider_entry(entry(providerId=bad)), [], ascii(bad))
+            self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": bad})), [], ascii(bad))
+            self.assertNotEqual(fp.validate_provider_entry(entry(extensions={bad: 1})), [], ascii(bad))
+        for good in ("https://agents.example/providers/x", "https://agents.example/caf%C3%A9", "urn:example:agent",
+                     "https://[::1]:8443/x", "https://xn--bcher-kva.example/x"):
+            self.assertEqual(fp.validate_provider_entry(entry(providerId=good)), [], good)
+            self.assertEqual(fp.validate_provider_entry(entry(extensions={good: 1})), [], good)
+
     def test_each_argument_is_at_most_1024_characters(self):
         self.assertNotEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x", "a" * 1025]}}})), [])
         self.assertEqual(fp.validate_provider_entry(entry(run={"mcp": {"stdio": {"command": ["/bin/x", "a" * 1024]}}})), [])

@@ -366,6 +366,10 @@ class Client:
                 if answer is not None:
                     answer["attempts"] = attempts
                     return answer
+                if outcome == "foreign-user":  # FAA-257: the fallback would go to the same refused listener
+                    raise OpenRouterError("The base URL's port is held by another OS account's process, or its owner "
+                                          "cannot be told; nothing was sent (DEC-0154 HA-2)", kind="foreign-user",
+                                          attempts=attempts)
                 if outcome in _STOP_AT_ONCE.values():
                     raise OpenRouterError("OpenRouter refused the key or the request (%s)" % status, kind=outcome,
                                           attempts=attempts)
@@ -390,6 +394,8 @@ class Client:
                 # the provider may have billed a call whose answer never arrived whole (a cut connection looks the
                 # same as a refused one from here): counted, never as $0; over-counting is the safe side
                 self.ledger.record(self._unmeasured(asked, task_run_id, worst))
+            if err.kind == "foreign-user":  # nothing was sent: nothing billed, and no other model there (FAA-257)
+                return "foreign-user", err.status, None, None
             return ("retry" if err.kind in ("connection", "timeout") else "refused"), err.status, None, None
         status = response.status
         if status in _STOP_AT_ONCE:

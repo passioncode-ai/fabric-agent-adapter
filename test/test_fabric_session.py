@@ -303,6 +303,21 @@ class Hub(Base):
         self.assertEqual(fs.locate_hub(self.root)["state"], "not-a-hub")
         self.assertLess(time.perf_counter() - started, 1.0)
 
+    def test_another_account_s_process_under_the_pid_is_not_verified(self):
+        # FAA-254: EPERM is a process of another OS account under the id hub.json names (a reused pid): never called
+        # running, said as not verified
+        from unittest import mock
+        with mock.patch.object(fs.os, "kill", side_effect=PermissionError(1, "Operation not permitted")):
+            if sys.platform != "win32":
+                self.assertIsNone(fs.pid_alive(4242))
+        self.hub()
+        hub = fs.locate_hub(self.root, alive=lambda pid: None)
+        self.assertEqual(hub["state"], "not-a-hub")
+        self.assertIn("another OS account", hub["reason"])
+        self.assertIn("not verified", hub["reason"])
+        self.assertEqual(fs.locate_hub(self.root, alive=lambda pid: True)["state"], "running")
+        self.assertEqual(fs.locate_hub(self.root, alive=lambda pid: False)["state"], "not-running")
+
     def test_running_hub_and_its_features(self):
         self.hub(features=["session-hooks/1", 3])
         hub = fs.locate_hub(self.root)

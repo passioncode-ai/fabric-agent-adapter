@@ -81,7 +81,7 @@ const answer = await client.chat(messages, { model, fallback, maxTokens: 800 });
 | Receipts | every status-200 answer records one, and so does an attempt that may have been billed without an answer to read (a timeout, a cut or refused connection, a 200 over the size cap or not JSON: no tokens, `costUsd: null`, `tokensMeasured: false`; over-counting a refused connection is the safe side): the served model, the provider's tokens (cache reads and writes kept apart), `costUsd` from `usage.cost`, else from the price list (`costBasis: price-list`), else `null` with `tokensMeasured: false`; `route: key`, the client's `project_id` and the call's `task_run_id`. A request the provider answered with a 4xx or 5xx records nothing: it was not billed |
 | What is an answer | `finish_reason` `stop` or `tool_calls` with content or tool calls; `error` is retried on the same model; `length` (the budget ran out, reasoning included), `content_filter` and empty content go to the fallback |
 | Retries | 408, 425, 429, 500, 502, 503, 504 and connection errors on the same model, `retries` times (default 1), `Retry-After` honoured, within one deadline (`deadline_s` 120) for the whole call |
-| Stop at once | 401, 402 and 403 (kinds `auth`, `payment`): a key, credit or permission problem is the same on every model |
+| Stop at once | 401, 402 and 403 (kinds `auth`, `payment`): a key, credit or permission problem is the same on every model; a loopback `base_url` another OS account's process holds (kind `foreign-user`, nothing sent, nothing counted): the fallback would reach the same listener (FAA-257) |
 | The fallback | required, of another vendor (the part before `/` differs) |
 | Content | text only: a string, null, or parts that are all `{"type": "text"}`; an image, audio or file part is refused (`config`), because what it is billed cannot be bounded from its bytes |
 | What the ceiling does not cover | the `provider` routing param can send a call to a provider priced above the catalog; two `Client` objects sharing one ledger each hold only their own calls in flight, so give an agent one client per key |
@@ -90,7 +90,7 @@ const answer = await client.chat(messages, { model, fallback, maxTokens: 800 });
 | Request body | `model`, `messages`, `max_tokens`, `usage: {include: true}` and your params (temperature, reasoning, response_format, tools); `stream`, `model`, `messages`, `max_tokens` and `usage` as params are refused |
 
 `OpenRouterError.attempts` lists every attempt as `{model, status, outcome}` (`answered`, `retry`, `error`,
-`length`, `filtered`, `empty`, `refused`, `bad-answer`, `auth`, `payment`); nothing in it holds the key or the
+`length`, `filtered`, `empty`, `refused`, `bad-answer`, `auth`, `payment`, `foreign-user`); nothing in it holds the key or the
 prompt. `totals(receipts)` gives calls, priced spend and unpriced calls for a dashboard line. Choosing the models
 themselves: creating-fabric-agents, `references/models-and-providers.md`.
 

@@ -12,9 +12,11 @@
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
 import { hubKeyCertified } from './fabric-estate.mjs';
 import { atomicWrite } from './fabric-paths.mjs'; // the kit's private writer (FAA-85)
+import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs'; // a loopback key set from this account's listener only (FAA-255)
 import { effectClosure } from './fabric-mandate.mjs'; // defined once beside the mandate that reads it too (DEC-0125)
 
 export const REFUSAL_CODES = Object.freeze([
@@ -411,8 +413,34 @@ export const actionDigest = (action) => `sha256:${crypto.createHash('sha256').up
 
 const loopback = (host) => host === 'localhost' || (net.isIP(host.replace(/^\[|\]$/g, '')) !== 0 && (/^127\./.test(host) || host.replace(/^\[|\]$/g, '') === '::1'));
 
+const KEY_SET_MAX = 65536;
+const KEY_SET_AGENT = new CheckedAgent({ keepAlive: false });
+
+// Plain http, which a key set source allows on loopback only: through a CheckedAgent, so the listener's owner is told
+// before a byte is written and keys another OS account's process serves are never read (DEC-0154 HA-2, FAA-255).
+function loopbackKeySet(source, agent) {
+  return new Promise((resolve, reject) => {
+    const request = http.get(source.split('#')[0], { agent, headers: { Accept: 'application/json' }, timeout: 5000 }, (response) => {
+      if (response.statusCode < 200 || response.statusCode > 299) { response.resume(); reject(new Error(`HTTP ${response.statusCode}`)); return; }
+      let text = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => { text += chunk; if (text.length > KEY_SET_MAX) { request.destroy(); reject(new Error('the key set is too large')); } });
+      response.on('end', () => { try { resolve(JSON.parse(text)); } catch (e) { reject(e); } });
+      response.on('error', reject);
+    });
+    request.on('timeout', () => request.destroy(new Error('the key set did not arrive within 5 s')));
+    request.on('error', (e) => reject(e instanceof ListenerRefused ? new Error(`foreign-user: ${e.message}`) : e));
+  });
+}
+
+/** Read a key set source: an https URL (fetch, no redirect), a loopback http URL (checked listener) or a file. */
+export async function fetchKeySet(source, { agent = KEY_SET_AGENT } = {}) {
+  if (/^http:\/\//.test(source)) return loopbackKeySet(source, agent);
+  return defaultFetch(source);
+}
+
 async function defaultFetch(source) {
-  if (/^https?:\/\//.test(source)) {
+  if (/^https:\/\//.test(source)) {
     const response = await fetch(source, { headers: { Accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(5000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     if (Number(response.headers.get('content-length') ?? 0) > 65536) throw new Error('the key set is too large');
@@ -428,7 +456,7 @@ async function defaultFetch(source) {
  * `await get(kid)` answers null when no set younger than 10 minutes can be had (issuer-unavailable).
  */
 export class JwksCache {
-  constructor(source, { fetch: fetcher = defaultFetch, clock = () => Date.now() / 1000 } = {}) {
+  constructor(source, { fetch: fetcher = fetchKeySet, clock = () => Date.now() / 1000 } = {}) {
     if (typeof source !== 'string' || !source) throw new Error('the key set needs a source');
     if (/^https?:\/\//.test(source)) {
       const url = new URL(source);

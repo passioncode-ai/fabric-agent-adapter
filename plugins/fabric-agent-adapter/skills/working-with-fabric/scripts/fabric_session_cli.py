@@ -334,7 +334,7 @@ def dispatch_cleared_from(dispatch: Dict[str, str], env: Optional[Dict[str, str]
     folder, key = _dispatch_record(dispatch, env)
     try:
         held = json.loads(read_small(folder / (key + ".json")) or "null")
-    except ValueError:
+    except (ValueError, RecursionError):  # 3.9 raises RecursionError on a deep record (FAA-208)
         return None
     if not isinstance(held, dict) or "cleared_from" not in held:
         return None
@@ -359,7 +359,7 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     if take_over:
         try:
             held = json.loads(read_small(folder / (key + ".json")) or "null")
-        except ValueError:
+        except (ValueError, RecursionError):
             held = None
         # no record: no prompt of this process confirmed the run (Fabric's spec 3.5), so the clear holds nothing. On
         # Windows the hook's parent is the Git Bash a hook runs in, a new one each time, so a /clear cannot tell the
@@ -384,13 +384,18 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
             return True
         # another agent process holds it: this is a session inside the run that cleared, still nested
     try:
+        # a `dispatch` that is not a folder raises FileExistsError here: a folder that cannot be written, never an
+        # existing record (FAA-208)
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
+    except OSError:
+        return True
+    try:
         fd = os.open(str(folder / (key + ".json")), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
         held = read_small(folder / (key + ".json")) or ""
         try:
             return json.loads(held).get("session") == session_id
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, RecursionError):
             return False
     except OSError:
         return True
@@ -418,7 +423,7 @@ def dispatch_held_elsewhere(dispatch: Dict[str, str], session_id: Any, env: Opti
         return False
     try:
         return json.loads(read_small(folder / (key + ".json")) or "null").get("session") != session_id
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, RecursionError):
         return True
 
 

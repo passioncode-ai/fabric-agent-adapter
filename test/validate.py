@@ -621,21 +621,59 @@ def validate_plugin_lifecycle(errors: List[str], plugin: Path) -> None:
                 errors.append("LC-21: a hook command carries a credential; argv is visible to every process")
 
 
+def board_cells(line: str) -> List[str]:
+    """A table row's cells as fabric-workspace `lib/backlog.mjs` `cells()` reads them (FAA-214): `\\|` is a literal
+    pipe wherever it stands, a backtick run opens a code span that only a run of the same length closes, and a `|`
+    inside a code span is text. An unbalanced run keeps the span open to the end of the line."""
+    result: List[str] = []
+    cell, ticks, i = "", 0, 0
+    while i < len(line):
+        c = line[i]
+        if c == "\\" and line[i + 1:i + 2] == "|":
+            cell += "|"
+            i += 2
+            continue
+        if c == "`":
+            n = 1
+            while line[i + n:i + n + 1] == "`":
+                n += 1
+            if not ticks:
+                ticks = n
+            elif ticks == n:
+                ticks = 0
+            cell += "`" * n
+            i += n
+            continue
+        if c == "|" and not ticks:
+            result.append(cell.strip())
+            cell = ""
+        else:
+            cell += c
+        i += 1
+    result.append(cell.strip())
+    if result and result[0] == "":
+        result.pop(0)
+    if result and result[-1] == "":
+        result.pop()
+    return result
+
+
 def malformed_board_rows(text: str) -> List[str]:
-    """Rows of a task table that do not split into its header's columns. The common-backlog aggregator splits a row on
-    every `|`, an escaped `\\|` included, so a cell that holds one breaks the workspace's publication."""
+    """Rows of a task table that do not split into its header's columns, read cell by cell as the common-backlog
+    aggregator reads them (`board_cells`), so a row with a bare `|` in a cell, or an unbalanced backtick run that
+    swallows the pipes after it, fails here before it fails the whole source at workspace sync."""
     problems: List[str] = []
     width = None
     for number, line in enumerate(text.splitlines(), 1):
         if not line.startswith("|"):
             width = None
             continue
-        cells = len(line.strip().strip("|").split("|"))
+        cells = len(board_cells(line))
         if width is None:
             width = cells  # the header row
         elif not re.fullmatch(r"\|[\s:|-]+\|?", line.strip()) and cells != width:
-            problems.append("docs/backlog.md:%d: a task row with %d cells in a table of %d (a `|` inside a cell, escaped or not, splits it)"
-                            % (number, cells, width))
+            problems.append("docs/backlog.md:%d: a task row with %d cells in a table of %d (a bare `|` in a cell, or a "
+                            "backtick run left open, splits it)" % (number, cells, width))
     return problems
 
 

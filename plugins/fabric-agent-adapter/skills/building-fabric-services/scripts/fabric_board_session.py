@@ -148,6 +148,9 @@ class Responder(SlotKeeper):
         caps = list(capabilities)
         if not caps or any(not isinstance(c, str) or not _CAPABILITY.fullmatch(c) for c in caps) or len(set(caps)) != len(caps):
             raise BoardError("invalid_arguments", "Name each capability once, [a-z][a-z0-9._-]{1,127}.")
+        if _fs.PRIMARY_CAPABILITY in caps:  # FAA-244: DEC-0140 PR-1, a session's slot, never a service's
+            raise BoardError("invalid_arguments", "%s is a Project's primary responder's, a session's: a service answers "
+                             "the capabilities it declares (DEC-0140 PR-1)." % _fs.PRIMARY_CAPABILITY)
         self.hub, self.project = hub, _hub._project(project_id)
         #: FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; None reads none).
         self.mandate_from, self.agent_id, self.wall = _link.mandate_options(agent_id, mandate_from), agent_id, wall
@@ -258,7 +261,7 @@ class Responder(SlotKeeper):
         status = self._status()
         if missing:
             self._emit("board.access.needed", "warning", "The operator has not let this service answer %s on this Project; ask in "
-                       "Fabric (Agents & access)." % ", ".join(missing), notify=True, episode=",".join(missing),
+                       "Fabric (Settings → Agent access)." % ", ".join(missing), notify=True, episode=",".join(missing),
                        capabilities=missing)
         self.slots = {}
         self._recover(status, [c for c in self.capabilities if c in grant.capabilities])
@@ -549,7 +552,7 @@ class Responder(SlotKeeper):
             self.state = "not-authorized"
             self._drop_session()
             self._emit("board.access.needed", "warning", "This service may not answer requests for this Project: the operator "
-                       "has to allow it in Fabric (Agents & access). Nothing is claimed until then.", notify=True,
+                       "has to allow it in Fabric (Settings → Agent access). Nothing is claimed until then.", notify=True,
                        episode="access", reason=code)
         elif code == "held":
             self.state = "paused"
@@ -564,9 +567,13 @@ class Responder(SlotKeeper):
         else:
             self.state = "down"
             # In recovery with no slot held a refusal reconnects (seam 6); with some held they are served (seam 7).
-            if (connecting or code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol")) and not keep:
+            if (connecting or code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol",
+                                       "foreign-user")) and not keep:
                 self._drop_session()
-            self._emit("board.down", "warning", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
+            # FAA-252: a port another OS account holds is said as such; nothing was sent there
+            self._emit("board.down", "warning", "Fabric's board port is held by another OS account's process; nothing was sent, "
+                       "and the responder tries again with a growing pause." if code == "foreign-user" else
+                       "Fabric's board cannot be reached; the responder tries again with a growing pause.",
                        episode="down", reason=code)
         return wait
 

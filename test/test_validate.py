@@ -606,11 +606,19 @@ class BoardRowTests(unittest.TestCase):
 
     TABLE = "| ID | Item | Status | Source |\n|---|---|---|---|\n"
 
-    def test_a_pipe_in_a_cell_is_refused_escaped_or_not(self):
-        for cell in ("`--to me\\|person`", "a|b"):
+    def test_a_bare_pipe_in_a_cell_is_refused(self):
+        found = validate.malformed_board_rows(self.TABLE + "| X-1 | a|b | open | here |\n")
+        self.assertEqual(len(found), 1)
+        self.assertIn("docs/backlog.md:3", found[0])
+
+    def test_cells_are_read_as_the_aggregator_reads_them(self):
+        # FAA-214: fabric-workspace lib/backlog.mjs cells(): a backtick run opens a code span the same run closes, a
+        # `|` inside it is text, and `\\|` anywhere is a literal pipe
+        for cell in ("`--to me\\|person`", "`a|b`", "a\\|b", "``a ` |b``", "`x` and `y|z`"):
+            self.assertEqual(validate.malformed_board_rows(self.TABLE + "| X-1 | %s | open | here |\n" % cell), [], cell)
+        for cell in ("`a", "`a|b` `c", "``a`|b"):  # an unbalanced run swallows the pipes after it, as cells() does
             found = validate.malformed_board_rows(self.TABLE + "| X-1 | %s | open | here |\n" % cell)
             self.assertEqual(len(found), 1, cell)
-            self.assertIn("docs/backlog.md:3", found[0])
 
     def test_a_well_formed_table_passes(self):
         self.assertEqual(validate.malformed_board_rows(self.TABLE + "| X-1 | item | open | here |\n\ntext\n| A | B |\n|---|---|\n| 1 | 2 |\n"), [])

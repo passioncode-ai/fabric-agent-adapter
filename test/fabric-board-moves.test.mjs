@@ -203,3 +203,21 @@ test('0.56.0 seam r7: a close timeout not above 0 is the session\'s own, as in P
 test('0.56.0 seam r8: a constructor timeout not above 0 is the default, as in Python', () => {
   for (const timeout of [0, -1]) assert.equal(new fb.BoardSession({}, { timeout }).timeout, 15000);
 });
+
+test('FAA-252: a hub port another OS account holds is foreign-user, never unreachable; board.down says so', async (t) => {
+  const grant = { origin: 'http://127.0.0.1:1', bearer: () => 'x' };
+  const refused = async () => { throw new fh.HubError('foreign-user', 'The hub\'s port is not held by this OS account\'s process; nothing was sent.', true); };
+  const s = new fb.BoardSession(grant, { post: refused });
+  await assert.rejects(s.open(), (e) => e.code === 'foreign-user' && e.retryable === true && !/may have been stored/.test(e.message));
+  s.mcpSession = 's-1';
+  await assert.rejects(s.call('com.status', {}), (e) => e.code === 'foreign-user');
+  const { SESSION_CODES } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board-slots.mjs');
+  assert.ok(SESSION_CODES.has('foreign-user'));
+  const events = [];
+  const r = Object.create(fb.Responder.prototype);
+  Object.assign(r, { state: 'running', slots: {}, backoff: { next: () => 1 }, now: () => 0, leaseLeft: () => 0, emit: (...e) => events.push(e), dropSession: async () => {} });
+  await fb.Responder.prototype.fault.call(r, new fb.BoardError('foreign-user', 'nothing was sent', true));
+  const down = events.filter((e) => e[0] === 'board.down').at(-1);
+  assert.equal(down[3].reason, 'foreign-user');
+  assert.match(down[2], /another OS account/);
+});

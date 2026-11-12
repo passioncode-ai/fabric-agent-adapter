@@ -207,6 +207,26 @@ class LaunchdInstallTests(unittest.TestCase):
         self.assertTrue(job.called)
         self.assertIs(fs.launchd_pid, sup.launchd_pid, "the facade carries it, as the Node one carries launchdPid")
 
+    def test_faa259_the_installer_takes_an_injected_reader_as_the_node_one_does(self):
+        sup = sys.modules["fabric_supervisors"]
+        body = fs.launchd_plist(self.label, ["/bin/echo", "1"], working_directory=Path(self.temp.name),
+                                stdout_path=Path(self.temp.name) / "service.log")
+        asked = []
+
+        def foreign(origin, vouch_pid=None):
+            asked.append((origin, vouch_pid))
+            return sup.ForeignUserAnswer("foreign-user: the server on port 1 belongs to system; nothing was sent")
+        with FakeLaunchd(), self.assertRaises(fs.ServiceError) as caught:
+            fs.launchd_install(self.label, self.plist, body, origin=self.web.origin, service_id="example-agent",
+                               timeout=1, fetch_well_known=foreign)
+        self.assertIn("is not this service's: foreign-user: ", str(caught.exception))
+        self.assertTrue(asked and asked[0] == (self.web.origin, None))
+        doc = {"service": {"id": "example-agent", "instance": "default"}}
+        with FakeLaunchd():
+            self.assertEqual(fs.launchd_install(self.label, self.plist, body, origin=self.web.origin,
+                                                service_id="example-agent", timeout=5,
+                                                fetch_well_known=lambda origin, vouch_pid=None: doc), doc)
+
     def test_faa267_a_readable_table_asks_launchctl_for_no_pid(self):
         sup = sys.modules["fabric_supervisors"]
         with FakeLaunchd(), mock.patch.object(sup, "launchd_pid") as job:

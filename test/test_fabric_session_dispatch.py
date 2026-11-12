@@ -855,5 +855,71 @@ class Hooks(Base):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"})
         self.assertNotIn("observatory_handoff_accept", done.stdout)
 
+class DamagedFolder(Base):
+    """FAA-208: a hooks folder damaged by hand gives the same answers on every Python the plugin runs on."""
+
+    OTHER = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
+
+    def record(self, env, text):
+        folder, key = cli._dispatch_record(FULL, env)
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / (key + ".json")).write_text(text)
+        return folder / (key + ".json")
+
+    def readers(self, env):
+        return (cli.dispatch_cleared_from(FULL, env), cli.dispatch_held_elsewhere(FULL, SID, env),
+                cli.dispatch_holder(FULL, SID, env), cli.dispatch_holder(FULL, SID, env, take_over=True))
+
+    def test_a_record_too_deep_to_parse_is_another_session_s_in_every_reader(self):
+        from unittest import mock
+        env = dict(self.env, **ENV)
+        self.record(env, json.dumps({"session": self.OTHER}))
+        # Python 3.9 raises RecursionError on a deep text where 3.14 parses it: both read as unreadable
+        with mock.patch.object(cli.json, "loads", side_effect=RecursionError("deep")):
+            self.assertEqual(self.readers(env), (None, True, False, False))
+
+    def test_a_deeply_nested_record_reads_the_same_on_every_python(self):
+        env = dict(self.env, **ENV)
+        self.record(env, '{"session": ' + "[" * 30000 + "]" * 30000 + "}")
+        self.assertEqual(self.readers(env), (None, True, False, False))
+
+    def test_a_dispatch_path_that_is_a_file_makes_this_session_the_holder(self):
+        # the folder cannot be written: the contract twice rather than never, as for any folder that cannot be written
+        env = dict(self.env, **ENV)
+        folder, _ = cli._dispatch_record(FULL, env)
+        folder.parent.mkdir(parents=True, exist_ok=True)
+        folder.write_text("not a folder")
+        self.assertTrue(cli.dispatch_holder(FULL, SID, env))
+        self.assertFalse(cli.dispatch_held_elsewhere(FULL, SID, env))
+
+    def test_a_dangling_link_record_is_pruned(self):
+        import time
+        env = dict(self.env, **ENV)
+        folder, key = cli._dispatch_record(FULL, env)
+        folder.mkdir(parents=True)
+        link = folder / (key + ".json")
+        os.symlink(str(folder / "gone"), str(link))
+        try:
+            os.utime(str(link), (1, 1), follow_symlinks=False)
+        except (NotImplementedError, OSError):
+            self.skipTest("NOT_RUN: this platform cannot set a link's own time")
+        self.assertEqual(importlib.import_module("fabric_session_env").prune_dispatch_records(env, now=time.time()), 1)
+        self.assertFalse(os.path.lexists(str(link)))
+
+    @unittest.skipIf(os.name == "nt" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+                     "NOT_RUN: needs a POSIX account that a folder's mode binds")
+    def test_an_unsearchable_folder_holds_nothing_elsewhere(self):
+        # the lexists half of dispatch_held_elsewhere: a record that cannot be looked up is no other session's, as
+        # dispatch_holder's refused open makes this session the holder
+        env = dict(self.env, **ENV)
+        path = self.record(env, json.dumps({"session": self.OTHER}))
+        os.chmod(str(path.parent), 0o000)
+        try:
+            self.assertFalse(cli.dispatch_held_elsewhere(FULL, SID, env))
+            self.assertTrue(cli.dispatch_holder(FULL, SID, env))
+        finally:
+            os.chmod(str(path.parent), 0o700)
+
+
 if __name__ == "__main__":
     unittest.main()

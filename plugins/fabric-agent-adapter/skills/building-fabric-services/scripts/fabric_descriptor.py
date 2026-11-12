@@ -18,6 +18,7 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from fabric_base import (
+    PRIMARY_CAPABILITY,
     PROTOCOL,
     ServiceError,
     _ID,
@@ -49,7 +50,7 @@ from fabric_usage import (
 DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
 
 
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.5"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.6"
 
 
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
@@ -628,6 +629,11 @@ def configuration_problems(doc: Any) -> List[str]:
     return problems
 
 
+#: FAA-244: DEC-0140 PR-1 reserves the primary responder's capability; a service never publishes it.
+_RESERVED = ("%%s: %s is reserved for a Project's primary responder, a session (DEC-0140 PR-1); a service never "
+             "serves it as a tool or declares it." % PRIMARY_CAPABILITY)
+
+
 def build_well_known(*, service_id: str, instance: str, name: str, version: str, build: Dict[str, Any],
                      started_at: str, status: str, degraded: Sequence[Dict[str, str]],
                      surfaces: Dict[str, Any], summary: Optional[Sequence[Dict[str, Any]]] = None,
@@ -664,6 +670,10 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
         problems = a2a_surface_problems(surfaces["a2a"])
         if problems:
             raise ServiceError("surfaces.a2a: %s." % "; ".join(problems))
+    mcp_surface = surfaces.get("mcp")
+    listed = mcp_surface.get("capabilities") if isinstance(mcp_surface, dict) else None
+    if isinstance(listed, list) and PRIMARY_CAPABILITY in listed:
+        raise ServiceError(_RESERVED % "surfaces.mcp.capabilities")
     doc: Dict[str, Any] = {
         "protocol": PROTOCOL,
         "service": {"id": service_id, "instance": instance, "name": name, "version": version, "build": build},
@@ -698,6 +708,9 @@ def build_well_known(*, service_id: str, instance: str, name: str, version: str,
                                                 "surfaces": surfaces})
             if findings:
                 raise ServiceError("Actions declaration: %s." % "; ".join(f["message"] for f in findings))
+            if any(isinstance(a, dict) and a.get("tool") == PRIMARY_CAPABILITY
+                   for a in extensions[ACTIONS_EXTENSION_KEY].get("actions") or []):
+                raise ServiceError(_RESERVED % "an action's tool")
         doc["extensions"] = dict(extensions)
     if configuration is not None:
         problems = configuration_problems(configuration)

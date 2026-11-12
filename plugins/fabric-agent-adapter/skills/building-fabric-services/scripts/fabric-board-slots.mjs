@@ -14,7 +14,7 @@ export const HOLD_RETRY_MAX_SECONDS = 900;
 
 /** Refusals that are about the board session, not one capability: they end recovery and go to the responder's fault. */
 export const SESSION_CODES = Object.freeze(new Set(['unreachable', 'session-ended', 'not_authorized', 'authority_changed', 'credential', 'no-epoch',
-  'schema-unsupported', 'checkpoint', 'receipt-shape', 'idempotency_conflict', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol', 'not_available']));
+  'schema-unsupported', 'checkpoint', 'receipt-shape', 'idempotency_conflict', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol', 'not_available', 'foreign-user']));
 
 const sameRecord = (a, b) => JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
 

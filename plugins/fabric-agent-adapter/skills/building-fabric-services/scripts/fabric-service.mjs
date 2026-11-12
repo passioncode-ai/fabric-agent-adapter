@@ -5,6 +5,7 @@
 export {
   PROTOCOL,
   EXTENSION_KEY,
+  PRIMARY_CAPABILITY,
   SUPERVISOR_ENV,
   DRAIN_SECONDS,
   ServiceError,
@@ -179,6 +180,7 @@ export {
   launchdPlist,
   SYSTEM_DAEMONS,
   launchdDomain,
+  wellKnownOf,
   jobWellKnownOf,
   ForeignUserAnswer,
   launchdLoaded,
