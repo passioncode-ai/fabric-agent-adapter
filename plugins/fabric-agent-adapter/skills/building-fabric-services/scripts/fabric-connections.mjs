@@ -3,7 +3,7 @@
 // connectionsExtension builds the `extensions` entry a service declares, `state` from its own checks and its degraded[].
 // Part of the Node service kit (FAA-62, layer L3); the twin of fabric_connections.py. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';
-import { BEARER_INSIDE, JWT_SHAPE, longSecret, secretUrl } from './fabric-secrets.mjs';
+import { BEARER_INSIDE, hasJwt, longSecret, secretUrl } from './fabric-secrets.mjs';
 import { isObject } from './fabric-jsvalue.mjs';
 
 export const CONNECTIONS_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1';
@@ -112,8 +112,9 @@ const longRun = (value) =>
     const cut = at < 0 ? -1 : piece.indexOf('://', at);
     return longSecret(cut < 0 ? piece : piece.slice(0, cut));
   });
+// hasJwt reads a JWT in one pass, where JWT_SHAPE backtracks from every `eyJ` of a long run (FAA-313).
 const credential = (value, runs) =>
-  JWT_SHAPE.test(value) || KEY_SHAPE.test(value) || BEARER_INSIDE.test(value) || (runs && longRun(value)) || urlsIn(value).some(secretUrl);
+  hasJwt(value) || KEY_SHAPE.test(value) || BEARER_INSIDE.test(value) || (runs && longRun(value)) || urlsIn(value).some(secretUrl);
 
 /** What the schema cannot state: an id named twice, a credential in any string member. */
 function beyondShape(list) {

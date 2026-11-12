@@ -28,6 +28,24 @@ CREDENTIAL_PAIRS = {
     'session': {'token', 'id'},
     'code': {'login', 'auth', 'access', 'session'}}
 JWT_SHAPE = re.compile(r'eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*')
+URL_BASE64_RUN = re.compile(r'[A-Za-z0-9_-]*')
+
+
+def has_jwt(text):
+    # Whether JWT_SHAPE matches anywhere, read in one pass (the contract's hasJwt, FAA-313): the expression backtracks
+    # from every `eyJ` of a long run, quadratic in it, while every `eyJ` of one run shares that run's end, so only its
+    # first is tried. The kit's fabric_secrets.has_jwt reads the same way; this file stands alone, so it has its own.
+    at = text.find('eyJ')
+    while at >= 0:
+        one = URL_BASE64_RUN.match(text, at + 3).end()
+        if one - at - 3 >= 2 and text[one:one + 1] == '.':
+            two = URL_BASE64_RUN.match(text, one + 1).end()
+            if two - one - 1 >= 2 and text[two:two + 1] == '.':
+                return True
+        at = text.find('eyJ', one)
+    return False
+
+
 # The contract's SECRET_VALUE at the pin (DEC-0151): `Bearer ` at a value's start in any case, or a provider key with its
 # prefix in its canonical case after a boundary (the start, a character that is no ASCII letter or digit, or an escape);
 # an `sk-` key holds a digit and an upper-case letter with 16 or more characters, or a digit with 32 or more.
@@ -58,7 +76,7 @@ def credential_name(name):
 def secret_value(value):
     long_secret = any(re.search(r'[a-z]', run) and re.search(r'[A-Z]', run) and re.search(r'[0-9]', run)
                       for run in LONG_RUN.findall(value))
-    return bool(JWT_SHAPE.search(value) or SECRET_VALUE.search(value) or long_secret)
+    return bool(has_jwt(value) or SECRET_VALUE.search(value) or long_secret)
 
 
 def carries_credential(text):

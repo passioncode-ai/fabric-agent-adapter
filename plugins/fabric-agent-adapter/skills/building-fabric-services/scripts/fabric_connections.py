@@ -15,7 +15,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_secrets import (  # noqa: E402
-    JWT_SHAPE, _BEARER_INSIDE as _BEARER, _long_secret, credential_name, raw_values, secret_argument, secret_value,
+    _BEARER_INSIDE as _BEARER, _long_secret, credential_name, has_jwt, raw_values, secret_argument, secret_value,
 )
 # The WHATWG host reading and its IDNA tables (FAA-98) live in fabric_secrets since FAA-309, where secret_url reads a
 # URL's host with them; the names stay here for code and tests that reached them.
@@ -279,7 +279,7 @@ def _secret_url(value: str) -> bool:
 
 
 def _credential(value: str, runs: bool) -> bool:
-    return bool(JWT_SHAPE.search(value) or _KEY_SHAPE.search(value) or _BEARER.search(value)
+    return bool(has_jwt(value) or _KEY_SHAPE.search(value) or _BEARER.search(value)  # has_jwt: one pass (FAA-313)
                 or (runs and _long_run(value)) or any(_secret_url(url) for url in _urls_in(value)))
 
 

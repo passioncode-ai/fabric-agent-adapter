@@ -395,6 +395,17 @@ class Findings(Tree):
         # four times the line costs about four times as much; copying the rest of the line per member cost nine
         self.assertLess(growth(lambda n: self.assertIsNone(sc._secret_finding(lines[n])), 14000, 56000), 6.5)
 
+    def test_a_long_run_of_jwt_starts_is_read_in_linear_time(self):
+        """FAA-313 follow-up: the line, span and URL-value readers read a JWT through fabric_secrets' one-pass reader,
+        not JWT_SHAPE's backtracking search, which cost sixteen times the work for four times the text."""
+        texts = {n: "eyJ" * n for n in (4000, 16000)}
+        for name, read in (("_secret_in", sc._secret_in), ("_secret_spans", sc._secret_spans),
+                           ("_url_secret", lambda text: sc._url_secret("https://h.example/?a=" + text))):
+            with self.subTest(read=name):
+                self.assertFalse(read(texts[4000]))
+                # four times the text costs about four times as much; the regular expression cost sixteen
+                self.assertLess(growth(lambda n: read(texts[n]), 4000, 16000), 9)
+
     def test_the_litter_files_the_check_skips_are_packs(self):
         packer = _package_module()
         self.assertTrue(packer.JUNK.pattern.endswith("|" + sc._PACK_JUNK_FILE.pattern), packer.JUNK.pattern)

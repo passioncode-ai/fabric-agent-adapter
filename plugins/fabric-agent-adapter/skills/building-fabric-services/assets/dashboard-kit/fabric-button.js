@@ -37,7 +37,23 @@
     session: ['token', 'id'],
     code: ['login', 'auth', 'access', 'session']
   };
-  var JWT_SHAPE = /eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*/;
+  // Whether /eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*/ matches anywhere, read in one pass (the
+  // contract's hasJwt, FAA-313): the expression backtracks from every `eyJ` of a long run, while every `eyJ` of one run
+  // shares that run's end, so only its first is tried.
+  var URL_BASE64 = /[A-Za-z0-9_-]/;
+  function runEnd(text, from) { while (from < text.length && URL_BASE64.test(text.charAt(from))) from += 1; return from; }
+  function hasJwt(text) {
+    var at = text.indexOf('eyJ');
+    while (at >= 0) {
+      var one = runEnd(text, at + 3);
+      if (one - at - 3 >= 2 && text.charAt(one) === '.') {
+        var two = runEnd(text, one + 1);
+        if (two - one - 1 >= 2 && text.charAt(two) === '.') return true;
+      }
+      at = text.indexOf('eyJ', one);
+    }
+    return false;
+  }
   // The contract's SECRET_VALUE at the pin (DEC-0151), as the kit's fabric-secrets.mjs writes it (FAA-314, kit 1.1.7):
   // `Bearer ` only at a value's start, a provider key's prefix in its canonical case after a boundary.
   var SECRET_VALUE = /(^[Bb][Ee][Aa][Rr][Ee][Rr]\s.+|(?:^|[^A-Za-z0-9]|%[0-9A-Fa-f]{2}|\\[nrt"']|\\u[0-9A-Fa-f]{4}|\\x[0-9A-Fa-f]{2}|\\[bfv0ae]|\\[0-7]{1,3}|%25[0-9A-Fa-f]{2}|\x1b\[[0-9;:]*m|(?:\\u001[bB]|\\x1[bB]|\\e|\\033|\\33)\[[0-9;:]*m)(?:sk-(?=[A-Za-z0-9_-]{0,255}?\d)(?:(?=[A-Za-z0-9_-]{0,255}?[A-Z])[A-Za-z0-9_-]{16,}|[A-Za-z0-9_-]{32,})|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}))/;
@@ -62,7 +78,7 @@
   function longSecret(value) {
     return (value.match(LONG_RUN) || []).some(function (run) { return /[a-z]/.test(run) && /[A-Z]/.test(run) && /[0-9]/.test(run); });
   }
-  function secretValue(value) { return JWT_SHAPE.test(value) || SECRET_VALUE.test(value) || longSecret(value); }
+  function secretValue(value) { return hasJwt(value) || SECRET_VALUE.test(value) || longSecret(value); }
   function decodeKeepingPlus(raw) { try { return decodeURIComponent(raw); } catch (e) { return raw; } }
   function firstKey(text) { var it = new URLSearchParams(text).keys().next(); return it.done ? '' : it.value; }
   function rawValues(query) {

@@ -211,7 +211,7 @@
     "fabric_base",
     "fabric_secrets"
    ],
-   "sha256": "3e59c4aeb8048826283d62a55630b66906b7a77f3567f75dc4b3e4d555366162"
+   "sha256": "ca6a4735b21d285a3ef2c60724f3ead08f5aa707fdfaa3cb5757e02a226132a0"
   },
   {
    "module": "fabric_a2a",
@@ -749,7 +749,7 @@
     "fabric-jsvalue",
     "fabric-secrets"
    ],
-   "sha256": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc"
+   "sha256": "dd82998d7b854bfb4a11fa0fc442357e1037e379f849a91ec21f0f81d73a82fb"
   },
   {
    "module": "fabric-a2a",
@@ -7005,7 +7005,7 @@
    "fabric_package.py": "8b835fcf173b8c345ea6d229edf8ebb98b0f94e9af4894c4a6bd1301f175e2b1",
    "fabric_protocols.py": "3cba881f6f3468e8d8a8455a5d54c5567e748c37291211a1c7f22d195ea562c4",
    "fabric_actions.py": "ae21d1199614c4f74d1dcd1e0a87107a9d52434cd9e2d64aa24a7b1e196fb723",
-   "fabric_connections.py": "3e59c4aeb8048826283d62a55630b66906b7a77f3567f75dc4b3e4d555366162",
+   "fabric_connections.py": "ca6a4735b21d285a3ef2c60724f3ead08f5aa707fdfaa3cb5757e02a226132a0",
    "fabric_a2a.py": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919",
    "fabric_page_links.py": "1b57ea573c550e2f90d1ec3edcc655917ceaa0db9dd1635fccf422ec3024d25e",
    "fabric_load.py": "0e97b6307108c5877a728be8f0c416686130ce98b31c4dfd5d788d9dc61a8860",
@@ -7052,7 +7052,7 @@
    "fabric-package.mjs": "aa75c4f6ff3dade68a47c6187666332a3845b3f5da98b50e3da7824d918e941f",
    "fabric-protocols.mjs": "26eeb8c63e9881d8fa56389455626f2bb80725bbc25b9d6ed756af88c05a848e",
    "fabric-actions.mjs": "06e42f5e24c96311d5417d0d1effa93479ef7128a7ab139903b2bcf59253f6be",
-   "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",
+   "fabric-connections.mjs": "dd82998d7b854bfb4a11fa0fc442357e1037e379f849a91ec21f0f81d73a82fb",
    "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
    "fabric-page-links.mjs": "a8834926e9d4bbf7c4857f551451d2ebf6ac8873bbccaaf89c5e30cf45b17ee6",
    "fabric-load.mjs": "88d9fc5576ac605a038b7ca8a8498aa0dc5848dee94f66c4c7900bd9de48e935",

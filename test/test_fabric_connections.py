@@ -2,6 +2,7 @@
 contract's fixtures/vectors/connections.json (vendored as test/fixtures/contract/connections-vectors.json, each case
 re-answered by the contract's connectionsView); the Node twin runs the same file in fabric-connections.test.mjs."""
 import json
+import sys
 import unittest
 from pathlib import Path
 
@@ -92,6 +93,26 @@ class IdnaHosts(unittest.TestCase):
                 self.assertFalse(fc._secret_url(value))
         self.assertIsNotNone(fc._whatwg_parts("foo:///?token=abcdef"))
         self.assertTrue(fc._secret_url("foo://h:/?token=abcdef"))
+
+
+class OnePassJwt(unittest.TestCase):
+    def test_a_long_run_of_jwt_starts_is_read_in_linear_time(self):
+        """FAA-313 follow-up: a member's credential check reads a JWT through fabric_secrets.has_jwt, not JWT_SHAPE's
+        backtracking search (a member is at most 300 code points once the schema passes; the reader is linear anyway)."""
+        import time
+        clock = time.perf_counter if sys.platform == "win32" else time.thread_time  # FAA-308's clock
+        # `_` ends the scheme search's letter run (a separate reading, bounded by the schema) but not a JWT's run
+        texts = {n: "eyJ_" * n for n in (4000, 16000)}
+        for runs in (False, True):
+            best = {}
+            for _ in range(3):  # each size's fastest of three, measured in turn (FAA-209's rule)
+                for n in (4000, 16000):
+                    started = clock()
+                    self.assertFalse(fc._credential(texts[n], runs))
+                    best[n] = min(best.get(n, float("inf")), clock() - started)
+            # four times the text costs about four times as much; the regular expression cost sixteen
+            self.assertLess(best[16000] / max(best[4000], 1e-9), 9, runs)
+        self.assertTrue(fc._credential("ey" + "J" + "ab.cd.ef", False))
 
 
 class DateTime(unittest.TestCase):

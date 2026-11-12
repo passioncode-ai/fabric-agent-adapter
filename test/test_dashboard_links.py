@@ -223,6 +223,31 @@ class DashboardLinksTest(unittest.TestCase):
         result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(item), text=True, capture_output=True)
         self.assertEqual(result.returncode, 0)
 
+    def test_a_jwt_is_read_in_one_pass_with_the_expressions_answers(self):
+        """FAA-313 follow-up: the standalone gate reads a JWT in one pass (its own has_jwt), with the answers JWT_SHAPE's
+        search gives, in linear time; the expression backtracks from every `eyJ` of a long run."""
+        import importlib.util
+        import random
+        import time
+        spec = importlib.util.spec_from_file_location('check_dashboard_link_jwt', SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        rand = random.Random(313)
+        texts = ['', 'ey' + 'J' + 'ab.cd.', 'x ey' + 'J' + 'ab.c.d', 'ey' + 'J' + 'ab.cd']
+        for _ in range(3000):
+            texts.append(''.join(rand.choice(['eyJ', 'e', 'y', 'J', 'a', '_', '-', '.', ' ', 'b'])
+                                 for _ in range(rand.randint(0, 14))))
+        self.assertEqual([t for t in texts if module.has_jwt(t) != bool(module.JWT_SHAPE.search(t))], [])
+        clock = time.perf_counter if sys.platform == 'win32' else time.thread_time  # FAA-308's clock
+        best = {}
+        for _ in range(3):  # each size's fastest of three, measured in turn (FAA-209's rule)
+            for n in (4000, 16000):
+                started = clock()
+                self.assertFalse(module.secret_value('eyJ' * n))
+                best[n] = min(best.get(n, float('inf')), clock() - started)
+        # four times the text costs about four times as much; the regular expression cost sixteen
+        self.assertLess(best[16000] / max(best[4000], 1e-9), 9)
+
     def test_shared_payload_is_self_contained_and_identical(self):
         for relative in ['scripts/check_dashboard_link.py', 'references/dashboard-links.md']:
             contents = [(SKILLS / name / relative).read_bytes() for name in ['building-fabric-services', 'creating-fabric-agents', 'adapting-projects-to-fabric']]

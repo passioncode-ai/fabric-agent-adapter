@@ -234,7 +234,7 @@ def _url_secret(url: str, depth: int = 0) -> bool:
                 if not _real(value):
                     continue
                 if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
-                        _secrets.JWT_SHAPE.search(value) or URL_SECRET_VALUE.search(value):
+                        _secrets.has_jwt(value) or URL_SECRET_VALUE.search(value):
                     return True
     return False
 
@@ -287,7 +287,7 @@ def _secret_in(line: str) -> Optional[str]:
         return "a private key block"
     if any(_real(m.group(1)) for m in JWK_PRIVATE.finditer(line)):
         return "a private key (a JWK's `d`)"
-    if any(_real(m.group(0)) for m in _secrets.JWT_SHAPE.finditer(line)):
+    if any(_real(line[a:b]) for a, b in _secrets.jwt_spans(line)):  # one pass (FAA-313)
         return "a token shaped like a JWT"
     # The detector reads one configuration value; across a line, `sk-` needs a word start of its own, or every name
     # with a segment ending in `sk` (`task-management-service`) would read as a key.
@@ -486,7 +486,7 @@ def _secret_spans(text: str) -> List[Tuple[int, int]]:
 
 def _raw_secret_spans(text: str) -> List[Tuple[int, int]]:
     spans = [m.span() for m in PRIVATE_KEY.finditer(text)]
-    spans += [m.span() for m in _secrets.JWT_SHAPE.finditer(text) if _real(m.group(0))]
+    spans += [(a, b) for a, b in _secrets.jwt_spans(text) if _real(text[a:b])]  # one pass (FAA-313)
     spans += [m.span(1) for m in JWK_PRIVATE.finditer(text) if _real(m.group(1))]
     spans += list(_provider_keys(text))
     spans += [m.span() for m in _overlapping(_secrets._BEARER_INSIDE, text) if _real(m.group(0))]
