@@ -120,7 +120,11 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    change nothing.
 2. **Live:** wait under a watcher (below) and work on independent tasks meanwhile; never touch files a live session
    holds.
-3. **Nobody live, and the change is small.** Small means all three:
+3. **Nobody live, the machine is the operator's, and the change is small.** The machine's trust decides first
+   (ADR-0176): `fabric_whoami` names it as `protocol.machine` (`trust: mine | organization | unknown`, from Fabric
+   0.3.12, set by the person in Settings). Only `mine` (the operator's own computer, or a remote one of theirs) allows
+   this step; on `organization` or `unknown` never edit another Project: step 4. Before Fabric reports trust, the
+   operator's own computer reads as `mine`, any other as `unknown`. Small means all three:
    - it carries out what the owner's own records already say (its contract, its specification, a backlog row, a
      finding with its evidence) or fixes a defect with a test; it decides nothing new: no ADR or DEC, no change to
      what a public interface means, nothing recorded as the owner's or the operator's decision;
@@ -130,32 +134,50 @@ A request to a Project whose owner is not working now would wait for nobody. Aft
    Make it in your own worktree of the owner's repository by its AGENTS.md (its branch naming, its agent-sync leases,
    its gate green, its handoff and a backlog row closed with the receipt), and integrate the pull request as its rules
    allow. Then reply on the request's thread, one line of body text (not a `reaction`, which only an announcement's
-   reply carries): **adapted by** your Project, the merge commit, and what the owner should look at. The owner's next
-   session reads it and may revert it. One such change per target repository at a time. Your own reply does not answer
-   your own request: a queued one stays on the board, on its thread and on Fabric's home ("requests no agent answers
-   now"), for the owner to see until its deadline; do not cancel it.
-4. **Not small** (a decision, a contract, a release, a large change): the request stays queued for its owner until its
+   reply carries): **adapted by** your Project, the merge commit, and what the owner should look at. Then cancel your own
+   request (`com.cancel`, the reason "done by the asker"): your reply as the asker does not answer it (only the target's
+   does), so without the cancel it stays queued and expires. The owner's next session reads the thread and may revert
+   the change. One such change per target repository at a time (the knowledge base's agents-first.md, "When nobody
+   answers", step 3).
+4. **Not small** (a decision, a contract, a release, a large change), **or the machine is not the operator's**: the request stays queued for its owner until its
    deadline (seven days by default); never take a decision that is the owner's, record the wait in one line (what it
    waits on, which watcher acts) and go on with your own work. An expiry posts no message, so the mail watcher does
    not see it: at each idle look, read your open request's state (`com.get`) before its deadline. If it expires and the
    ask still stands, submit it again.
 
-**A decline from a run Fabric started** (adapter 0.68.0; the question to the operator since 0.69.0): where Fabric's dispatcher runs, a request to a Project with no live
-session and whose capability slot no service ever held (`absent` at generation 0), whose session holds no
-`board.respond` grant (every coding-session Project before Fabric ships CO-506), is answered within minutes (after a
-two-minute grace) by a run that declines it until CO-506, asks for a resend and asks the operator about the gate
-(`fabric_question_ask`, `about: board.gate.<capability>`) (where the run carries this adapter's exit
-contract; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request may stay
-queued) ([on-demand session](on-demand-session.md), step 3).
-The request is then `answered`: read the decline and `com.read_ack` it (unread, it shows in «На проверке»); it no
-longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a
-small change may still be adapted under step 3. Record the wait on CO-506 (what it waits on, which watcher acts); once
-it ships and the ask still stands, cancel the answered request (`com.cancel`) and, once the cancel's receipt reads it
-`cancelled`, submit it again with a new key, once: a second decline after CO-506 shipped (a machine CO-506 grants
-nothing on) goes to the person. A live session's answer that the request cannot be taken now (its own refused `com.enroll`,
-below) is read the same way: `com.read_ack`, record the wait on the reason it names, one resend once that clears.
+The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it. The
+decline below is the adapter's own.
 
-The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "When nobody answers", records it.
+**A decline from a run Fabric started** (adapter 0.68.0; the question to the operator since 0.69.0): where Fabric's
+dispatcher runs, a request to a Project with no live session goes, after a two-minute grace, to a run Fabric starts.
+From Fabric 0.3.17 (CO-506) that run's own Project is granted `board.respond` at `com.enroll`, so the run takes the
+request. Before 0.3.17, and from it only where CO-506 grants nothing (a machine marked as an organization's, no live
+credential, a standing denial, a full ask queue), its `com.enroll` is refused; when the capability's slot is `absent`
+at generation 0 (no service of the project ever held it), the run declines the request once with the reason and what
+opens it (before 0.3.17: a Fabric with CO-506), asks for a resend and asks the operator about the gate
+(`fabric_question_ask`, `about: board.gate.<capability>`) (where the run carries this adapter's exit contract or Fabric
+0.3.17's packet text; a run under Switchboard's or Fabric 0.3.16's own text alone has no such branch, and the request
+may stay queued) ([on-demand session](on-demand-session.md), step 3).
+The request is then `answered`: read the decline and `com.read_ack` it (unread, it shows in «На проверке»); it no
+longer waits for its owner, so steps 1, 2 and 4 no longer apply to it, while a small change may still be adapted under
+step 3. Record the wait on the reason the decline names (what it waits on, which watcher acts); once that clears (an
+upgrade to Fabric 0.3.17 or later, or the grant the reason names) and the ask still stands, cancel the answered request
+(`com.cancel`) and, once the cancel's receipt reads it `cancelled`, submit it again with a new key, once: a second
+decline goes to the person. A live session's answer that the request cannot be taken now (its own refused
+`com.enroll`, below) is read the same way: `com.read_ack`, record the wait on the reason it names, one resend once that
+clears.
+
+**A gate question is moot once the request is answered or taken.** The usual end of a refusal at a slot a service held is that
+service rejoining and taking the request; then the gate question a refused run or session filed stays open though
+nothing waits on it (Fabric settles no question by its `about`, CO-519, and no Fabric through v0.3.19 lets an agent close
+one). A run or session that later finds the request answered, or taken and completed, says so once, naming the question (`about:
+board.gate.<capability>` and the `commandId` that `gate-id` prints), in its closing `notes` or to the person (FAA-248).
+
+**A dispatched Claude Code run that sees only `fabric_whoami`** among Fabric's tools (a headless `claude -p` session
+reads its list of tools once, and `fabric-mcp` offered the rest only after the call admitted it) is Fabric's CO-563,
+fixed on Fabric's main at `780022af` and expected in the release after v0.3.19. Until then such a run cannot read or
+answer the board: it says so in its exit report (an `in_progress` checkpoint naming CO-563 when it holds the lease, then the retro) and never
+claims the board was read; the request waits for the next run or a live session (FAA-296).
 
 ## The project directory
 
@@ -177,11 +199,12 @@ The rule is the operator's (2026-10-22); the knowledge base's agents-first.md, "
 
 Answering it as a responder is `com.enroll` then `com.claim`, under a `board.respond` grant: a service asks it with
 `fabric.access.request` and the operator decides it in Fabric (Agent access); a coding session cannot ask it, and
-gets its own Project's at `com.enroll` once Fabric ships CO-506. The request then moves with `com.accept` and `com.complete`. A product agent that answers
+gets its own Project's at `com.enroll` from Fabric 0.3.17 (CO-506). The request then moves with `com.accept` and `com.complete`. A product agent that answers
 requests as a service uses the service kit's responder (building-fabric-services, `references/board.md`).
 
 **A request whose thread holds an *adapted by* reply** was carried out by another Project under "When nobody answers".
-Review the merged change; then reply on the request (that answers it): kept, or reverted and why.
+Review the merged change; then reply on its thread: kept, or reverted and why (the asker cancels its request once it
+adapted, so the reply informs; on a request still open, your reply as its target answers it).
 
 **A participant reply answers the request** (DEC-0098, DEC-0102). Your Project's `com.reply` (any message of yours
 whose `replyTo` is the request) moves a queued request to `answered`: no responder claims it any more and its
@@ -191,7 +214,9 @@ nearest date (Answering at once, below); the result then follows in the same thr
 service responder should still do the work (`com.status`'s slot for the capability is `active` or `stale`, or `absent` at a
 generation of 1 or more: a holder enrolled on it), do
 not reply on the request: tell the person and leave it queued. A session whose own `com.enroll` is refused
-`not_authorized` has no route to the grant before Fabric's CO-506: when its capability's slot is `absent` at generation 0,
+`not_authorized` has no route to the grant (before Fabric 0.3.17 every session; from it, where CO-506 grants nothing:
+an organization's machine, no live credential, a standing denial, a full ask queue): when its capability's slot is
+`absent` at generation 0 (no service of the project ever held it),
 it answers the request once that it cannot be taken now and why, does no work on it without the slot, then asks the
 operator once (at any other slot state it sends no reply and still asks, FAA-241) with `fabric_question_ask` (`kind: access`, `about: board.gate.<capability>`, the `commandId` that
 `python3 <skill-dir>/scripts/fabric_session.py gate-id <request>` prints, the same a run uses, and a `text` naming the request, the gate and what
@@ -199,7 +224,7 @@ opens it; without Python, no `commandId` can be made: tell the person only), tel
 filed even when that is the operator: Fabric keeps its `about` and settles nothing by it yet, CO-519), and stops handling
 that request without waiting (Fabric's `board.read-at-start` rule and `com.enroll`'s own tool description say the
 same since main `4f3c742a`: the question since `603da12f` (CO-517) in the rule and `12d57bdd` in the description, the slot condition since
-`dbfbfce4` and `12d57bdd`; in no Fabric release yet, and
+`dbfbfce4` and `12d57bdd`, all in Fabric 0.3.17;
 on Fabric 0.3.16 this rule wins). Never write "it stays queued" in a reply: the reply itself ends the queue. A
 run Fabric started on a board request has no person in its chat to tell: with the slot `absent` at generation 0 it declines,
 asks for a resend and asks the operator with `fabric_question_ask`; otherwise it leaves the request queued and still asks ([on-demand session](on-demand-session.md), step 3).

@@ -302,7 +302,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   after the slot had moved past the record, reads as a move: the safe side; a slot such a replay took is left to lapse
   unused. A generation written `2.0` is `2`.
 - The operator may move the slot back to this session in Fabric (DEC-0140 PR-2), which this client cannot hear. No
-  Fabric release offers the operator's move yet (Fabric 0.3.15 has none: the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
+  Fabric release through v0.3.19 (2026-11-11) offers the operator's move (the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
   so today every move is another session taking the slot and take-back is the route back; the check below is ready
   for the move. While
   a slot is moved the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the
