@@ -81,22 +81,22 @@ _TSI_S_LISTEN = 1
 _TSI_S_TIME_WAIT = 10
 
 Address = Tuple[str, int]
+# Real types, not postponed strings (as fabric_peer_owner's Owner): a NamedTuple's generated __new__ resolves its
+# annotations in a namespace of its own, where `Address` is no name.
+_SocketFields = NamedTuple("_SocketFields", [("local", Tuple[str, int]), ("remote", Tuple[str, int]),
+                                             ("listening", bool), ("pid", Optional[int])])
+_ProofFields = NamedTuple("_ProofFields", [("proved", bool), ("pid", Optional[int]), ("method", str),
+                                           ("reason", Optional[str])])
 
 
-class Socket(NamedTuple):
+class Socket(_SocketFields):
     """One TCP socket of this account: `pid` is None when several of its processes hold it."""
-    local: Address
-    remote: Address
-    listening: bool
-    pid: Optional[int]
+    __slots__ = ()
 
 
-class Proof(NamedTuple):
+class Proof(_ProofFields):
     """Whether this account's process holds the socket asked about; `reason` says why not, or `several-processes`."""
-    proved: bool
-    pid: Optional[int]
-    method: str
-    reason: Optional[str]
+    __slots__ = ()
 
 
 class ProofUnreadable(Exception):

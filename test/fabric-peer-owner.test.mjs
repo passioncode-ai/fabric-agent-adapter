@@ -430,3 +430,35 @@ test('pidListens takes an owner: this account by default, a uid, or none (FAA-28
   assert.equal(await po.pidListens(4343, 81, { ...base, owner: null }), false);
   for (const bad of ['0', true, -1, 1.5]) await assert.rejects(po.pidListens(4242, 80, { ...base, owner: bad }), RangeError);
 });
+
+test('the whole vouch chain under a restricted table, only the table mocked (FAA-273 item 1)', { skip: process.platform !== 'darwin' }, async (t) => {
+  const { server, port } = await recorder();
+  t.after(() => server.close());
+  // The real ps and lsof vouch for this process; a proof is not asked (an injected table reaches none unless named).
+  const socket = await po.checkedSocket(port, { ...restrictedRead, vouchPid: process.pid });
+  socket.destroy();
+  await assert.rejects(po.checkedSocket(port, restrictedRead), (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
+  const { spawn } = await import('node:child_process');
+  const other = spawn('/bin/sleep', ['30']);
+  try {
+    await assert.rejects(po.checkedSocket(port, { ...restrictedRead, vouchPid: other.pid }), (err) => err instanceof po.ListenerRefused);
+  } finally {
+    other.kill();
+  }
+});
+
+test('a connection that reached ::1 is never vouched for (FAA-273 item 12)', async (t) => {
+  const server = http.createServer((req, res) => res.writeHead(204).end());
+  try {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '::1', resolve); });
+  } catch {
+    t.skip('no IPv6 loopback on this host');
+    return;
+  }
+  t.after(() => server.close());
+  let vouched = 0;
+  const run = async () => { vouched += 1; return ''; };
+  await assert.rejects(po.checkedSocket(server.address().port, { ...restrictedRead, host: '::1', vouchPid: 4242, platform: 'darwin', ownUid: 501, ownEuid: 501, run }),
+    (err) => err instanceof po.ListenerRefused);
+  assert.equal(vouched, 0);
+});

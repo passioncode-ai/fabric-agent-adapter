@@ -626,8 +626,9 @@ export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, exp
         // A reader that throws (an injected one; the readers themselves answer unknown) fails closed.
         who = owner(UNKNOWN, { method: method(), reason: `check: ${err?.name ?? 'Error'}` });
       }
+      // The vouch proves a listener on exactly 127.0.0.1, so only a connection that reached it (FAA-273 item 12).
       if (who.kind === UNKNOWN && String(who.reason ?? '').startsWith(TABLE_RESTRICTED) && vouchPid
-        && await pidListens(vouchPid, port, ask)) {
+        && normHost(socket.remoteAddress) === '127.0.0.1' && await pidListens(vouchPid, port, ask)) {
         // The table hides other processes (FAA-267); the process this caller started holds the listener.
         who = owner(THIS_ACCOUNT, { uid: ask.ownUid ?? ownUid(), pid: vouchPid, method: 'lsof-pid' });
       }

@@ -60,7 +60,7 @@ function noMarkerArgument(argv) {
 // An environment value: read path-aware (secretArgument) only when it reads as a path (it starts as one, has at least two
 // separators and a lower-case word between them), so a release folder under Application Support is no key (FAA-266) while
 // a base64 key whose `/` splits it stays one; any other value keeps the strict secretValue.
-const secretEnvValue = (value) => {
+export const secretEnvValue = (value) => {
   const pieces = value.split(/[\\/]/);
   const path = /^(?:[/~.]|[A-Za-z]:[\\/])/.test(value) && pieces.length >= 3 && pieces.some((x) => /^[a-z][a-z0-9_-]{2,}$/.test(x));
   return path ? secretArgument(value) : secretValue(value);
