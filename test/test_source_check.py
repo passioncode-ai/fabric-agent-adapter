@@ -1464,7 +1464,9 @@ class Refusals(Tree):
         self.assertIn("1 home name(s) declared", out)
 
     def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
-        siblings = ("fabric_source_ignore.py", "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py")
+        siblings = ("fabric_source_ignore.py", "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py",
+                    "fabric_source_tree.py")  # 0.81.0 seam: the tree module, imported only when a manifest is there
+        (self.root / "fabric.source.json").write_text("{}\n", encoding="utf-8")
         for missing in siblings:  # reading 38, seam: each sibling left behind in turn
             tools = self.tmp / ("tools-" + missing)
             tools.mkdir()
@@ -1475,6 +1477,7 @@ class Refusals(Tree):
             self.assertEqual(done.returncode, 2, done.stderr)
             self.assertIn(missing + " must sit beside this file", done.stderr)
             self.assertNotIn("Traceback", done.stderr)
+        (self.root / "fabric.source.json").unlink()
         # reading 40, unit: a sibling from another version (a missing name, a syntax error) is named as such
         for name, broken in (("fabric_source_homes.py", lambda s: s.replace("def _spellings(", "def _spelled(")),
                              ("fabric_source_ignore.py", lambda s: s + "\ndef broken(:\n")):

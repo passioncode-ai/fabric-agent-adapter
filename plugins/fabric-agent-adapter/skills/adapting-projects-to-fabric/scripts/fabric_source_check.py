@@ -71,6 +71,28 @@ from urllib.parse import unquote
 from typing import Dict, Iterable, List, NoReturn, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def _refuse_sibling(step: str, missing: BaseException) -> NoReturn:
+    """A sibling module that did not load: name it and exit 2, never a traceback and never exit 1 (a finding)."""
+    # the exception's own text is never printed: an OSError's carries a path, which may be under the owner's home
+    why = "a module beside this file refused to load"
+    try:
+        here, sibling = Path(__file__).resolve().parent, step + ".py"
+        file = getattr(missing, "filename", None) if isinstance(missing, OSError) else None
+        why = ("%s must sit beside this file" % sibling if not (here / sibling).is_file()
+               else "%s beside this file cannot be read" % sibling
+               if isinstance(file, (str, bytes)) and Path(os.fsdecode(file)).resolve() == here / sibling
+               else "%s beside this file is from another version: copy it with this one" % sibling
+               if isinstance(missing, (ImportError, SyntaxError))
+               else "%s beside this file refused to load (%s): copy the scripts folder whole, from one version"
+               % (sibling, type(missing).__name__))
+    except Exception:  # naming the cause must never be what fails
+        pass
+    sys.stderr.write("fabric_source_check.py: %s\n" % why)
+    sys.exit(2)
+
+
 _WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the checked tree adds no .pyc
 _STEP = "fabric_secrets"  # the sibling being loaded, so a refusal names it whatever the exception says
 try:
@@ -84,22 +106,7 @@ try:
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
 except Exception as _missing:  # a copy without its siblings, or mixed from two versions: a refusal, never exit 1
-    # the exception's own text is never printed: an OSError's carries a path, which may be under the owner's home
-    _why = "a module beside this file refused to load"
-    try:
-        _HERE, _sibling = Path(__file__).resolve().parent, _STEP + ".py"
-        _file = getattr(_missing, "filename", None) if isinstance(_missing, OSError) else None
-        _why = ("%s must sit beside this file" % _sibling if not (_HERE / _sibling).is_file()
-                else "%s beside this file cannot be read" % _sibling
-                if isinstance(_file, (str, bytes)) and Path(os.fsdecode(_file)).resolve() == _HERE / _sibling
-                else "%s beside this file is from another version: copy it with this one" % _sibling
-                if isinstance(_missing, (ImportError, SyntaxError))
-                else "%s beside this file refused to load (%s): copy the scripts folder whole, from one version"
-                % (_sibling, type(_missing).__name__))
-    except Exception:  # naming the cause must never be what fails
-        pass
-    sys.stderr.write("fabric_source_check.py: %s\n" % _why)
-    sys.exit(2)
+    _refuse_sibling(_STEP, _missing)
 finally:
     sys.dont_write_bytecode = _WROTE_BYTECODE
 
@@ -729,6 +736,8 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         wrote, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a copy inside the tree adds no .pyc
         try:
             import fabric_source_tree  # noqa: E402 - beside this file; imported here, since it imports this one
+        except Exception as missing:  # the same named-sibling refusal as the imports at the top (exit 2)
+            _refuse_sibling("fabric_source_tree", missing)
         finally:
             sys.dont_write_bytecode = wrote
         return fabric_source_tree.check_folder(root, files, mode, entries, unreadable, dependencies)
