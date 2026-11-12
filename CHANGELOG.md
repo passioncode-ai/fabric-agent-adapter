@@ -1017,7 +1017,7 @@ on the Linux jobs (`python`, `floors`), so 0.69.1 is the first npm release carry
 ### Fixed
 
 - working-with-fabric: a run Fabric started on a board request closes its workflow only once the request is settled
-  (FAA-213, passioncode-vesta's finding on the board; Fabric agrees). On an error the run cannot get past (a refused
+  (FAA-213, a board project's finding; Fabric agrees). On an error the run cannot get past (a refused
   claim, a missing key, a tool that fails twice) `references/on-demand-session.md` closed the workflow while the
   request could still be `queued` or `claimed`, and Fabric's next dispatch then failed at the take-back on every cycle
   (Fabric's main at `a6f0ffda`, before 0.3.16).
@@ -2098,7 +2098,7 @@ command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix
 ### Fixed
 
 - The hooks now name this release to Fabric: 0.51.1 still said 0.51.0, and `test/validate.py` now checks it.
-  Copylot check `4028969a-aa35-48f9-9300-331da036fb1d`: no findings.
+  Text check `4028969a-aa35-48f9-9300-331da036fb1d`: no findings.
 
 ## 0.51.1 (2026-10-26)
 
@@ -2217,7 +2217,7 @@ release carrying everything listed under 0.51.0 below.
   its four strings were English only, so a Russian dashboard could not mount it without editing a vendored file that
   `dashboard_kit.py install` then refuses as changed. The message now uses a colon. The button reads the page's `lang`
   and shows Russian on a Russian page, English otherwise; `data-label-chat`, `data-label-session` (with `{name}`),
-  `data-label-open` and `data-label-absent` set a page's own words. The strings were checked with Copylot in the
+  `data-label-open` and `data-label-absent` set a page's own words. The strings were checked with the text checker in the
   PassionCode.ai site voice (en-US report `239ff62c-e0af-4b8b-96e1-0c45c5eca02a`, ru-RU report
   `be37143c-aff1-4502-b9d0-f8b1be56bbf3`, no findings). A test fails on U+2014 in any kit asset, and the WebKit test
   opens a Russian page and a page with its own words. The button's accessible name follows the page too (*Открыть Fabric*, or
