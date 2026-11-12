@@ -10,10 +10,17 @@
 // every provider.schema.json fixture, the same way (provider-fixtures.json).
 // Never written by hand.
 //
-//   node test/fixtures/contract/vendor_vectors.mjs --contract <a clean checkout of the contract at the pin>
-//     --contract-src <dir with its src/*.ts staged, .js imports rewritten to .ts> [--out test/fixtures/contract]
+// Run it under the contract's own tsx, on a clean tree of the contract at the pin (a `git archive` of the pinned commit,
+// with the contract checkout's node_modules beside it); tsx reads src/*.ts as they are, .js imports included (FAA-242):
 //
-// Needs Node 24 or later (type stripping). The hub keys' private seeds are dropped: the kits verify and never sign.
+//   git -C <contract> archive <pinned commit> | tar -x -C <tree> && ln -s <contract>/node_modules <tree>/node_modules
+//   <contract>/node_modules/.bin/tsx test/fixtures/contract/vendor_vectors.mjs --contract <tree> --contract-src <tree>/src
+//     [--out test/fixtures/contract]
+//
+// Plain `node` does not do: Node's type stripping refuses src/http-signature.ts (a parameter property,
+// ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX), and Node 26 has no --experimental-transform-types. Checked 2026-11-12 at the pin
+// 18f8d487 under Node 26: every file it writes equal to the vendored one. The hub keys' private seeds are dropped:
+// the kits verify and never sign.
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';
