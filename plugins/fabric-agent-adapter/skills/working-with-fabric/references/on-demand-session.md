@@ -199,7 +199,8 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
 7. **End the run.** The one write left is the retro after work
    (`observatory_lesson` and insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout), or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
-   `watch-mail`, no further `fabric_question_ask` (step 3's gate question is the only one).
+   `watch-mail`, no further `fabric_question_ask` (step 3's gate question is the only one), no `agents-db.*` ask (a measured
+   win stays in its insight lines for a later session to contribute; FAA-277).
 
 On an error the session cannot get past (a refused claim, a missing key, a tool that fails twice), it completes the
 request `failed_known` with the reason (and `observed: true` after `com.effect_begin`) when it holds a fence for it,

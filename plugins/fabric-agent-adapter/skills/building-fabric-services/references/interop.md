@@ -125,6 +125,7 @@ action it also carries the operator's decision, [Actions](#actions)), act on eve
 (`jobs.quotaExhausted(id, message, {retryable, resetsAt})`, `jobCallerAction`, `intentIdempotencyKey`). The guidance
 for an agent's own design is in `creating-fabric-agents/references/resilience-and-autonomy.md`.
 
+<a id="a-nodes-call-queue"></a>
 **A node's call queue (DEC-0104).** A provider that queues refuses a start past its queue with `queue-full`: an `isError`
 result with one text item whose JSON is `{error: {code: "queue-full", message, data: {retryable, retryAfterSeconds}}}`,
 never `structuredContent`; the caller starts again after `retryAfterSeconds` under the same key. Read that refusal
@@ -132,9 +133,31 @@ from the start's own `isError` result, before any answer reaches `job_caller_act
 job, and `queue-full` never ends one, so they answer a job it ended `invalid` (`QUEUE_FULL` names the code, and the
 kit's job store refuses to end a job with it). The kit has no reader for the refusal yet (FAA-103). Through Fabric's hub
 a caller today sees `product-error` instead, kept under the key for 24 hours, until the hub relays `queue-full`
-(Fabric CO-376). The kit does not queue: it declares no load extension (`extensions/load/0.1`) and serves no
-`fabric.job.list`, so its `unknown-job` and repeated keys keep the rules above. A node that will queue needs
-`jobCallerKey`, the contract's `agent-network.json` vectors and the load report first (FAA-103).
+(Fabric CO-376). The kit's job store does not queue by itself: it declares no load extension (`extensions/load/0.1`)
+and serves no `fabric.job.list`, so its `unknown-job` and repeated keys keep the rules above.
+
+A node that queues takes the contract's reference functions from the kit instead of copying them (since 0.80.0,
+FAA-289): `fabric_load.py` and `fabric-load.mjs`, exported by both facades, held to the contract's
+`fixtures/vectors/agent-network.json` and its `job-queue`, `service-load` and `service-well-known-load` fixtures at the
+pin (vendored as `test/fixtures/contract/load-vectors.json` by `make_load_vectors.mjs`):
+
+| Python | Node | What |
+|---|---|---|
+| `job_caller_key(accepted, credential)` | `jobCallerKey` | the caller's opaque key: an accepted delegation's `principal`, `caller` and a partner organization ending the chain, else the credential; `None` / `undefined` for a refused or unreadable call |
+| `next_queued_job(queue, running, limits)` | `nextQueuedJob` | the id to start next per (agentRef, context): nothing at `concurrency`, a caller at `perCaller` waits, the caller running fewest first, then the oldest arrival, ties by id |
+| `admit_job(queue, running, job, limits, retry_after_seconds)` | `admitJob` | `{admit: True}` when the job would start at once or fewer than `queueMax` wait, else the `queue-full` error with `retryAfterSeconds` (1 to 3600, else 60) |
+| `queue_status_message(position, length)` | `queueStatusMessage` | a waiting job's `statusMessage`, `queued <position> of <length>` |
+| `read_queue_position(status_message)` | `readQueuePosition` | `{position, length}` from that message, or none |
+| `job_queue_rules(value)` | `jobQueueRules` | FAC-SEM-131 on `{queue, running, limits, started}` |
+| `load_report_rules(report)` | `loadReportRules` | FAC-SEM-132 on a `service-load/1` report: windows one `windowSeconds` apart, none after `generatedAt`, one row per context, p50 at most p95, a run time only where a job ended |
+| `load_report_problems(report)` | `loadReportProblems` | the report against `service-load.schema.json` (no caller, no job id, counts and durations only) |
+| `load_view(well_known)`, `load_extension_rules(well_known)` | `loadView`, `loadExtensionRules` | the declaration as a reader reads it, and FAC-SEM-133: an invalid one is treated as not declared and reported |
+| `load_extension(path, window_seconds, limits)` | `loadExtension({path, windowSeconds, limits})` | the `extensions` entry a service declares; raises `ServiceError` on one a reader would hide |
+
+Queue times are UTC instants (`T`, `Z`, at most three fraction digits); report times are RFC 3339 read strictly. A
+node keys every per-caller rule with `job_caller_key`, counts every started job that has not ended (`input_required`
+and paused ones too) as running, and answers another caller's job id `unknown-job`. The text-only `queue-full` result
+and `fabric.job.list` are still the node's own (FAA-103).
 
 <a id="actions"></a>
 

@@ -170,6 +170,32 @@ class Hooks(Base):
         context = self.context(self.prompt(sb, LINE)[0])
         self.assertEqual(context, cli.DISPATCH_INCOMPLETE.format(workflow=WF))
 
+    def test_the_verdict_and_the_preamble_under_a_cyrillic_folder_and_a_code_page(self):
+        # FAA-210: the host writes UTF-8; Windows before Python 3.15 decodes a text stdin with its code page. The
+        # session start and the prompt hook's dispatch verdict read their bytes the same under every code page, in a
+        # folder whose name is Cyrillic
+        from test_fabric_session import SCRIPT
+        folder = self.base / "проект Ж"
+        folder.mkdir()
+        (folder / "fabric-agent.json").write_text("{}")
+        self.register()
+        self.hub()
+
+        def run(event, payload, env):
+            done = subprocess.run([sys.executable, "-S", str(SCRIPT), "hook", event],
+                                  input=json.dumps(payload, ensure_ascii=False).encode("utf-8"), capture_output=True,
+                                  cwd=str(folder), env=dict(self.env, PYTHONIOENCODING=encoding, **env), timeout=10)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            return json.loads(done.stdout.decode("utf-8"))["hookSpecificOutput"]["additionalContext"]
+
+        for encoding in ("cp1251", "cp1252", "utf-8"):
+            with self.subTest(encoding=encoding):
+                start = {"session_id": SID, "cwd": str(folder), "source": "startup"}
+                self.assertEqual(run("session-start", start, {}), fs.PREAMBLE.format(host="Claude Code"))
+                self.assertEqual(run("session-start", start, ENV), cli.dispatch_contract(FULL, SID, conditional=True))
+                prompt = {"session_id": SID, "cwd": str(folder), "prompt": LINE + "\nОтветь на запрос."}
+                self.assertTrue(run("user-prompt-submit", prompt, ENV).startswith(cli.DISPATCH_IS_RUN))
+
     def test_the_contract_does_not_wait_for_a_registration_or_a_project_sign(self):
         self.assertIn(WF, self.context(self.start(ENV)[0]))
 

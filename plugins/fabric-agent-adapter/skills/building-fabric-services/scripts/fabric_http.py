@@ -28,6 +28,7 @@ The transport is injected in tests: `transport(method, url, headers, body, timeo
 `(status, headers, body_bytes)` or raises `OSError` (a connection error, `TimeoutError` included) or `HttpError`.
 Standard library only. Part of the service kit (FAA-65, layer L4).
 """
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 from __future__ import annotations
 
 import datetime as _dt
@@ -64,7 +65,7 @@ class HttpError(Exception):
     refused URL or a body over the cap; `url` is redacted; `body` holds at most 2048 bytes of an answer's body."""
 
     def __init__(self, message: str, *, status: Optional[int] = None, url: str = "", attempts: int = 0,
-                 retry_after_s: Optional[float] = None, body: bytes = b"", kind: str = "http"):
+                 retry_after_s: Optional[float] = None, body: bytes = b"", kind: str = "http", reason: Optional[str] = None):
         super().__init__(message)
         self.status = status
         self.url = url
@@ -72,6 +73,9 @@ class HttpError(Exception):
         self.retry_after_s = retry_after_s
         self.body = bytes(body[:2048])
         self.kind = kind  # http (an answer), connection, timeout, too-large, refused, foreign-user
+        #: For foreign-user, why (FAA-272): `table-restricted` (this process sees no other process's sockets, which
+        #: never clears), the owner's kind (`another-account`, `system`) or the check's reason (`no-row`).
+        self.reason = reason
 
 
 class Response:
@@ -385,7 +389,10 @@ def urllib_transport(method: str, url: str, headers: Dict[str, str], body: Optio
         return _send(req, timeout_s, max_bytes, end, watchdog)
     except _po.ListenerRefused as exc:
         where = "%s %s" % (method, redact_url(url))
-        raise HttpError("%s: foreign-user: %s" % (where, exc), url=redact_url(url), kind="foreign-user") from None
+        owner = getattr(exc, "owner", None)
+        why = str(getattr(owner, "reason", None) or getattr(owner, "kind", None) or getattr(exc, "code", "") or "unknown")
+        reason = _po.TABLE_RESTRICTED if why.startswith(_po.TABLE_RESTRICTED) else why.split(":", 1)[0]
+        raise HttpError("%s: foreign-user: %s" % (where, exc), url=redact_url(url), kind="foreign-user", reason=reason) from None
     except (OSError, http.client.HTTPException) as exc:
         if watchdog.fired:
             raise TimeoutError("the answer did not arrive within the deadline")

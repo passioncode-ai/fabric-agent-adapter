@@ -254,6 +254,7 @@ export class SlotKeeper {
       if (!(e instanceof BoardError)) throw e;
       this.retryLater(capability, entries, e);
       if (SESSION_CODES.has(e.code)) throw e;
+      if (e.code === 'idempotency_window_expired') await this.status(); // the epoch moved: read it before the retry (FAA-186)
     }
   }
 }

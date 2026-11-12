@@ -1,6 +1,6 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.1.0+kit.3: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
+    peer_owner 1.1.0+kit.4: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
     DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py` at
     commit f86f0622 (passioncode-ai/project-observatory-dashboard, the same licence). It differs
     from that file in this paragraph, in `Owner` and `Row` (NamedTuples here where it has
@@ -19,7 +19,8 @@
     macOS: the sysctl calibration also requires a child process's listener, an empty netstat reads as
     `TABLE_RESTRICTED`, and a caller may vouch for a listener with a pid it started (`pid_listens`,
     `parse_lsof_listeners`, `LSOF`, `CheckedHTTPConnection(vouch_pid=...)`, `own_connection(vouch_pid=...)`); since kit.3
-    the child's port is waited on with `selectors` and read under one deadline (FAA-273).
+    the child's port is waited on with `selectors` and read under one deadline (FAA-273); since kit.4 a number is ASCII
+    digits only and a netstat with only its header reads as `TABLE_RESTRICTED` (FAA-273 items 3 and 4).
     A limit /proc sets: it carries a socket's creator and no pid, so a listening socket that root
     created and handed to another account (systemd socket activation with User=) reads as root's. Standard library only, no import of another kit module.
     The kit's tests are `test/test_fabric_peer_owner.py`, over `test/fixtures/peer-owner/`;
@@ -110,7 +111,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.1.0+kit.3"  # Observatory's 1.1.0 with the kit's differences above
+PEER_OWNER_VERSION = "1.1.0+kit.4"  # Observatory's 1.1.0 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
@@ -231,6 +232,11 @@ def classify(uid: Optional[int], pid: Optional[int], *, method: str, own_uid: Op
 
 # -- parsers: pure functions over captured text or bytes (the tests' fixtures) ---------------------------------------
 
+def _ascii_digits(text: str) -> bool:
+    """`[0-9]+` as the Node twin reads a number; `str.isdigit` also takes `٤` and `²` (FAA-273 item 4)."""
+    return text != "" and text.isascii() and text.isdigit()
+
+
 def parse_netstat(text: str) -> list[Row]:
     """`netstat -anv -p tcp` on macOS. Process names may hold spaces ("Some App:123"), so the
     `process:pid` column is what is left between the leading and the trailing columns, both
@@ -246,6 +252,10 @@ def parse_netstat(text: str) -> list[Row]:
     # "Local Address" and "Foreign Address" are two header words each and one data column each.
     leading = at - sum(1 for w in names[:at] if w == "Address")
     trailing = len(names) - at - 1
+    if not any(line.split()[:1] and line.split()[0].startswith("tcp") for line in lines[header + 1:]):
+        # The caller's own connection is in any table it can see: a header and no tcp row is the restricted table
+        # (FAA-273 item 3), not `no-row`.
+        raise TableUnreadable(f"{TABLE_RESTRICTED}: netstat printed only its header to this process")
     rows: list[Row] = []
     for line in lines[header + 1:]:
         tok = line.split()
@@ -259,7 +269,7 @@ def parse_netstat(text: str) -> list[Row]:
         pid = None
         if ":" in process:
             tail = process.rsplit(":", 1)[1]
-            pid = int(tail) if tail.isdigit() else None
+            pid = int(tail) if _ascii_digits(tail) else None
         rows.append(Row(local, remote, tok[5] == "LISTEN", None, pid, tok[5] == "TIME_WAIT"))
     return rows
 
@@ -283,7 +293,7 @@ def parse_lsof_listeners(text: str) -> list[tuple[str, int]]:
         if not line.startswith("n") or ":" not in line:
             continue
         host, port = line[1:].rsplit(":", 1)
-        if port.isdigit():
+        if _ascii_digits(port):
             found.append((norm_host(host.strip("[]")), int(port)))
     return found
 
@@ -291,7 +301,7 @@ def parse_lsof_listeners(text: str) -> list[tuple[str, int]]:
 def parse_ps_uid(text: str) -> Optional[int]:
     """`ps -o uid= -p PID`: one number, or nothing when the process is gone."""
     text = text.strip()
-    return int(text) if text.isdigit() else None
+    return int(text) if _ascii_digits(text) else None
 
 
 def parse_proc_net_tcp(text: str, *, family: int, byteorder: Optional[str] = None) -> list[Row]:
@@ -540,7 +550,7 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
     port = None
     try:
         line = _child_line(child, deadline)
-        if line is None or not line.strip().isdigit():
+        if line is None or not _ascii_digits(line.strip()):
             return None
         port = int(line.strip())
         try:

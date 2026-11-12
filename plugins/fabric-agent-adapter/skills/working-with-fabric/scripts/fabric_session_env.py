@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.79.1"
+VERSION = "0.80.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -98,7 +98,7 @@ UNREAD_LINE = ("%d unread on the project board: com.list; answer what waits on y
 #: them once: at most MAX_NUDGES lines, each one line of at most MAX_NUDGE_CHARS characters.
 NUDGES_FILE = "nudges.json"
 #: Each nudge's line names its source, so the agent sees Fabric's words, data to act on through its tools, never the
-#: person's request. Fabric 0.3.14 starts every `says` with "Fabric:" (board e94ec9c0, release/0.3.14 b63dedb6); a
+#: person's request. Fabric 0.3.14 starts every `says` with "Fabric:" (board e94ec9c0; tag v0.3.14 7e43dc03, FAA-143); a
 #: line that does not gets this tag.
 NUDGE_PREFIX = "Fabric reminder: "
 
@@ -357,13 +357,47 @@ def _stdio_entry(entry: Any) -> Optional[Dict[str, Any]]:
             "fabricMcp": name in ("fabric-mcp", "fabric-mcp.cmd")}
 
 
+#: Claude Code's own variable for its folder, and Fabric Switchboard's for the person's folder a Switchboard home is
+#: built from (0.7.14 and later); a home of an earlier Switchboard lies in its data folder (FAA-218).
+CLAUDE_CONFIG_ENV = "CLAUDE_CONFIG_DIR"
+SWITCHBOARD_SOURCE_ENV = "SWITCHBOARD_CLAUDE_SOURCE_DIR"
+SWITCHBOARD_DATA = "ai.passioncode.fabric-switchboard"
+
+
+def claude_folders(env: Optional[Dict[str, str]] = None) -> Dict[str, Optional[Path]]:
+    """The launcher's `claudeFolders` (passioncode lib/launcher.js, PC-129; FAA-218): `read` is where the session's
+    Claude Code files are, CLAUDE_CONFIG_DIR when set, else ~/.claude; `write` is where settings, plugins and user MCP
+    servers are written, None for Claude Code's default (~/.claude with ~/.claude.json). In a Switchboard home `write`
+    is SWITCHBOARD_CLAUDE_SOURCE_DIR when it is absolute, ~/.claude's default for a home of an earlier Switchboard."""
+    env = os.environ if env is None else env
+    home = _home(env)
+    value = env.get(CLAUDE_CONFIG_ENV) or ""
+    config = Path(os.path.abspath(value)) if value else None
+    named = env.get(SWITCHBOARD_SOURCE_ENV) or ""
+    source: Optional[Path] = None
+    if config is not None:
+        if named and os.path.isabs(named):
+            source = Path(os.path.abspath(named))
+        elif SWITCHBOARD_DATA in re.split(r"[\\/]", str(config)):
+            source = home / ".claude"
+    write = (None if source == home / ".claude" else source) if source is not None else config
+    return {"read": config or home / ".claude", "write": write}
+
+
+def claude_json(env: Optional[Dict[str, str]] = None) -> Path:
+    """The `.claude.json` Claude Code reads in this environment: inside CLAUDE_CONFIG_DIR when it is set (Claude Code
+    2.1.299 reads and `claude mcp add` writes it there, FAA-234), else ~/.claude.json. In a Switchboard home that is the
+    home's own, the servers Switchboard carried into it."""
+    env = os.environ if env is None else env
+    return (claude_folders(env)["read"] if env.get(CLAUDE_CONFIG_ENV) else _home(env)) / ".claude.json"
+
+
 def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
     """Claude Code's MCP server `fabric` for this folder: local, then project (.mcp.json), then user scope.
     Only command and args are returned, with the folder a local or project entry was found in; an entry's env is never
     read out."""
-    home = _home(env)
     config: Dict[str, Any] = {}
-    text = read_small(home / ".claude.json", CONFIG_CAP)
+    text = read_small(claude_json(env), CONFIG_CAP)
     if text:
         try:
             loaded = json.loads(text)
@@ -371,9 +405,18 @@ def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Opti
         except ValueError:
             config = {}
     projects = config.get("projects") if isinstance(config.get("projects"), dict) else {}
-    for folder in _ancestors(cwd):
-        servers = (projects.get(str(folder)) or {}).get("mcpServers") if isinstance(projects.get(str(folder)), dict) else None
-        found = _stdio_entry((servers or {}).get("fabric")) if isinstance(servers, dict) else None
+    # FAA-235: Claude Code keys a local entry by the git root of the folder it was added in, or that folder outside a
+    # checkout, and applies it only there (Claude Code 2.1.299; docs/evidence/runs/2026-11-12-faa-235-local-scope-key.md):
+    # one key, never an ancestor's. A hook's cwd moves with the session (a submodule, a worktree under .claude/), while
+    # Claude Code keeps the entry of the folder the session started in, which it hands hooks as CLAUDE_PROJECT_DIR:
+    # that folder's key is read too (the 0.80.0 seam reading)
+    started = (env if env is not None else os.environ).get("CLAUDE_PROJECT_DIR") or ""
+    keys = [cwd] + ([Path(started)] if started else [])
+    for place in keys:
+        folder = checkout_root(place, env) or _ancestors(place)[0]
+        project = projects.get(str(folder))
+        servers = project.get("mcpServers") if isinstance(project, dict) else None
+        found = _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
         if found:
             return dict(found, scope="local", folder=str(folder))
     for folder in _ancestors(cwd):
@@ -391,21 +434,86 @@ def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Opti
     return dict(found, scope="user") if found else None
 
 
-def codex_registered(env: Optional[Dict[str, str]] = None) -> bool:
+_CODEX_FABRIC = re.compile(r'^\s*\[\s*"?mcp_servers"?\s*\.\s*"?fabric"?\s*\]\s*$', re.MULTILINE)
+_TOML_HEADER = re.compile(r"^\s*\[", re.MULTILINE)
+#: one `command = "..."` line of a table (a basic or literal string), up to the line's end: a lookahead, not `$` (R1)
+_TOML_COMMAND = re.compile(r"""^[ \t]*command[ \t]*=[ \t]*("(?:[^"\\\n]|\\.)*"|'[^'\n]*')[ \t]*(?:#[^\n]*)?(?=\r?\n|\Z)""",
+                           re.MULTILINE)
+
+
+def _codex_config(env: Optional[Dict[str, str]] = None) -> str:
     env = os.environ if env is None else env
     codex_home = Path(env.get("CODEX_HOME") or str(_home(env) / ".codex"))
-    text = read_small(codex_home / "config.toml", CONFIG_CAP) or ""
-    return re.search(r'^\s*\[\s*"?mcp_servers"?\s*\.\s*"?fabric"?\s*\]\s*$', text, re.MULTILINE) is not None
+    return read_small(codex_home / "config.toml", CONFIG_CAP) or ""
 
 
-def kimi_registered(env: Optional[Dict[str, str]] = None) -> bool:
-    """Kimi Code keeps its MCP servers in ~/.kimi-code/mcp.json (`mcpServers`, Claude's shape)."""
+def codex_registered(env: Optional[Dict[str, str]] = None) -> bool:
+    return _CODEX_FABRIC.search(_codex_config(env)) is not None
+
+
+def codex_command(env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """The `command` of `[mcp_servers.fabric]` in Codex's config.toml (FAA-233), a basic or literal TOML string, or
+    None. Read with a pattern, not a TOML parser (Python 3.9 has none): the table runs to the next header."""
+    text = _codex_config(env)
+    header = _CODEX_FABRIC.search(text)
+    if header is None:
+        return None
+    rest = text[header.end():]
+    following = _TOML_HEADER.search(rest)
+    found = _TOML_COMMAND.search(rest[:following.start()] if following else rest)
+    if not found:
+        return None
+    value = found.group(1)
+    if value.startswith("'"):
+        return value[1:-1]
+    try:
+        decoded = json.loads(value)
+    except ValueError:
+        return None
+    return decoded if isinstance(decoded, str) else None
+
+
+def kimi_registration(env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
+    """Kimi Code keeps its MCP servers in ~/.kimi-code/mcp.json (`mcpServers`, Claude's shape): the `fabric` entry's
+    command and args, or None."""
     text = read_small(_home(env) / ".kimi-code" / "mcp.json", CONFIG_CAP)
     try:
         servers = json.loads(text).get("mcpServers") if text else None
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, RecursionError):
+        return None
+    return _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
+
+
+def kimi_registered(env: Optional[Dict[str, str]] = None) -> bool:
+    return kimi_registration(env) is not None
+
+
+def registered_command(host: str, cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """The command the host runs as `fabric` (FAA-232, FAA-233): Claude Code's entry for this folder, Codex's
+    config.toml, Kimi Code's mcp.json; None when the host registers none, or registers it in a file read elsewhere."""
+    if host == "claude":
+        entry = claude_registration(cwd, env)
+        return entry["command"] if entry else None
+    if host == "codex":
+        return codex_command(env)
+    if host == "kimi":
+        entry = kimi_registration(env)
+        return entry["command"] if entry else None
+    return None
+
+
+def foreign_command(command: Optional[str], platform: str = sys.platform, env: Optional[Dict[str, str]] = None,
+                    lookup: bool = True) -> bool:
+    """Whether a registered command runs another user's copy (FAA-229): never one relative to a folder (`./`), and a
+    bare name only with `lookup` (a PATH lookup, which status makes and the session hooks do not)."""
+    if not command or re.split(r"[\\/]", command)[-1].lower() not in ("fabric-mcp", "fabric-mcp.cmd"):
         return False
-    return isinstance(servers, dict) and _stdio_entry(servers.get("fabric")) is not None
+    if command.startswith(("./", ".\\")):  # Path() drops a leading ./, which would read as a PATH name
+        return False
+    path = Path(command)
+    if not lookup and not path.is_absolute():
+        return False
+    return another_users_copy(path, platform, env)
 
 
 def host_registered(host: str, cwd: Path, env: Optional[Dict[str, str]] = None) -> bool:
@@ -422,7 +530,11 @@ def services_dir(platform: str = sys.platform, env: Optional[Dict[str, str]] = N
     """Where fabric-service/0.1 descriptors live: FABRIC_SERVICES_DIR, else Fabric's folder per OS + /services."""
     env = os.environ if env is None else env
     if env.get("FABRIC_SERVICES_DIR"):
-        return Path(env["FABRIC_SERVICES_DIR"])
+        value = env["FABRIC_SERVICES_DIR"]
+        if value == "~" or value[:2] in ("~/", "~\\"):  # `~` as the kit, Fabric and Fabric Dashboards expand it (FAA-189)
+            home = env.get("HOME") or env.get("USERPROFILE") or str(Path.home())
+            return Path(home) / value[2:] if len(value) > 2 else Path(home)
+        return Path(value)
     return fabric_root(platform, env) / "services"
 
 
@@ -636,6 +748,15 @@ def _write_private(path: Path, text: str) -> None:
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(text)
     os.replace(str(tmp), str(path))
+
+
+#: FAA-152: the turn's git branch goes to Fabric (contract DEC-0140 PR-3: shown on this machine's screens, never stored
+#: or shared) unless the person turns it off with FABRIC_SESSION_NO_BRANCH set to anything but "" or "0".
+NO_BRANCH_ENV = "FABRIC_SESSION_NO_BRANCH"
+
+
+def branch_off(env: Optional[Dict[str, str]] = None) -> bool:
+    return (os.environ if env is None else env).get(NO_BRANCH_ENV, "") not in ("", "0")
 
 
 def repositories_off(env: Optional[Dict[str, str]] = None) -> bool:

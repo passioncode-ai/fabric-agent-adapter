@@ -673,12 +673,14 @@ class Probe:
         self.events_trace_rule(self.events)
 
     def channel_agent_rule(self) -> None:
-        """DEC-0150 (FAA-197): the channel agent's declaration, read from the manifest the descriptor names, else from the
-        well-known answer (CA-1); one read as not declared is NOT_RUN with its evidence, never a FAIL (D3), except a string
-        shaped like a credential in it or in a copy the probe reads beside it (CA-5)."""
+        """DEC-0150 (FAA-197): the declaration, from the manifest the descriptor names, else the well-known answer (CA-1); one
+        read as not declared is NOT_RUN, never a FAIL (D3), except a credential's shape in it or a copy beside it (CA-5)."""
         manifest, _, where = self.load_manifest()
-        self.add("channel-agent.declaration", *cac.declaration_verdict(
-            manifest, bool(self.d.get("fabricManifest")), where, self.wk, getattr(self, "wk_bytes", None)))
+        try:  # a copy of the probe without its schema file is NOT_RUN, and the later rules run (FAA-250)
+            verdict = cac.declaration_verdict(manifest, bool(self.d.get("fabricManifest")), where, self.wk, getattr(self, "wk_bytes", None))
+        except (OSError, ValueError) as exc:
+            verdict = ("NOT_RUN", "the probe cannot read %s beside it (%s)" % (cac.cas.SCHEMA_FILE.name, type(exc).__name__))
+        self.add("channel-agent.declaration", *verdict)
 
     def configuration_rule(self) -> None:
         """DEC-0046: a well-known `configuration` is {slots, resolved} as the schema types it; absent is NOT_RUN."""

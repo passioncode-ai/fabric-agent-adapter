@@ -1514,7 +1514,9 @@ test('FAA-155 seam 3: an idle renew writes nothing; a clean leave forgets the re
   }
   assert.equal(writes, 0);
   assert.equal(fs.statSync(file).mtimeMs, before);
+  assert.equal(r.draining, null, 'FAA-186 (2): nothing published before the shutdown');
   await r.shutdown(0);
+  assert.equal(r.draining, false, 'idle: shutdown says it had nothing to drain');
   assert.ok(!('video.render' in slotRecord(hub)));
   await hub.control({ op: 'move', capability: 'video.render' }); // an older kit enrolls the free slot, then stops
   await h.advance(61);
@@ -1654,6 +1656,19 @@ test('FAA-155 seam 7: a capability refused at connect never stops the others', a
     assert.equal((await h.state()).requests[rid].state, 'completed', code);
     assert.equal(r.slots['video.render'].state, 'held', code);
   }
+});
+
+test('FAA-186 (3): an enroll refused for its epoch reads com.status before the capability asks again', async (t) => {
+  const hub = await fakeHub(t, ['video.render', 'video.cut']);
+  const h = harness(hub);
+  await hub.control({ op: 'refuse', tool: 'com.enroll', capability: 'video.cut', code: 'idempotency_window_expired' });
+  const r = h.responder({ capabilities: ['video.render', 'video.cut'] });
+  await r.step();
+  const { calls, callArgs } = await h.state();
+  const refused = calls.map((tool, i) => (tool === 'com.enroll' && callArgs[i].capability === 'video.cut' ? i : -1)).reduce((a, b) => Math.max(a, b));
+  assert.ok(calls.slice(refused + 1).includes('com.status'), calls.join(' '));
+  assert.equal(r.slots['video.cut'].state, 'retry');
+  assert.equal(r.slots['video.render'].state, 'held');
 });
 
 // --- FAA-163 and FAA-158: one capability's refusal, a reconnect, a lapsed lease, the DELETE, a take-back ------------------

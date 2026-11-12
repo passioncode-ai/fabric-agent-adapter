@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import * as fb from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board.mjs';
 import * as fh from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-hub.mjs';
+import { ListenerRefused, TABLE_RESTRICTED } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-peer-owner.mjs';
 import { tempDir } from './temp-dir.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -220,4 +221,18 @@ test('FAA-252: a hub port another OS account holds is foreign-user, never unreac
   const down = events.filter((e) => e[0] === 'board.down').at(-1);
   assert.equal(down[3].reason, 'foreign-user');
   assert.match(down[2], /another OS account/);
+});
+
+test('FAA-272: a hub refusal keeps the owner\'s reason; a restricted table is not retryable', () => {
+  const owner = (kind, reason = null) => ({ kind, uid: null, pid: null, method: 'netstat', reason });
+  for (const [who, reason, retryable] of [
+    [owner('unknown', `${TABLE_RESTRICTED}: this runtime sees no other process's sockets`), TABLE_RESTRICTED, false],
+    [owner('unknown', 'no-row'), 'no-row', true],
+    [owner('another-account'), 'another-account', true],
+  ]) {
+    const e = fh.listenerRefusal(new ListenerRefused('server-unverified', 'refused', who));
+    assert.deepEqual([e.code, e.retryable, e.data.reason], ['foreign-user', retryable, reason], reason);
+    assert.ok(e.message.includes(reason), e.message);
+    assert.ok(e.message.includes(who.kind), e.message);
+  }
 });

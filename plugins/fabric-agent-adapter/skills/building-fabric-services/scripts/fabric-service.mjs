@@ -43,6 +43,10 @@ export {
 } from './fabric-protocols.mjs';
 export { ACTIONS_EXTENSION_KEY, actionDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape } from './fabric-actions.mjs';
 export { CONNECTIONS_EXTENSION_KEY, connectionsExtension, connectionsRules, connectionsView } from './fabric-connections.mjs';
+export { // the call queue and the load report (DEC-0104, FAA-289)
+  DEFAULT_RETRY_AFTER_SECONDS, LOAD_EXTENSION_KEY, LOAD_REPORT_TYPE, QUEUE_FULL_MESSAGE, QUEUE_LENGTH_MAX, admitJob, jobCallerKey, jobQueueRules,
+  loadExtension, loadExtensionRules, loadReportProblems, loadReportRules, loadView, nextQueuedJob, queueStatusMessage, readQueuePosition,
+} from './fabric-load.mjs';
 export {
   EXIT_ALREADY_RUNNING,
   LOCK_WAIT_SUPERVISED_SECONDS,
@@ -118,7 +122,9 @@ export {
   fabricButtonPresence,
   placementOf,
   remoteOriginProblems,
+  portListenerRefusal,
   portOf,
+  portOwner,
   NO_SOURCE_REPOSITORY,
   namesRepository,
   sourceRefusal,

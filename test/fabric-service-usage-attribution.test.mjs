@@ -31,6 +31,14 @@ test('the report writes byProject in normal form and passes FAC-SEM-025', () => 
   for (const bad of [{ projectId: 'no uri' }, { projectId: 'urn:' }, { taskRunId: 'run-1' }, { projectId: 'urn:project:a', taskRunId: '-bad' }]) assert.throws(() => receipt(bad));
 });
 
+test('many task runs rounding up never cost more than their project (board request f5753c5a)', () => {
+  const receipts = Array.from({ length: 10 }, (_, i) => receipt({ costUsd: 0.1000006, projectId: 'urn:project:a', taskRunId: `run-${String(i).padStart(2, '0')}` }));
+  const report = k.usageReport(receipts, { id: 'example-agent', now: NOW });
+  const project = report.byProject[0];
+  assert.ok(project.costUsd >= Math.round(project.taskRuns.reduce((n, r) => n + r.costUsd, 0) * 1e6) / 1e6);
+  assert.deepEqual(k.usageFindings(report), []);
+});
+
 test('unmeasured tokens are counted, never guessed (DEC-0091)', () => {
   const at = '2026-10-13T09:00:00Z';
   const receipts = [k.makeUsageReceipt('openrouter', 'model-a', { inputTokens: 0, outputTokens: 0, at, tokensMeasured: false }),

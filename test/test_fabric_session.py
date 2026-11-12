@@ -85,6 +85,11 @@ FAKE_MCP = textwrap.dedent('''\
                     if shape == "untyped":
                         field.pop("type")
                     return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": field}}}}
+                branch = os.environ.get("FAKE_MCP_OBSERVE_BRANCH")
+                if n == "fabric_session_observe" and branch:  # Fabric 0.3.16 (CO-459): an optional branch on a turn
+                    rule = {{"type": "string", "pattern": "^[A-Za-z0-9._@+\\/-]{{1,200}}$"}}
+                    return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "branch": rule if branch == "no-null"
+                            else {{"anyOf": [rule, {{"type": "null"}}]}}}}}}
                 return {{"type": "object"}}
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": schema(n)}} for n in names]}}}})
         elif method == "tools/call":
@@ -135,7 +140,8 @@ class Base(unittest.TestCase):
                                  "FABRIC_SERVICES_DIR", "FABRIC_LAUNCHED_SESSION", "FABRIC_ACP_SESSION",
                                  "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT", "FABRIC_DISPATCH_WORKFLOW",
                                  "FABRIC_DISPATCH_HANDOFF", "FABRIC_DISPATCH_REQUEST",
-                                 "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID", "PASSIONCODE_APPLICATIONS")}
+                                 "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID", "PASSIONCODE_APPLICATIONS",
+                                 "CLAUDE_CONFIG_DIR", "SWITCHBOARD_CLAUDE_SOURCE_DIR")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"
@@ -155,7 +161,10 @@ class Base(unittest.TestCase):
         doc.update(over)
         (self.root / "hub.json").write_text(json.dumps(doc))
 
-    def register(self, command="/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp", scope="user", kind=None):
+    def register(self, command=None, scope="user", kind=None):
+        # a path in the test's home by default: the session start judges a registered copy's owner (FAA-232), and this
+        # machine's /Applications/Fabric.app may be another user's
+        command = command or str(self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")
         entry = {"command": command, "args": ["--runner", "claude-code"]}
         if kind:
             entry["type"] = kind
@@ -336,13 +345,91 @@ class Registrations(Base):
         reg = fs.claude_registration(self.repo, self.env)
         self.assertEqual((reg["scope"], reg["fabricMcp"], reg["args"]), ("user", True, ["--runner", "claude-code"]))
         self.register(scope="local")
+        (self.repo / ".git").mkdir()  # FAA-235: a local entry is keyed by the git root, found from any folder inside it
         self.assertEqual(fs.claude_registration(self.repo / "sub", self.env)["scope"], "local")
+        (self.repo / ".git").rmdir()
         (self.home / ".claude.json").unlink()
         (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {
             "command": "C:\\Fabric\\resources\\bin\\fabric-mcp.cmd", "args": [], "env": {"X": "secret"}}}}))
         reg = fs.claude_registration(self.repo, self.env)
         self.assertEqual((reg["scope"], reg["fabricMcp"]), ("project", True))
         self.assertNotIn("env", reg)
+
+    def test_claude_config_dir_is_where_claude_code_reads_its_registration(self):
+        # FAA-218, FAA-234: with CLAUDE_CONFIG_DIR set, Claude Code reads (and `claude mcp add` writes)
+        # $CLAUDE_CONFIG_DIR/.claude.json, never ~/.claude.json (the launcher's claudeFolders, lib/launcher.js).
+        self.register()  # ~/.claude.json: not the file this session reads once the variable is set
+        config = self.base / "claude-folder"
+        config.mkdir()
+        env = dict(self.env, CLAUDE_CONFIG_DIR=str(config))
+        self.assertIsNone(fs.claude_registration(self.repo, env))
+        (config / ".claude.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "/x/fabric-mcp"}}}))
+        reg = fs.claude_registration(self.repo, env)
+        self.assertEqual((reg["scope"], reg["command"]), ("user", "/x/fabric-mcp"))
+        self.assertEqual(fs.claude_json(env), config / ".claude.json")
+        self.assertEqual(fs.claude_json(self.env), self.home / ".claude.json")
+
+    def test_claude_folders_follow_the_launcher(self):
+        # lib/launcher.js claudeFolders: read is CLAUDE_CONFIG_DIR or ~/.claude; write is the Switchboard source when
+        # one is named (absolute), ~/.claude's default (None) for an older Switchboard home, else CLAUDE_CONFIG_DIR.
+        home = self.home
+        self.assertEqual(fs.claude_folders(self.env), {"read": home / ".claude", "write": None})
+        mine = self.base / "mine"
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(mine))), {"read": mine, "write": mine})
+        sb = self.base / "Library/Application Support/ai.passioncode.fabric-switchboard/homes/a"
+        source = self.base / "src"
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb), SWITCHBOARD_CLAUDE_SOURCE_DIR=str(source))),
+                         {"read": sb, "write": source})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb))), {"read": sb, "write": None})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb), SWITCHBOARD_CLAUDE_SOURCE_DIR="rel")),
+                         {"read": sb, "write": None})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(mine), SWITCHBOARD_CLAUDE_SOURCE_DIR="rel")),
+                         {"read": mine, "write": mine})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb),
+                                                SWITCHBOARD_CLAUDE_SOURCE_DIR=str(home / ".claude"))),
+                         {"read": sb, "write": None})
+        self.assertEqual(fs.claude_folders(dict(self.env, SWITCHBOARD_CLAUDE_SOURCE_DIR=str(source))),
+                         {"read": home / ".claude", "write": None})
+
+    def test_the_session_hook_reads_the_claude_config_dir_registration(self):
+        config = self.base / "claude-folder"
+        config.mkdir()
+        (config / ".claude.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "/x/fabric-mcp"}}}))
+        self.hub()
+        (self.repo / "fabric-agent.json").write_text("{}")
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
+                                extra_env={"CLAUDE_CONFIG_DIR": str(config)})
+        self.assertIn("fabric_whoami", done.stdout)
+
+    def test_a_local_entry_is_keyed_by_the_git_root_or_the_exact_folder(self):
+        # FAA-235, measured with Claude Code 2.1.299 (docs/evidence/runs/2026-11-12-faa-235-local-scope-key.md):
+        # `claude mcp add --scope local` keys projects[<git root>] inside a checkout and projects[<cwd>] outside one;
+        # Claude Code applies it from inside that checkout only, never from a child folder outside git or from a nested
+        # repository, so no ancestor walk.
+        self.register(scope="local")  # keyed at self.repo
+        self.assertEqual(fs.claude_registration(self.repo, self.env)["scope"], "local")
+        self.assertIsNone(fs.claude_registration(self.repo / "child", self.env))  # outside git: the exact folder only
+        (self.repo / ".git").mkdir()
+        self.assertEqual(fs.claude_registration(self.repo / "a" / "b", self.env)["folder"], str(self.repo.resolve()))
+        nested = self.repo / "nested"
+        (nested / ".git").mkdir(parents=True)
+        self.assertIsNone(fs.claude_registration(nested, self.env))  # a nested repository is its own key
+        self.assertIsNone(fs.claude_registration(nested / "deep", self.env))
+
+    def test_a_session_that_moved_into_a_nested_checkout_keeps_its_local_entry(self):
+        """The 0.80.0 seam reading: a hook's `cwd` moves with the session (a submodule, a `.claude/worktrees/` worktree);
+        Claude Code keeps the registration of the folder the session started in, which it gives hooks as
+        CLAUDE_PROJECT_DIR. Keyed by the cwd alone, the Stop hook read such a session as unregistered."""
+        self.register(scope="local")  # keyed at self.repo
+        (self.repo / ".git").mkdir()
+        worktree = self.repo / ".claude" / "worktrees" / "agent-x"
+        worktree.mkdir(parents=True)
+        (worktree / ".git").write_text("gitdir: elsewhere\n")
+        self.assertIsNone(fs.claude_registration(worktree, self.env), "a new session there sees its own key only")
+        moved = dict(self.env, CLAUDE_PROJECT_DIR=str(self.repo))
+        self.assertEqual(fs.claude_registration(worktree, moved)["folder"], str(self.repo.resolve()))
+        elsewhere = dict(self.env, CLAUDE_PROJECT_DIR=str(self.home / "other"))
+        self.assertIsNone(fs.claude_registration(worktree, elsewhere), "another start folder's key is not ours")
 
     def test_an_http_entry_is_not_fabric_mcp(self):
         self.register(kind="http")
@@ -424,6 +511,44 @@ class SessionStart(Base):
                 done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
                                         args=["--host", host])
                 self.assertEqual((done.returncode, done.stdout), (0, ""), host)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_a_registration_of_another_users_copy_is_named_at_session_start(self):
+        # FAA-232: a registration made before 0.69.0 of another user's fabric-mcp keeps running from the hooks; the
+        # session start says so in one line, before whatever else it says, for Claude Code, Codex and Kimi Code
+        env_module = sys.modules["fabric_session_env"]
+        shared = self.base / "Shared" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        theirs = os.path.realpath(str(shared))
+        saved = env_module._owner_uid
+        env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
+        payload = {"session_id": SID, "cwd": str(self.repo), "source": "startup"}
+        try:
+            self.register(command=str(shared))
+            self.hub()
+            out = json.loads(fs.hook_session_start(payload, self.env, platform="darwin"))
+            context = out["hookSpecificOutput"]["additionalContext"].splitlines()
+            self.assertEqual(context[0], fs.FOREIGN_NOTICE.format(host="Claude Code", command=shared))
+            self.assertEqual(context[1], fs.POINTER.format(host="Claude Code"))
+            self.assertIn("fabric_session.py status", context[0])
+            self.assertNotIn("\u2014", context[0])
+            self.hub(pid=self.dead_pid())  # down, in a folder with no sign: the one line still
+            out = json.loads(fs.hook_session_start(payload, self.env, platform="darwin"))
+            self.assertEqual(out["hookSpecificOutput"]["additionalContext"],
+                             fs.FOREIGN_NOTICE.format(host="Claude Code", command=shared))
+            self.assertIsNone(fs.hook_session_start(payload, self.env, platform="linux"), "the owner rule is macOS'")
+            (self.home / ".kimi-code").mkdir()
+            (self.home / ".kimi-code" / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
+            self.assertEqual(fs.hook_session_start(payload, self.env, host="kimi", platform="darwin"),
+                             fs.FOREIGN_NOTICE.format(host="Kimi Code", command=shared))
+            self.register(command="fabric-mcp")  # a bare name: the hook does no PATH lookup (status does)
+            self.assertIsNone(fs.hook_session_start(payload, self.env, platform="darwin"))
+            env_module._owner_uid = lambda path: os.getuid()
+            self.register(command=str(shared))
+            self.assertIsNone(fs.hook_session_start(payload, self.env, platform="darwin"), "the user's own copy")
+        finally:
+            env_module._owner_uid = saved
 
     def test_compact_and_resume_are_silent(self):
         self.register()
@@ -517,11 +642,51 @@ class StopAndEndActive(Base):
         said = fs.hook_spool(dict({"session_id": SID, "cwd": str(self.repo)}, **extra), event, self.env, spawn=spawned.append)
         return said, spawned
 
+    def test_the_branch_goes_with_a_turn_only_where_fabric_takes_it(self):
+        # FAA-152 (contract DEC-0140 PR-3; Fabric 0.3.16 CO-459): `branch` on a turn, never on the end, and only where
+        # fabric_session_observe declares it; a detached head is null where the schema allows it
+        branch = subprocess.run(["git", "-C", str(self.repo), "symbolic-ref", "--short", "HEAD"],
+                                capture_output=True, text=True).stdout.strip()
+        said, spawned = self.spool("turn")
+        (entry,) = sorted(spawned[0].glob("*-turn.json"))
+        self.assertEqual(json.loads(entry.read_text())["branch"], branch)
+        self.spool("end", reason="other")
+        self.assertNotIn("branch", json.loads(sorted(spawned[0].glob("*-end.json"))[0].read_text()))
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertEqual(["branch" in c["arguments"] for c in self.records("call")], [False, False, False],
+                         "a Fabric that does not declare it gets none")
+        self.record.unlink()
+        self.env["FAKE_MCP_OBSERVE_BRANCH"] = "1"
+        subprocess.run(["git", "-C", str(self.repo), "checkout", "-qb", "agent/faa-152"], check=True)
+        said, spawned = self.spool("turn")
+        subprocess.run(["git", "-C", str(self.repo), "checkout", "-q", "--detach"], check=True)
+        self.spool("turn")
+        self.spool("end", reason="other")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        calls = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
+        self.assertEqual([(c["event"], c.get("branch", "absent")) for c in calls],
+                         [("turn", "agent/faa-152"), ("turn", None), ("end", "absent")])
+        # a schema with no null takes no null; a name outside its pattern is left out, never sent to be refused
+        self.record.unlink()
+        self.env["FAKE_MCP_OBSERVE_BRANCH"] = "no-null"
+        self.spool("turn")
+        subprocess.run(["git", "-C", str(self.repo), "checkout", "-qb", "f\u00e4hig"], check=True)
+        said, spawned = self.spool("turn")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        calls = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
+        self.assertEqual([c.get("branch", "absent") for c in calls], ["absent", "absent"])
+        # turned off: none read, none sent
+        said, spawned = fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn",
+                                      dict(self.env, FABRIC_SESSION_NO_BRANCH="1"), spawn=lambda d: None), None
+        (entry,) = sorted((fs.state_root(env=self.env) / "sessions" / SID).glob("*-turn.json"))
+        self.assertNotIn("branch", json.loads(entry.read_text()))
+
     def test_a_turn_and_the_end_reach_fabric_with_facts_only(self):
         said, spawned = self.spool("turn")
         self.assertEqual(said, "spooled: worker started")
         (entry,) = sorted(spawned[0].glob("*-turn.json"))
-        self.assertEqual(sorted(json.loads(entry.read_text())), ["cwd", "event", "facts", "observedAt", "runtimeSessionId"])
+        self.assertEqual(sorted(json.loads(entry.read_text())), ["branch", "cwd", "event", "facts", "observedAt",
+                                                                 "runtimeSessionId"])
         self.spool("end", reason="prompt_input_exit")
         lines = fs.deliver(spawned[0], self.env, deadline_s=8)
         (argv,) = self.records("argv")
@@ -958,13 +1123,21 @@ class TurnNudges(Active):
         self.assertEqual(self.prompt(), "Fabric reminder: One.\nFabric reminder: Two.")
 
     def test_fabric_s_own_sentence_is_printed_as_given(self):
-        # The shape Fabric 0.3.14 answers (board e94ec9c0, release/0.3.14 b63dedb6): {recorded, seq, nudges?}, and
-        # every `says` starts with "Fabric:", so it gets no second tag.
+        # The shape Fabric 0.3.14 answers (board e94ec9c0; re-read at the tag v0.3.14, 7e43dc03, FAA-143): {recorded,
+        # seq, nudges?}, and every `says` starts with "Fabric:" (shared/abandonedSweep.ts nudgeText), so no second tag.
         self.answer({"recorded": True, "seq": 7, "nudges": [
             {"kind": "claim-lapsed", "says": "Fabric: your claim on task 12 lapsed; claim it again or let it go.",
              "task_id": "t12"}]})
         self.turn()
         self.assertEqual(self.prompt(), "Fabric: your claim on task 12 lapsed; claim it again or let it go.")
+
+    def test_the_notes_name_the_fabric_tag_they_were_read_against(self):
+        # FAA-143 item 5: the nudge notes follow Fabric's tag v0.3.14 (7e43dc03), not its release branch
+        notes = " ".join((SKILL / "references/session-hooks.md").read_text(encoding="utf-8").split())
+        for said in ("`v0.3.14`, `7e43dc03`", "within an hour", "at most five", "`repeated: true`",
+                     "starts every `says` with `Fabric:`"):
+            self.assertIn(said, notes)
+        self.assertEqual(fs.MAX_NUDGES, 5, "Fabric's TURN_NUDGES_MAX at v0.3.14")
 
     def test_a_full_pending_list_logs_what_it_dropped(self):
         self.answer({"nudges": [{"kind": "k", "says": "n%d" % i} for i in range(fs.MAX_NUDGES)]})
@@ -1326,6 +1499,34 @@ class OriginNames(unittest.TestCase):
 
 
 class BashPaths(unittest.TestCase):
+    def turn(self, *commands, cwd="/work"):
+        """turn_paths over a turn of Bash calls, in order (FAA-184)."""
+        with tempfile.TemporaryDirectory() as base:
+            transcript = Path(base) / "t.jsonl"
+            transcript.write_text("\n".join(json.dumps(e) for e in [prompt_entry()] + [
+                tool_entry("Bash", command=c) for c in commands]) + "\n")
+            return MCP.turn_paths(str(transcript), Path(cwd))
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX paths")
+    def test_the_folder_a_call_ends_in_is_the_next_calls(self):
+        # FAA-184: Claude Code keeps the Bash folder between calls inside the session's folder, so a relative -C in a
+        # later call is read against the folder an earlier call moved to
+        self.assertEqual(self.turn("cd /work/other", "git -C ../x log"), ["/work/other", "/work/x"])
+        self.assertEqual(self.turn("cd /work/other && make", "ls", "git -C ../x log"), ["/work/other", "/work/x"],
+                         "a call with no cd or git keeps the folder")
+        # a folder outside the session's: Claude Code goes back to the session's folder for the next call
+        self.assertEqual(self.turn("cd /elsewhere/a", "git -C ../x log"), ["/elsewhere/a", "/x"])
+        # an unknown folder (a relative cd, popd) resets to the session's folder
+        self.assertEqual(self.turn("cd /work/other", "cd sub", "git -C ../x log"), ["/work/other", "/x"])
+        self.assertEqual(self.turn("cd /work/other", "popd", "git -C ../x log"), ["/work/other", "/x"])
+        # a cd in a subshell or a pipeline moves nothing past its call
+        self.assertEqual(self.turn("(cd /work/other)", "git -C ../x log"), ["/work/other", "/x"])
+        self.assertEqual(self.turn("cd /work/other | cat", "git -C ../x log"), ["/work/other", "/x"])
+        self.assertEqual(MCP.bash_paths("cd /work/a; cd /work/b", Path("/work"), ends=[]), ["/work/a", "/work/b"])
+        ends = []
+        MCP.bash_paths("cd /work/a; (cd /work/b", Path("/work"), ends=ends)
+        self.assertEqual(ends, [None], "an unclosed subshell: not known")
+
     def test_cd_to_an_absolute_path_and_git_dash_c(self):
         cwd = Path("/work/start")
         got = MCP.bash_paths("cd /a/b && git -C ../c -c core.x=y status; (cd /d) | git --no-pager -C /e log -C "
@@ -1608,6 +1809,46 @@ class TurnRepositories(Base):
         self.assertLess(time.monotonic() - started, 1.5)
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo, until=time.monotonic()), [])
 
+    def test_the_facts_are_spooled_before_the_repositories_are_read(self):
+        # FAA-161: a hook Claude Code kills during the folder walk still leaves the turn's facts in the spool
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "a.txt"))])
+        cli = sys.modules["fabric_session_cli"]
+        seen = []
+        real = cli.turn_repositories
+
+        def walk(transcript, cwd, until):
+            seen.append([json.loads(p.read_text()) for p in fs.session_dir(SID, self.env).glob("*-turn.json")])
+            return real(transcript, cwd, until)
+        with mock.patch.object(cli, "turn_repositories", walk):
+            said, entry = self.spool_turn()
+        (before,) = seen[0]
+        self.assertIn("facts", before)
+        self.assertNotIn("repositories", before)
+        self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "one"}])
+        self.assertEqual(entry["facts"], before["facts"])
+        self.assertEqual(len(list(fs.session_dir(SID, self.env).glob("*-turn.json"))), 1, "rewritten, not added")
+
+    def test_a_folder_walk_that_hangs_ends_with_the_budget(self):
+        # FAA-161: a path on a hung network mount blocks os.path.isdir; the walk runs beside the hook, which waits for
+        # it no longer than the facts budget and spools the facts without repositories
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "a.txt"))])
+        release = __import__("threading").Event()
+        with mock.patch.object(MCP, "_existing_folder", lambda path: release.wait(20) and None):
+            started = time.perf_counter()
+            spawned = []
+            said = fs.hook_spool({"session_id": SID, "cwd": str(self.repo), "transcript_path": str(self.transcript)},
+                                 "turn", self.env, spawn=spawned.append)
+            elapsed = time.perf_counter() - started
+            release.set()
+        self.assertEqual(said, "spooled: worker started")
+        self.assertLess(elapsed, fs.FACTS_BUDGET_S + 1.0)
+        (entry,) = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))
+        stored = json.loads(entry.read_text())
+        self.assertIn("facts", stored)
+        self.assertNotIn("repositories", stored)
+
     def test_a_spent_budget_names_none(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])
@@ -1618,7 +1859,7 @@ class TurnRepositories(Base):
         """0.56.0 seam r6: on Windows `GIT.EXE -C` runs git and bash_paths reads it, so the prefilter passes it too."""
         seen = []
         self.write_transcript([prompt_entry(), tool_entry("Bash", command=r"C:\Git\cmd\GIT.EXE -C C:\work status")])
-        with mock.patch.object(MCP, "bash_paths", side_effect=lambda command, cwd: seen.append(command) or []):
+        with mock.patch.object(MCP, "bash_paths", side_effect=lambda command, cwd, ends=None: seen.append(command) or []):
             MCP.turn_paths(str(self.transcript), self.repo)
         self.assertEqual(seen, [r"C:\Git\cmd\GIT.EXE -C C:\work status"])
 
@@ -1831,6 +2072,11 @@ class NoServicesLine(Base):
         self.assertEqual(fs.services_dir("win32", {"HOME": "C:/U", "LOCALAPPDATA": "C:/L"}),
                          Path("C:/L") / "passioncode-fabric" / "services")
         self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "/s"}), Path("/s"))
+        # FAA-189 (3): `~` is expanded as the kit, Fabric and Fabric Dashboards expand it, from the given HOME
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "~/s"}), Path("/h/s"))
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "~"}), Path("/h"))
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "/x/~s"}), Path("/x/~s"))
+        self.assertEqual(fs.services_dir("win32", {"USERPROFILE": "C:/U", "FABRIC_SERVICES_DIR": "~\\s"}), Path("C:/U") / "s")
 
 
 
@@ -2147,17 +2393,141 @@ class Status(Base):
     def setUp(self):
         super().setUp()
         self.env_module = sys.modules["fabric_session_env"]  # find_fabric_bin reads it there (FAA-65)
+        # status imports the name too (FAA-240 item 3): stub both, so its install advice reads the same candidates
+        self.cli_module = sys.modules["fabric_session_cli"]
         self.saved = self.env_module.fabric_bin_candidates
-        self.env_module.fabric_bin_candidates = lambda platform=None, env=None: [self.base / "no-fabric" / "fabric-mcp"]
+        self.stub_candidates(lambda platform=None, env=None: [self.base / "no-fabric" / "fabric-mcp"])
         # 0.69.0 unit reading 3: every file is this user's, so a host's /Applications/Fabric.app of another user
         # (FAA-229's machine) cannot change a test that registers its default path
         self.saved_owner = self.env_module._owner_uid
         self.env_module._owner_uid = lambda path: getattr(os, "getuid", lambda: 0)()
 
+    def stub_candidates(self, candidates):
+        self.env_module.fabric_bin_candidates = self.cli_module.fabric_bin_candidates = candidates
+
     def tearDown(self):
-        self.env_module.fabric_bin_candidates = self.saved
+        self.stub_candidates(self.saved)
         self.env_module._owner_uid = self.saved_owner
         super().tearDown()
+
+    def test_the_launchers_folder_is_macos_only(self):
+        # FAA-240 item 1: status's darwin guard on launcher_folder (removing it fails this)
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(self.base / "Apps"))
+        self.assertEqual(fs.status(self.repo, env, "darwin")["launcherFolder"], str(self.base / "Apps"))
+        for platform in ("linux", "win32"):
+            self.assertIsNone(fs.status(self.repo, env, platform)["launcherFolder"], platform)
+
+    def test_a_value_the_launcher_ignores_is_named(self):
+        # FAA-239: a relative value or a literal ~ is read as unset, here and by the launcher; status says so
+        for value in ("Apps", "~/Apps", "./Apps"):
+            report = fs.status(self.repo, dict(self.env, PASSIONCODE_APPLICATIONS=value), "darwin")
+            self.assertEqual((report["launcherFolder"], report["launcherFolderIgnored"]), (None, value), value)
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                fs.print_status(report)
+            self.assertIn("PASSIONCODE_APPLICATIONS: %s is ignored: not an absolute path, read as unset" % value,
+                          printed.getvalue())
+        for env in (self.env, dict(self.env, PASSIONCODE_APPLICATIONS="/Apps"), dict(self.env, PASSIONCODE_APPLICATIONS="")):
+            report = fs.status(self.repo, env, "darwin")
+            self.assertIsNone(report["launcherFolderIgnored"])
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                fs.print_status(report)
+            self.assertNotIn("ignored", printed.getvalue())
+        self.assertIsNone(fs.status(self.repo, dict(self.env, PASSIONCODE_APPLICATIONS="Apps"), "linux")["launcherFolderIgnored"])
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_a_copy_outside_the_launchers_folder_is_named(self):
+        # FAA-239: with PASSIONCODE_APPLICATIONS set, a registration made before it (in ~/Applications) is one the
+        # launcher no longer updates, and the user's own copy there is not taken: status names both
+        self.stub_candidates(self.saved)
+        apps = self.base / "Apps"
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(apps))
+        mine = self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"
+        mine.parent.mkdir(parents=True)
+        mine.write_text("")
+        self.register(command=str(mine))
+        self.hub()
+        report = fs.status(self.repo, env, "darwin")
+        self.assertEqual((report["fabricMcp"], report["ownCopyOutside"]), (None, str(mine)))
+        self.assertTrue(report["registeredOutsideLauncherFolder"])
+        self.assertIn("put your own Fabric.app in %s" % apps, report["next"])
+        self.assertIn("or unset PASSIONCODE_APPLICATIONS to keep %s" % mine, report["next"])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("none of yours in %s (PASSIONCODE_APPLICATIONS); yours at %s is outside it" % (apps, mine),
+                      printed.getvalue())
+        self.assertIn("(outside PASSIONCODE_APPLICATIONS, %s: the launcher does not update it)" % apps, printed.getvalue())
+        chosen = apps / "Fabric.app/Contents/Resources/bin/fabric-mcp"
+        chosen.parent.mkdir(parents=True)
+        chosen.write_text("")
+        report = fs.status(self.repo, env, "darwin")
+        self.assertTrue(report["registeredOutsideLauncherFolder"])
+        self.assertEqual(report["next"], "The registered fabric-mcp is outside PASSIONCODE_APPLICATIONS (%s), which the "
+                         "launcher updates: claude mcp remove --scope user fabric, then claude mcp add --scope user "
+                         'fabric -- "%s" --runner claude-code' % (apps, chosen))
+        self.register(command=str(chosen))
+        report = fs.status(self.repo, env, "darwin")
+        self.assertFalse(report["registeredOutsideLauncherFolder"])
+        self.assertEqual(report["next"], "Call fabric_whoami.")
+        self.assertFalse(fs.status(self.repo, self.env, "darwin")["registeredOutsideLauncherFolder"], "no variable")
+
+    @unittest.skipUnless(hasattr(os, "getuid") and os.getuid() != 0, "POSIX modes, not root")
+    def test_a_launchers_folder_this_user_cannot_enter_is_not_advised(self):
+        # FAA-239: the install advice names ~/Applications with the variable unset, never a folder that cannot be entered
+        self.stub_candidates(self.saved)
+        locked = self.base / "locked"
+        locked.mkdir()
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(locked / "Apps"))
+        locked.chmod(0)
+        try:
+            report = fs.status(self.repo, env, "darwin")
+        finally:
+            locked.chmod(0o700)
+        self.assertIn("(your own copy, in ~/Applications, with PASSIONCODE_APPLICATIONS unset: this user cannot enter %s)"
+                      % (locked / "Apps"), report["next"])
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_codex_and_kimi_registrations_are_checked_for_another_users_copy(self):
+        # FAA-233: Codex's config.toml and Kimi's mcp.json register fabric-mcp too; status judges each command
+        shared = self.base / "Shared" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        own = self.base / "no-fabric" / "fabric-mcp"
+        own.parent.mkdir()
+        own.write_text("")
+        (self.home / ".codex").mkdir()
+        (self.home / ".codex" / "config.toml").write_text(
+            'model = "x"\n[mcp_servers.fabric]\ncommand = "%s"\nargs = ["--runner", "codex"]\n[other]\ncommand = "y"\n' % shared)
+        (self.home / ".kimi-code").mkdir()
+        (self.home / ".kimi-code" / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
+        self.hub()
+        self.register(command=str(own))
+        theirs = os.path.realpath(str(shared))
+        self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["registeredCopy"], "ok")
+        self.assertEqual(report["hostCopies"], {"codex": "another user's", "kimi": "another user's"})
+        self.assertEqual(report["next"], "The fabric-mcp Codex has registered is another user's copy: codex mcp remove "
+                         'fabric, then codex mcp add fabric -- "%s" --runner codex' % own)
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("Codex: fabric registered -> %s (another user's copy)" % shared, printed.getvalue())
+        self.assertIn("Kimi Code: fabric registered -> %s (another user's copy)" % shared, printed.getvalue())
+        (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\ncommand = "%s"\n' % own)
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["hostCopies"], {"codex": "ok", "kimi": "another user's"})
+        self.assertIn("The fabric-mcp Kimi Code has registered is another user's copy: in ~/.kimi-code/mcp.json, set "
+                      'mcpServers.fabric.command to "%s"' % own, report["next"])
+        self.assertEqual(fs.status(self.repo, self.env, "linux")["hostCopies"], {"codex": "ok", "kimi": "ok"})
+        self.assertEqual(fs.codex_command(self.env), str(own))
+        (self.home / ".codex" / "config.toml").write_text("[mcp_servers.fabric]\ncommand = 'C:\\x\\fabric-mcp.cmd'\n")
+        self.assertEqual(fs.codex_command(self.env), "C:\\x\\fabric-mcp.cmd")
+        (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\nargs = []\n')
+        self.assertIsNone(fs.codex_command(self.env))
+        self.assertTrue(fs.codex_registered(self.env))
 
     def test_one_next_action_per_state(self):
         report = fs.status(self.repo, self.env)
@@ -2196,8 +2566,7 @@ class Status(Base):
             # 0.69.0 product reading 2: with no copy of the user's own, install one first; never a placeholder path
             self.assertEqual(report["next"], "The registered fabric-mcp is another user's copy: put your own "
                              "Fabric.app in ~/Applications, then claude mcp remove --scope user fabric, "
-                             'then claude mcp add --scope user fabric -- "%s" --runner claude-code'
-                             % (self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"))
+                             'then claude mcp add --scope user fabric -- "%s" --runner claude-code' % own)
             printed = io.StringIO()
             with contextlib.redirect_stdout(printed):
                 fs.print_status(report)
@@ -2278,10 +2647,13 @@ class Status(Base):
             report = fs.status(self.repo, self.env, "darwin")
             self.assertIn("in %s, claude mcp remove --scope local fabric, then claude mcp add --scope local fabric"
                           % self.repo.resolve(), report["next"])
-            # 0.69.0 seam reading 4: the entry may be an ancestor's; the line names the folder it was found in
+            # 0.69.0 seam reading 4: the entry may be the git root's (FAA-235: never another ancestor's); the line
+            # names the folder it was found in
             (self.repo / "sub").mkdir(exist_ok=True)
+            (self.repo / ".git").mkdir()
             self.assertIn("in %s, claude mcp remove" % self.repo.resolve(),
                           fs.status(self.repo / "sub", self.env, "darwin")["next"])
+            (self.repo / ".git").rmdir()
             self.assertIn("put your own Fabric.app in ~/Applications, then", report["next"])
             (self.home / ".claude.json").unlink()
             (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
@@ -2305,8 +2677,9 @@ class Status(Base):
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
             fs.print_status(report)
-        self.assertIn("fabric-mcp: %s (the administrator's copy, which the launcher does not update)" % binary,
-                      printed.getvalue())
+        # FAA-240 item 6: "which the launcher does not update" is the launcher's word (its PR #277), said as its
+        self.assertIn("fabric-mcp: %s (root's copy: the launcher calls it the administrator's and does not update it)"
+                      % binary, printed.getvalue())
         self.env_module._owner_uid = lambda path: os.getuid()
         self.assertFalse(fs.status(self.repo, self.env, "darwin")["administratorsCopy"], "the user's own copy")
         self.assertFalse(fs.status(self.repo, self.env, "linux")["administratorsCopy"])
@@ -2314,7 +2687,7 @@ class Status(Base):
     @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
     def test_status_follows_the_launchers_one_folder(self):
         # FAA-237 (0.70.0 unit reading 1): the folder the person named is where status looks and where it says to install
-        self.env_module.fabric_bin_candidates = self.saved
+        self.stub_candidates(self.saved)
         apps = self.base / "Apps"
         env = dict(self.env, PASSIONCODE_APPLICATIONS=str(apps))
         report = fs.status(self.repo, env, "darwin")
@@ -2369,7 +2742,7 @@ class Status(Base):
     @unittest.skipUnless(hasattr(os, "getuid") and os.getuid() != 0, "POSIX modes, not root")
     def test_status_survives_a_launchers_folder_it_cannot_enter(self):
         # 0.70.0 unit reading 4: a folder under one this user cannot enter raised PermissionError before Python 3.14
-        self.env_module.fabric_bin_candidates = self.saved
+        self.stub_candidates(self.saved)
         locked = self.base / "locked"
         locked.mkdir()
         env = dict(self.env, PASSIONCODE_APPLICATIONS=str(locked / "Apps"))
@@ -2379,7 +2752,9 @@ class Status(Base):
             report = fs.status(self.repo, env, "darwin")
         finally:
             locked.chmod(0o700)
-        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in %s)" % (locked / "Apps"), report["next"])
+        # FAA-239: a folder this user cannot enter is not advised; ~/Applications with the variable unset is
+        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in ~/Applications, with PASSIONCODE_APPLICATIONS "
+                      "unset: this user cannot enter %s)" % (locked / "Apps"), report["next"])
         # Python 3.14 answers False itself: raise as 3.9 to 3.13 do, so the check holds on any Python (0.70.0 unit reading 5)
         original = Path.is_file
 

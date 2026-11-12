@@ -1361,6 +1361,25 @@ class JobApprovalStepTests(unittest.TestCase):
             self.assertEqual(self.jobs.get(job_id)["status"], "input_required")
             self.assertEqual(self.faults, [("reviewsApprove", "mandate-capability-missing")], "and the answer, by the same name")
 
+    def test_a_refused_answer_names_its_fault_from_the_one_read_of_the_job(self):
+        # FAA-186 (1): the refusal's fault name came from a second jobs.private read with no UnknownJob guard; a job
+        # removed between the gate and that read crashed the call. _gate_inputs now hands back the capability it read.
+        server = self.camel_server()
+        self.start_camel(server, {})
+        job_id, _ = self.step()
+        reads, real = [], self.jobs.private
+        def private_once(jid):
+            reads.append(jid)
+            if len(reads) > 1:
+                raise fi.UnknownJob(jid)
+            return real(jid)
+        self.jobs.private = private_once
+        refused = self.answer(server, job_id, {"mandate": relayed_mandate({"actions": ["approve-reply"], "effects": ["reply"]})})
+        self.assertTrue(refused["isError"])
+        self.assertEqual(refused["structuredContent"]["error"]["code"], "operator-decision-required")
+        self.assertEqual(reads, [job_id], "one read of the job's private part")
+        self.assertEqual(self.faults, [("reviewsApprove", "mandate-capability-missing")])
+
     def test_a_job_created_under_another_name_is_read_under_it_at_the_start_and_the_answer(self):
         # FAA-179 (5): approval_step read self.tool while the answer read the job's stored capability.
         self.temp = tempfile.TemporaryDirectory()

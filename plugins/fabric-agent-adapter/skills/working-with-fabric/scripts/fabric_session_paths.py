@@ -33,7 +33,8 @@ KEYWORDS = frozenset(("{", "!", "then", "do", "else", "elif", "if", "while", "un
 ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 
 
-def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[str]:
+def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None,
+               ends: Optional[List[Optional[str]]] = None) -> List[str]:
     """The folders a Bash command names as `cd <absolute path>` or `git -C <path>`, in order. A relative `-C` is read
     against the folder the command last changed into with an absolute `cd`, else `cwd`; after a `cd` to a relative or
     unknown folder it is dropped (FAA-166). A `cd` inside `( )`, a pipeline's stage or a list sent to the background
@@ -42,7 +43,8 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
     else of the command is kept; a command that does not split is [] (FAA-140). On Windows (`windows`, default
     `sys.platform == "win32"`) paths are read as Git Bash writes them, with its quoting: an unquoted `C:\\work` is
     `C:work` there too, so a native path counts when it is quoted (FAA-175); Cygwin and MSYS2 Pythons read their own
-    POSIX paths (FAA-177)."""
+    POSIX paths (FAA-177). With `ends`, the folder the command leaves the shell in is appended to it: an absolute path,
+    or None when it is not known (a relative cd, popd, an unclosed subshell, a command that does not split; FAA-184)."""
     import shlex  # only a Stop hook with a transcript needs it
     windows = sys.platform == "win32" if windows is None else windows
     if windows:
@@ -59,6 +61,8 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
         lexer.whitespace_split = True
         tokens = list(lexer)
     except ValueError:
+        if ends is not None:
+            ends.append(None)
         return []
 
     def absolute(token: str) -> Optional[str]:
@@ -187,4 +191,7 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None) -> List[
                 found.append(at)
         start = False
         index += 1
+    if ends is not None:
+        end_pipeline()
+        ends.append(None if stack else base)
     return found

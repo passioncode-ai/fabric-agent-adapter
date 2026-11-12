@@ -109,3 +109,32 @@ test('a subscription runner kind that is no string is named, as the Python twin 
     assert.ok(problems.some((p) => p.includes("vendor's runner")), problems.join('; '));
   }
 });
+
+// FAA-225 (port part): an install refuses a port another OS account listens on (DEC-0154 HA-2), read with the kit's
+// fabric-peer-owner; this account, the system, nobody and an unread table pass. The claim file waits on DEC-0160.
+test('a port another OS account listens on is refused, and only that', async () => {
+  const dir = temp();
+  const services = path.join(dir, 'services');
+  const desc = { ...fixture('service-descriptor-node'), source: { repository: 'https://github.com/example-org/example-agent' } };
+  const port = k.portOf(desc.origin);
+  const asked = [];
+  assert.throws(() => k.writeDescriptor(desc, services, { portOwner: (p) => { asked.push(p); return ['another-account', 502]; } }),
+    new RegExp(`Port ${port} is listened on by another OS account \\(uid 502\\).*FAA-225`));
+  assert.deepEqual(asked, [port]);
+  assert.equal(fs.existsSync(services) ? fs.readdirSync(services).filter((f) => f.endsWith('.json')).length : 0, 0, 'a refused install writes nothing');
+  for (const answer of [null, ['this-account', process.getuid?.() ?? null], ['system', 0], ['unknown', null], ['none', null]]) {
+    assert.ok(fs.existsSync(k.writeDescriptor(desc, services, { portOwner: () => answer })), JSON.stringify(answer));
+  }
+  const remote = { ...fixture('service-descriptor-peer-remote'), source: desc.source };
+  k.writeDescriptor(remote, services, { portOwner: () => { throw new Error('asked about a remote port'); } });
+  // the default reader: a free port reads null without the table; a port this process listens on is this account's
+  const net = await import('node:net');
+  const server = net.createServer();
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const held = server.address().port;
+  const [kind] = k.portOwner(held);
+  assert.ok(['this-account', 'unknown'].includes(kind), kind);
+  assert.equal(k.portListenerRefusal(held), null);
+  await new Promise((resolve) => server.close(resolve));
+  assert.equal(k.portOwner(held), null, 'a port nothing binds is free');
+});

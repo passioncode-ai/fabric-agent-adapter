@@ -28,7 +28,7 @@ other browser, unless Fabric Dashboards is confirmed not installed.
    is also authoritative. Hand back **the returned `open_link` as the primary
    dashboard action**. Do not rebuild its URI or double-encode `path`.
 3. Use `host_status`, where offered, to distinguish available, not_installed,
-   unknown, incompatible and handler_mismatch. It is a read, not a GUI launch.
+   unknown, incompatible, handler_mismatch and unsupported. It is a read, not a GUI launch.
    With an older server lacking that tool, host readiness is unverified: use a
    compatible host resolver or report the limitation, not presumed absence.
 4. A request for a link opens nothing. A request to open uses the host `open`
@@ -119,7 +119,10 @@ Its trusted context is supplied by the host, not by untrusted model output:
 
 `native_link` must equal the resolved open_link, with an available host on the
 viewer's device. `browser_link` must equal http_url, with confirmed not_installed,
-if_absent policy and the same device. `remote_open` instead contains `device_id`,
+if_absent policy and the same device. Contract DEC-0123 PL-3 also allows a browser
+on `unsupported` (a system the host does not ship for); the gate treats
+`unsupported` as no fallback, by the operator's rule that a browser opens only on a
+confirmed `not_installed`, and macOS never reports it (FAA-137). `remote_open` instead contains `device_id`,
 `service` and optional `path`, exactly matching the target and resolved page;
 its acceptance does not authorize or deliver it. Enforce grants/dedup/expiry in
 the transport. Unknown or failed host status produces no executable local action.

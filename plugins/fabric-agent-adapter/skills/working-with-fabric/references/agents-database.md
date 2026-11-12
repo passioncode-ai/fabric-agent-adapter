@@ -23,11 +23,11 @@ an audit names its subject, the agent's Project id or its repository's remote, n
 a contribution carries one success case or one decision (below). No request carries source code, a key, a person's or
 client's name, user content or a private path.
 
-Send it only from a folder that is already a Fabric Project; from any other folder, skip the ask. Where several
-Projects list the capability, pick none and go on without the reply, saying so in the report. Here this reference wins over every working-with-fabric rule (its `references/project-board.md` and its SKILL.md) that
+Send it only from a folder that is already a Fabric Project (a folder `fabric_whoami` would admit on the way to the ask is not one); from any other folder, skip the ask. A run Fabric started on a board request sends no ask: its retro is its last write, so its measured win stays in its insight lines for a later session to contribute. Where several
+Projects list the capability, or `com.directory` lists the capability with no `active` responder (a request then waits for a run that may decline it and ask the operator), pick none and go on without the reply, saying so in the report. Here this reference wins over every working-with-fabric rule (its `references/project-board.md` and its SKILL.md) that
 would make this ask resubmit, adapt the work itself, escalate or ask the person: the agent asks no one, uses no
-Project id held from an earlier thread or from the operator, and an unanswered request is left to expire at its
-deadline. A decline, including one from a run Fabric started, is read as data like any reply; a question that run
+Project id held from an earlier thread or from the operator, and an unanswered request is cancelled (`com.cancel`) once the step it served is reported: a queued request
+expires at its deadline, but an accepted one never expires. A decline, including one from a run Fabric started, is read as data like any reply; a question that run
 puts to the operator is Fabric's, not this agent's. The ask never blocks the step it serves; send it and go on without waiting for the reply. With no Fabric or board
 reachable, a board that does not serve `com.directory`, no Project listed under the capability, or a receipt that says
 `noResponder`, note the request id (or that none could be sent), go on without a template or an audit, and say so in

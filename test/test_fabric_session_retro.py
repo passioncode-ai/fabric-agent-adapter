@@ -35,6 +35,8 @@ class Words(unittest.TestCase):
                      "insight/1", "insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout)", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
                      "No values"):
             self.assertIn(word, cli.RETRO_LINE)
+        # FAA-277 item 1: a measured win is also contributed, as SKILL.md Step 7 says
+        self.assertIn("a measured win also goes to `agents-db.contribute`", cli.RETRO_LINE)
         # 0.64.0 product reading 2: the line names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
         self.assertNotIn("fabric_whoami", cli.RETRO_LINE)
         self.assertNotIn("—", cli.RETRO_LINE)
@@ -45,6 +47,7 @@ class Words(unittest.TestCase):
         self.assertIn("When a piece of work ends (released as done, or the session about to end), write its retro in "
                       "the same turn: `observatory_lesson` for what went wrong (or your answer without it), insight/1 "
                       "lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout) for what you learned, or one line that there is nothing.", text)
+        self.assertIn("A measured win also goes to `agents-db.contribute`", text)  # FAA-277 item 1
         self.assertNotIn("—", text)
 
 
@@ -149,6 +152,22 @@ class Registration(unittest.TestCase):
         (command,) = hooks[0]["hooks"]
         self.assertEqual(command["timeout"], 5)
         self.assertTrue(command["command"].endswith("fabric_session.py\" hook post-tool-use"), command["command"])
+
+
+class DepthBound(unittest.TestCase):
+    def test_the_answer_is_read_six_levels_deep_and_no_deeper(self):
+        # FAA-210: _release_answer unwraps at most six levels; a refusal at the sixth is read, one at the seventh is
+        # an answer the hook cannot read, which keeps the reminder
+        for depth, said in ((5, False), (6, False), (7, True)):
+            with self.subTest(depth=depth):
+                self.assertEqual(cli.released_done(release(how="done", response=_nested({"released": False}, depth))),
+                                 said)
+        # the content list and its text block are a level each: four wrappers inside them put the refusal at the
+        # sixth level (read), five at the seventh (not read)
+        text = [{"type": "text", "text": json.dumps(_nested({"released": False}, 4))}]
+        self.assertFalse(cli.released_done(release(how="done", response=text)))
+        deeper = [{"type": "text", "text": json.dumps(_nested({"released": False}, 5))}]
+        self.assertTrue(cli.released_done(release(how="done", response=deeper)))
 
 
 class Hook(Base):

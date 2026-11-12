@@ -133,12 +133,20 @@ def check(data):
     return {'ok': True, 'kind': kind}
 
 
+def read_input(limit=65536):
+    # The handoff's bytes, decoded as UTF-8 with a byte order mark dropped: Windows before Python 3.15 decodes a text
+    # stdin with its code page, which misreads a Cyrillic handoff (FAA-210). A stream without bytes is read as text.
+    stream = getattr(sys.stdin, 'buffer', None)
+    raw = stream.read(limit + 1) if stream is not None else sys.stdin.read(limit + 1)
+    require(len(raw) <= limit, 'input_too_large')
+    return raw.decode('utf-8-sig') if isinstance(raw, bytes) else raw.lstrip('\ufeff')
+
+
 def main():
     try:
-        raw = sys.stdin.read(65537)
-        require(len(raw) <= 65536, 'input_too_large')
-        result = check(json.loads(raw))
-    except (ValueError, TypeError, KeyError, AttributeError):
+        result = check(json.loads(read_input()))
+    # RecursionError: Python 3.9 to 3.13 raise it on a deeply nested document under the cap
+    except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
         # Fixed reasons only: never echo a submitted URL, token or JSON blob.
         result = {'ok': False, 'reason': 'dashboard_handoff_refused'}
     print(json.dumps(result))

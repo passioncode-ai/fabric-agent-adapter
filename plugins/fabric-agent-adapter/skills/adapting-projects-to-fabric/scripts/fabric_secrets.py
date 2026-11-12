@@ -6,6 +6,7 @@ only. The dashboard kit's fabric-button.js carries its own copy of the name and 
 
 It reads as the contract's ECMAScript does (FAA-136): ECMAScript's whitespace (Python's `\\s` also takes U+0085 and
 U+001C to U+001F, and not U+FEFF), `.` stopping at every line terminator, ASCII case folding, an ASCII word boundary."""
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 from __future__ import annotations
 
@@ -142,7 +143,7 @@ def _percent_encode(text: str, also: str) -> str:
     return "".join(out)
 
 
-def _url_parts(value: str) -> Tuple[str, str, str]:
+def url_parts(value: str) -> Tuple[str, str, str]:
     """The password, query and fragment of an absolute URL as WHATWG URL parsing splits them, read by hand: urlsplit
     refuses a `[` or `]` outside an IPv6 host (`<https>://u:p[w@h/`), where `new URL` reads the password (0.56.0 unit
     r7). The fragment starts at the first `#`, the query at the first `?` before it. A special scheme's authority starts
@@ -166,6 +167,9 @@ def _url_parts(value: str) -> Tuple[str, str, str]:
             _percent_encode(fragment, "`"))
 
 
+_url_parts = url_parts  # the name before FAA-250, kept for code that reached it
+
+
 def secret_url(value: str) -> bool:
     """Whether a URL an MCP entry or a launch names carries a credential (LC-21): anything secret_argument finds, a
     password in its user information, or a query or fragment parameter whose name can only carry a credential and has
@@ -177,7 +181,7 @@ def secret_url(value: str) -> bool:
     value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
     if not _SCHEME.match(value):
         return False  # not an absolute URL (WHATWG URL parsing refuses it)
-    password, query, fragment = _url_parts(value)
+    password, query, fragment = url_parts(value)
     if password:
         return True
     for part in (query, fragment):

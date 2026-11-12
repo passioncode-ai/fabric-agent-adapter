@@ -17,6 +17,7 @@ The normative rules are the Fabric Agent Contract's, at the commit this plugin p
 - [Sharing an agent into an organization](#sharing-an-agent-into-an-organization)
 - [Running while the laptop is closed](#running-while-the-laptop-is-closed)
 - [Uptime: A or B](#uptime-a-or-b)
+- [Its own machine: placement, keys and port](#its-own-machine-placement-keys-and-port)
 - [Selling an agent](#selling-an-agent)
 - [The checklist](#the-checklist)
 
@@ -115,6 +116,31 @@ Every new agent is given an uptime category on its first day, and the README nam
 A B agent that gains a capability that must answer around the clock becomes A for that capability; record the change
 and move only that capability to the cloud.
 
+## Its own machine: placement, keys and port
+
+An agent that may run on more than one machine of the estate (a laptop and a personal cloud, an old and a new
+computer during a move) runs on exactly one at a time, and each copy reads only its own machine's keys.
+
+- **Placement.** At start, before it polls, schedules or listens, the agent reads Project Observatory's placement
+  record, `${XDG_DATA_HOME:-~/.local/share}/project-observatory/placement.json` (schema `observatory-placement/1`;
+  Observatory's `observatory/engine/machine_identity.py`). An entry of its `elsewhere` list whose `serviceId` is the
+  agent's `id.instance`, or whose `label` is its launchd label or systemd unit, and whose `placedOn` is not the file's
+  `machine`, says the agent runs on another machine: it refuses to start, writes one log line and reports
+  `degraded` with the reason `placed-elsewhere` and the machine id where it can, and starts nothing that acts. With
+  no file (Observatory absent, nothing ever moved) it starts. A file it cannot read, or one of another schema, does
+  not stop it: it starts and reports `degraded` with `placement-unreadable`, since a guard that cannot read refuses
+  nothing the estate recorded. `full machine-move leave LABEL --to MACHINE` writes the entry and stops the job here;
+  `full machine-move cutover LABEL` removes it on the machine the job moves to. A supervisor that restarts on exit
+  (`KeepAlive`, `Restart=always`) restarts a refused copy under its throttle: stopping the job here is `leave`'s, and
+  the refusal guards a copy started anyway (a restore, a start by hand). Its tests start one copy placed elsewhere and see it refuse, and one with no file and one with a
+  malformed file and see them start.
+- **Keys.** Each copy reads its credentials only from its own vault, the vault of the OS account and machine it
+  runs on (`use_secret.py run` there), never copied from another machine's or account's vault, a backup or a file a
+  move carried. A key the new machine needs is issued anew there through the provider's door, or asked of the
+  person once, and the old machine's key is revoked when the copy there stops.
+- **Port.** Until the contract's port-claim decision (DEC-0160) lands, the kit refuses a port another OS account
+  already listens on (FAA-225); the port recorded per account and its claim file follow DEC-0160.
+
 ## Selling an agent
 
 - **A paid agent** runs in PassionCode's cloud inside its developer's organization (`org:<developer>`); each customer
@@ -133,6 +159,8 @@ and move only that capability to the cloud.
 - Which capabilities need the person's machine, and what do they answer when it is off?
 - On a computer with more than one counted OS account, or under a member's virtual machine: a port recorded per
   account, the listener's owner checked before a token is sent, no token-free loopback door (DEC-0154).
+- On a machine of its own: it starts only on the machine `placement.json` names (or with no entry for it), and reads
+  keys from that machine's own vault.
 - Which uptime category is it, A (a cloud host from the first release) or B (local only)? The README names it.
 - Who pays for each call (which grant, which key)? The person's personal key never pays for an organization.
 - If it joins machines or applies the estate record: tokens from stdin or a 0600 file only, revisions verified with

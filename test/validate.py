@@ -21,7 +21,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric; observing-products builds nothing, it watches a product.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.79.1"
+VERSION = "0.80.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -807,8 +807,8 @@ def _scheme_of(found: str) -> str:
     return "no scheme"
 
 
-def credential_url_problems(root: Path = ROOT) -> List[str]:
-    problems: List[str] = credential_url_scope_problems(root)
+def shipped_text_files(root: Path = ROOT):
+    """(relative path, text) of every UTF-8 file in the shipped scope, `__pycache__` left out."""
     for name in credential_url_scope(root):
         top = root / name
         if not top.exists():
@@ -816,15 +816,77 @@ def credential_url_problems(root: Path = ROOT) -> List[str]:
         files = [top] if top.is_file() else sorted(p for p in top.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
         for path in files:
             try:
-                text = path.read_text(encoding="utf-8")
+                yield path.relative_to(root).as_posix(), path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
-            for lineno, line in enumerate(text.splitlines(), 1):
-                found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
-                if found:  # the scheme alone: a real credential is never repeated into a log
-                    problems.append("%s:%d writes a URL with credentials (%s): name the scheme in angle brackets, "
-                                    "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
-                                    % (path.relative_to(root).as_posix(), lineno, _scheme_of(found.group(0))))
+
+
+def credential_url_problems(root: Path = ROOT) -> List[str]:
+    problems: List[str] = credential_url_scope_problems(root)
+    for rel, text in shipped_text_files(root):
+        for lineno, line in enumerate(text.splitlines(), 1):
+            found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
+            if found:  # the scheme alone: a real credential is never repeated into a log
+                problems.append("%s:%d writes a URL with credentials (%s): name the scheme in angle brackets, "
+                                "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
+                                % (rel, lineno, _scheme_of(found.group(0))))
+    return problems
+
+
+# FAA-212: the vendoring product's release check (project-observatory-open-source `tools/check_public_release.py`)
+# refuses three more patterns; they are composed from parts as it composes them, so this source is no fixture hit.
+SHIPPED_PATTERNS = {
+    "provider-token-shape": re.compile(r"\b(?:" + "gh[pousr]_" + r"[A-Za-z0-9]{30,}|" + "github_pat_" + r"[A-Za-z0-9_]{40,}|"
+                                       + "sk-" + r"(?:proj-|or-v1-|ant-api03-)?[A-Za-z0-9_-]{30,}|" + "AKIA"
+                                       + r"[A-Z0-9]{16}|" + "AIza" + r"[A-Za-z0-9_-]{30,})"),
+    "private-key-block": re.compile("-----BEGIN " + r"(?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "personal-machine-path": re.compile(r"(?<![A-Za-z0-9_.:/-])(?:file://)?/(?:" + "Users" + r"|home)/[A-Za-z0-9_.-]+/"),
+}
+
+
+def shipped_pattern_problems(root: Path = ROOT) -> List[str]:
+    """FAA-212: no shipped file carries a provider token shape, a private key block or a path in a person's home."""
+    problems: List[str] = []
+    for rel, text in shipped_text_files(root):
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for name, rx in SHIPPED_PATTERNS.items():
+                if rx.search(line):  # the pattern's name alone: a value is never repeated into a log
+                    problems.append("%s:%d writes a %s, which the products that vendor the kit refuse to ship: use a "
+                                    "neutral example (`<name>`, `example`) (FAA-212)" % (rel, lineno, name))
+    return problems
+
+
+# FAA-212: a module vendored on its own leaves references/kit-modules.md behind, so a shipped script that writes an
+# example scheme in angle brackets carries the legend itself.
+HTTPS_EXAMPLE = "<https>"
+HTTPS_LEGEND = re.compile(r"^\s*(?:#|//) Example URLs write their scheme in angle brackets: read `<https>` as `https`",
+                          re.MULTILINE)
+SCRIPT_PLACES = re.compile(r"^(?:plugins/[^/]+/skills/[^/]+/scripts|bin)/")
+# A script that writes the example and is owned by another change this wave; each entry names why, and an entry that
+# is no longer needed fails.
+HTTPS_LEGEND_PENDING = {
+    "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs":
+        "the delegation modules belong to another builder in wave 2; its legend lands with that change",
+}
+
+
+def https_legend_problems(root: Path = ROOT, pending: Optional[Dict[str, str]] = None) -> List[str]:
+    pending = HTTPS_LEGEND_PENDING if pending is None else pending
+    problems: List[str] = []
+    for rel, text in shipped_text_files(root):
+        if not SCRIPT_PLACES.match(rel) or HTTPS_EXAMPLE not in text:
+            continue
+        has = bool(HTTPS_LEGEND.search(text))
+        if not has and rel not in pending:
+            problems.append("%s writes `<https>` in an example and carries no legend: add the line `# Example URLs "
+                            "write their scheme in angle brackets: read `<https>` as `https` (FAA-212).` (// in "
+                            "JavaScript)" % rel)
+        elif has and rel in pending:
+            problems.append("HTTPS_LEGEND_PENDING names %s, which carries the legend now: remove it (FAA-212)" % rel)
+    for rel in sorted(pending):
+        path = root / rel
+        if not path.is_file() or HTTPS_EXAMPLE not in path.read_text(encoding="utf-8", errors="replace"):
+            problems.append("HTTPS_LEGEND_PENDING names %s, which writes no `<https>`: remove it (FAA-212)" % rel)
     return problems
 
 
@@ -833,13 +895,24 @@ WORKFLOW_USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
 PINNED_ACTION = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}")
 
 
-CONTRACT_GATE = re.compile(r"^\s*@unittest\.skipUnless\([^\n]*FABRIC_CONTRACT_NEW", re.MULTILINE)
+CONTRACT_VARIABLES = ("FABRIC_CONTRACT_NEW", "FABRIC_CONTRACT_OLD")
 CONTRACT_JOB_LINE = re.compile(r"^\s*python3 -m unittest -v (test_contract_revisions\b[^\n|]*)", re.MULTILINE)
 
 
+def _reads_contract_variables(text: str) -> bool:
+    """True when the code itself names FABRIC_CONTRACT_NEW or _OLD (FAA-189): a string constant that is exactly that
+    name, so a gate over several lines, `skipIf(not ...)`, `self.skipTest` or a module constant counts, and a test that
+    only holds the name inside a longer string (a fixture) does not."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return any(name in text for name in CONTRACT_VARIABLES)
+    return any(isinstance(node, ast.Constant) and node.value in CONTRACT_VARIABLES for node in ast.walk(tree))
+
+
 def contract_gated_modules(root: Path = ROOT) -> List[str]:
-    """The test modules holding a test gated on FABRIC_CONTRACT_NEW: only the contract job can run them."""
-    return sorted(path.stem for path in (root / "test").glob("test_*.py") if CONTRACT_GATE.search(path.read_text(encoding="utf-8")))
+    """The test modules reading FABRIC_CONTRACT_NEW or _OLD: only the contract job can run their gated tests."""
+    return sorted(path.stem for path in (root / "test").glob("test_*.py") if _reads_contract_variables(path.read_text(encoding="utf-8")))
 
 
 def workflow_problems(root: Path = ROOT) -> List[str]:
@@ -1041,6 +1114,8 @@ def validate_repo() -> List[str]:
     errors.extend(workflow_problems())
     errors.extend(dollar_anchor_problems())
     errors.extend(credential_url_problems())
+    errors.extend(shipped_pattern_problems())
+    errors.extend(https_legend_problems())
     return errors
 
 

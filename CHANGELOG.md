@@ -1,5 +1,116 @@
 # Changelog
 
+## 0.80.0 (2026-11-12)
+
+Wave 2 and the first part of wave 3 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. A new kit
+module, `fabric_load` and `fabric-load.mjs` (layer L3). Kit modules change: `fabric_secrets`, `fabric_peer_owner`
+(`1.1.0+kit.4`), `fabric_connections`, `fabric_descriptor`, `fabric_context`, `fabric_supervisors`, `fabric_interop`,
+`fabric_hub`, `fabric_board_slots`, `fabric_board_session`, `fabric_http`, `fabric_usage`, the facade `fabric_service`,
+and their Node twins where they have one.
+
+### Added
+
+- **Three working rules in working-with-fabric and in a new agent's template** (the contract owner's board request
+  `bfc0e14e`, relaying the operator's words of 2026-11-12): the task's context is settled before the first act that
+  crosses contexts (`personal`, `org:<orgId>`), asked once when no source settles it, recorded in the handoff and never
+  posted to a board thread, following contract CT-292's draft (TC-1 to TC-6) until its DEC lands, the one exception to
+  "do not ask" (`references/task-context.md`, FAA-299); a wait is not a stop: each wait has its condition, owner, next
+  action and watcher, `fabric_heartbeat` carries `waitingOn`, a turn ends with one line per open wait
+  (`references/waits.md`, FAA-300); clean up after yourself: merged worktrees and branches, `git fetch --prune`, unique
+  commits archived under `refs/archive/<date>/`, `git ls-files` checked before a folder goes (`references/cleanup.md`,
+  FAA-301). creating-fabric-agents carries the three in `references/working-rules.md`. Six scenario evals and
+  `test/test_working_rules_prose.py`.
+- **A service install refuses a port another OS account listens on** (FAA-225, its port part), read with
+  `fabric_peer_owner`; a port of this account, the system or nobody, or an unreadable table, still passes. The claim
+  file waits on contract DEC-0160.
+- creating-fabric-agents: an agent on its own machine refuses to start where Observatory's `placement.json` places it
+  elsewhere, starts with no file, reports `placement-unreadable`, and takes keys only from its machine's vault
+  (`where-agents-run.md`, FAA-230's placement and vault parts).
+- A recorded working-with-fabric trigger run: 38 of 44 with haiku, above the 85 % gate, USD 0.0122
+  (`docs/evidence/evals/2026-11-12-trigger-run.md`, FAA-130); six misses follow FAA-291's shorter description (FAA-305).
+
+- **The call queue and load reference functions of DEC-0104** (FAA-289): `fabric_load.py` and `fabric-load.mjs`,
+  exported by both facades: `jobCallerKey`, `nextQueuedJob`, `admitJob`, `queueStatusMessage`, `readQueuePosition` as
+  the contract's `src/agent-network.ts` answers them at the pin, FAC-SEM-131 to FAC-SEM-133, the `service-load/1` and
+  `extensions/load/0.1` shapes, and `loadExtension`. Both twins are held to `test/fixtures/contract/load-vectors.json`,
+  written by `make_load_vectors.mjs` from the contract's own vectors, fixtures and functions.
+- **A dashboard-only service recipe** (FAA-268, `recipes/dashboard-only/`): an installer with `--id` and `--folder`,
+  a JSON last line and an idempotent repeat, and a runnable entry `check_service.py` passes; the HA-1 claim file waits
+  on contract CT-228.
+- **A key-delivery door template** (FAA-238, `recipes/key-delivery-door/`): it prints one `fabric-credential-envelope/1`
+  line, writes into no store, and exits as Observatory's `receive --from-command` reads it; built against Observatory's
+  V2 spec until OBS-360 ships. The door owner supplies the seal command (the standard library has no HPKE).
+- `context_gate_options` / `contextGateOptions` hand an instance's context and its pin's issuer to the delegation gate:
+  an organization instance refuses a token signed by the personal hub key (FAA-150).
+- working-with-fabric: `references/remote-sessions.md`, a session over SSH with no GUI login (never start Fabric, the
+  login is the human gate) and one Project worked on from two machines (two boards, ids never cross) (FAA-284).
+
+### Changed
+
+- **working-with-fabric's description names the relayed operator approval, a usage limit hit mid-run and its
+  exclusions (Fabric's own code, agent-sync leases) again**, within the 360-character budget: the trigger run goes from
+  86.4 % to 95.7 % with haiku, and 95.7 % with sonnet (`docs/evidence/evals/2026-11-12-faa-305.md`, FAA-305).
+- `remote-placement.md`: a cloud service registered from several hosts keeps one token per host, and revoking one ends
+  only its sessions (FAA-280).
+- The Python connections reader refuses a non-ASCII host where every Node from 20 to 26 refuses it, with tables measured
+  by `test/fixtures/idna/make_idna_tables.mjs` (no host any Node accepts is refused, over 3,573,756 hosts) (FAA-98).
+- The kit's mandate inputs carry 19 hostile `source` shapes, the vectors regenerated at the pin (FAA-149).
+- `systemd_install` and `task_install` poll the installed answer when given `origin`, as `launchd_install` does
+  (FAA-253). A supervised `fabric_context` refusal waits the lock's back-off before it exits 78, so `KeepAlive` no
+  longer respawns it every 10 s (FAA-279).
+- Hub and `fabric_http` refusals carry the listener owner's reason, and a restricted table is not retryable (FAA-272).
+- **working-with-fabric finds Claude Code's files where `CLAUDE_CONFIG_DIR` points** (and Switchboard's source folder),
+  with the launcher's folder rule; the installer reads the same place (FAA-218, FAA-234). A local Claude Code
+  registration is read as Claude Code applies it, keyed by the git root or the folder itself outside git, measured
+  with 2.1.299 (`docs/evidence/runs/2026-11-12-faa-235-local-scope-key.md`, FAA-235).
+- Session start warns in one line when the registered `fabric-mcp` is another user's copy (Claude Code, Codex, Kimi
+  Code) (FAA-232); `status` checks Codex's and Kimi Code's registrations too (FAA-233) and names an ignored
+  `PASSIONCODE_APPLICATIONS` value, a copy outside that folder, your own copy in `~/Applications` and a folder you
+  cannot enter (FAA-239, FAA-240).
+- A turn carries its git branch where Fabric 0.3.16 and later take it; `FABRIC_SESSION_NO_BRANCH=1` turns it off
+  (FAA-152, its branch part).
+- The Stop hook spools the turn's facts before it reads other repositories, and waits for that read only within its
+  1.5 s budget (FAA-161). A turn's Bash calls carry the working folder inside the session folder, so a relative
+  `git -C` names the right repository (FAA-184).
+- The retro texts name `agents-db.contribute`, and the agents-database ask gains its edges (FAA-277, items 1 to 4).
+- `test/validate.py` searches the shipped files for a provider token shape, a private key block and a home path, and
+  every shipped script that writes `<https>` carries its legend but `fabric-delegation.mjs`, which takes it when it next
+  changes (FAA-306) (FAA-212).
+- The nudge notes were re-read against Fabric's tag v0.3.14 (FAA-143).
+- The insight/1 shape follows the estate's spec: `evidence` and `audience` are required, and the kind `market`
+  exists (`session-hooks.md`, FAA-217).
+- `dashboard-links.md`: the `unsupported` host state takes no browser fallback, by the operator's rule; macOS never
+  reports it (FAA-137).
+- `resilience-and-autonomy.md`: a routine whose result write fails exits non-zero and never logs success (FAA-294,
+  item 4).
+
+### Fixed
+
+- **A usage report with many task runs passes its own FAC-SEM-025** (board request `f5753c5a`): each run and its project
+  were rounded to 6 decimals apart, so ten or more runs rounding up summed past the project (2.926432 > 2.926429 on a
+  15-language localization). A run's cost now rounds as before but never above its exact cost, so the runs' sum stays
+  within the project by construction, in both twins. The projects against the days is the contract's own comparison
+  and its fixed tolerance; asked of the contract's owner (FAA-310).
+- **A session that moved into a nested checkout keeps its local registration** (the 0.80.0 seam reading of the
+  candidate): FAA-235's one-key rule read a hook's moving `cwd` only, so the Stop and SessionEnd hooks, the deliver
+  worker and `watch-mail` took a session registered with `--scope local` at the repository root for unregistered once
+  it worked in a submodule or a `.claude/worktrees/` worktree. They also read the key of the folder the session started
+  in, `CLAUDE_PROJECT_DIR`, as Claude Code keeps that folder's registration.
+- A refused job answer is named from one read of the job; the responder's shutdown says whether it drains; an epoch
+  refusal reads `com.status` before the retry (FAA-186). Provider stems read as the contract reads them, `~` in
+  `FABRIC_SERVICES_DIR` is expanded, contract-gated tests are found by `ast` (FAA-189). The channel-agent rule agrees
+  with the contract on Python 3.9 and answers NOT_RUN without its schema (FAA-250). ASCII digits only, a header-only
+  netstat reads as a restricted table, a hung `launchctl` no longer escapes (FAA-273).
+- The release waits 20 minutes, not 10, for the registry to serve a new version, and the publish job's own limit is 30
+  minutes: 0.79.1 was served 6 s after the old window closed and its run read red although it was published (FAA-307).
+- The dashboard link gate reads its handoff as UTF-8 bytes, drops a byte-order mark, caps it at 64 KiB and refuses a
+  deep document plainly, so a Cyrillic handoff passes under any code page (FAA-210).
+
+### Upgrading
+
+- `fabric_descriptor` (and its Node twin) imports `fabric_peer_owner`, and the facades import `fabric_load`: update with
+  `fabric_kit.py install`, which brings both along, never a hand copy of one file.
+
 ## 0.79.1 (2026-11-12)
 
 0.79.0 was tagged and never published: its release run (43176165810) failed two jobs, so `release` and `publish` were

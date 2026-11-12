@@ -32,6 +32,9 @@ Usage:
       remove plain ~/.claude/skills copies that shadow the installed plugin
   npx @passioncode-ai/fabric-agent-adapter --help
 
+~/.claude is the folder CLAUDE_CONFIG_DIR names when it is set, as Claude Code reads it; in a Switchboard home the
+plugin is looked for in SWITCHBOARD_CLAUDE_SOURCE_DIR, where it was installed.
+
 Packages (fabric-package/1):
   npx @passioncode-ai/fabric-agent-adapter pack <folder> [--apply]
       list the folder's files, derive agentRef, compute the digest, check it
@@ -118,9 +121,27 @@ function linkOwner(dest) {
   return fs.readlinkSync(dest).split(path.sep).includes('.passioncode') ? 'launcher' : 'other';
 }
 
+// Claude Code's folders as the PassionCode launcher finds them (its lib/launcher.js claudeFolders, PC-129; FAA-218):
+// `read`, where the session's skills are, is CLAUDE_CONFIG_DIR when set, else ~/.claude; `write`, where plugins are
+// installed, is the folder the CLI was run against (null: ~/.claude). Inside a Switchboard home CLAUDE_CONFIG_DIR is
+// the home and SWITCHBOARD_CLAUDE_SOURCE_DIR the person's folder it is built from; a home of a Switchboard before
+// 0.7.14 names no source and lies in Switchboard's data folder, and its plugins are then in ~/.claude.
+const SWITCHBOARD_DATA = 'ai.passioncode.fabric-switchboard';
+function claudeFolders(home) {
+  const configDir = process.env.CLAUDE_CONFIG_DIR ? path.resolve(process.env.CLAUDE_CONFIG_DIR) : null;
+  const named = process.env.SWITCHBOARD_CLAUDE_SOURCE_DIR;
+  const inSwitchboard = configDir && configDir.split(/[\\/]/).includes(SWITCHBOARD_DATA);
+  const source = !configDir ? null
+    : named && path.isAbsolute(named) ? path.resolve(named)
+      : inSwitchboard ? path.join(home, '.claude') : null;
+  const write = source ? (source === path.join(home, '.claude') ? null : source) : configDir;
+  return { read: configDir || path.join(home, '.claude'), write };
+}
+
 function pluginInstalled(home) {
+  const folders = claudeFolders(home);
   try {
-    const data = JSON.parse(fs.readFileSync(path.join(home, '.claude/plugins/installed_plugins.json'), 'utf8'));
+    const data = JSON.parse(fs.readFileSync(path.join(folders.write || path.join(home, '.claude'), 'plugins/installed_plugins.json'), 'utf8'));
     const records = (data.plugins || {})[PLUGIN_ID] || [];
     return records.some((r) => r.installPath && fs.existsSync(path.join(r.installPath, 'skills')));
   } catch {
@@ -140,10 +161,11 @@ function skillNames() {
 function pruneShadows(home, names) {
   let removed = 0;
   for (const name of names) {
-    const shadow = path.join(home, '.claude', 'skills', name);
+    const skills = claudeFolders(home).read;
+    const shadow = path.join(skills, 'skills', name);
     let info;
     try { info = fs.lstatSync(shadow); } catch { continue; }
-    const backup = path.join(home, '.claude', 'skills-shadow-backup', `${name}-${Date.now()}`);
+    const backup = path.join(skills, 'skills-shadow-backup', `${name}-${Date.now()}`);
     fs.mkdirSync(path.dirname(backup), { recursive: true });
     fs.renameSync(shadow, backup);
     console.log(`Removed shadowing ${info.isSymbolicLink() ? 'link' : 'copy'} ${shadow} (kept at ${backup})`);
@@ -196,7 +218,7 @@ function main(argv) {
     return 1;
   }
 
-  const destRoot = target === 'claude' ? path.join(home, '.claude', 'skills') : path.join(home, '.agents', 'skills');
+  const destRoot = target === 'claude' ? path.join(claudeFolders(home).read, 'skills') : path.join(home, '.agents', 'skills');
   const failed = [];
   for (const name of names) {
     const dest = path.join(destRoot, name);

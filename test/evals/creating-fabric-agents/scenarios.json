@@ -287,6 +287,33 @@
         "runs the grill and the build after that ask, building from the template the answer names when it has come, and records the template's id and version (or says no answer came)",
         "names no private catalogue, repository or person in the agent's public files"
       ]
+    },
+    {
+      "id": "new-agent-settles-the-task-context",
+      "request": "Create a Fabric-compatible agent that files weekly reports to project boards; it will hold keys for a personal estate and for two organizations.",
+      "expected": [
+        "the agent's template settles the task's context at session start from the operator's words, the board request's Project, the folder's Project and its organization, the grant's context and the place",
+        "when they are silent or disagree, the template asks the operator once with the candidates and what each would do, through fabric_question_ask when no person is in the session; never a guess, a safest pick or a split",
+        "the answer is recorded in the handoff and never posted to either organization's board thread; a test pins the rule's key sentence"
+      ]
+    },
+    {
+      "id": "new-agent-treats-a-wait-as-not-a-stop",
+      "request": "Create a Fabric-compatible agent that opens pull requests and waits for CI before merging.",
+      "expected": [
+        "the template records every wait with its condition, owner, next action and watcher, or an honest 'no watcher'",
+        "the agent heartbeats waitingOn while it waits and takes the next task in the same turn",
+        "a turn ends with one line per open wait, never with 'shall I continue?'; a test pins it"
+      ]
+    },
+    {
+      "id": "new-agent-cleans-up-after-itself",
+      "request": "Create a Fabric-compatible agent that works in its own Git worktrees and builds release artefacts.",
+      "expected": [
+        "after a merge the template removes its own worktrees and branches locally and on origin, then runs git fetch --prune",
+        "a branch with commits found nowhere else is archived under refs/archive/<date>/ before deletion",
+        "it never touches another session's worktree, a locked one or a Git-tracked file, checking git ls-files -- <dir> first; a test pins it"
+      ]
     }
   ]
 }

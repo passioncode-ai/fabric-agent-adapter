@@ -260,6 +260,60 @@ class Writers(unittest.TestCase):
         self.assertNotIn("platform-metered", fs.ROUTES, "a configuration's route stays subscription or key")
 
 
+class ForeignListener(unittest.TestCase):
+    """FAA-225 (port part): an install refuses a port another OS account listens on, read with the kit's
+    fabric_peer_owner (DEC-0154 HA-2). A port this account, the system, nobody or an unreadable table holds passes;
+    the claim file in the host's sticky folder waits on the contract's DEC-0160."""
+
+    def setUp(self):
+        self.services = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.services, True)
+        self.desc = dict(fixture("service-descriptor-node"), source={"repository": "https://github.com/example-org/example-agent"})
+
+    def test_a_port_another_account_listens_on_is_refused(self):
+        asked = []
+
+        def owner(port):
+            asked.append(port)
+            return ("another-account", 502)
+        with self.assertRaises(fs.ServiceError) as caught:
+            fs.write_descriptor(self.desc, self.services, port_owner=owner)
+        port = fs.port_of(self.desc["origin"])
+        self.assertEqual(asked, [port])
+        self.assertIn("Port %d is listened on by another OS account (uid 502)" % port, str(caught.exception))
+        self.assertIn("FAA-225", str(caught.exception))
+        self.assertEqual(list(self.services.glob("*.json")), [], "a refused install writes nothing")
+
+    def test_this_account_the_system_nobody_and_an_unread_table_pass(self):
+        for answer in (None, ("this-account", os.getuid() if hasattr(os, "getuid") else None), ("system", 0),
+                       ("unknown", None), ("none", None)):
+            with self.subTest(answer=answer):
+                self.assertTrue(fs.write_descriptor(self.desc, self.services, port_owner=lambda port: answer).is_file())
+
+    def test_a_remote_or_app_descriptor_asks_nothing(self):
+        def owner(port):
+            raise AssertionError("asked about port %d" % port)
+        remote = dict(fixture("service-descriptor-peer-remote"), source=self.desc["source"])
+        app = dict(fixture("service-descriptor-person-app"), source=self.desc["source"])
+        app["lifecycle"] = dict(app["lifecycle"], app=str(self.services))
+        for desc in (remote, app):
+            with self.subTest(desc=desc["id"]):
+                fs.write_descriptor(desc, self.services, port_owner=owner)
+
+    def test_the_default_reader_is_the_kits_and_a_free_port_is_not_read(self):
+        import socket
+        with socket.socket() as held:
+            held.bind(("127.0.0.1", 0))
+            free = held.getsockname()[1]
+        self.assertIsNone(fs.port_owner(free), "a port nothing binds is free without reading the table")
+        with socket.socket() as mine:
+            mine.bind(("127.0.0.1", 0))
+            mine.listen(1)
+            kind, _uid = fs.port_owner(mine.getsockname()[1])
+            self.assertIn(kind, ("this-account", "unknown"))
+            self.assertIsNone(fs.port_listener_refusal(mine.getsockname()[1]))
+
+
 class RunnerKindTests(unittest.TestCase):
     def test_a_subscription_runner_kind_that_is_no_string_is_named_not_raised(self):
         # 0.62.0 unit reading 17: a list or an object as a key raised TypeError; the Node twin names the same problems.

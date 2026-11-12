@@ -70,7 +70,14 @@ function byProject(receipts, first, last) {
   const close = ({ cost, ...rest }) => ({ ...rest, costUsd: rest.calls && rest.unpricedCalls === rest.calls ? null : Math.round(cost * 1e6) / 1e6 });
   return [...projects.keys()].sort().map((key) => {
     const { runs, ...row } = projects.get(key);
-    const taskRuns = [...runs.keys()].sort().map((id) => close(runs.get(id)));
+    // A run's cost rounds as the project's does but never above its exact cost: each run and the project round apart,
+    // so many runs rounding up summed past the project and failed FAC-SEM-025 (board request f5753c5a).
+    const closeRun = (run) => {
+      const out = close(run);
+      if (out.costUsd !== null && out.costUsd > run.cost) out.costUsd = Math.round((out.costUsd - 0.000001) * 1e6) / 1e6;
+      return out;
+    };
+    const taskRuns = [...runs.keys()].sort().map((id) => closeRun(runs.get(id)));
     return { ...close(row), ...(taskRuns.length ? { taskRuns } : {}) };
   });
 }

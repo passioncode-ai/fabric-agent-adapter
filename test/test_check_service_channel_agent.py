@@ -187,6 +187,26 @@ class Verdict(unittest.TestCase):
         self.assertIn("FAC-SEM-165", evidence)
         self.assertNotIn("k-or-v1", evidence)
 
+    def test_a_copy_shape_failure_also_names_the_read_declarations_findings(self):
+        """FAA-250 (6): the copy-shape FAIL named only the copies; the read declaration's own findings join it."""
+        shaped = valid_declaration()
+        shaped["projects"][0]["channels"][0]["texts"]["final"] = {"en": "key " + "s" + "k-or-v1-" + "a1b2c3d4" * 8}
+        declaration = valid_declaration()
+        declaration["projects"][0]["channels"][0]["texts"]["final"] = {"en": "a \u2014 b"}
+        verdict, evidence = ca.declaration_verdict(self.manifest(declaration), True, "", {"extensions": {KEY: shaped}})
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("outside the read declaration", evidence)
+        self.assertIn("on the read declaration itself", evidence)
+
+    def test_format_characters_newer_than_this_pythons_unicode_are_blank(self):
+        """FAA-250 (1): Python 3.9 (Unicode 13) reads U+0890 and U+1343F as unassigned; the contract's \\p{Cf} and newer
+        Pythons read them as format characters, so a text of them is blank on every Python."""
+        for code in (0x0890, 0x0891, 0x13439, 0x1343F):
+            with self.subTest(code=hex(code)):
+                self.assertTrue(ca.blank(chr(code)))
+                self.assertTrue(ca.blank(" " + chr(code) + "\u200b"))
+        self.assertFalse(ca.blank(chr(0x0892)))
+
     def test_ca1_a_service_with_a_manifest_is_read_from_the_manifest_only(self):
         bad = valid_declaration()
         bad["standard"] = "channel-agent-standard/2"
@@ -265,6 +285,21 @@ class Probe(unittest.TestCase):
             probe = self.probe({"fabricManifest": str(path)}, {"extensions": {}})
             probe.channel_agent_rule()
             self.assertEqual((probe.results[-1]["rule"], probe.results[-1]["verdict"]), ("channel-agent.declaration", "PASS"))
+
+    def test_a_copy_without_the_schema_is_not_run_and_the_later_rules_run(self):
+        """FAA-250 (3): a probe copied without service-channel-agent-extension.schema.json raised at the first declared
+        service; the rule is NOT_RUN naming the file."""
+        from unittest import mock
+        checker = load("check_service")
+        probe = checker.Probe(Path("/nonexistent"), {"origin": "http://127.0.0.1:1"}, Path("/nonexistent"), True)
+        probe.wk = {"extensions": {KEY: valid_declaration()}}
+        schema = checker.cac.cas
+        with mock.patch.object(schema, "SCHEMA_FILE", Path("/nonexistent/service-channel-agent-extension.schema.json")), \
+                mock.patch.object(schema, "_schema", None):
+            probe.channel_agent_rule()
+        result = probe.results[-1]
+        self.assertEqual((result["rule"], result["verdict"]), ("channel-agent.declaration", "NOT_RUN"))
+        self.assertIn("service-channel-agent-extension.schema.json", result["evidence"])
 
     def test_the_rule_reads_the_well_known_answer_with_no_manifest(self):
         declaration = valid_declaration()

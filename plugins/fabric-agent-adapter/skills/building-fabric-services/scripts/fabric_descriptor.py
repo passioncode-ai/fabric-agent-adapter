@@ -1,5 +1,6 @@
 """How a service is found (fabric-service/0.1): its descriptor, peers and app descriptors (DEC-0061, DEC-0069),
 build identity and the well-known document, the loopback HTTP server. Part of the service kit (FAA-65, layer L3)."""
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 from __future__ import annotations
 
 import hashlib
@@ -7,6 +8,7 @@ import http.server
 import json
 import os
 import re
+import socket
 import socketserver
 import subprocess
 import warnings
@@ -29,6 +31,7 @@ from fabric_base import (
     expand,
     now_iso,
 )
+import fabric_peer_owner  # noqa: E402 - L0: who listens on a port (DEC-0154 HA-2, FAA-225)
 from fabric_paths import (
     atomic_write,
     ensure_private_dir,
@@ -477,8 +480,35 @@ def source_refusal(descriptor: Dict[str, Any], directory: Optional[Path] = None)
     return "Descriptor %s %s. %s" % (me, NO_SOURCE_REPOSITORY, PASS_SOURCE)
 
 
-def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None, *, _stacklevel: int = 2) -> Path:
-    """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim).
+def port_owner(port: int) -> Optional[Tuple[str, Optional[int]]]:
+    """Who listens on 127.0.0.1:<port> now, as (kind, uid) from the kit's fabric_peer_owner, or None when a plain bind
+    of that address succeeds (nothing holds it, and the socket table is not read). FAA-225, DEC-0154 HA-2."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        try:
+            probe.bind(("127.0.0.1", port))
+            return None
+        except OSError:
+            pass
+    owner = fabric_peer_owner.listener(port)
+    return owner.kind, owner.uid
+
+
+def port_listener_refusal(port: int, reader: Optional[Any] = None) -> Optional[str]:
+    """Why an install may not take ``port``: another OS account listens on it (FAA-225). This account, the system
+    (launchd holds a socket-activated job's socket), nobody and an unreadable table pass: the refusal is for a port
+    that is surely another account's. The recorded port per account and its claim file wait on contract DEC-0160."""
+    found = (reader or port_owner)(port)
+    if not found or found[0] != fabric_peer_owner.ANOTHER_ACCOUNT:
+        return None
+    uid = " (uid %d)" % found[1] if isinstance(found[1], int) else ""
+    return ("Port %d is listened on by another OS account%s: choose a port no other account holds (DEC-0154, "
+            "FAA-225)." % (port, uid))
+
+
+def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None, *, _stacklevel: int = 2,
+                     port_owner: Optional[Any] = None) -> Path:
+    """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim), and a port another
+    OS account listens on (FAA-225; ``port_owner(port) -> (kind, uid) | None`` reads it, the kit's own by default).
 
     FAA-198: a new descriptor names its ``source.repository``; rewriting one already installed without it only
     warns (``NoSourceRepositoryWarning``), so an installed agent's update keeps working."""
@@ -505,6 +535,9 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
             continue
         if other_port == port:
             raise ServiceError("Port %d is already claimed by %s (%s)." % (port, key, path))
+    held = port_listener_refusal(port, port_owner) if port is not None else None
+    if held:
+        raise ServiceError(held)
     ensure_private_dir(root)
     target = descriptor_path(descriptor["id"], descriptor["instance"], root)
     atomic_write(target, (json.dumps(descriptor, indent=2, ensure_ascii=False) + "\n").encode(), 0o600)

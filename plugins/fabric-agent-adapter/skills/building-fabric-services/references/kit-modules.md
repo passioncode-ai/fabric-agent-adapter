@@ -59,7 +59,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L0 | `fabric_time` | strict RFC 3339, UTC days, formatting, day windows, the clock ([dates](#dates-and-times)) |
 | L0 | `fabric_identifiers` | identifier equality by normal form (DEC-0076) |
 | L0 | `fabric_secrets` | the contract's one credential detector (DEC-0044) |
-| L0 | `fabric_peer_owner` | which OS account owns each end of a loopback connection, from the computer's socket table (DEC-0154 HA-2, FAA-226): `listener`, `server_end`, `peer`, `CheckedHTTPConnection`; the Python file is Project Observatory's `peer_owner.py` 1.1.0 vendored from commit `f86f0622` with the readings its header names (`1.1.0+kit.3`), the Node twin reads netstat, `/proc` and the owner SID where Python reads `sysctl`, `/proc` and `GetExtendedTcpTable`; on a restricted macOS table (FAA-267) a caller may vouch with a pid it started, proved by `lsof -p` |
+| L0 | `fabric_peer_owner` | which OS account owns each end of a loopback connection, from the computer's socket table (DEC-0154 HA-2, FAA-226): `listener`, `server_end`, `peer`, `CheckedHTTPConnection`; the Python file is Project Observatory's `peer_owner.py` 1.1.0 vendored from commit `f86f0622` with the readings its header names (`1.1.0+kit.4`), the Node twin reads netstat, `/proc` and the owner SID where Python reads `sysctl`, `/proc` and `GetExtendedTcpTable`; on a restricted macOS table (FAA-267) a caller may vouch with a pid it started, proved by `lsof -p` |
 | L0 | `fabric_tailnet` | who calls an agent behind `tailscale serve` and what that person may open (FAA-297): `Tailscale-User-Login` only on the agent's own serve listener from a loopback peer, groups from a generated `tailnet-perimeter/1` file, a personal SHA-256-stored key for MCP no wider than the groups; `authorize`, `load_perimeter`, `load_keys`, `hash_key`, refusals 401/403 with a code ([surfaces-and-auth.md](surfaces-and-auth.md#behind-tailscale-serve)) |
 | L1 | `fabric_crypto` | Ed25519 signing (a Montgomery ladder that does not branch on the key) and verification, P-256 verification, base64url, sha256 |
 | L1 | `fabric_base` | the protocol name, `ServiceError`, small shared helpers |
@@ -78,6 +78,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_connections` | what an agent uses, `fabric-connections/0.1`: the reference reading and the declaration (DEC-0096, FAC-SEM-127) |
 | L3 | `fabric_a2a` | the reading side of an A2A Agent Card: `surfaces.a2a` as the schema reads it, and what a public card must not carry (DEC-0122) |
 | L3 | `fabric_page_links` | a service's pages as Fabric Dashboards' open_link: build and read it, a raw local address, FAC-SEM-143 on a link and on a URL-mode input request (DEC-0123); the Python twin reads URLs as WHATWG does by hand |
+| L3 | `fabric_load` | the call queue and the load report of DEC-0104 (FAA-289): `job_caller_key`, `next_queued_job`, `admit_job`, `queue_status_message`, `read_queue_position`, FAC-SEM-131 to 133, the `service-load/1` and `extensions/load/0.1` shapes, `load_extension`; imports `fabric_connections` for ajv's `date-time` ([interop](interop.md#a-nodes-call-queue)) |
 | L3 | `fabric_lock` | the instance lock and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |
@@ -105,7 +106,8 @@ Beside the kit, not in `kit.json`: the probe (`check_service.py`, `check_service
 `check_service_channel_agent.py`, `check_service_channel_agent_schema.py` and the
 `service-channel-agent-extension.schema.json` it reads at run time), the sample
 (`sample_service.py`, `sample-remote-service.mjs`), `fabric_kit.py` itself and the dashboard tools. Recipes built on
-the kit live in `../recipes/` ([the draft-and-check step of a support agent](../recipes/support-agent/README.md)).
+the kit live in `../recipes/` ([the draft-and-check step of a support agent](../recipes/support-agent/README.md), [a service that is only a
+dashboard](../recipes/dashboard-only/README.md), [a key-delivery door](../recipes/key-delivery-door/README.md)).
 
 ## What 0.39 code keeps
 

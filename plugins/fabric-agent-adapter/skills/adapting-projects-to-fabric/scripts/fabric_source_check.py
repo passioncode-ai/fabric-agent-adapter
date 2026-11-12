@@ -45,6 +45,7 @@ is refused: it would travel with the source. The summary says whether Git chose 
 Under a locale whose file-system encoding is not UTF-8 the check restarts itself in Python's UTF-8 mode, so a name,
 an argument and a file are read in one encoding. Standard library only.
 """
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 # #region source-check — docs: plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/source-and-instance.md#the-check
 
@@ -200,7 +201,7 @@ def _url_secret(url: str, depth: int = 0) -> bool:
     url = url.rstrip(".,;)]}")
     if not _secrets._SCHEME.match(url):
         return False
-    password, query, fragment = _secrets._url_parts(url)
+    password, query, fragment = _secrets.url_parts(url)
     # what says it is synthetic is the value, never the host or the path (`examples.blob.core.windows.net`)
     if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password) and _real(unquote(password)):
         return True

@@ -27,7 +27,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { atomicWrite, ensurePrivateDir, readToken } from './fabric-service.mjs';
 import { hubKeyCertified } from './fabric-estate.mjs';
-import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';
+import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED } from './fabric-peer-owner.mjs';
 
 // DEC-0154 HA-2: every connection to the door is checked before a byte goes out; kept alive, so a busy session reads the
 // socket table once per connection, not once per call. A free socket is closed after 2 s idle, before a server's own
@@ -51,6 +51,20 @@ export class HubError extends Error {
     this.retryable = retryable;
     this.data = data ?? {};
   }
+}
+
+/**
+ * The HubError for a hub port the peer-owner check refused (DEC-0154 HA-2): code `foreign-user`, the pinned contract's
+ * state name, with the owner's reason in the sentence and in `data.reason` (FAA-272): `table-restricted` when this
+ * runtime's socket table hides other processes' sockets, which never clears, so it is not retryable; otherwise the
+ * owner's kind or the check's reason (`another-account`, `no-row`), retryable as before.
+ */
+export function listenerRefusal(e) {
+  const kind = e?.owner?.kind ?? null;
+  const why = String(e?.owner?.reason ?? kind ?? e?.code ?? 'unknown');
+  const reason = why.startsWith(TABLE_RESTRICTED) ? TABLE_RESTRICTED : why.split(':', 1)[0];
+  const shown = kind && e?.owner?.reason ? `${kind}: ${e.owner.reason}` : String(kind ?? why);
+  return new HubError('foreign-user', `The hub's port is not held by this OS account's process (${shown}); nothing was sent.`, reason !== TABLE_RESTRICTED, { reason });
 }
 
 /** Fabric's registry root, where hub.json lives (Fabric agentRegistry.ts#registryDirs). */
@@ -202,7 +216,7 @@ export function postMcp(origin, body, bearer, { session, timeout = 15000, method
     });
     req.on('timeout', () => req.destroy(new Error('timeout')));
     req.on('error', (e) => reject(e instanceof ListenerRefused
-      ? new HubError('foreign-user', `The hub's port is not held by this OS account's process (${e.owner?.kind ?? e.code}); nothing was sent.`, true)
+      ? listenerRefusal(e)
       : new HubError('hub-unavailable', `Fabric's hub did not answer (${e.code ?? e.message}).`, true)));
     if (payload) req.write(payload);
     req.end();

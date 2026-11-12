@@ -1,0 +1,4 @@
+working-with-fabric: 44/46 passed (95.7%; positives 27/29, negatives 17/17, errors 0) PASS
+  miss: Подключи этого агента к Fabric и возьми задачу через fabric_work_claim. -> adapting-projects-to-fabric
+  miss: Наш запрос на доске вернулся с noResponder. Что делать? -> building-fabric-services
+cost: $0.2707

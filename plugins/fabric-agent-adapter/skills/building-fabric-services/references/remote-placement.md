@@ -10,6 +10,7 @@ DEC-0019, at the commit this skill pins. This page is the how-to.
 - [On the platform](#on-the-platform)
 - [Checking it](#checking-it)
 - [What a host does and will not do](#what-a-host-does-and-will-not-do)
+- [Registered from several hosts](#registered-from-several-hosts)
 - [Rotation](#rotation)
 
 ## Is it a remote service?
@@ -68,8 +69,9 @@ watch the gate fail.
 ## On the platform
 
 - **Token**: a random value of at least 16 characters (32 bytes recommended), set as a secret;
-  the same value is written on the operator's computer by `registerRemote`. Compare in constant
-  time (`tokenMatches`).
+  the same value is written on the registering host by `registerRemote`. Compare in constant
+  time (`tokenMatches`). A service registered from more than one host holds one token per host
+  ([Registered from several hosts](#registered-from-several-hosts)).
 - **Session key**: 32 random bytes, a separate secret; rotating it signs every operator out.
 - **Codes and sessions**: `MemoryCodeStore`: a restart forgets every outstanding code, so none
   can be replayed, and every session record, so a deploy signs the operator out (DEC-0039: the
@@ -122,10 +124,49 @@ The login rules keep every `Set-Cookie` of the answer and judge the session cook
 | start, stop, restart, update | not offered |
 | a host older than the remote placement | shows the service as invalid and never contacts it |
 
+## Registered from several hosts
+
+One cloud service is often registered from more than one host: the operator's two computers, or an organization's
+space beside a personal one (FAA-280). Each registering host gets **its own token**; a token is never copied from one
+host to another, so one host can be revoked or rotated without touching the others.
+
+- **On the platform**, keep one secret per host (`FABRIC_HOST_TOKEN_<HOST>`, each at least 16 characters) and accept
+  a request whose bearer matches any of them. Compare it with every token, each with `tokenMatches` /
+  `token_matches`, with no early return, so the answer's timing does not say which host's token matched:
+
+  ```python
+  def host_of(authorization, tokens):  # tokens: {host name: token}; the kit's comparison, once per token
+      matched = [host for host, token in sorted(tokens.items()) if fs.token_matches(authorization, token)]
+      return matched[0] if matched else None  # None: a 401 with an empty body, as with one token
+  ```
+
+  `well_known_allowed` / `wellKnownAllowed` take one token: call it once per token the same way, or gate the route on
+  `host_of(...) is not None`.
+- **On each host**, run `registerRemote` / `register_remote` with that host's token only. The descriptor is the same
+  on every host but its `tokenFile`, which holds that host's value and nothing else (0600, never printed).
+- **Sign-in**: `LoginCodes` binds a session to one token's revision. Give each host its own `LoginCodes` with
+  `token=` that host's token and its own store (`MemoryCodeStore`, or a durable row per host); the session key may be
+  shared. Issue the login code from the instance whose token the bearer matched; redeem a code and check a session by
+  trying each instance in turn (a code another instance issued is not in its store, and a session cookie carries
+  another token's revision, so neither changes anything there). Removing or rotating one host's token then ends that
+  host's sessions only. One `LoginCodes` whose `token=` is a callable returning every token joined also works, and
+  signs every host out when any one rotates.
+- **The probe**: `check_service.py <id>` run on a host sends that host's token, so `well-known.requires-token` passes
+  on each; the request without a token, or with a value no host holds, still gets the `401` with an empty body.
+- **Revoking a host**: delete its secret on the platform and restart; that host then sees `401` and shows the service
+  `down`, never `foreign`. Remove its descriptor there with `remove_descriptor` / `removeDescriptor`.
+- **Adding a host**: create its secret, restart, then `registerRemote` on the new host. The other hosts' tokens and
+  sessions do not change.
+
+A token per host still gives each host the descriptor token's whole authority over the service. A remote surface no
+host token reaches (callers with their own delegation, the page opened only with Fabric Dashboards' one-time code)
+is the "local and cloud" form, FAA-204, which waits on the contract recording that form.
+
 ## Rotation
 
 Rotate the token by setting the new value on the platform and re-running `registerRemote` on the
-operator's computer with it; the old token stops working the moment the platform restarts with the
+registering host with it (on a service registered from several hosts, only that host's token,
+[above](#registered-from-several-hosts)); the old token stops working the moment the platform restarts with the
 new value, and so does every session begun under it when `LoginCodes` has `token=`. The re-run keeps the
 installed `source` when it passes none (one the kit refuses, edited by hand, is dropped with the warning); pass
 `runner`, `peer`, `summary`, `doctor` and `installedBy` / `installed_by` again, since a re-run writes only what it is

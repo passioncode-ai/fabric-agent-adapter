@@ -104,6 +104,8 @@ export class Responder extends SlotKeeper {
     this.state = 'idle';
     this.waitUntil = 0;
     this.stopping = false;
+    /** Whether shutdown found work to drain, published before it waits; null before shutdown starts (FAA-186). */
+    this.draining = null;
     this.claimKeys = {};
     this.probing = new Set(); // moved slots whose move-back claim lost its answer: asked again under the same key
     this.said = {};
@@ -939,6 +941,7 @@ export class Responder extends SlotKeeper {
   async shutdown(drain = DRAIN_SECONDS) {
     this.stopping = true;
     const work = this.current;
+    this.draining = Boolean(work); // what this shutdown waits for (FAA-186)
     if (work && !work.done) {
       await Promise.race([work.promise, new Promise((resolve) => setTimeout(resolve, drain * 1000).unref?.())]);
       if (!work.done) work.ctx.stopped = true;

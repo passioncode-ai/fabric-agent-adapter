@@ -137,7 +137,7 @@ def _by_project(receipts: List[Dict[str, Any]], first: str, last: str) -> List[D
     out = []
     for key in sorted(projects):
         row = projects[key]
-        runs = [_close_totals(run) for _, run in sorted(row.pop("_runs").items())]
+        runs = [_close_run(run) for _, run in sorted(row.pop("_runs").items())]
         row = _close_totals(row)
         if runs:
             row["taskRuns"] = runs
@@ -165,6 +165,17 @@ def _round_usd(value: float) -> float:
     if product - whole >= 0.5:
         whole += 1
     return whole / 1e6
+
+
+def _close_run(run: Dict[str, Any]) -> Dict[str, Any]:
+    """A task run's totals, its cost rounded as `_round_usd` rounds but never above the exact cost: each run and its
+    project round apart, so many runs rounding up summed past the project and failed FAC-SEM-025 (board request
+    f5753c5a). Rounded this way the runs' sum stays within the project's rounded cost by construction."""
+    exact = run["_cost"]
+    run = _close_totals(run)
+    if run["costUsd"] is not None and run["costUsd"] > exact:
+        run["costUsd"] = _round_usd(run["costUsd"] - 0.000001)
+    return run
 
 
 def _close_totals(row: Dict[str, Any]) -> Dict[str, Any]:

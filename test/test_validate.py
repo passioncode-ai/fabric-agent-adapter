@@ -850,6 +850,101 @@ class CredentialUrlTests(unittest.TestCase):
         self.assertEqual(validate.credential_url_problems(), [])
 
 
+class ShippedPatternTests(unittest.TestCase):
+    """FAA-212: the vendoring product's release check (project-observatory-open-source `tools/check_public_release.py`)
+    refuses three more patterns than a URL with credentials: a provider token shape, a private key block and a path in
+    a person's home folder. They are searched over the same shipped scope here, so a vendored module fails here first.
+    Every value is built from parts, so this file holds none."""
+
+    KIT = CredentialUrlTests.KIT
+    SHAPES = (("provider-token-shape", "gh" + "p_" + "A1b2" * 9), ("provider-token-shape", "github" + "_pat_" + "x1" * 21),
+              ("provider-token-shape", "sk" + "-proj-" + "Ab3" * 11), ("provider-token-shape", "sk" + "-" + "q9" * 16),
+              ("provider-token-shape", "AK" + "IA" + "ABCDEFGH23456789"), ("provider-token-shape", "AI" + "za" + "Q" * 35),
+              ("private-key-block", "-----BEGIN " + "PRIVATE KEY-----"),
+              ("private-key-block", "-----BEGIN " + "OPENSSH PRIVATE KEY-----"),
+              ("personal-machine-path", "/" + "Users" + "/alice/notes"), ("personal-machine-path", "/" + "home" + "/bob/x"),
+              ("personal-machine-path", "file://" + "/" + "Users" + "/alice/x"))
+
+    def test_every_shape_fails_in_every_shipped_place_without_its_value(self):
+        for rel in (self.KIT, "plugins/fabric-agent-adapter/skills/working-with-fabric/references/x.md",
+                    "bin/fabric-agent-adapter.js", "README.md", "SECURITY.md"):
+            for name, shape in self.SHAPES:
+                with self.subTest(rel=rel, shape=shape):
+                    tmp, root = _tree({rel: "intro\nsee %s here\n" % shape})
+                    with tmp:
+                        problems = validate.shipped_pattern_problems(root)
+                    self.assertEqual(len(problems), 1, problems)
+                    self.assertIn("%s:2 writes a %s" % (rel, name), problems[0])
+                    self.assertIn("FAA-212", problems[0])
+                    self.assertNotIn(shape, problems[0])
+                    self.assertNotIn("alice", problems[0])
+
+    def test_neutral_examples_and_unshipped_files_pass(self):
+        neutral = ("`/" + "Users" + "/<name>/`, `/" + "home" + "/<name>/`, `/" + "Users" + "/example`, "
+                   "`WORKDIR /" + "home" + "/${APP_USER}/app`, ~/x/, a/" + "home" + "/x/, sk" + "-short, "
+                   "-----BEGIN " + "PUBLIC KEY-----, gh" + "p_short")
+        files = {self.KIT: neutral + "\n", "CHANGELOG.md": "`/" + "Users" + "/alice/x`\n",
+                 "test/test_x.py": "/" + "home" + "/bob/x\n", "docs/x.md": "-----BEGIN " + "PRIVATE KEY-----\n"}
+        tmp, root = _tree(files)
+        with tmp:
+            self.assertEqual(validate.shipped_pattern_problems(root), [])
+
+    def test_the_patterns_are_the_products(self):
+        # the product composes its patterns from parts too; the names and the shapes they take are pinned here
+        self.assertEqual(sorted(validate.SHIPPED_PATTERNS),
+                         ["personal-machine-path", "private-key-block", "provider-token-shape"])
+
+    def test_validate_repo_runs_the_check(self):
+        import inspect
+        self.assertIn("shipped_pattern_problems()", inspect.getsource(validate.validate_repo))
+
+    def test_the_real_tree_passes(self):
+        self.assertEqual(validate.shipped_pattern_problems(), [])
+
+
+class HttpsLegendTests(unittest.TestCase):
+    """FAA-212: a shipped script that writes an example scheme in angle brackets carries the legend that says how to
+    read it, since a module vendored on its own leaves `references/kit-modules.md` behind."""
+
+    SCRIPT = "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_example.py"
+    LEGEND = "# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).\n"
+
+    def test_a_script_with_the_example_and_no_legend_fails(self):
+        for rel in (self.SCRIPT, "plugins/x/skills/y/scripts/z.mjs", "bin/x.js"):
+            with self.subTest(rel=rel):
+                tmp, root = _tree({rel: "# so `<https>://u:pw@h` loses it\n"})
+                with tmp:
+                    problems = validate.https_legend_problems(root, pending={})
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn(rel, problems[0])
+                self.assertIn("FAA-212", problems[0])
+
+    def test_the_legend_a_reference_and_a_script_without_the_example_pass(self):
+        files = {self.SCRIPT: self.LEGEND + "# `<https>://u:pw@h`\n",
+                 "plugins/x/skills/y/scripts/z.mjs": self.LEGEND.replace("#", "//", 1) + "// `<https>:u:pw@h`\n",
+                 "plugins/x/skills/y/references/r.md": "`<https>://u:pw@h`\n", "bin/x.js": "plain\n"}
+        tmp, root = _tree(files)
+        with tmp:
+            self.assertEqual(validate.https_legend_problems(root, pending={}), [])
+
+    def test_a_pending_entry_holds_until_it_is_not_needed(self):
+        tmp, root = _tree({self.SCRIPT: "# `<https>://u:pw@h`\n"})
+        with tmp:
+            self.assertEqual(validate.https_legend_problems(root, pending={self.SCRIPT: "another wave owns it"}), [])
+        tmp, root = _tree({self.SCRIPT: self.LEGEND + "# `<https>://u:pw@h`\n"})
+        with tmp:
+            problems = validate.https_legend_problems(root, pending={self.SCRIPT: "another wave owns it"})
+        self.assertEqual(len(problems), 1, problems)
+        self.assertIn("remove it", problems[0])
+
+    def test_validate_repo_runs_the_check(self):
+        import inspect
+        self.assertIn("https_legend_problems()", inspect.getsource(validate.validate_repo))
+
+    def test_the_real_tree_passes(self):
+        self.assertEqual(validate.https_legend_problems(), [])
+
+
 class WorkflowGuardTests(unittest.TestCase):
     """R5 and FAA-72/FAA-73: the hosted gates must be able to fail, and the release path must be safe."""
 
@@ -905,6 +1000,24 @@ class WorkflowGuardTests(unittest.TestCase):
             problems = validate.workflow_problems(root)
         self.assertTrue(any("test_gated_example" in p for p in problems), problems)
         self.assertEqual(validate.contract_gated_modules(), ["test_contract_revisions", "test_dashboard_kit", "test_provider"])
+
+    def test_any_read_of_the_contract_variables_is_a_gate(self):
+        # FAA-189 (7): a gate over several lines, as skipIf(not ...), or as self.skipTest went unnoticed; any read of
+        # FABRIC_CONTRACT_NEW or _OLD in the code (not in a string) makes the module the contract job's.
+        files = {p.relative_to(ROOT).as_posix(): p.read_text(encoding="utf-8")
+                 for p in sorted((ROOT / ".github/workflows").glob("*.yml"))}
+        gates = {
+            "test_multi_line": 'import os, unittest\n@unittest.skipUnless(\n    os.environ.get("FABRIC_CONTRACT_NEW"),\n    "x")\nclass T(unittest.TestCase):\n    pass\n',
+            "test_skip_if": 'import os, unittest\n@unittest.skipIf(not os.environ.get("FABRIC_CONTRACT_OLD"), "x")\nclass T(unittest.TestCase):\n    pass\n',
+            "test_skip_test": 'import os, unittest\nclass T(unittest.TestCase):\n    def setUp(self):\n        if "FABRIC_CONTRACT_NEW" not in os.environ:\n            self.skipTest("x")\n',
+            "test_getenv": 'import os\nNEW = os.getenv("FABRIC_CONTRACT_NEW")\n',
+            "test_subscript": 'import os\nNEW = os.environ["FABRIC_CONTRACT_NEW"]\n',
+        }
+        files.update({"test/%s.py" % name: text for name, text in gates.items()})
+        files["test/test_only_a_string.py"] = 'TEXT = \'os.environ.get("FABRIC_CONTRACT_NEW")\'\n'
+        tmp, root = _tree(files)
+        with tmp:
+            self.assertEqual(validate.contract_gated_modules(root), sorted(gates))
 
     def test_a_per_push_trigger_fails(self):
         problems = self._problems(".github/workflows/validate.yml",

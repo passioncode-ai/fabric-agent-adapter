@@ -87,3 +87,19 @@ test('a secret-shaped member name never reaches the message', () => {
   assert.ok(!JSON.stringify(findings).includes(secret));
   assert.throws(() => connectionsExtension([{ ...DECLARED[2], [secret]: 1 }]), (err) => err instanceof ServiceError && !err.message.includes(secret));
 });
+
+// FAA-98: the Python twin refuses a non-ASCII host by tables measured on Node 20 to 26; this Node reads them alike.
+const IDNA = JSON.parse(fs.readFileSync(new URL('./fixtures/idna/idna-tables.json', import.meta.url), 'utf8'));
+const parses = (host) => { try { new URL(`https://${host}/`); return true; } catch { return false; } };
+test('the measured IDNA tables hold on this Node (20 or later)', { skip: Number(process.versions.node.split('.')[0]) < 20 }, () => {
+  assert.equal(IDNA.nodes[0].slice(0, 3), 'v20');
+  for (const [first, last] of IDNA.disallowed) {
+    for (const cp of new Set([first, last])) {
+      const c = String.fromCodePoint(cp);
+      for (const host of [c, `a${c}b`, `a.${c}`]) assert.equal(parses(host), false, `U+${cp.toString(16)} in ${JSON.stringify(host)}`);
+    }
+  }
+  for (const [first, last] of IDNA.ignored) {
+    for (const cp of new Set([first, last])) assert.equal(new URL(`https://a${String.fromCodePoint(cp)}b/`).host, 'ab', `U+${cp.toString(16)}`);
+  }
+});
