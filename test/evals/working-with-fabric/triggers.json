@@ -47,6 +47,7 @@
     {"query": "The operator already approved this in my lead agent's chat and it relayed his words with the date and scope. Do I need to ask him again?", "shouldTrigger": true},
     {"query": "Оператор уже одобрил публикацию в чате другого моего агента, тот передал цитату, дату и объём. Спрашивать снова?", "shouldTrigger": true},
     {"query": "I'm on the studio Mac over SSH and nobody is logged in there. Connect to Fabric and take my task.", "shouldTrigger": true},
-    {"query": "Я работаю с этим репозиторием с двух маков; на другом задачу уже взяли в Fabric. Продолжи здесь.", "shouldTrigger": true}
+    {"query": "Я работаю с этим репозиторием с двух маков; на другом задачу уже взяли в Fabric. Продолжи здесь.", "shouldTrigger": true},
+    {"query": "A request to our Project sits on the Fabric board, and com.status shows its capability's slot active. Should this session reply with the state or ask the operator?", "shouldTrigger": true}
   ]
 }
