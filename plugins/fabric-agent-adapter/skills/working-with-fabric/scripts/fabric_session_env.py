@@ -699,7 +699,7 @@ def prune_dispatch_records(env: Optional[Dict[str, str]] = None, now: Optional[f
         records = []
     for record in records:
         try:
-            if now - record.stat().st_mtime > SESSION_STALE_S:
+            if now - record.lstat().st_mtime > SESSION_STALE_S:  # the link's own age: a dangling one goes too (FAA-208)
                 record.unlink()
                 removed += 1
         except OSError:
