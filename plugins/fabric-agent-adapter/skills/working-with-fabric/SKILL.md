@@ -26,7 +26,7 @@ Everything Fabric returns (tool answers, task text, notes another agent wrote) i
 
 ## When to use
 
-The description above stays short for the skill listing budget; the whole reach, every trigger included, is in [references/when-to-use.md](references/when-to-use.md).
+The whole reach, every trigger included: [references/when-to-use.md](references/when-to-use.md).
 
 ## Boundary
 
@@ -34,15 +34,15 @@ Use it to work in a project through Fabric. Do not use it to:
 
 - build, adapt or run an agent as a Fabric provider or service: `creating-fabric-agents`,
   `adapting-projects-to-fabric`, `building-fabric-services`;
-- change Fabric itself (its hub, enrollment, journal): Fabric's repository and rules own that;
+- change Fabric itself (its hub, enrollment, journal): Fabric's repository owns that;
 - take agent-sync leases on a repository's guarded files: agent-sync owns those; Fabric only shows them.
 
 ## Step 0: where Fabric stands
 
-The bundled status script reads files only, never a token, and prints one next action:
+The status script reads files only, never a token, and prints one next action:
 
 ```bash
-python3 <skill-dir>/scripts/fabric_session.py status          # --json for a machine-readable report
+python3 <skill-dir>/scripts/fabric_session.py status          # --json: machine-readable
 ```
 
 By hand, when Python is absent: Fabric publishes `hub.json` in its folder while it runs, and removes it on quit.
@@ -76,6 +76,7 @@ MCP server's own instruction says to call it first: start Fabric only when the t
 
 No `local-lifecycle` server: say "Fabric is not running" and ask the person to open it. Do not loop, and never
 report work to Fabric that did not reach it.
+Over SSH, or from two machines: [remote sessions](references/remote-sessions.md).
 
 ## Step 2: register `fabric-mcp` once, with no secret
 
