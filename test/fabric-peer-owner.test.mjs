@@ -282,13 +282,13 @@ test('a restricted table answers table-restricted, and a vouched pid that listen
   // No vouch: unknown, fail closed.
   await assert.rejects(po.checkedSocket(port, restricted), (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
   // A vouched pid that does not listen on this port: still refused.
-  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, run: lsof(port + 1) }),
+  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, ownEuid: 501, run: lsof(port + 1) }),
     (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
   // A vouched pid of another account: refused.
-  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 502, run: lsof(port) }),
+  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 502, ownEuid: 502, run: lsof(port) }),
     (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
   // This account's vouched pid holds the listener: the socket is handed over.
-  const socket = await po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, run: lsof(port) });
+  const socket = await po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, ownEuid: 501, run: lsof(port) });
   socket.destroy();
   assert.deepEqual(received, []);
 });
@@ -298,15 +298,15 @@ test('a vouch is an integer pid of this account, and lsof is asked for IPv4 alon
   let listens = 'p4242\nf4\nn127.0.0.1:80\n';
   const run = async (file, args) => { calls.push(args); return file === po.PS ? '501\n' : listens; };
   for (const pid of ['4242', true, null, 1, 0, -5]) {
-    assert.equal(await po.pidListens(pid, 80, { run, platform: 'darwin', ownUid: 501 }), false, String(pid));
+    assert.equal(await po.pidListens(pid, 80, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), false, String(pid));
   }
-  assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501 }), true);
-  assert.equal(await po.pidListens(4242, 81, { run, platform: 'darwin', ownUid: 501 }), false);
-  assert.equal(await po.pidListens(4242, 80, { run, platform: 'linux', ownUid: 501 }), false);
+  assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), true);
+  assert.equal(await po.pidListens(4242, 81, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), false);
+  assert.equal(await po.pidListens(4242, 80, { run, platform: 'linux', ownUid: 501, ownEuid: 501 }), false);
   // FAA-312, DEC-0155 RT-3: only a listen on exactly 127.0.0.1 is vouched for, never the IPv4 wildcard nor ::1.
   for (const text of ['p4242\nf4\nn*:80\n', 'p4242\nf4\nn[::1]:80\n']) {
     listens = text;
-    assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501 }), false, text);
+    assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), false, text);
   }
   listens = 'p4242\nf4\nn127.0.0.1:80\n';
   // DEC-0155: a reader whose real and effective uid differ vouches for nothing.
