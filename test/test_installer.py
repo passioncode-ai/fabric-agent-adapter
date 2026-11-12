@@ -12,15 +12,17 @@ BIN = ROOT / "bin/fabric-agent-adapter.js"
 SKILLS = sorted(p.name for p in (ROOT / "plugins/fabric-agent-adapter/skills").iterdir() if p.is_dir())
 
 
-def run(home, *args):
-    env = dict(os.environ, HOME=str(home))
+def run(home, *args, extra=None):
+    env = {k: v for k, v in os.environ.items() if k not in ("CLAUDE_CONFIG_DIR", "SWITCHBOARD_CLAUDE_SOURCE_DIR")}
+    env.update(HOME=str(home), **(extra or {}))
     return subprocess.run(["node", str(BIN), *args], capture_output=True, text=True, env=env)
 
 
-def fake_plugin(home):
-    install = home / ".claude/plugins/cache/fabric-agent-adapter/fabric-agent-adapter/0.4.2"
+def fake_plugin(home, folder=None):
+    folder = folder or home / ".claude"
+    install = folder / "plugins/cache/fabric-agent-adapter/fabric-agent-adapter/0.4.2"
     (install / "skills").mkdir(parents=True)
-    (home / ".claude/plugins/installed_plugins.json").write_text(json.dumps(
+    (folder / "plugins/installed_plugins.json").write_text(json.dumps(
         {"version": 2, "plugins": {"fabric-agent-adapter@fabric-agent-adapter": [{"installPath": str(install)}]}}))
 
 
@@ -68,6 +70,51 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(shadow.exists())
             self.assertTrue(any((home / ".claude/skills-shadow-backup").iterdir()))
+
+    def test_claude_config_dir_is_the_folder_the_installer_reads(self):
+        # FAA-218: with CLAUDE_CONFIG_DIR set, the plugin registry and the skills Claude Code reads are in that folder
+        # (the launcher's claudeFolders): the shadow check and the prune look there, never in ~/.claude.
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp) / "home"
+            config = Path(temp) / "claude-folder"
+            home.mkdir()
+            fake_plugin(home, config)
+            extra = {"CLAUDE_CONFIG_DIR": str(config)}
+            shadow = config / "skills" / SKILLS[0]
+            shadow.mkdir(parents=True)
+            (shadow / "SKILL.md").write_text("stale")
+            refused = run(home, "--target", "claude", extra=extra)
+            self.assertEqual(refused.returncode, 1, refused.stdout)
+            self.assertIn("would shadow it", refused.stderr)
+            result = run(home, "--prune-shadow", extra=extra)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(shadow.exists())
+            self.assertTrue(any((config / "skills-shadow-backup").iterdir()))
+            self.assertFalse((home / ".claude").exists())
+            # without the variable ~/.claude holds no plugin: nothing is a shadow there
+            self.assertEqual(run(home, "--prune-shadow").returncode, 1)
+
+    def test_a_switchboard_home_checks_the_plugin_where_the_cli_wrote_it(self):
+        # FAA-218: in a Switchboard home (SWITCHBOARD_CLAUDE_SOURCE_DIR, 0.7.14 and later) plugins are installed in the
+        # person's folder, and the shadowing skills are in the home, whose links lead there.
+        with tempfile.TemporaryDirectory() as temp:
+            home = Path(temp) / "home"
+            sb = Path(temp) / "data/ai.passioncode.fabric-switchboard/homes/a"
+            source = Path(temp) / "mine"
+            home.mkdir()
+            fake_plugin(home, source)
+            shadow = sb / "skills" / SKILLS[0]
+            shadow.mkdir(parents=True)
+            extra = {"CLAUDE_CONFIG_DIR": str(sb), "SWITCHBOARD_CLAUDE_SOURCE_DIR": str(source)}
+            result = run(home, "--prune-shadow", extra=extra)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(shadow.exists())
+            # an older Switchboard names no source: the plugin is in ~/.claude, as the launcher writes it then
+            fake_plugin(home)
+            shadow.mkdir(parents=True)
+            result = run(home, "--prune-shadow", extra={"CLAUDE_CONFIG_DIR": str(sb)})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(shadow.exists())
 
     def test_launcher_managed_hub_links_survive_force(self):
         # LC-14 / F16: one owner per artefact on disk. A plain copy over the launcher's link

@@ -134,7 +134,7 @@ this repository both obeys it and ships its service layer
   when the budget runs out, and exits 0, always once `python3` starts (on Windows it must name Python in Git Bash, FAA-183), within its 5 s timeout; it writes nothing. Measured under a
   load average of about 50: median 294–443 ms per session start.
 - `SessionStart`, `Stop`, `UserPromptSubmit`, `SessionEnd`: `fabric_session.py hook …` (working-with-fabric). Session
-  start (matcher `startup|clear`) reads `~/.claude.json` and Fabric's `hub.json`, and prints the preamble only when
+  start (matcher `startup|clear`) reads `~/.claude.json` (inside `CLAUDE_CONFIG_DIR` when it is set) and Fabric's `hub.json`, and prints the preamble only when
   `fabric` is registered, Fabric runs and the project uses Fabric (a contract file up to the checkout root, a
   project-bound registration, or, read last, a service descriptor naming the checkout's origin, one `git config`
   call); in a folder with no such sign, one line pointing at `fabric_whoami` (FAA-60); when Fabric is down, one line,

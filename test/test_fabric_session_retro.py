@@ -35,6 +35,8 @@ class Words(unittest.TestCase):
                      "insight/1", "insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout)", "one line that says so", "Without `observatory_lesson`, say it in this turn's answer",
                      "No values"):
             self.assertIn(word, cli.RETRO_LINE)
+        # FAA-277 item 1: a measured win is also contributed, as SKILL.md Step 7 says
+        self.assertIn("a measured win also goes to `agents-db.contribute`", cli.RETRO_LINE)
         # 0.64.0 product reading 2: the line names the retro itself (Fabric's fabric_whoami asks it only since 0.3.16)
         self.assertNotIn("fabric_whoami", cli.RETRO_LINE)
         self.assertNotIn("—", cli.RETRO_LINE)
@@ -45,6 +47,7 @@ class Words(unittest.TestCase):
         self.assertIn("When a piece of work ends (released as done, or the session about to end), write its retro in "
                       "the same turn: `observatory_lesson` for what went wrong (or your answer without it), insight/1 "
                       "lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout) for what you learned, or one line that there is nothing.", text)
+        self.assertIn("A measured win also goes to `agents-db.contribute`", text)  # FAA-277 item 1
         self.assertNotIn("—", text)
 
 
