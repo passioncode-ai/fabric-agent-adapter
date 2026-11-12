@@ -11,7 +11,6 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
   account's own processes (DEC-0155 RT-2; Python reads libproc, calibrated on a pair of its own, with an lsof fallback;
   Node reads `lsof -F pun`). `fabric_peer_owner` asks it on a restricted macOS table before the RT-3 vouch, and stands
   alone without it. `PEER_OWNER_VERSION` is `1.3.1+kit.7`.
-
 - **Operations digests** (FAA-206 part 2): `fabric_ops_digest` and `fabric-ops-digest.mjs` fold a service's own counts
   into `ops.digest.hourly@1` and `ops.digest.daily@1` (DEC-0153), held to the contract's reference folds and its
   fixtures (FAC-SEM-166, FAC-SEM-167); they keep the hour the service stops in for the next run, never fill hours
