@@ -298,7 +298,7 @@
     "fabric_secrets",
     "fabric_usage"
    ],
-   "sha256": "a8dc410ada8cbcb6cccddd0ab08ded394b4fb6b5271da21cabbe1f6c0fe46e03"
+   "sha256": "923cda5e94564079a8320e346d8ae48f04a83964071b7b673d0e03c67aedee68"
   },
   {
    "module": "fabric_context",
@@ -835,7 +835,7 @@
     "fabric-secrets",
     "fabric-usage"
    ],
-   "sha256": "af7d309a3fb939ce8e3a467ac1241837ae3fab1989e948e021b14f8da205a05a"
+   "sha256": "25265f3d9bb1364529be060244027f0944da9cbb863dc563bc6ea584ddd5fa4d"
   },
   {
    "module": "fabric-context",
@@ -7110,7 +7110,7 @@
    "fabric_lock.py": "6dac051969f2c331f7cc6a90b6bb1a506a5a23a4082425d07e708ce6682aedfb",
    "fabric_usage.py": "c1a605a84e57c5ab5d3b2bd824412c20219c237dfc4bc13f778f75340905f51e",
    "fabric_backups.py": "1f3f0d7ecf361b29e9101e07f1c53e5dc304d598bf26fd59ec89f16b9fed2420",
-   "fabric_descriptor.py": "a8dc410ada8cbcb6cccddd0ab08ded394b4fb6b5271da21cabbe1f6c0fe46e03",
+   "fabric_descriptor.py": "923cda5e94564079a8320e346d8ae48f04a83964071b7b673d0e03c67aedee68",
    "fabric_context.py": "59e39fb9fd91f713f6e92ea3ec7e8252107efd148847f05934892158b326db4d",
    "fabric_auth.py": "f8b71b7d3b9cd51d271207d1c90570e2104e7e7e487272ce1e73ff422af8db9b",
    "fabric_events.py": "da3fe3e3e19d4c9754b90c719e9c069a3ac85e080b9fffd07adbaf63b5bfcf0d",
@@ -7157,7 +7157,7 @@
    "fabric-lock.mjs": "ffd569de66d214c18f2b739e1e5fd169d84fe8f034fee8ed3d1fcb1cd87325c7",
    "fabric-usage.mjs": "d42ae671a1182a542f94a83cc297b1ef2161376f4f56267a8915e7123c025087",
    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
-   "fabric-descriptor.mjs": "af7d309a3fb939ce8e3a467ac1241837ae3fab1989e948e021b14f8da205a05a",
+   "fabric-descriptor.mjs": "25265f3d9bb1364529be060244027f0944da9cbb863dc563bc6ea584ddd5fa4d",
    "fabric-context.mjs": "ac88273a7ff0010a122c9bd309012a484c439ffd6e9e16923f103a3f8de7a539",
    "fabric-auth.mjs": "1626a7c9cab26984907501f07178fa0790ce440698e398f3924087c63b3d86a6",
    "fabric-events.mjs": "c95c07e2745e52fddbb7237b89824123f240d4f8d6b14f5cb269a09e1845c3ba",

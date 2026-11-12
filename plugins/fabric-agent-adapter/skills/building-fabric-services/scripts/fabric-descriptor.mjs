@@ -74,9 +74,9 @@ export function validateDescriptor(d) {
   if (remote) problems.push(...remoteOriginProblems(d.origin));
   else if (d.origin !== undefined && !ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
   if (!d.auth?.tokenFile) problems.push('auth.tokenFile is required');
-  else if (!LOCAL_PATH.test(String(d.auth.tokenFile))) problems.push('auth.tokenFile must be a local path, never a network share');
+  else if (!LOCAL_PATH.test(String(d.auth.tokenFile))) problems.push('auth.tokenFile must be an absolute local path (/, ~/ or a drive letter), never a relative path, never a network share');
   for (const value of [...(d.paths?.data !== undefined ? [d.paths.data] : []), ...(d.paths?.logs ?? [])]) {
-    if (!LOCAL_PATH.test(String(value))) problems.push(`paths must be local paths, never a network share: ${JSON.stringify(value)}`);
+    if (!LOCAL_PATH.test(String(value))) problems.push(`paths must be absolute local paths (/, ~/ or a drive letter), never a relative path, never a network share: ${JSON.stringify(value)}`);
   }
   if (!(typeof (d.auth?.header ?? 'Authorization') === 'string' && AUTH_HEADER.test(d.auth?.header ?? 'Authorization'))) problems.push(`auth.header must match ${AUTH_HEADER.source}`);
   if (!['Bearer', 'none'].includes(d.auth?.scheme ?? 'Bearer')) problems.push('auth.scheme is Bearer or none');
@@ -201,7 +201,7 @@ export function descriptorMemberProblems(d) {
       else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential'); // before the host
       else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
       else if (repository.includes('@') && !HIERARCHICAL.test(repository)) problems.push('source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'); // readings 7
-      else if (repositoryCredential(repository)) problems.push('FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository'); // its name is no key (seam 6)
+      else if (repositoryCredential(repository)) problems.push("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one"); // its name is no key (seam 6)
     }
   }
   if ('peer' in d) {

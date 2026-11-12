@@ -158,7 +158,7 @@ def validate_provider_entry(entry: Any) -> List[str]:
             # FAA-120, as the service kit: a repository is named, never reached with a credential in its URI. Said
             # before the character check, so a password beside a character the URI class refuses (a backslash, as
             # git reads one) is still named a credential (FAA-127).
-            problems.append("source.repository carries no password or credential: it names the repository")
+            problems.append("source.repository carries no password or credential: it names the repository (write the repository's name in lower case if it is one)")
         elif "repository" in source and not _is_uri(source["repository"]):
             problems.append("source.repository is an absolute URI")
     if not isinstance(entry["installedAt"], str) or not _TIMESTAMP.fullmatch(entry["installedAt"]):

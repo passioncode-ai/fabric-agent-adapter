@@ -153,6 +153,13 @@ class RemotePlacement(unittest.TestCase):
                                          origin="https://agent.example.com", token="r" * 40, directory=root)
         self.assertNotIn("source", json.loads(rotated.read_text()))
 
+    def test_a_mixed_case_name_with_a_digit_is_told_the_remedy(self):
+        # FAA-200 (19): a repository's name in mixed case with a digit reads as a credential's shape; the refusal says
+        # what to write instead
+        d = remote(source={"repository": "https://github.com/example/Agent" + "Qx7a" * 10})
+        problems = fs.validate_descriptor(d)
+        self.assertTrue(any("write the repository's name in lower case if it is one" in p for p in problems), problems)
+
     def test_register_remote_source(self):
         # FAA-120: the repository of the service's code goes into source.repository, checked as the schema's URI.
         temp = Path(tempfile.mkdtemp())

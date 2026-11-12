@@ -160,3 +160,11 @@ test('a services-folder file that holds no object is left out (FAA-200 (50))', (
   fs.writeFileSync(path.join(dir, 'e.json'), JSON.stringify(FIX.descriptors.find((d) => d.valid).descriptor));
   assert.deepEqual(k.readDescriptors(dir).map(([file]) => path.basename(file)), ['e.json']);
 });
+
+test('a relative path is named as relative, not as a share (FAA-200 (6))', () => {
+  const d = structuredClone(FIX.descriptors.find((x) => x.valid && x.descriptor.paths).descriptor);
+  d.paths.data = 'data/example';
+  d.auth.tokenFile = 'data/example/service.token';
+  const problems = k.validateDescriptor(d).join(' ');
+  assert.ok(problems.includes('absolute local path') && problems.includes('never a relative path'), problems);
+});

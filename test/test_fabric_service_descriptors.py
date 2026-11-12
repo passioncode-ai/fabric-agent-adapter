@@ -348,5 +348,16 @@ class OddValuesInTheServicesFolder(unittest.TestCase):
         (root / "e.json").write_text(json.dumps(d), encoding="utf-8")
         self.assertEqual([path.name for path, _ in fs.read_descriptors(root)], ["e.json"])
 
+
+class RelativePaths(unittest.TestCase):
+    def test_a_relative_path_is_named_as_relative_not_as_a_share(self):
+        # FAA-200 (6): a relative --data-dir was refused as "never a network share", which it is not
+        d = fixture(next(x["name"] for x in FIX["descriptors"] if x["valid"] and "paths" in x["descriptor"]))
+        d["paths"]["data"] = "data/example"
+        d["auth"]["tokenFile"] = "data/example/service.token"
+        problems = " ".join(fs.validate_descriptor(d))
+        self.assertIn("absolute local path", problems)
+        self.assertIn("never a relative path", problems)
+
 if __name__ == "__main__":
     unittest.main()

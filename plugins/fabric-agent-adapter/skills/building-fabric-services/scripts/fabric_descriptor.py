@@ -237,11 +237,11 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
     if "tokenFile" not in auth:
         problems.append("auth.tokenFile is required")
     elif not _LOCAL_PATH.match(str(auth["tokenFile"])):
-        problems.append("auth.tokenFile must be a local path, never a network share")
+        problems.append("auth.tokenFile must be an absolute local path (/, ~/ or a drive letter), never a relative path, never a network share")
     paths = descriptor.get("paths") or {}
     for value in ([paths["data"]] if "data" in paths else []) + list(paths.get("logs") or []):
         if not _LOCAL_PATH.match(str(value)):
-            problems.append("paths must be local paths, never a network share: %r" % value)
+            problems.append("paths must be absolute local paths (/, ~/ or a drive letter), never a relative path, never a network share: %r" % value)
     header = auth.get("header", "Authorization")
     scheme = auth.get("scheme", "Bearer")
     if not (isinstance(header, str) and _AUTH_HEADER.fullmatch(header)):
@@ -408,7 +408,7 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             elif "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
                 problems.append("source.repository with a user is a URL with an authority (https://user@host/path), never an scp form")
             elif fabric_secrets.repository_credential(repository):  # its name is no key (0.62.0 seam reading 6)
-                problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository")
+                problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one")
     if "peer" in descriptor:
         peer = descriptor.get("peer")
         if not isinstance(peer, dict):

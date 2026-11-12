@@ -257,14 +257,19 @@ class SchemaParityTests(unittest.TestCase):
                     "https://me@corp.example:hunter2@github.com/a/b", "wss:u@x:pw@h/a", "ssh://a\\b:pw@host/r",
                     "https://github.com/a/b?t=ghp_" + "a1B2" * 9,
                     "https://h\\u:hunter2@x.example/o/r", "https://u\\:hunter2@h.example/o/r"):  # as git reads it (seam r10)
-            self.assertIn("source.repository carries no password or credential: it names the repository",
-                          fp.validate_provider_entry(entry(source={"repository": bad})), bad)
+            self.assertTrue(any(p.startswith("source.repository carries no password or credential: it names the repository")
+                                for p in fp.validate_provider_entry(entry(source={"repository": bad}))), bad)
         self.assertEqual(fp.validate_provider_entry(entry(source={"repository": "ssh://git@example.com/a.git"})), [])
         for good in ("https://h/x?a=b:c@d", "https://github.com/a:b", "https://github.com/example-org/task-pipeline-dashboard"):
             self.assertEqual(fp.validate_provider_entry(entry(source={"repository": good})), [], good)
         for opaque in ("https:u@h:443/a", "bot:fixture@github.com:example-org/r", "bot:fixture@github.com:example-org/r?x=://",
                        "bot:fixture@github.com:example-org/r#://", "https:u@h/o/r/x://y"):  # a user is an authority's (readings 7, 8)
             self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": opaque})), [], opaque)
+
+    def test_a_mixed_case_name_with_a_digit_is_told_the_remedy(self):
+        # FAA-200 (19), as the service kit says it
+        problems = fp.validate_provider_entry(entry(source={"repository": "https://github.com/example/Agent" + "Qx7a" * 10}))
+        self.assertTrue(any("write the repository's name in lower case if it is one" in p for p in problems), problems)
 
     def test_a_uri_is_rfc_3986_characters_as_the_contract_reads_it(self):
         # FAA-127: ajv-formats `uri` refuses a byte-order mark, a zero-width space, a non-ASCII path and an IDN host;

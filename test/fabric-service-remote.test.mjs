@@ -262,3 +262,8 @@ test('the sample online service over real TLS, met the way a host meets it', { s
     child.kill('SIGTERM');
   }
 });
+
+test('a mixed-case repository name with a digit is told the remedy (FAA-200 (19))', () => {
+  const problems = k.validateDescriptor(remote({ source: { repository: `https://github.com/example/Agent${'Qx7a'.repeat(10)}` } }));
+  assert.ok(problems.some((p) => p.includes("write the repository's name in lower case if it is one")), problems.join('; '));
+});
