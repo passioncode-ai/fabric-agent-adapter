@@ -12,7 +12,7 @@ import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
 import { ACTIONS_EXTENSION_KEY, actionsExtension, actionsExtensionRules } from './fabric-actions.mjs';
 import { a2aSurfaceProblems } from './fabric-a2a.mjs';
-import { ROUTES } from './fabric-usage.mjs';
+import { ROUTES, isPlainObject } from './fabric-usage.mjs';
 
 // The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
 // document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
@@ -47,7 +47,8 @@ export function readDescriptors(dir = servicesDir()) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter((n) => n.endsWith('.json')).sort().flatMap((n) => {
     try {
-      return [[path.join(dir, n), JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'))]];
+      const value = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'));
+      return isPlainObject(value) ? [[path.join(dir, n), value]] : []; // no object, no descriptor (FAA-200 (50))
     } catch {
       return [];
     }
@@ -66,8 +67,10 @@ export function validateDescriptor(d) {
   }
   if (problems.length) return problems;
   if (d.protocol !== PROTOCOL) problems.push(`protocol must be ${PROTOCOL}`);
-  if (!ID.test(d.id)) problems.push(`id must match ${ID}`);
-  if (!INSTANCE.test(d.instance)) problems.push(`instance must match ${INSTANCE}`);
+  for (const [key, pattern] of [['id', ID], ['instance', INSTANCE]]) { // a string before its pattern (FAA-200 (9), (36))
+    if (typeof d[key] !== 'string') problems.push(`${key} must be a string`);
+    else if (!pattern.test(d[key])) problems.push(`${key} must match ${pattern}`);
+  }
   if (remote) problems.push(...remoteOriginProblems(d.origin));
   else if (d.origin !== undefined && !ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
   if (!d.auth?.tokenFile) problems.push('auth.tokenFile is required');

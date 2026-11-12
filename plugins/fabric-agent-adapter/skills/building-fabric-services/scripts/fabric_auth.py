@@ -400,7 +400,7 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
     if source is None:  # a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
         try:
             installed = json.loads(descriptor_path(service_id, instance, root).read_text(encoding="utf-8")).get("source")
-        except (OSError, ValueError, AttributeError):
+        except (OSError, ValueError, AttributeError, RecursionError):  # nested thousands deep (FAA-200 (10))
             installed = None
         # Only one the kit accepts: a hand-edited source never blocks a rotation; it is dropped with the warning.
         base = set(validate_descriptor(descriptor))

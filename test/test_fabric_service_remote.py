@@ -136,6 +136,23 @@ class RemotePlacement(unittest.TestCase):
         self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the installer's call")
         self.assertEqual(token_file.read_text(), "n" * 40)
 
+    def test_a_rotation_over_a_deeply_nested_descriptor_drops_it(self):
+        # FAA-200 (10): a hand-edited installed descriptor nested thousands deep is no source to keep, never a RecursionError
+        import shutil
+        import warnings
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        root = temp / "services"
+        fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                           token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
+        path = fs.descriptor_path("example-agent", "default", root)
+        path.write_text("[" * 200000 + "]" * 200000)
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            rotated = fs.register_remote(service_id="example-agent", name="Example Agent",
+                                         origin="https://agent.example.com", token="r" * 40, directory=root)
+        self.assertNotIn("source", json.loads(rotated.read_text()))
+
     def test_register_remote_source(self):
         # FAA-120: the repository of the service's code goes into source.repository, checked as the schema's URI.
         temp = Path(tempfile.mkdtemp())

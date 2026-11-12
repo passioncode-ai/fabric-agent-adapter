@@ -197,9 +197,11 @@ def read_descriptors(directory: Optional[Path] = None) -> List[Tuple[Path, Dict[
         return found
     for path in sorted(root.glob("*.json")):
         try:
-            found.append((path, json.loads(path.read_text(encoding="utf-8"))))
-        except (OSError, ValueError):
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, RecursionError):
             continue
+        if isinstance(value, dict):  # a file that holds no object is no descriptor (FAA-200 (50))
+            found.append((path, value))
     return found
 
 
@@ -222,10 +224,11 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         return problems
     if descriptor["protocol"] != PROTOCOL:
         problems.append("protocol must be %s" % PROTOCOL)
-    if not _ID.match(str(descriptor["id"])):
-        problems.append("id must match %s" % _ID.pattern)
-    if not _INSTANCE.match(str(descriptor["instance"])):
-        problems.append("instance must match %s" % _INSTANCE.pattern)
+    for key, pattern in (("id", _ID), ("instance", _INSTANCE)):  # a string before its pattern (FAA-200 (9), (36))
+        if not isinstance(descriptor[key], str):
+            problems.append("%s must be a string" % key)
+        elif not pattern.match(descriptor[key]):
+            problems.append("%s must match %s" % (key, pattern.pattern))
     if remote:
         problems.extend(remote_origin_problems(descriptor["origin"]))
     elif "origin" in descriptor and not _ORIGIN.match(str(descriptor["origin"])):

@@ -323,5 +323,30 @@ class RunnerKindTests(unittest.TestCase):
             self.assertTrue(any("vendor's runner" in p for p in problems), problems)
 
 
+
+class OddValuesInTheServicesFolder(unittest.TestCase):
+    """FAA-200 (9), (36), (50): an id or instance that is no string is refused before its pattern (the Node twin coerced
+    `null` to text and wrote `null.default.json`), and a services-folder file that holds no object is no descriptor."""
+
+    def valid(self):
+        return fixture(next(d["name"] for d in FIX["descriptors"] if d["valid"]))
+
+    def test_an_id_or_instance_that_is_no_string_is_refused(self):
+        for key in ("id", "instance"):
+            for value in (None, True, 1, ["example-agent"]):
+                with self.subTest(key=key, value=value):
+                    d = self.valid()
+                    d[key] = value
+                    self.assertIn("%s must be a string" % key, fs.validate_descriptor(d))
+
+    def test_a_file_that_holds_no_object_is_left_out(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        for name, text in (("a.json", "[]"), ("b.json", "null"), ("c.json", '"text"'), ("d.json", "7")):
+            (root / name).write_text(text, encoding="utf-8")
+        d = self.valid()
+        (root / "e.json").write_text(json.dumps(d), encoding="utf-8")
+        self.assertEqual([path.name for path, _ in fs.read_descriptors(root)], ["e.json"])
+
 if __name__ == "__main__":
     unittest.main()
