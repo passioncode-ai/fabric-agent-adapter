@@ -457,7 +457,8 @@ def secrets(value: Any, root: str, budget: Budget) -> List[Dict[str, str]]:
     def flag(at: str, what: str, text: str, ident: bool) -> None:
         if budget.named < SECRET_FINDINGS:
             budget.named += 1
-            rename = "; an id that starts with sk- is read as a key; rename it" if ident and re.match(r"sk-", text, re.I | re.A) else ""
+            # canonical case only (DEC-0151): an upper-case SK- is no key, so the advice would name the wrong cause
+            rename = "; an id that starts with sk- is read as a key; rename it" if ident and text.startswith("sk-") else ""
             findings.append(_finding("FAC-SEM-165", at, "%s is shaped like a credential: a token is named by its vault slot, never written%s (DEC-0150 CA-5)" % (what, rename)))
         else:
             budget.more += 1

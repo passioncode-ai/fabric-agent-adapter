@@ -30,8 +30,20 @@ CREDENTIAL_PAIRS: Dict[str, tuple] = {
 JS_SPACE = "\t\n\x0b\x0c\r \xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 _NOT_LINE_END = "[^\n\r\u2028\u2029]"  # ECMAScript's `.` without the s flag
 JWT_SHAPE = re.compile(r"eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*")
-SECRET_VALUE = re.compile(r"(^bearer[%s]%s+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}"
-                          r"|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})" % (JS_SPACE, _NOT_LINE_END), re.IGNORECASE | re.ASCII)
+#: Where a provider key's prefix may start (DEC-0151): the start of a value, a character that is no ASCII letter or
+#: digit, or an escape (a percent-escape, single or double, a backslash escape, an octal, `\\x` with two hex digits,
+#: `\\u` with four, an ESC colour sequence, raw or escaped). A consuming group, as the contract writes it.
+_KEY_BOUNDARY = (r"(?:^|[^A-Za-z0-9]|%[0-9A-Fa-f]{2}|\\[nrt\"']|\\u[0-9A-Fa-f]{4}|\\x[0-9A-Fa-f]{2}|\\[bfv0ae]|\\[0-7]{1,3}"
+                 r"|%25[0-9A-Fa-f]{2}|\x1b\[[0-9;:]*m|(?:\\u001[bB]|\\x1[bB]|\\e|\\033|\\33)\[[0-9;:]*m)")
+#: The provider keys' shapes, prefixes in their canonical case only (DEC-0151 item 7: `SK-` or `GHP_` is no key). An
+#: `sk-` key holds, within 256 characters, a digit and an upper-case letter with 16 or more characters, or a digit with
+#: 32 or more; the look-aheads are bounded to 255 characters and lazy, so a long run of prefixes reads in linear time.
+_PROVIDER_KEYS = (r"(?:sk-(?=[A-Za-z0-9_-]{0,255}?[0-9])(?:(?=[A-Za-z0-9_-]{0,255}?[A-Z])[A-Za-z0-9_-]{16,}|[A-Za-z0-9_-]{32,})"
+                  r"|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})")
+#: The contract's SECRET_VALUE at the pin (DEC-0151): `Bearer ` at a value's start in any case, or a provider key after a
+#: boundary. No case-insensitive flag; digits are ASCII. A match includes its boundary character: callers test, never
+#: read the matched text or its index.
+SECRET_VALUE = re.compile("(^[Bb][Ee][Aa][Rr][Ee][Rr][" + JS_SPACE + "]" + _NOT_LINE_END + "+|" + _KEY_BOUNDARY + _PROVIDER_KEYS + ")")
 _LONG_RUN = re.compile(r"[A-Za-z0-9+/=_-]{40,}")
 _BEARER_INSIDE = re.compile(r"(?<![A-Za-z0-9_])bearer[%s]+(?=[A-Za-z0-9._~+/-]*[0-9])[A-Za-z0-9._~+/-]{12,}=*" % JS_SPACE,
                             re.IGNORECASE | re.ASCII)
@@ -194,7 +206,10 @@ def secret_url(value: str) -> bool:
 _REPOSITORY_URI = re.compile(r"\A([A-Za-z][A-Za-z0-9+.-]*:(?://[^/?#]*)?)([^?#]*)(.*)\Z", re.S)
 _REPOSITORY_NAME = re.compile(r"(?:[a-z0-9._-]+|[A-Za-z._-]+)\Z")  # lower case, or letters with no digit (readings 8)
 _REPOSITORY_AUTHORITY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
-_KEY_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))(?:%s)" % SECRET_VALUE.pattern, re.IGNORECASE | re.ASCII)
+#: A repository name's own key shapes, boundary-free and case-sensitive (DEC-0151): SECRET_VALUE takes a consuming
+#: boundary, so composed after a separator look-behind it would miss a key after `-`, `.` or `_`.
+_REPOSITORY_KEYS = r"sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}"
+_KEY_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))(?:%s)" % _REPOSITORY_KEYS)
 _JWT_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))%s" % JWT_SHAPE.pattern)
 
 

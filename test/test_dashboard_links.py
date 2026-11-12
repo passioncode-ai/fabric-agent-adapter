@@ -60,7 +60,7 @@ class DashboardLinksTest(unittest.TestCase):
         for page in ['/dashboard?code=one-time', '/dashboard?api_key=x', '/dashboard?apikey=x', '/dashboard?key=x',
                      '/dashboard?auth=x', '/dashboard?accessToken=x', '/dashboard?Login-Code=x', '/dashboard?session_id=x',
                      '/dashboard?client_secret=x', '/dashboard?x=eyJhbGciOiJ.eyJzdWIiOiIx.c2ln',
-                     '/dashboard?x=sk-abcdefghijklmnopqrstuv', '/dashboard?x=Bearer%20abc',
+                     '/dashboard?x=sk-' + 'Ab1' + 'cdefghijklmnopqrstuv',  # a key DEC-0151 reads, built from pieces '/dashboard?x=Bearer%20abc',
                      '/dashboard?note=aB3' + 'xY9' * 13, '/dashboard#token=abc', '/dashboard#/jobs?code=abc',
                      '/dashboard?tab=jobs&TOKEN=x']:
             with self.subTest(page=page):

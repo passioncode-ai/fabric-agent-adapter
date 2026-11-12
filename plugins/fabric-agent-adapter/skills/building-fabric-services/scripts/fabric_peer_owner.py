@@ -1,8 +1,11 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.1.0+kit.4: Observatory's peer_owner 1.1.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
-    DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py` at
-    commit f86f0622 (passioncode-ai/project-observatory-dashboard, the same licence). It differs
+    peer_owner 1.2.0+kit.5: Observatory's peer_owner 1.2.0, vendored into the Fabric service kit as `fabric_peer_owner` (layer L0;
+    DEC-0154 HA-2, FAA-226) from Project Observatory's `observatory/engine/peer_owner.py`, first at
+    commit f86f0622 (1.1.0) and read against commit 2180235c (1.2.0, passioncode-ai/project-observatory-dashboard, the
+    same licence): the kit's line names 1.2.0 since kit.5 (FAA-258), whose Linux rule kit.1 to kit.4 already carried
+    and the contract's CT-254 states (v0.1.0+2026-11-07.3). Observatory's 1.3.x (this account's own sockets through
+    libproc, the contract's DEC-0155 RT-2) is not in it yet (FAA-292). It differs
     from that file in this paragraph, in `Owner` and `Row` (NamedTuples here where it has
     frozen dataclasses: a dataclass with postponed annotations needs its module in sys.modules,
     and a service may load a kit file by its path without one), and in writing `Optional[X]`
@@ -11,7 +14,8 @@
     SID before the system's (a client running as root or SYSTEM owns root's listener), and in
     two Linux and selection rules: on Linux `server_end` reads an accepted connection's own row
     and, for one not accept()ed yet (printed with uid 0 and inode 0), the listener row on its
-    local address (state 0A; Observatory's 1.2.0 reading), `peer` reads a client
+    local address (state 0A; 1.2.0's rule, where the kit names its reasons `not-accepted`, `several-rows` and `closed`
+    and Observatory `no-listener`, `listener-no-socket`, `listeners-disagree` and `no-socket`), `peer` reads a client
     row with inode 0 (a closed client) as unknown, and several rows of one owner are that owner;
     a row printed twice by a `/proc` read under churn counts once, and a `/proc` question that
     finds no row or several reads the table once more; ctypes is imported where it is used, so a
@@ -111,7 +115,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.1.0+kit.4"  # Observatory's 1.1.0 with the kit's differences above
+PEER_OWNER_VERSION = "1.2.0+kit.5"  # Observatory's 1.2.0 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
@@ -804,7 +808,7 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = Fa
         # (inet_csk_listen_stop), so that listener answers. An accepted connection's own row carries the uid of the
         # process that accepted it (sock_graft): it answers itself, so a listener swapped after another account
         # accepted the client cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e; the contract's
-        # pending CT-254, FAA-258).
+        # CT-254, HA-2's Linux source, released in v0.1.0+2026-11-07.3).
         # A server row its owner already closed (an orphan) also has inode 0 and reads so: no process holds it, so
         # nothing sent to it reaches anyone (0.74.0 unit reading 6).
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
@@ -856,7 +860,7 @@ def server_end(sock: socket.socket) -> Owner:
     server's and whose remote address is this socket's own, which is the server process's
     accepted socket, so a listener swapped after `listen` cannot pass for the one that answers.
     On Linux a connection not yet accept()ed has no owner of its own (inode 0): its listener
-    answers (the contract's pending CT-254, FAA-258)."""
+    answers (the contract's CT-254, HA-2's Linux source)."""
     try:
         own, server = sock.getsockname(), sock.getpeername()
     except OSError as exc:

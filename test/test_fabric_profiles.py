@@ -36,7 +36,7 @@ class SecretShapeTests(unittest.TestCase):
         self.assertGreaterEqual(sum(len(c) for c in VECTORS["secrets"].values()), 120)
 
     def test_whitespace_dot_and_case_read_as_ecmascript(self):
-        """FAA-136: the answers of the contract's src/secret-shape.ts at the pin (00e050b, run under Node 24) where
+        """FAA-136: the answers of the contract's src/secret-shape.ts at the pin (00e050b, run under Node 24; re-read at 93e7db16 under tsx, FAA-258) where
         Python's own \\s, `.` and case folding differ; both copies of the module answer them."""
         import importlib.util
         copy = Path(__file__).resolve().parent.parent / "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_secrets.py"
@@ -47,7 +47,7 @@ class SecretShapeTests(unittest.TestCase):
                  ("credential_name", "api\u2028key", True), ("credential_name", "api\x1ckey", False),
                  ("secret_value", "bearer\ufeffabc", True), ("secret_value", "bearer\x85abc", False),
                  ("secret_value", "bearer \u2028x", False), ("secret_value", "\u017fk-" + "a" * 20, False),
-                 ("secret_value", "SK-" + "a" * 20, True), ("secret_value", "Bearer\xa0abc", True),
+                 ("secret_value", "SK-" + "a" * 20, False), ("secret_value", "Bearer\xa0abc", True),
                  ("secret_argument", "--h=Authorization: Bearer\ufeffabc123456789012", True),
                  ("secret_argument", "--h=Authorization: Bearer\x85abc123456789012", False),
                  ("secret_argument", "x\u3000" + "aB1" * 14, True),
@@ -69,7 +69,9 @@ class SecretShapeTests(unittest.TestCase):
                  ("secret_url", 'https://h.example/?x=%zz"' + ("A1b" * 13)[:38], True),
                  ("secret_url", "https://h.example/?x=%zz\u00e9" + ("A1b" * 13)[:38], True),
                  ("secret_url", "https://h.example/#x=%zz<" + ("A1b" * 13)[:38], True),
-                 ("secret_url", "https://h.example/?x=%zz\x1aKIA0123456789ABCDEF", True),
+                 # DEC-0151: the `A` of the encoded `%1A` no longer starts a key; with a boundary before `AKIA` one is found
+                 ("secret_url", "https://h.example/?x=%zz\x1aKIA0123456789ABCDEF", False),
+                 ("secret_url", "https://h.example/?x=%zz\x1a" + "A" + "KIA0123456789ABCDEF", True),
                  ("secret_url", "https://h.example/?q=caf\u00e9", False),
                  # unit r9: file is a special scheme too, so its query encodes `'`
                  ("secret_url", "file:///x?x=%zz'" + ("A1b" * 13)[:38], True),

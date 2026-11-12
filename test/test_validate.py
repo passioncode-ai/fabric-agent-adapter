@@ -649,7 +649,7 @@ class PluginLifecycleGateTests(unittest.TestCase):
             v.validate_plugin_lifecycle(errors, plugin)
             self.assertEqual(errors, [])
             (plugin / ".mcp.json").write_text(json.dumps({"mcpServers": {"x": {"command": "node"}}}))
-            (plugin / "hooks" / "hooks.json").write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "x --token=" + "s" + "k-" + "z" * 24}]}]}}))
+            (plugin / "hooks" / "hooks.json").write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "x --token=" + "s" + "k-" + "Z1" + "z" * 22}]}]}}))
             errors = []
             v.validate_plugin_lifecycle(errors, plugin)
             self.assertTrue(any("LC-19" in e for e in errors), errors)

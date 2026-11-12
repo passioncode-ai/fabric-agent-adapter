@@ -273,11 +273,11 @@ class ShownRepositoryTests(unittest.TestCase):
             self.assertEqual(rules.shown_repository(value), shown, value)
         self.assertEqual(rules.shown_repository("https://github.com/example-org/task-pipeline-dashboard"),
                          "https://github.com/example-org/task-pipeline-dashboard", "a name is no key (seam reading 6)")
-        letters = "sk-" + "AbCd" * 10  # made up, no digit: a key all the same, never a name (seam and unit readings 10)
+        letters = "sk-" + "Ab1d" * 10  # made up: a key DEC-0151 reads (a digit and an upper-case letter), never a name
         for fake in ("ghp_" + "Fx9k" * 9 + ":example-org/r", "https://github.com/example-org/ghp_" + "Fx9k" * 9,
                      "https://github.com/example-org/" + letters, "git@github.com:example-org/" + letters,
                      "https://github.com/example-org/%73" + letters[1:],
-                     "https://github.com/example-org/%73k-" + "abcd" * 10):  # made up; decoded too (product reading 11)
+                     "https://github.com/example-org/%73k-" + "ab1d" * 10):  # made up, 32 or more with a digit; decoded too (product reading 11)
             self.assertEqual(rules.shown_repository(fake), "<a repository shaped like a credential>")
         for value in ("https:/\t/h\\u:fixture-pw@x.example/o/r", " https://a@u:fixture-pw@h.example/o/r",
                       "ssh:/\t/a@u:fixture-pw@h.example/o/r", "x-r:\t//@u:fixture-pw@o", "https:/\n/u:fixture-pw@h.example/r",

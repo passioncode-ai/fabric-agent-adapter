@@ -11,7 +11,7 @@ metadata:
   author: PassionCode.ai
   version: "0.81.0"
   contract-version: "0.1.0"
-  contract-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
+  contract-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
 ---
 
 # Creating Fabric-compatible agents
@@ -174,7 +174,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
 The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
 does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
 
-Pin exactly contract `0.1.0` at commit `18f8d48762edc5bfb1433657cbfe1c16196df1a6` and
+Pin exactly contract `0.1.0` at commit `93e7db164c7829e2783b4b7705c4113bb5201131` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check
