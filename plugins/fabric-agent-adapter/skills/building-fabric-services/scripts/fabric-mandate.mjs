@@ -193,6 +193,11 @@ const invalid = (detail) => ({ ok: false, code: MANDATE_INVALID, data: { detail 
  * being where the operator said the words when the mandate carries it (DEC-0126 OA-6). `callerAgent` is
  * passed only when the callee authenticated the caller's agent id; without one the chain's end alone binds it. A missing
  * or non-object `call` is read as a call that names nothing (the reference would throw).
+ *
+ * A call is a plain object of its own data properties (FAA-196 (19)): its members are read as own members only, where
+ * the contract's reference reads plain properties, so an inherited or getter `project`, `action` or `spendUsd` is none
+ * here and may be covered where the reference refuses it. Build the call as an object literal of the values the work
+ * names, as the kit's own readers do (the board's `covers`, actionGate, jobStep).
  */
 export function mandateCovers(input) {
   const field = (key) => member(input, key);
