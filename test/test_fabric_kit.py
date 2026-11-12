@@ -226,6 +226,23 @@ class Install(unittest.TestCase):
             self.assertIn("fabric_estate.py", needs, "the 0.39.1 file imports fabric_estate itself")
             self.assertNotIn("fabric_base.py", needs, "a module only the 0.40.0 file imports is not asked of it")
 
+    def test_older_and_modified_need_no_release_tag(self):
+        """FAA-212: the tests above skip in a clone without tags (hosted CI checks out one commit). The same verdicts
+        from a manifest built here: a copy matching an earlier release's digest is `older` with that release, a copy
+        matching none is `modified`, and the newest earlier release wins when two share a digest."""
+        import hashlib
+        with tempfile.TemporaryDirectory() as tmp:
+            copy = Path(tmp) / "fabric_share.py"
+            copy.write_bytes(b"# an earlier release\n")
+            old = hashlib.sha256(copy.read_bytes()).hexdigest()
+            manifest = {"version": "0.9.0", "python": [{"file": "fabric_share.py", "sha256": "0" * 64}], "node": [],
+                        "history": {"0.2.0": {"fabric_share.py": old}, "0.10.0": {"fabric_share.py": old},
+                                    "0.9.0": {"fabric_share.py": "0" * 64}}}
+            self.assertEqual(fabric_kit.state_of(copy, manifest), {"state": "older", "version": "0.10.0"},
+                             "versions compare as numbers, 0.10.0 after 0.2.0")
+            copy.write_bytes(b"# an earlier release\n# a local edit\n")
+            self.assertEqual(fabric_kit.state_of(copy, manifest), {"state": "modified", "version": None})
+
     def test_an_older_release_and_an_edited_copy_are_told_apart(self):
         shown = subprocess.run(["git", "show", "v0.39.1:plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_share.py"],
                                capture_output=True, cwd=ROOT)

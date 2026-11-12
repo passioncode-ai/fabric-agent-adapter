@@ -715,17 +715,62 @@ CREDENTIAL_URL_RECORDS = ("CHANGELOG.md",)
 CREDENTIAL_URL_SCOPE = ("bin", "plugins", "README.md", "SECURITY.md")  # a tree without package.json
 
 
+# npm ships these from the package root whatever `files` says (README and LICENSE in any case and extension).
+NPM_ALWAYS = re.compile(r"(?i)^(readme|licen[sc]e)(\.[^/]*)?$")
+# A name the wide pattern took for a scheme is reported as one only when slashes follow it or it is a scheme a URL
+# with credentials uses; `key=abcdefgh:u:x@h` has none (FAA-212).
+KNOWN_SCHEMES = frozenset(("http", "https", "ws", "wss", "ftp", "ftps", "ssh", "git", "redis", "rediss", "amqp",
+                           "amqps", "mongodb", "postgres", "postgresql", "mysql", "smtp", "smtps", "imap", "imaps", "sftp"))
+
+
 def credential_url_scope(root: Path = ROOT) -> List[str]:
-    """What the npm package ships (package.json `files`, its exclusions aside) but the records."""
+    """What the npm package ships (package.json `files`, its exclusions aside, and what npm always ships) but the
+    records. An entry the check cannot read literally is left to `credential_url_scope_problems`."""
     manifest = root / "package.json"
     if not manifest.is_file():
         return list(CREDENTIAL_URL_SCOPE)
     files = json.loads(manifest.read_text(encoding="utf-8")).get("files") or []
-    return [name for name in files if not name.startswith("!") and name not in CREDENTIAL_URL_RECORDS] + ["package.json"]
+    scope = [name for name in files if not name.startswith("!") and name not in CREDENTIAL_URL_RECORDS
+             and not GLOB_CHARS.search(name)] + ["package.json"]
+    scope += sorted(p.name for p in root.iterdir() if p.is_file() and NPM_ALWAYS.match(p.name) and p.name not in scope
+                    and p.name not in CREDENTIAL_URL_RECORDS)
+    return scope
+
+
+GLOB_CHARS = re.compile(r"[*?\[\]{}]")
+
+
+def credential_url_scope_problems(root: Path = ROOT) -> List[str]:
+    """FAA-212: a `files` entry holding a glob, one naming nothing, or no `files` at all (npm then ships the whole
+    tree) cannot be read literally, so the shipped-file checks would skip what npm ships."""
+    manifest = root / "package.json"
+    if not manifest.is_file():
+        return []
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    if "files" not in data:
+        return ["package.json has no `files`: npm ships the whole tree and the shipped-file checks cannot follow it; "
+                "list what ships (FAA-212)"]
+    problems = []
+    for name in data["files"]:
+        if name.startswith("!"):
+            continue
+        if GLOB_CHARS.search(name):
+            problems.append("package.json `files` entry %r is a glob the shipped-file checks do not expand: name the "
+                            "folder or file (FAA-212)" % name)
+        elif not (root / name).exists():
+            problems.append("package.json `files` entry %r names nothing (FAA-212)" % name)
+    return problems
+
+
+def _scheme_of(found: str) -> str:
+    head = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):([/\\\t]*)", found)
+    if head and (head.group(2) or head.group(1).lower() in KNOWN_SCHEMES):
+        return "scheme %r" % head.group(1)
+    return "no scheme"
 
 
 def credential_url_problems(root: Path = ROOT) -> List[str]:
-    problems: List[str] = []
+    problems: List[str] = credential_url_scope_problems(root)
     for name in credential_url_scope(root):
         top = root / name
         if not top.exists():
@@ -739,10 +784,9 @@ def credential_url_problems(root: Path = ROOT) -> List[str]:
             for lineno, line in enumerate(text.splitlines(), 1):
                 found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
                 if found:  # the scheme alone: a real credential is never repeated into a log
-                    scheme = re.match(r"[A-Za-z][A-Za-z0-9+.-]*", found.group(0)).group(0)
-                    problems.append("%s:%d writes a URL with credentials (scheme %r): name the scheme in angle brackets, "
+                    problems.append("%s:%d writes a URL with credentials (%s): name the scheme in angle brackets, "
                                     "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
-                                    % (path.relative_to(root).as_posix(), lineno, scheme))
+                                    % (path.relative_to(root).as_posix(), lineno, _scheme_of(found.group(0))))
     return problems
 
 
