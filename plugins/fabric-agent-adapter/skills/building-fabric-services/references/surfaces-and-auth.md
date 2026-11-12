@@ -6,6 +6,7 @@
 - [CLI for people and scripts](#cli-for-people-and-scripts)
 - [A2A for remote agents](#a2a-for-remote-agents)
 - [Behind tailscale serve](#behind-tailscale-serve)
+  - [A groups file at every door](#a-groups-file-at-every-door)
 - [Token](#token)
 - [Dashboard session](#dashboard-session)
 - [Headers every response carries](#headers-every-response-carries)
@@ -123,6 +124,62 @@ handler.
 A tagged node (a server, not a person) gets no identity header from serve and is refused `identity-missing`; a
 machine caller uses the estate's delegation tokens instead. The serve listener is an outward surface: watch it like
 the A2A tunnel above.
+
+### A groups file at every door
+
+`fabric_tailnet_identity.py` / `fabric-tailnet-identity.mjs` (FAA-324) are the simpler sibling for a service whose
+every door (its dashboard, its MCP endpoint, its own API) sits behind `tailscale serve` on one loopback listener, with
+access kept in a file the organization writes rather than a generated perimeter and personal keys.
+
+- **The header and where it is believed.** Serve sets `Tailscale-User-Login` and removes any copy a client sent (also
+  the `_` spelling); it sets none for a tagged node or for Funnel traffic, which carries `Tailscale-Funnel-Request`
+  instead ([Tailscale: identity headers](https://tailscale.com/kb/1312/serve)). The module believes the header only
+  when the service listens on a loopback address and the request's peer is loopback; a service bound to `0.0.0.0` or
+  a LAN address, or a request from another peer, is refused, since there the header comes from the network. Another
+  process of the machine can still reach the loopback port: the kit's loopback server refuses other OS accounts
+  (FAA-227), and a listener of serve's own (above) closes the rest where that matters.
+- **The groups file.** JSON the organization writes, at a path the service takes from its own setting (an
+  environment variable or a config key it names), checked against `tailnet-groups.schema.json` beside the module:
+
+  ```json
+  {"schema": "tailnet-groups/1",
+   "about": "Who may open example-agent's doors.",
+   "groups": {"ops": ["ana@example.com", "bo@example.com"], "viewers": ["cy@example.com"]},
+   "rules": [{"group": "ops", "door": "dashboard", "capabilities": "*"},
+             {"group": "ops", "door": "mcp", "capabilities": ["cve.scan", "vitals.read"]},
+             {"group": "ops", "door": "service", "capabilities": "*"},
+             {"group": "viewers", "door": "dashboard", "capabilities": ["vitals"]}]}
+  ```
+
+  A door is `dashboard`, `mcp` or `service`; a capability is the name the service asks for there (a page, a tool, an
+  action), or `"*"` for all of them. Logins are compared as ASCII names lowercased whole after trimming spaces and
+  tabs, with no other folding; a non-ASCII login (serve RFC 2047-encodes one) is refused as malformed.
+- **Wiring.** Make one `TailnetIdentity(path)` at start and ask it at each door: in Python
+  `decision = identity.decide_request(self, door="mcp", capability=tool)` in an `http.server` handler, then
+  `send_refusal(self, decision)` when `decision["allowed"]` is false; in Node
+  `identity.decideRequest(req, {door, capability})` and `sendRefusal(res, decision)`. Behind the kit's
+  `loopbackServer` gate the request's own server never listened, so pass `bound: gate.address().address` (Python:
+  `bound=` when the handler's server is not the listening one); an unknown bound address is refused. The decision
+  carries `login`, `name` (from `Tailscale-User-Name`, for display only) and `groups`.
+- **Reload and failure.** The file is looked at on every request (one `stat`; `recheck_seconds` / `recheckSeconds`
+  makes it at most that often) and read again when its inode, size, mtime or ctime change, with no restart. While it
+  is missing, unreadable or invalid, every door answers `groups-unreadable` or `groups-invalid`; one line per change
+  goes to the log (stderr by default), naming the field and never the file's content.
+
+| Code | When |
+|---|---|
+| `bind-not-loopback` | the service does not listen on a loopback address, or the address is unknown |
+| `not-loopback` | the request's peer is not loopback: it did not come through the local serve |
+| `groups-unreadable`, `groups-invalid` | the groups file cannot be read, or breaks its schema; every door is shut |
+| `funnel-request` | the request came through Funnel from the public internet |
+| `no-login` | no `Tailscale-User-Login`, or an empty one |
+| `tagged-node` | no login, and serve's `X-Forwarded-For` is a tailnet address: a node without a user |
+| `login-ambiguous`, `login-malformed` | two login headers, or one that is no login name |
+| `unknown-login` | the login is in no group |
+| `not-allowed` | no group of the login has a rule for this door and capability |
+
+Every refusal is 403 with `{"error": {"code", "message"}}`, the message a fixed sentence; `tagged-node` and `no-login`
+differ only in their label, since a direct local call can send any `X-Forwarded-For`.
 
 ## Token
 
