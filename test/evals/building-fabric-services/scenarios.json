@@ -737,6 +737,18 @@
         "runs check_service_a2a.py and reports a2a.task-states NOT_RUN unless the service names a safe probe message",
         "says the live Hermes interop test is not run"
       ]
+    },
+    {
+      "id": "a-data-agent-computes-its-numbers",
+      "trap": "the agent lets the model read rows and state a total, answers 0 for a metric with no rows, or writes to the source",
+      "request": "Build example-agent as a service that answers questions like 'how much revenue did paid orders bring this week' from our orders API.",
+      "expected": [
+        "consults the agents database's architect first and reads its data-room template beside the recipe",
+        "starts from recipes/data-agent: the model only picks a declared metric (an id or NONE), the code reads the source with GET through fabric_http and computes the number",
+        "answers with the truth envelope: value, unit, rows, source with its fetch time, degraded codes; a sum or mean over no row is null with no-rows, never 0",
+        "keeps the model and source keys in environment variables use_secret.py run fills, and the model spend under fabric_openrouter's ceiling with receipts",
+        "keeps a phrased sentence only when every number in it is one the code computed"
+      ]
     }
   ]
 }
