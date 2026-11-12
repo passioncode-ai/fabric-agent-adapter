@@ -429,21 +429,86 @@ def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Opti
     return dict(found, scope="user") if found else None
 
 
-def codex_registered(env: Optional[Dict[str, str]] = None) -> bool:
+_CODEX_FABRIC = re.compile(r'^\s*\[\s*"?mcp_servers"?\s*\.\s*"?fabric"?\s*\]\s*$', re.MULTILINE)
+_TOML_HEADER = re.compile(r"^\s*\[", re.MULTILINE)
+#: one `command = "..."` line of a table (a basic or literal string), up to the line's end: a lookahead, not `$` (R1)
+_TOML_COMMAND = re.compile(r"""^[ \t]*command[ \t]*=[ \t]*("(?:[^"\\\n]|\\.)*"|'[^'\n]*')[ \t]*(?:#[^\n]*)?(?=\r?\n|\Z)""",
+                           re.MULTILINE)
+
+
+def _codex_config(env: Optional[Dict[str, str]] = None) -> str:
     env = os.environ if env is None else env
     codex_home = Path(env.get("CODEX_HOME") or str(_home(env) / ".codex"))
-    text = read_small(codex_home / "config.toml", CONFIG_CAP) or ""
-    return re.search(r'^\s*\[\s*"?mcp_servers"?\s*\.\s*"?fabric"?\s*\]\s*$', text, re.MULTILINE) is not None
+    return read_small(codex_home / "config.toml", CONFIG_CAP) or ""
 
 
-def kimi_registered(env: Optional[Dict[str, str]] = None) -> bool:
-    """Kimi Code keeps its MCP servers in ~/.kimi-code/mcp.json (`mcpServers`, Claude's shape)."""
+def codex_registered(env: Optional[Dict[str, str]] = None) -> bool:
+    return _CODEX_FABRIC.search(_codex_config(env)) is not None
+
+
+def codex_command(env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """The `command` of `[mcp_servers.fabric]` in Codex's config.toml (FAA-233), a basic or literal TOML string, or
+    None. Read with a pattern, not a TOML parser (Python 3.9 has none): the table runs to the next header."""
+    text = _codex_config(env)
+    header = _CODEX_FABRIC.search(text)
+    if header is None:
+        return None
+    rest = text[header.end():]
+    following = _TOML_HEADER.search(rest)
+    found = _TOML_COMMAND.search(rest[:following.start()] if following else rest)
+    if not found:
+        return None
+    value = found.group(1)
+    if value.startswith("'"):
+        return value[1:-1]
+    try:
+        decoded = json.loads(value)
+    except ValueError:
+        return None
+    return decoded if isinstance(decoded, str) else None
+
+
+def kimi_registration(env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
+    """Kimi Code keeps its MCP servers in ~/.kimi-code/mcp.json (`mcpServers`, Claude's shape): the `fabric` entry's
+    command and args, or None."""
     text = read_small(_home(env) / ".kimi-code" / "mcp.json", CONFIG_CAP)
     try:
         servers = json.loads(text).get("mcpServers") if text else None
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, RecursionError):
+        return None
+    return _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
+
+
+def kimi_registered(env: Optional[Dict[str, str]] = None) -> bool:
+    return kimi_registration(env) is not None
+
+
+def registered_command(host: str, cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """The command the host runs as `fabric` (FAA-232, FAA-233): Claude Code's entry for this folder, Codex's
+    config.toml, Kimi Code's mcp.json; None when the host registers none, or registers it in a file read elsewhere."""
+    if host == "claude":
+        entry = claude_registration(cwd, env)
+        return entry["command"] if entry else None
+    if host == "codex":
+        return codex_command(env)
+    if host == "kimi":
+        entry = kimi_registration(env)
+        return entry["command"] if entry else None
+    return None
+
+
+def foreign_command(command: Optional[str], platform: str = sys.platform, env: Optional[Dict[str, str]] = None,
+                    lookup: bool = True) -> bool:
+    """Whether a registered command runs another user's copy (FAA-229): never one relative to a folder (`./`), and a
+    bare name only with `lookup` (a PATH lookup, which status makes and the session hooks do not)."""
+    if not command or re.split(r"[\\/]", command)[-1].lower() not in ("fabric-mcp", "fabric-mcp.cmd"):
         return False
-    return isinstance(servers, dict) and _stdio_entry(servers.get("fabric")) is not None
+    if command.startswith(("./", ".\\")):  # Path() drops a leading ./, which would read as a PATH name
+        return False
+    path = Path(command)
+    if not lookup and not path.is_absolute():
+        return False
+    return another_users_copy(path, platform, env)
 
 
 def host_registered(host: str, cwd: Path, env: Optional[Dict[str, str]] = None) -> bool:

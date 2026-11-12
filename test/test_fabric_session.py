@@ -156,7 +156,10 @@ class Base(unittest.TestCase):
         doc.update(over)
         (self.root / "hub.json").write_text(json.dumps(doc))
 
-    def register(self, command="/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp", scope="user", kind=None):
+    def register(self, command=None, scope="user", kind=None):
+        # a path in the test's home by default: the session start judges a registered copy's owner (FAA-232), and this
+        # machine's /Applications/Fabric.app may be another user's
+        command = command or str(self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp")
         entry = {"command": command, "args": ["--runner", "claude-code"]}
         if kind:
             entry["type"] = kind
@@ -488,6 +491,44 @@ class SessionStart(Base):
                 done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
                                         args=["--host", host])
                 self.assertEqual((done.returncode, done.stdout), (0, ""), host)
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_a_registration_of_another_users_copy_is_named_at_session_start(self):
+        # FAA-232: a registration made before 0.69.0 of another user's fabric-mcp keeps running from the hooks; the
+        # session start says so in one line, before whatever else it says, for Claude Code, Codex and Kimi Code
+        env_module = sys.modules["fabric_session_env"]
+        shared = self.base / "Shared" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        theirs = os.path.realpath(str(shared))
+        saved = env_module._owner_uid
+        env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
+        payload = {"session_id": SID, "cwd": str(self.repo), "source": "startup"}
+        try:
+            self.register(command=str(shared))
+            self.hub()
+            out = json.loads(fs.hook_session_start(payload, self.env, platform="darwin"))
+            context = out["hookSpecificOutput"]["additionalContext"].splitlines()
+            self.assertEqual(context[0], fs.FOREIGN_NOTICE.format(host="Claude Code", command=shared))
+            self.assertEqual(context[1], fs.POINTER.format(host="Claude Code"))
+            self.assertIn("fabric_session.py status", context[0])
+            self.assertNotIn("\u2014", context[0])
+            self.hub(pid=self.dead_pid())  # down, in a folder with no sign: the one line still
+            out = json.loads(fs.hook_session_start(payload, self.env, platform="darwin"))
+            self.assertEqual(out["hookSpecificOutput"]["additionalContext"],
+                             fs.FOREIGN_NOTICE.format(host="Claude Code", command=shared))
+            self.assertIsNone(fs.hook_session_start(payload, self.env, platform="linux"), "the owner rule is macOS'")
+            (self.home / ".kimi-code").mkdir()
+            (self.home / ".kimi-code" / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
+            self.assertEqual(fs.hook_session_start(payload, self.env, host="kimi", platform="darwin"),
+                             fs.FOREIGN_NOTICE.format(host="Kimi Code", command=shared))
+            self.register(command="fabric-mcp")  # a bare name: the hook does no PATH lookup (status does)
+            self.assertIsNone(fs.hook_session_start(payload, self.env, platform="darwin"))
+            env_module._owner_uid = lambda path: os.getuid()
+            self.register(command=str(shared))
+            self.assertIsNone(fs.hook_session_start(payload, self.env, platform="darwin"), "the user's own copy")
+        finally:
+            env_module._owner_uid = saved
 
     def test_compact_and_resume_are_silent(self):
         self.register()
@@ -2211,17 +2252,141 @@ class Status(Base):
     def setUp(self):
         super().setUp()
         self.env_module = sys.modules["fabric_session_env"]  # find_fabric_bin reads it there (FAA-65)
+        # status imports the name too (FAA-240 item 3): stub both, so its install advice reads the same candidates
+        self.cli_module = sys.modules["fabric_session_cli"]
         self.saved = self.env_module.fabric_bin_candidates
-        self.env_module.fabric_bin_candidates = lambda platform=None, env=None: [self.base / "no-fabric" / "fabric-mcp"]
+        self.stub_candidates(lambda platform=None, env=None: [self.base / "no-fabric" / "fabric-mcp"])
         # 0.69.0 unit reading 3: every file is this user's, so a host's /Applications/Fabric.app of another user
         # (FAA-229's machine) cannot change a test that registers its default path
         self.saved_owner = self.env_module._owner_uid
         self.env_module._owner_uid = lambda path: getattr(os, "getuid", lambda: 0)()
 
+    def stub_candidates(self, candidates):
+        self.env_module.fabric_bin_candidates = self.cli_module.fabric_bin_candidates = candidates
+
     def tearDown(self):
-        self.env_module.fabric_bin_candidates = self.saved
+        self.stub_candidates(self.saved)
         self.env_module._owner_uid = self.saved_owner
         super().tearDown()
+
+    def test_the_launchers_folder_is_macos_only(self):
+        # FAA-240 item 1: status's darwin guard on launcher_folder (removing it fails this)
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(self.base / "Apps"))
+        self.assertEqual(fs.status(self.repo, env, "darwin")["launcherFolder"], str(self.base / "Apps"))
+        for platform in ("linux", "win32"):
+            self.assertIsNone(fs.status(self.repo, env, platform)["launcherFolder"], platform)
+
+    def test_a_value_the_launcher_ignores_is_named(self):
+        # FAA-239: a relative value or a literal ~ is read as unset, here and by the launcher; status says so
+        for value in ("Apps", "~/Apps", "./Apps"):
+            report = fs.status(self.repo, dict(self.env, PASSIONCODE_APPLICATIONS=value), "darwin")
+            self.assertEqual((report["launcherFolder"], report["launcherFolderIgnored"]), (None, value), value)
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                fs.print_status(report)
+            self.assertIn("PASSIONCODE_APPLICATIONS: %s is ignored: not an absolute path, read as unset" % value,
+                          printed.getvalue())
+        for env in (self.env, dict(self.env, PASSIONCODE_APPLICATIONS="/Apps"), dict(self.env, PASSIONCODE_APPLICATIONS="")):
+            report = fs.status(self.repo, env, "darwin")
+            self.assertIsNone(report["launcherFolderIgnored"])
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                fs.print_status(report)
+            self.assertNotIn("ignored", printed.getvalue())
+        self.assertIsNone(fs.status(self.repo, dict(self.env, PASSIONCODE_APPLICATIONS="Apps"), "linux")["launcherFolderIgnored"])
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_a_copy_outside_the_launchers_folder_is_named(self):
+        # FAA-239: with PASSIONCODE_APPLICATIONS set, a registration made before it (in ~/Applications) is one the
+        # launcher no longer updates, and the user's own copy there is not taken: status names both
+        self.stub_candidates(self.saved)
+        apps = self.base / "Apps"
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(apps))
+        mine = self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"
+        mine.parent.mkdir(parents=True)
+        mine.write_text("")
+        self.register(command=str(mine))
+        self.hub()
+        report = fs.status(self.repo, env, "darwin")
+        self.assertEqual((report["fabricMcp"], report["ownCopyOutside"]), (None, str(mine)))
+        self.assertTrue(report["registeredOutsideLauncherFolder"])
+        self.assertIn("put your own Fabric.app in %s" % apps, report["next"])
+        self.assertIn("or unset PASSIONCODE_APPLICATIONS to keep %s" % mine, report["next"])
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("none of yours in %s (PASSIONCODE_APPLICATIONS); yours at %s is outside it" % (apps, mine),
+                      printed.getvalue())
+        self.assertIn("(outside PASSIONCODE_APPLICATIONS, %s: the launcher does not update it)" % apps, printed.getvalue())
+        chosen = apps / "Fabric.app/Contents/Resources/bin/fabric-mcp"
+        chosen.parent.mkdir(parents=True)
+        chosen.write_text("")
+        report = fs.status(self.repo, env, "darwin")
+        self.assertTrue(report["registeredOutsideLauncherFolder"])
+        self.assertEqual(report["next"], "The registered fabric-mcp is outside PASSIONCODE_APPLICATIONS (%s), which the "
+                         "launcher updates: claude mcp remove --scope user fabric, then claude mcp add --scope user "
+                         'fabric -- "%s" --runner claude-code' % (apps, chosen))
+        self.register(command=str(chosen))
+        report = fs.status(self.repo, env, "darwin")
+        self.assertFalse(report["registeredOutsideLauncherFolder"])
+        self.assertEqual(report["next"], "Call fabric_whoami.")
+        self.assertFalse(fs.status(self.repo, self.env, "darwin")["registeredOutsideLauncherFolder"], "no variable")
+
+    @unittest.skipUnless(hasattr(os, "getuid") and os.getuid() != 0, "POSIX modes, not root")
+    def test_a_launchers_folder_this_user_cannot_enter_is_not_advised(self):
+        # FAA-239: the install advice names ~/Applications with the variable unset, never a folder that cannot be entered
+        self.stub_candidates(self.saved)
+        locked = self.base / "locked"
+        locked.mkdir()
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(locked / "Apps"))
+        locked.chmod(0)
+        try:
+            report = fs.status(self.repo, env, "darwin")
+        finally:
+            locked.chmod(0o700)
+        self.assertIn("(your own copy, in ~/Applications, with PASSIONCODE_APPLICATIONS unset: this user cannot enter %s)"
+                      % (locked / "Apps"), report["next"])
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_codex_and_kimi_registrations_are_checked_for_another_users_copy(self):
+        # FAA-233: Codex's config.toml and Kimi's mcp.json register fabric-mcp too; status judges each command
+        shared = self.base / "Shared" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        own = self.base / "no-fabric" / "fabric-mcp"
+        own.parent.mkdir()
+        own.write_text("")
+        (self.home / ".codex").mkdir()
+        (self.home / ".codex" / "config.toml").write_text(
+            'model = "x"\n[mcp_servers.fabric]\ncommand = "%s"\nargs = ["--runner", "codex"]\n[other]\ncommand = "y"\n' % shared)
+        (self.home / ".kimi-code").mkdir()
+        (self.home / ".kimi-code" / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))
+        self.hub()
+        self.register(command=str(own))
+        theirs = os.path.realpath(str(shared))
+        self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["registeredCopy"], "ok")
+        self.assertEqual(report["hostCopies"], {"codex": "another user's", "kimi": "another user's"})
+        self.assertEqual(report["next"], "The fabric-mcp Codex has registered is another user's copy: codex mcp remove "
+                         'fabric, then codex mcp add fabric -- "%s" --runner codex' % own)
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("Codex: fabric registered -> %s (another user's copy)" % shared, printed.getvalue())
+        self.assertIn("Kimi Code: fabric registered -> %s (another user's copy)" % shared, printed.getvalue())
+        (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\ncommand = "%s"\n' % own)
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["hostCopies"], {"codex": "ok", "kimi": "another user's"})
+        self.assertIn("The fabric-mcp Kimi Code has registered is another user's copy: in ~/.kimi-code/mcp.json, set "
+                      'mcpServers.fabric.command to "%s"' % own, report["next"])
+        self.assertEqual(fs.status(self.repo, self.env, "linux")["hostCopies"], {"codex": "ok", "kimi": "ok"})
+        self.assertEqual(fs.codex_command(self.env), str(own))
+        (self.home / ".codex" / "config.toml").write_text("[mcp_servers.fabric]\ncommand = 'C:\\x\\fabric-mcp.cmd'\n")
+        self.assertEqual(fs.codex_command(self.env), "C:\\x\\fabric-mcp.cmd")
+        (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\nargs = []\n')
+        self.assertIsNone(fs.codex_command(self.env))
+        self.assertTrue(fs.codex_registered(self.env))
 
     def test_one_next_action_per_state(self):
         report = fs.status(self.repo, self.env)
@@ -2260,8 +2425,7 @@ class Status(Base):
             # 0.69.0 product reading 2: with no copy of the user's own, install one first; never a placeholder path
             self.assertEqual(report["next"], "The registered fabric-mcp is another user's copy: put your own "
                              "Fabric.app in ~/Applications, then claude mcp remove --scope user fabric, "
-                             'then claude mcp add --scope user fabric -- "%s" --runner claude-code'
-                             % (self.home / "Applications/Fabric.app/Contents/Resources/bin/fabric-mcp"))
+                             'then claude mcp add --scope user fabric -- "%s" --runner claude-code' % own)
             printed = io.StringIO()
             with contextlib.redirect_stdout(printed):
                 fs.print_status(report)
@@ -2372,8 +2536,9 @@ class Status(Base):
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
             fs.print_status(report)
-        self.assertIn("fabric-mcp: %s (the administrator's copy, which the launcher does not update)" % binary,
-                      printed.getvalue())
+        # FAA-240 item 6: "which the launcher does not update" is the launcher's word (its PR #277), said as its
+        self.assertIn("fabric-mcp: %s (root's copy: the launcher calls it the administrator's and does not update it)"
+                      % binary, printed.getvalue())
         self.env_module._owner_uid = lambda path: os.getuid()
         self.assertFalse(fs.status(self.repo, self.env, "darwin")["administratorsCopy"], "the user's own copy")
         self.assertFalse(fs.status(self.repo, self.env, "linux")["administratorsCopy"])
@@ -2381,7 +2546,7 @@ class Status(Base):
     @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
     def test_status_follows_the_launchers_one_folder(self):
         # FAA-237 (0.70.0 unit reading 1): the folder the person named is where status looks and where it says to install
-        self.env_module.fabric_bin_candidates = self.saved
+        self.stub_candidates(self.saved)
         apps = self.base / "Apps"
         env = dict(self.env, PASSIONCODE_APPLICATIONS=str(apps))
         report = fs.status(self.repo, env, "darwin")
@@ -2436,7 +2601,7 @@ class Status(Base):
     @unittest.skipUnless(hasattr(os, "getuid") and os.getuid() != 0, "POSIX modes, not root")
     def test_status_survives_a_launchers_folder_it_cannot_enter(self):
         # 0.70.0 unit reading 4: a folder under one this user cannot enter raised PermissionError before Python 3.14
-        self.env_module.fabric_bin_candidates = self.saved
+        self.stub_candidates(self.saved)
         locked = self.base / "locked"
         locked.mkdir()
         env = dict(self.env, PASSIONCODE_APPLICATIONS=str(locked / "Apps"))
@@ -2446,7 +2611,9 @@ class Status(Base):
             report = fs.status(self.repo, env, "darwin")
         finally:
             locked.chmod(0o700)
-        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in %s)" % (locked / "Apps"), report["next"])
+        # FAA-239: a folder this user cannot enter is not advised; ~/Applications with the variable unset is
+        self.assertIn("Install Fabric v0.3.5 or later (your own copy, in ~/Applications, with PASSIONCODE_APPLICATIONS "
+                      "unset: this user cannot enter %s)" % (locked / "Apps"), report["next"])
         # Python 3.14 answers False itself: raise as 3.9 to 3.13 do, so the check holds on any Python (0.70.0 unit reading 5)
         original = Path.is_file
 

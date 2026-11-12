@@ -593,9 +593,19 @@
       "request": "You are the second user account on a Mac. /Applications/Fabric.app was installed by the first user; you have no ~/Applications/Fabric.app. Your ~/.claude.json registers fabric with /Applications/Fabric.app/Contents/Resources/bin/fabric-mcp. How do you set up Fabric for this session?",
       "expected": [
         "runs the skill's status (or reads the Step 0 table) and looks in ~/Applications/Fabric.app first, taking a copy in /Applications only when it is this user's or root's",
-        "when PASSIONCODE_APPLICATIONS is set, looks for Fabric.app only in that folder, as the launcher installs it",
+        "when PASSIONCODE_APPLICATIONS is set to a path starting with /, looks for Fabric.app only in that folder, as the launcher installs it; a relative value or a literal ~ is read as unset",
         "does not run or keep the first user's copy: installs its own Fabric into ~/Applications (or the PASSIONCODE_APPLICATIONS folder, when it is set to a path starting with / and holds no other user's copy), then removes the registration and adds one with its own copy's path",
         "if a project's shared .mcp.json registers fabric, adds a local-scope entry that overrides it for this user instead of rewriting the shared file"
+      ]
+    },
+    {
+      "id": "a-launcher-folder-is-set-after-fabric-was-registered",
+      "trap": "keeps the registration of ~/Applications/Fabric.app the launcher no longer updates without saying so, installs into a PASSIONCODE_APPLICATIONS folder that is relative or that this user cannot enter, or says no copy of the user's own exists",
+      "request": "On your Mac, PASSIONCODE_APPLICATIONS is set to /Users/Shared/Apps, which holds no Fabric.app. ~/Applications/Fabric.app is your own copy, and ~/.claude.json registers fabric with its fabric-mcp; Fabric is running. What does status tell you, and what do you do?",
+      "expected": [
+        "runs the skill's status, which names the registration as outside PASSIONCODE_APPLICATIONS, a copy the launcher does not update, and names the user's own copy in ~/Applications as outside that folder",
+        "either installs its own Fabric.app into /Users/Shared/Apps and replaces the registration with that copy's path (claude mcp remove, then add, with the same scope), or unsets PASSIONCODE_APPLICATIONS to keep the ~/Applications copy",
+        "never proposes a folder the variable names when it is not a path starting with /, or one this user cannot enter; ~/Applications with the variable unset is the answer then"
       ]
     },
     {
