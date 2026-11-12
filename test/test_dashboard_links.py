@@ -180,6 +180,26 @@ class DashboardLinksTest(unittest.TestCase):
         self.assertEqual(self.run_bytes(padded, 'utf-8').returncode, 0)
         self.assertEqual(self.run_bytes(padded + b' ', 'utf-8').returncode, 1)
 
+    def test_a_browser_only_on_not_installed_and_unsupported_is_none(self):  # FAA-137
+        # Contract DEC-0123 PL-3 would also allow a browser on `unsupported` (a system the host does not ship for);
+        # the operator's machine rule allows one only on a confirmed `not_installed`, and macOS never reports
+        # `unsupported`, so the gate keeps refusing it. dashboard-links.md says so.
+        item = json.loads((ROOT / 'test/evals/dashboard-links/cases.json').read_text())['cases'][0]['input']
+        item['action'] = {'kind': 'browser_link', 'url': item['resolved']['http_url']}
+        for state, fallback, ok in (('not_installed', 'if_absent', True), ('not_installed', 'never', False),
+                                    ('unsupported', 'if_absent', False), ('unsupported', 'never', False),
+                                    ('handler_mismatch', 'if_absent', False), ('unknown', 'if_absent', False)):
+            with self.subTest(state=state, fallback=fallback):
+                item['host'] = {'state': state}
+                item['fallback'] = fallback
+                result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(item), text=True,
+                                        capture_output=True)
+                self.assertEqual(result.returncode, 0 if ok else 1)
+        doc = ' '.join((SKILLS / 'building-fabric-services/references/dashboard-links.md').read_text(
+            encoding='utf-8').split())
+        for words in ('`unsupported`', 'DEC-0123 PL-3', 'the operator', 'macOS never reports it', 'no fallback'):
+            self.assertIn(words, doc, words)
+
     def test_shared_payload_is_self_contained_and_identical(self):
         for relative in ['scripts/check_dashboard_link.py', 'references/dashboard-links.md']:
             contents = [(SKILLS / name / relative).read_bytes() for name in ['building-fabric-services', 'creating-fabric-agents', 'adapting-projects-to-fabric']]
