@@ -4,6 +4,29 @@
 
 Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
 
+### Added
+
+- **The accepted-socket proof** (FAA-292, FAA-272): a new L0 kit module, `fabric_socket_proof` /
+  `fabric-socket-proof.mjs`, finds the server end of a connection, or a listener on exactly 127.0.0.1, among this OS
+  account's own processes (DEC-0155 RT-2; Python reads libproc, calibrated on a pair of its own, with an lsof fallback;
+  Node reads `lsof -F pun`). `fabric_peer_owner` asks it on a restricted macOS table before the RT-3 vouch, and stands
+  alone without it. `PEER_OWNER_VERSION` is `1.3.1+kit.7`.
+
+### Changed
+
+- `pid_listens` takes an `owner` (this account by default, a uid, or None), and the LaunchDaemon check reads that one
+  lsof reader (FAA-286); a vouch is taken only for a connection that reached 127.0.0.1 (FAA-273).
+- One loopback host rule (`loopback_host` / `loopbackHost`) for `fabric_http` and `fabric_delegation`; Python's
+  `check_url` and `JwksCache` refuse a host `new URL` refuses and one Python's IDNA codec cannot write, up front. One
+  base URL rule for both OpenRouter clients: a tab or line break, a non-ASCII path, a backslash or a dot segment is a
+  `config` error in both (Node used to rewrite and send it), and attribution reads the host as dialed (FAA-187).
+- Hold records written before 0.83.0 are matched under both whitespace squashes; new records carry
+  `squash: "ecmascript"` (FAA-320). The connections reader finds URL schemes in linear time (FAA-322). A delegation key
+  set holding NaN or Infinity is refused (FAA-194). The adapter scaffold names `__pycache__/` and `*.pyc` in
+  `.gitignore` (FAA-190).
+- `AGENTS.md` carries item 1a, the course check before every change (fabric-workspace `knowledge/rules.md` §0).
+- Private terms in `CHANGELOG.md` and `docs/backlog.md` are replaced by neutral words; ids and findings stay (FAA-243).
+
 ## 0.82.0 (2026-11-12)
 
 Wave 4 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`). Kit modules
