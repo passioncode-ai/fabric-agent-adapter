@@ -825,7 +825,7 @@ class McpToolServer:
             gated = self._gate_action(action, "fabric.job.get", {"id": job_id, "inputResponses": {key: value}}, None, None,
                                       headers, tier, meta, caller, mandate)
             if not gated["ok"]:
-                return gated
+                return dict(gated, capability=private.get("capability"))  # the one read names the fault (FAA-186)
             records[key] = gated["record"]
         return {"ok": True, "records": records}
 
@@ -933,7 +933,7 @@ class McpToolServer:
                 if not inputs["ok"] and "invalid" in inputs:
                     return self._error(rid, -32602, inputs["invalid"])
                 if not inputs["ok"]:
-                    stored = self.jobs.private(str(arguments.get("id", ""))).get("capability")
+                    stored = inputs.get("capability")  # read once, by _gate_inputs (FAA-186)
                     self._fault(stored if isinstance(stored, str) else name, inputs)  # as the start heard it (FAA-179)
                     import fabric_delegation as _fd  # noqa: E402 - DL-19
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(inputs["refusal"], traceparent=span)}

@@ -98,6 +98,15 @@ gate = fd.delegation_gate(audience=..., jwks=keys, issuer=pin["iss"], effects=..
                           estate_context="org:acme-rehearsal")     # the context fabric_context started it for
 ```
 
+`fabric_context.context_gate_options(info, record)` / `contextGateOptions(info, record)` hands both back from the
+instance `hold_context_instance` started (FAA-150): `estate_context` always, and `issuer` when the record pins that
+organization; spread it after the estate issuer, so a personal instance keeps the estate's:
+
+```python
+gate = fd.delegation_gate(audience=..., jwks=keys, effects=..., estate=lambda: current,
+                          **{"issuer": estate_issuer, **fabric_context.context_gate_options(info, current)})
+```
+
 The `kid` is then certified only when exactly one machine lists it for that context with the published key and the
 revision pins the organization; omitted or `personal`, the personal `hubKey` is read. A context key never verifies a
 personal token, the personal key never an organization's, and a context that is neither (`Org:x`, a trailing space, a
@@ -218,7 +227,9 @@ const { dirs, instance, lock } = await holdContextInstance('example-agent', 'org
   kept; another context or instance, or unreadable, releases the lock and refuses. The folder never changes context.
 
 A refusal is one sentence on stderr naming the code and the context, never a record or grant value, and exit 78
-(`EXIT_CONTEXT_REFUSED`, EX_CONFIG; 75 stays "already running"). `ContextRefused` carries the code:
+(`EXIT_CONTEXT_REFUSED`, EX_CONFIG; 75 stays "already running"); a copy its supervisor started waits the lock's
+back-off (300 s in all) before that exit, so `KeepAlive` does not restart it every 10 s (FAA-279). `ContextRefused`
+carries the code:
 
 | Code | When |
 |---|---|

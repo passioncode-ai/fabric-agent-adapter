@@ -180,6 +180,23 @@ class JoinTests(HubTestCase):
         self.client.join_board(PROJECT, self.cred)  # this account's own hub, read from the real table
         self.assertEqual(self.hub.bindings_seen, ["fabric.board.join"])
 
+    def test_a_refusal_keeps_the_owners_reason(self):
+        """FAA-272: the hub client named only `unknown`; it carries the owner's reason, and a restricted table (which
+        never clears) is marked `table-restricted` in data.reason and not retryable. The code stays `foreign-user`,
+        the pinned contract's HA-2 state name (FAA-273 item 19)."""
+        po = importlib.import_module("fabric_peer_owner")
+        restricted = po.Owner(po.UNKNOWN, None, None, "netstat", "table-restricted: this interpreter sees no other process's sockets")
+        for owner, reason, retryable in ((restricted, "table-restricted", False),
+                                         (po.Owner(po.UNKNOWN, None, None, "sysctl", "no-row"), "no-row", True),
+                                         (po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "sysctl"), "another-account", True)):
+            with self.subTest(reason), unittest.mock.patch.object(po, "server_end", return_value=owner):
+                with self.assertRaises(fh.HubError) as cm:
+                    self.client.join_board(PROJECT, self.cred)
+                self.assertEqual((cm.exception.code, cm.exception.retryable, cm.exception.data.get("reason")),
+                                 ("foreign-user", retryable, reason))
+                self.assertIn(reason, str(cm.exception))
+        self.assertEqual(self.hub.bindings_seen, [], "no bearer went out")
+
     def test_the_credential_is_never_sent_when_the_pid_is_dead(self):
         client = fh.HubClient(self.root, alive=lambda pid: False)
         with self.assertRaises(fh.HubError) as cm:

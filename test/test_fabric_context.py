@@ -153,6 +153,46 @@ class Dirs(TempHome):
             fabric_paths.instance_dirs("Bad Id", "default")
 
 
+class GateOptions(unittest.TestCase):
+    """FAA-150: the delegation gate of an instance is built from its context, so an organization instance refuses a
+    token the personal hub key signed (DL-14a, DEC-0128) without wiring `estate_context` by hand."""
+    HUB = json.loads((ROOT / "test/fixtures/contract/hub-key-vectors.json").read_text(encoding="utf-8"))
+
+    def gate(self, info, case, estate_issuer):
+        dl = importlib.import_module("fabric_delegation")
+        options = {"issuer": estate_issuer, **fc.context_gate_options(info, case["estate"])}
+        return dl.delegation_gate(audience="example-media", jwks=self.HUB["contextJwks"], effects={"media.render": "draft"},
+                                  clock=lambda: case["now"], estate=lambda: case["estate"], **options)
+
+    def test_an_organization_instance_takes_its_context_and_its_pins_issuer(self):
+        cases = {c["name"]: c for c in self.HUB["contextVerifier"]}
+        org_token = cases["an organization token in its own context"]
+        personal_token = cases["a personal token in an organization context"]
+        estate_issuer = personal_token["issuer"]
+        org = {"context": "org:org_3fh9p1zc", "kind": "org", "org": "org_3fh9p1zc"}  # as context_instance answers it
+        self.assertEqual(fc.context_gate_options(org, org_token["estate"]),
+                         {"estate_context": "org:org_3fh9p1zc", "issuer": org_token["issuer"]})
+        got = self.gate(org, org_token, estate_issuer)("media.render", {"Fabric-Delegation": org_token["token"]})
+        self.assertEqual((got["ok"], got["kid"]), (True, "hub-ctx-a-1"))
+        got = self.gate(org, personal_token, estate_issuer)("media.render", {"Fabric-Delegation": personal_token["token"]})
+        self.assertEqual((got["ok"], got["code"]), (False, "unauthenticated"), "the personal hub key is refused")
+        personal = fc.context_instance(SERVICE, "personal")
+        self.assertEqual(fc.context_gate_options(personal, org_token["estate"]), {"estate_context": "personal"})
+        mine = cases["a personal token in the personal context"]
+        got = self.gate(personal, mine, estate_issuer)("media.render", {"Fabric-Delegation": mine["token"]})
+        self.assertEqual((got["ok"], got["kid"]), (True, "hub-m-4c1e-1"))
+        got = self.gate(personal, org_token, estate_issuer)("media.render", {"Fabric-Delegation": org_token["token"]})
+        self.assertFalse(got["ok"], "an organization's token is refused by the personal instance")
+
+    def test_an_unpinned_organization_keeps_the_issuer_the_service_names(self):
+        org = {"context": "org:org_unpinned", "kind": "org", "org": "org_unpinned"}
+        self.assertEqual(fc.context_gate_options(org, {"organizations": []}), {"estate_context": "org:org_unpinned"})
+        self.assertEqual(fc.context_gate_options(org), {"estate_context": "org:org_unpinned"})
+        for bad in (None, {}, {"context": "Org:x"}, "personal"):
+            with self.subTest(bad=bad), self.assertRaises(fc.ContextRefused):
+                fc.context_gate_options(bad)
+
+
 class Hold(TempHome):
     def hold(self, context, **kwargs):
         options = dict(NO_SUPERVISOR, **kwargs)
@@ -217,6 +257,49 @@ class Hold(TempHome):
                 self.assertNotIn("urn:fabric:share", err, "never a grant value")
                 self.assertNotIn("machine-a", err, "never a record value")
         self.assertEqual(self.created(), ["home"], "nothing created before a refusal")
+
+    def test_a_supervised_refusal_backs_off_before_exiting_78(self):
+        """FAA-279: under KeepAlive an exit 78 at once is a respawn every ThrottleInterval (10 s), forever; a supervised
+        copy waits the lock's back-off (0.5 s doubling to 30 s, 300 s in all) before it exits; one by hand does not."""
+        slept, now = [], [0.0]
+        def sleep(seconds):
+            slept.append(seconds)
+            now[0] += seconds
+        for supervised in ({"env": {"FABRIC_SERVICE_SUPERVISOR": "launchd"}, "argv": []},
+                           {"env": {}, "argv": ["service.py", "--fabric-supervisor=systemd"]}):
+            slept.clear()
+            now[0] = 0.0
+            with self.subTest(supervised):
+                held, err, code = self.hold("org:acme-rehearsal", wait_seconds=None, sleep=sleep, clock=lambda: now[0],
+                                            **supervised)
+                self.assertIsNone(held)
+                self.assertEqual(code, 78)
+                self.assertEqual(slept[:7], [0.5, 1, 2, 4, 8, 16, 30])
+                self.assertAlmostEqual(sum(slept), fabric_lock.LOCK_WAIT_SUPERVISED_SECONDS)
+                self.assertIn("record-required", err)
+                self.assertIn("300 s", err)
+                self.assertEqual(len(err.strip().splitlines()), 1, "one sentence")
+        slept.clear()
+        held, err, code = self.hold("org:acme-rehearsal", wait_seconds=None, sleep=sleep, clock=lambda: now[0])
+        self.assertEqual((code, slept), (78, []), "by hand: at once")
+        self.assertNotIn("Waiting", err)
+        self.assertEqual(self.created(), ["home"], "nothing created while it waits")
+
+    def test_a_supervised_context_mismatch_backs_off_with_the_lock_released(self):
+        data = fabric_paths.service_dirs(SERVICE)["data"]
+        data.mkdir(parents=True)
+        (data / "fabric-context.json").write_text(json.dumps({"service": SERVICE, "instance": "default",
+                                                               "context": "org:other"}), encoding="utf-8")
+        released = []
+        def sleep(seconds):
+            if not released:  # the lock is free while it waits
+                fabric_lock.InstanceLock(data).acquire().release()
+                released.append(seconds)
+        held, err, code = self.hold("personal", wait_seconds=2, sleep=sleep, clock=iter(range(100)).__next__,
+                                    env={"FABRIC_SERVICE_SUPERVISOR": "launchd"})
+        self.assertEqual(code, 78)
+        self.assertEqual(released, [0.5])
+        self.assertIn("context-mismatch", err)
 
     def test_a_folder_never_changes_context(self):
         data = fabric_paths.service_dirs(SERVICE)["data"]

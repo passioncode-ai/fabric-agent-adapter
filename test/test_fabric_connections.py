@@ -49,6 +49,40 @@ class Vectors(unittest.TestCase):
                 fc.connections_view(value)
 
 
+class IdnaHosts(unittest.TestCase):
+    """FAA-98: a non-ASCII host is refused only where every Node from 20 to 26 refuses it (the closed side stays)."""
+    TABLES = json.loads((Path(__file__).resolve().parent / "fixtures/idna/idna-tables.json").read_text(encoding="utf-8"))
+
+    def test_the_idna_tables_are_the_measured_ones(self):
+        self.assertEqual([list(r) for r in fc._IDNA_DISALLOWED], self.TABLES["disallowed"])
+        self.assertEqual([list(r) for r in fc._IDNA_IGNORED], self.TABLES["ignored"])
+        self.assertEqual(self.TABLES["nodes"][0][:3], "v20")
+        for table in (fc._IDNA_DISALLOWED, fc._IDNA_IGNORED):
+            self.assertEqual(list(table), sorted(table))
+            self.assertTrue(all(a <= b for a, b in table))
+
+    def test_refused_for_certain(self):
+        for host in ("\ue000", "a\U000f0000b", "a\u0085b", "a\u00a0b", "a\uff0fb", "a\u2488b", "\u00ad", "\u00ad\u200b",
+                     "\u0301a", "a.\u0301", "a\u200db", "\u200cb", "a\u05d0b", "\u0628a", "\u05d0\u0661\u06f1",
+                     "\uff19\uff19\uff19.\uff11", "a.\uff11", "%ef%bc%8f"):
+            with self.subTest(host=ascii(host)):
+                self.assertFalse(fc._domain_ok(host))
+
+    def test_left_to_the_doubt_or_valid(self):
+        for host in ("b\u00fccher", "\u65e5\u672c", "\u05d0\u05d1", "a.\u05d0", "1.\u05d0", "\u0660",
+                     "\u0915\u094d\u200d\u0937", "\u0628a\u200c\u0627", "\u05d0a\u094d\u200d", "a\u061db",
+                     "\u0345", "a.\u17b4", "\uff11\uff12\uff17.\uff10.\uff10.\uff11", "\u3002", "\U000e0100a",
+                     "xn--bcher-kva\u00e9", "a\U0001f600b"):
+            with self.subTest(host=ascii(host)):
+                self.assertTrue(fc._domain_ok(host))
+
+    def test_a_mapped_address_is_read_as_one(self):
+        """A host UTS46 maps to ASCII is read by the ASCII rules: a credential in `https://u:p@１２７.０.０.１` is read."""
+        view = fc.connections_view({"extensions": {KEY: {"connections": [
+            {"id": "a", "kind": "connector", "target": "https://u:p@\uff11\uff12\uff17.\uff10.\uff10.\uff11/", "state": "ok"}]}}})
+        self.assertTrue(view["reported"])
+
+
 class DateTime(unittest.TestCase):
     """ajv-formats `date-time`, full mode: what the contract's validator accepts for `lastAt`."""
 

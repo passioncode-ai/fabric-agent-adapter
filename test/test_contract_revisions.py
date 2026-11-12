@@ -185,7 +185,8 @@ class CompiledRevisionTests(unittest.TestCase):
                 closure(ref, seen)
             return seen
 
-        for name in ('fabric-package.schema.json', 'share-registration.schema.json'):
+        for name in ('fabric-package.schema.json', 'share-registration.schema.json',
+                     'service-channel-agent-extension.schema.json'):  # FAA-250 (5): the probe's copy too
             with self.subTest(schema=name):
                 allowed = set()
                 for reached in closure(name, set()):

@@ -220,6 +220,9 @@ class DefaultTransport(unittest.TestCase):
                 with self.assertRaises(fh.HttpError) as cm:
                     fh.request("GET", self.base + "/ok", headers={"Authorization": "Bearer synthetic"}, deadline_s=10)
                 self.assertEqual(cm.exception.kind, "foreign-user")
+                # FAA-272: the reason travels, and a restricted table is told apart from another account's listener
+                self.assertEqual(cm.exception.reason, po.TABLE_RESTRICTED if (owner.reason or "").startswith(po.TABLE_RESTRICTED)
+                                 else (owner.reason or owner.kind))
                 self.assertNotIn("synthetic", str(cm.exception))
                 self.assertEqual(checked.call_count, 1)  # refused at once, not retried
         self.assertEqual(len(Handler.seen), before)

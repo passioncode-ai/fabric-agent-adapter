@@ -41,7 +41,7 @@ when the server itself takes an option of that name. `--env` belongs to a stdio 
 writer does not set it until Fabric reads it. An argument that carries a credential is refused
 (LC-21, FAC-SEM-057): a key goes in `env` as a `secret-ref:<name>`, never in argv.
 
-It refuses, with one sentence that never quotes a value:
+It refuses, with one sentence that never quotes a credential (it names the path and the URIs at fault):
 
 - a manifest that does not resolve, or whose `provider.id` is not the entry's
   `providerId`: the two URIs are compared as URIs (FAC-SEM-014);

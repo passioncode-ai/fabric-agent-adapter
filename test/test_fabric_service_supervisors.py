@@ -131,6 +131,45 @@ class SystemdUnitTests(unittest.TestCase):
             self.assertFalse(path.exists())
             self.assertEqual(run.calls, [["systemctl", "--user", "disable", "--now", "example-agent.default.service"], ["systemctl", "--user", "daemon-reload"]])
 
+    def test_install_polls_until_this_accounts_listener_answers(self):
+        """FAA-253: with `origin`, systemd_install polls the well-known answer as launchd_install does (the pinned
+        contract's Install row: every supervisor polls) and refuses another account's listener."""
+        name = "example-agent.default.service"
+        me = {"service": {"id": "example-agent", "instance": "default"}}
+        with tempfile.TemporaryDirectory() as temp:
+            unit_dir = Path(temp) / "systemd/user"
+            answers = [None, {"service": {"id": "other", "instance": "default"}}, me]
+            reads, slept = [], []
+            def read(origin):
+                reads.append(origin)
+                return answers.pop(0)
+            done = fs.systemd_install(name, self.unit(), unit_dir=unit_dir, run=Recorder(), system="linux",
+                                      origin="http://127.0.0.1:8123", service_id="example-agent",
+                                      fetch_well_known=read, sleep=slept.append)
+            self.assertEqual(done, unit_dir / name)
+            self.assertEqual(reads, ["http://127.0.0.1:8123"] * 3)
+            self.assertEqual(slept, [0.5, 0.5])
+            now = [0.0]
+            def tick(seconds):
+                now[0] += seconds
+            foreign = lambda origin: fs.ForeignUserAnswer("foreign-user: uid 502 listens")
+            with self.assertRaisesRegex(fs.ServiceError, "not this service's: foreign-user: uid 502"):
+                fs.systemd_install(name, self.unit(), unit_dir=unit_dir, run=Recorder(), system="linux",
+                                   origin="http://127.0.0.1:8123", service_id="example-agent", timeout=2,
+                                   fetch_well_known=foreign, sleep=tick, clock=lambda: now[0])
+            with self.assertRaisesRegex(fs.ServiceError, "did not answer as example-agent.default within 2 s"):
+                fs.systemd_install(name, self.unit(), unit_dir=unit_dir, run=Recorder(), system="linux",
+                                   origin="http://127.0.0.1:8123", service_id="example-agent", timeout=2,
+                                   fetch_well_known=lambda origin: None, sleep=tick, clock=lambda: now[0])
+            reads.clear()
+            fs.systemd_install(name, self.unit(), unit_dir=unit_dir, run=Recorder(out={"is-enabled": "disabled\n"}),
+                               system="linux", origin="http://127.0.0.1:8123", service_id="example-agent",
+                               fetch_well_known=read)
+            self.assertEqual(reads, [], "a unit the operator switched off is not started, so nothing is polled")
+            with self.assertRaisesRegex(fs.ServiceError, "service_id"):
+                fs.systemd_install(name, self.unit(), unit_dir=unit_dir, run=Recorder(), system="linux",
+                                   origin="http://127.0.0.1:8123")
+
     def test_a_failed_enable_is_reported_and_off_linux_is_refused(self):
         with tempfile.TemporaryDirectory() as temp:
             with self.assertRaises(fs.ServiceError):
@@ -212,6 +251,28 @@ class TaskSchedulerTests(unittest.TestCase):
             fs.task_install("\\PassionCode\\x", self.task(), run=Recorder(), system="linux")
         with self.assertRaises(fs.ServiceError):
             fs.task_install("\\PassionCode\\x", self.task(), run=Recorder(fail={"/Create"}), system="win32")
+
+    def test_install_polls_until_this_accounts_listener_answers(self):
+        """FAA-253: with `origin`, task_install polls as launchd_install does; a task kept off is not polled."""
+        task = "\\PassionCode\\example-agent.default"
+        me = {"service": {"id": "example-agent", "instance": "default"}}
+        answers, slept = [None, me], []
+        got = fs.task_install(task, self.task(), run=Recorder(fail={"/Query"}), system="win32",
+                              origin="http://127.0.0.1:8123", service_id="example-agent",
+                              fetch_well_known=lambda origin: answers.pop(0), sleep=slept.append)
+        self.assertEqual(got, me)
+        self.assertEqual((answers, slept), ([], [0.5]))
+        now = [0.0]
+        def tick(seconds):
+            now[0] += seconds
+        with self.assertRaisesRegex(fs.ServiceError, "not this service's"):
+            fs.task_install(task, self.task(), run=Recorder(fail={"/Query"}), system="win32", origin="http://127.0.0.1:8123",
+                            service_id="example-agent", timeout=1, sleep=tick, clock=lambda: now[0],
+                            fetch_well_known=lambda origin: fs.ForeignUserAnswer("foreign-user: S-1-5-21-x"))
+        disabled = self.task().replace("<Enabled>true</Enabled>\n    <ExecutionTimeLimit>", "<Enabled>false</Enabled>\n    <ExecutionTimeLimit>")
+        self.assertIsNone(fs.task_install(task, self.task(), run=Recorder(out={"/Query": disabled}), system="win32",
+                                          origin="http://127.0.0.1:8123", service_id="example-agent",
+                                          fetch_well_known=lambda origin: self.fail("polled a task kept off")))
 
     @unittest.skipUnless(os.name == "nt", "needs Windows (the windows CI job)")
     def test_task_scheduler_accepts_the_task(self):

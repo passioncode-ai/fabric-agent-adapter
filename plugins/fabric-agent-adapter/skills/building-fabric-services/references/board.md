@@ -39,7 +39,8 @@ refuses it with `invalid_arguments` (FAA-244).
 3. Each connection joins with `fabric.board.join {projectId}` (`join_board` / `joinBoard`). It re-reads `hub.json`,
    checks the pid it names is alive, tells the owner of the door's listener from the socket table (DEC-0154 HA-2:
    another OS account's process, or one whose owner cannot be told, is `HubError` code `foreign-user`, retryable, with
-   nothing sent; a retry never clears a restricted macOS table, `table-restricted` in protocol.md, FAA-272), and only then sends the credential (a session already running carries that refusal as `BoardError` code
+   nothing sent; a restricted macOS table, which a retry never clears, is `data.reason` `table-restricted` and not
+   retryable, protocol.md, FAA-272), and only then sends the credential (a session already running carries that refusal as `BoardError` code
    `foreign-user`, one of `SESSION_CODES`, to `board.down` with reason `foreign-user` and a sentence that says nothing
    was sent, never `unreachable`'s "a write may have been stored", FAA-252). A missing grant is `HubError` code
    `not_authorized` whose `data.ask` holds the arguments to ask with.
@@ -214,7 +215,8 @@ capability's enroll or replace is settled on its own: a refusal of that capabili
 `invalid_arguments`, any code that is not about the board session) leaves it `retry`, asked again alone after 15 s,
 30 s, doubling to 15 minutes, with one `board.slot.refused` event (warning; said again if it is refused again after
 the slot was held); its accepted work waits `lapsed` and goes back
-by a transfer once the slot is held. The capabilities after it are recovered as before. A refusal of the board session
+by a transfer once the slot is held; `idempotency_window_expired` also reads `com.status` first, so the retry goes
+under the epoch Fabric names now (FAA-186). The capabilities after it are recovered as before. A refusal of the board session
 (`unreachable`, `session-ended`, `not_available`, `not_authorized` and the other codes in `SESSION_CODES`) leaves the
 rest `retry` too, says no `board.slot.refused`, and goes to the responder's fault, which says it by code:
 `board.access.needed` for `not_authorized`, `authority_changed` and `credential` (the session is left),

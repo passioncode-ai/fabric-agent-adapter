@@ -581,6 +581,22 @@ class RestrictedTable(unittest.TestCase):
         self.assertEqual(P.parse_lsof_listeners("p78564\nf4\nn127.0.0.1:47480\nn*:5000\nn[::1]:7\nnoise\n"),
                          [("127.0.0.1", 47480), ("*", 5000), ("::1", 7)])
 
+    def test_only_ascii_digits_are_numbers(self):
+        """FAA-273 (4): `str.isdigit` takes `٤٧٤٨٠` and `²`, which Node's [0-9] refuses; the twins read alike."""
+        self.assertEqual(P.parse_lsof_listeners("n127.0.0.1:\u0664\u0667\u0664\u0668\u0660\nn*:5\u00b2\nn*:80\n"), [("*", 80)])
+        self.assertIsNone(P.parse_ps_uid("\u0665\u0660\u0661"))
+        self.assertIsNone(P.parse_ps_uid("\uff15\uff10\uff11"))
+        self.assertEqual(P.parse_ps_uid(" 501\n"), 501)
+
+    def test_a_header_only_netstat_is_a_restricted_table(self):
+        """FAA-273 (3): the caller's own connection is in any table it can see, so a netstat with its header and no tcp
+        row is the restricted table, not `no-row`."""
+        header = ("Active Internet connections (including servers)\n"
+                  "Proto Recv-Q Send-Q  Local Address          Foreign Address        (state)      rhiwat  shiwat    pid   epid  state  options  gencnt  flags  flags1 usscnt rtncnt fltrs process:pid\n")
+        with self.assertRaises(P.TableUnreadable) as caught:
+            P.parse_netstat(header)
+        self.assertTrue(str(caught.exception).startswith(P.TABLE_RESTRICTED))
+
     def test_a_table_without_the_childs_listener_fails_calibration(self):
         # The child check runs on macOS alone; elsewhere a pipe cannot be waited on, and that proves nothing (None).
         expected = (False,) if sys.platform != "win32" else (False, None)
@@ -700,6 +716,12 @@ class RestrictedTable(unittest.TestCase):
         with mock.patch.object(sup, "_launchctl", return_value=done(0, "gui/501/a.b = {\n\tstate = waiting\n}\n")):
             self.assertIsNone(sup.launchd_pid("a.b"))
         with mock.patch.object(sup, "_launchctl", return_value=done(113, "")):
+            self.assertIsNone(sup.launchd_pid("a.b"))
+        # FAA-273 (2) and (4): a launchctl that hangs is a pid not read, never a TimeoutExpired out of an install's
+        # poll; a pid in other digits is no pid, as Node's [0-9] reads it.
+        with mock.patch.object(sup, "_launchctl", side_effect=subprocess.TimeoutExpired(["launchctl"], 30)):
+            self.assertIsNone(sup.launchd_pid("a.b"))
+        with mock.patch.object(sup, "_launchctl", return_value=done(0, "gui/501/a.b = {\n\tpid = \u0664\u0662\n}\n")):
             self.assertIsNone(sup.launchd_pid("a.b"))
 
     @unittest.skipUnless(sys.platform == "darwin" and os.path.exists(P.LSOF), "lsof on macOS")

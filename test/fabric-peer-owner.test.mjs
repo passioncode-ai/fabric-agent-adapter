@@ -261,6 +261,16 @@ test('the hub client sends no bearer to a door another account holds, and does t
   assert.deepEqual(received, ['Bearer synthetic']);
 });
 
+test('only ASCII digits are numbers, and a header-only netstat is a restricted table (FAA-273 items 3 and 4)', () => {
+  assert.deepEqual(po.parseLsofListeners('n127.0.0.1:\u0664\u0667\u0664\u0668\u0660\nn*:5\u00b2\nn*:80\n'), [['*', 80]]);
+  assert.equal(po.parsePsUid('\u0665\u0660\u0661'), null);
+  assert.equal(po.parsePsUid('\uff15\uff10\uff11'), null);
+  assert.equal(po.parsePsUid(' 501\n'), 501);
+  const header = 'Active Internet connections (including servers)\n'
+    + 'Proto Recv-Q Send-Q  Local Address          Foreign Address        (state)      rhiwat  shiwat    pid   epid  state  options  gencnt  flags  flags1 usscnt rtncnt fltrs process:pid\n';
+  assert.throws(() => po.parseNetstat(header), (err) => err instanceof po.TableUnreadable && err.message.startsWith(po.TABLE_RESTRICTED));
+});
+
 test('a restricted table answers table-restricted, and a vouched pid that listens passes (FAA-267)', async (t) => {
   assert.throws(() => po.parseNetstat(''), (err) => err instanceof po.TableUnreadable && err.message.startsWith(po.TABLE_RESTRICTED));
   assert.deepEqual(po.parseLsofListeners('p78564\nf4\nn127.0.0.1:47480\nn*:5000\nn[::1]:7\nnoise\n'),

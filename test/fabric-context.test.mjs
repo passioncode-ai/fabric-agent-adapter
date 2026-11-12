@@ -8,9 +8,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { INSTANCE, ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
 import * as fc from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-context.mjs';
+import { delegationGate } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs';
 import { descriptorPath } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 import { placementGrantFindings } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-estate.mjs';
-import { abstractNames, EXIT_ALREADY_RUNNING, InstanceLock } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+import { abstractNames, EXIT_ALREADY_RUNNING, InstanceLock, LOCK_WAIT_SUPERVISED_SECONDS } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
 import { instanceDirs, serviceDirs } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-paths.mjs';
 import { instanceShareGrant } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-share.mjs';
 import { parseRfc3339Ms } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-time.mjs';
@@ -180,6 +181,30 @@ test('a refusal exits 78 with one sentence and creates nothing', async (t) => {
   assert.deepEqual(created(), ['home'], 'nothing created before a refusal');
 });
 
+test('a supervised refusal backs off before it exits 78 (FAA-279)', async (t) => {
+  const { created } = tempHome(t);
+  const slept = [];
+  let now = 0;
+  const sleep = async (seconds) => { slept.push(seconds); now += seconds; };
+  for (const marker of [{ env: { FABRIC_SERVICE_SUPERVISOR: 'launchd' }, argv: [] }, { env: {}, argv: ['service.mjs', '--fabric-supervisor=systemd'] }]) {
+    slept.length = 0;
+    now = 0;
+    const { code, err } = await hold('org:acme-rehearsal', { waitSeconds: undefined, sleep, clock: () => now, ...marker });
+    assert.equal(code, 78);
+    assert.deepEqual(slept.slice(0, 7), [0.5, 1, 2, 4, 8, 16, 30]);
+    assert.ok(Math.abs(slept.reduce((a, b) => a + b, 0) - LOCK_WAIT_SUPERVISED_SECONDS) < 1e-9);
+    assert.match(err, /record-required/);
+    assert.match(err, /300 s/);
+    assert.equal(err.trim().split('\n').length, 1, 'one sentence');
+  }
+  slept.length = 0;
+  const byHand = await hold('org:acme-rehearsal', { waitSeconds: undefined, sleep, clock: () => now });
+  assert.equal(byHand.code, 78);
+  assert.deepEqual(slept, [], 'by hand: at once');
+  assert.doesNotMatch(byHand.err, /Waiting/);
+  assert.deepEqual(created(), ['home'], 'nothing created while it waits');
+});
+
 test('a folder never changes context; the lock is released before the exit', { skip: noLinuxLock }, async (t) => {
   tempHome(t);
   const data = serviceDirs(SERVICE).data;
@@ -221,4 +246,32 @@ test('instanceShareGrant answers and never throws; placementGrantFindings is pub
   assert.deepEqual(findings.map((f) => [f.code, f.instancePath]), [['FAC-SEM-111', '/grant']]);
   assert.deepEqual(placementGrantFindings(RECORD, { agentRef: A }), []);
   assert.deepEqual(placementGrantFindings(null, null), [], 'answers, never throws');
+});
+
+// FAA-150: the delegation gate of an instance is built from its context (DL-14a, DEC-0128).
+const HUB = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/hub-key-vectors.json', import.meta.url), 'utf8'));
+test('an organization instance takes its context and its pin\'s issuer into its delegation gate', async () => {
+  const cases = Object.fromEntries(HUB.contextVerifier.map((c) => [c.name, c]));
+  const orgToken = cases['an organization token in its own context'];
+  const personalToken = cases['a personal token in an organization context'];
+  const estateIssuer = personalToken.issuer;
+  const gate = (info, c) => delegationGate({ audience: 'example-media', jwks: HUB.contextJwks, effects: { 'media.render': 'draft' },
+    clock: () => c.now, estate: () => c.estate, issuer: estateIssuer, ...fc.contextGateOptions(info, c.estate) });
+  const org = { context: 'org:org_3fh9p1zc', kind: 'org', org: 'org_3fh9p1zc' }; // as contextInstance answers it
+  assert.deepEqual(fc.contextGateOptions(org, orgToken.estate), { estateContext: 'org:org_3fh9p1zc', issuer: orgToken.issuer });
+  let got = await gate(org, orgToken)('media.render', { 'Fabric-Delegation': orgToken.token });
+  assert.deepEqual([got.ok, got.kid], [true, 'hub-ctx-a-1']);
+  got = await gate(org, personalToken)('media.render', { 'Fabric-Delegation': personalToken.token });
+  assert.deepEqual([got.ok, got.code], [false, 'unauthenticated'], 'the personal hub key is refused');
+  const personal = fc.contextInstance(SERVICE, 'personal');
+  assert.deepEqual(fc.contextGateOptions(personal, orgToken.estate), { estateContext: 'personal' });
+  const mine = cases['a personal token in the personal context'];
+  got = await gate(personal, mine)('media.render', { 'Fabric-Delegation': mine.token });
+  assert.deepEqual([got.ok, got.kid], [true, 'hub-m-4c1e-1']);
+  got = await gate(personal, orgToken)('media.render', { 'Fabric-Delegation': orgToken.token });
+  assert.equal(got.ok, false, "an organization's token is refused by the personal instance");
+  const unpinned = { context: 'org:org_unpinned', kind: 'org', org: 'org_unpinned' };
+  assert.deepEqual(fc.contextGateOptions(unpinned, { organizations: [] }), { estateContext: 'org:org_unpinned' });
+  assert.deepEqual(fc.contextGateOptions(unpinned), { estateContext: 'org:org_unpinned' });
+  for (const bad of [null, {}, { context: 'Org:x' }, 'personal']) assert.throws(() => fc.contextGateOptions(bad), fc.ContextRefused, JSON.stringify(bad));
 });

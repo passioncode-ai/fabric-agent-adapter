@@ -115,12 +115,33 @@ export function systemdUnit(unit, programArguments, { workingDirectory, environm
 
 const systemdDir = () => path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'systemd', 'user');
 
+// FAA-253: the well-known answer at `origin`, polled until this OS account's listener answers as serviceId.instance, as
+// launchdInstall does (the pinned contract's Install row: every supervisor polls). Another account's listener, or one
+// whose owner cannot be told, is never a successful install (DEC-0154 HA-2).
+async function pollInstalled(origin, { serviceId, instance = 'default', timeout = 40, fetchWellKnown = wellKnownOf, sleep = pause, clock = Date.now } = {}) {
+  if (!serviceId) throw new ServiceError(`polling the install at ${origin} needs the serviceId it must answer as`);
+  const deadline = clock() + Math.max(0, timeout) * 1000;
+  let foreign = null;
+  for (;;) {
+    const doc = await fetchWellKnown(origin);
+    foreign = doc instanceof ForeignUserAnswer ? doc.reason : null;
+    if (!foreign && doc?.service?.id === serviceId && doc?.service?.instance === instance) return doc;
+    if (clock() >= deadline) break;
+    await sleep(500);
+  }
+  if (foreign) throw new ServiceError(`${origin} is not this service's: ${foreign} (DEC-0154 HA-2); the port is another OS account's or its owner cannot be told.`);
+  throw new ServiceError(`${origin} did not answer as ${serviceId}.${instance} within ${timeout} s; read its log.`);
+}
+
 /**
  * Write the user unit, enable it so it comes back after a login, and (re)start it so the new unit is what runs.
  * The operator's intent wins (LC-14): a unit already installed and disabled stays off — the file is rewritten, so the
- * new version is what starts once they enable it — unless `forceEnable` (the operator asked for it on).
+ * new version is what starts once they enable it — unless `forceEnable` (the operator asked for it on). With `origin`
+ * (and `serviceId`) it then polls the well-known answer as launchdInstall does and resolves to the unit file once this
+ * account's listener answers (FAA-253); without `origin` it stays synchronous.
  */
-export function systemdInstall(unit, text, { unitDir = systemdDir(), run = defaultRun, platform = process.platform, forceEnable = false } = {}) {
+export function systemdInstall(unit, text, { unitDir = systemdDir(), run = defaultRun, platform = process.platform, forceEnable = false,
+  origin, serviceId, instance, timeout, fetchWellKnown, sleep, clock } = {}) {
   if (platform !== 'linux') throw new ServiceError('systemd is the supervisor on Linux only.');
   if (!UNIT.test(unit)) throw new ServiceError(`unit must match ${UNIT.source}`);
   fs.mkdirSync(unitDir, { recursive: true });
@@ -128,10 +149,14 @@ export function systemdInstall(unit, text, { unitDir = systemdDir(), run = defau
   const state = fs.existsSync(file) ? String(run(['systemctl', '--user', 'is-enabled', unit])?.stdout ?? '').trim() : '';
   atomicWrite(file, text, 0o644);
   checkRun(run(['systemctl', '--user', 'daemon-reload']), 'systemctl --user daemon-reload');
-  if (state === 'disabled' && !forceEnable) return file;
-  checkRun(run(['systemctl', '--user', 'enable', unit]), 'systemctl --user enable');
-  checkRun(run(['systemctl', '--user', 'restart', unit]), 'systemctl --user restart');
-  return file;
+  const started = !(state === 'disabled' && !forceEnable);
+  if (started) {
+    checkRun(run(['systemctl', '--user', 'enable', unit]), 'systemctl --user enable');
+    checkRun(run(['systemctl', '--user', 'restart', unit]), 'systemctl --user restart');
+  }
+  if (origin === undefined) return file;
+  // FAA-253: with an origin it resolves once this account's listener answers; a unit kept off is not polled.
+  return started ? pollInstalled(origin, { serviceId, instance, timeout, fetchWellKnown, sleep, clock }).then(() => file) : Promise.resolve(file);
 }
 
 /** Stop it and keep it off across logins (`disable --now`), then remove the unit. */
@@ -203,9 +228,12 @@ const TASK_DISABLED = /<Settings>(?:(?!<\/Settings>)[\s\S])*<Enabled>false<\/Ena
 
 /**
  * Create (or replace) the task from its XML without administrator rights, then (re)start it so the new definition
- * is what runs. A task already installed and disabled stays off (LC-14) unless `forceEnable`.
+ * is what runs. A task already installed and disabled stays off (LC-14) unless `forceEnable`. With `origin` (and
+ * `serviceId`) it then polls the well-known answer as launchdInstall does and resolves to it (FAA-253); a task kept off
+ * resolves to undefined, unpolled. Without `origin` it stays synchronous.
  */
-export function taskInstall(task, xmlText, { run = defaultRun, platform = process.platform, forceEnable = false } = {}) {
+export function taskInstall(task, xmlText, { run = defaultRun, platform = process.platform, forceEnable = false,
+  origin, serviceId, instance, timeout, fetchWellKnown, sleep, clock } = {}) {
   if (platform !== 'win32') throw new ServiceError('Task Scheduler is the supervisor on Windows only.');
   const query = run(['schtasks', '/Query', '/TN', task, '/XML']);
   const existed = query?.status === 0;
@@ -221,10 +249,11 @@ export function taskInstall(task, xmlText, { run = defaultRun, platform = proces
   }
   if (keepOff) {
     checkRun(run(['schtasks', '/Change', '/TN', task, '/DISABLE']), 'schtasks /Change /DISABLE');
-    return;
+    return origin === undefined ? undefined : Promise.resolve(undefined);
   }
   if (existed) run(['schtasks', '/End', '/TN', task]);
   checkRun(run(['schtasks', '/Run', '/TN', task]), 'schtasks /Run');
+  return origin === undefined ? undefined : pollInstalled(origin, { serviceId, instance, timeout, fetchWellKnown, sleep, clock });
 }
 
 /** End the running task, then delete it. */

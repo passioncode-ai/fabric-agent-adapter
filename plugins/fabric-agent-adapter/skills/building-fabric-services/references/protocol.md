@@ -241,8 +241,9 @@ IPv4 wildcard for a LaunchAgent's installer, exactly `127.0.0.1` for a LaunchDae
 the contract's ruling on vouching is CT-261.
 
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
-a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`),
-`fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user`, never retried),
+a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`, its
+`data.reason` and sentence the owner's reason: `table-restricted`, then not retryable, or the owner's kind or `no-row`, FAA-272),
+`fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user` with the same `reason`, never retried),
 `check_dashboard_layout.mjs` before a local login code, and the launchd installers' poll (a listener of another account
 is never a successful install, except a LaunchDaemon's job as its root installer proves it; the systemd and Task Scheduler installers do not poll yet, FAA-253). A running board
 session reports a door another account holds as `board.down` with reason `unreachable` until FAA-252. On macOS the Node

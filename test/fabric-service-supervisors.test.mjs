@@ -102,6 +102,38 @@ test('systemd install enables and (re)starts it, keeps a disabled unit off; unin
   assert.deepEqual(r.calls, [['systemctl', '--user', 'disable', '--now', UNIT], ['systemctl', '--user', 'daemon-reload']]);
 });
 
+test('with an origin, systemd and task installs poll until this account\'s listener answers (FAA-253)', async () => {
+  const me = { service: { id: 'example-agent', instance: 'default' } };
+  const origin = 'http://127.0.0.1:8123';
+  const dir = path.join(temp(), 'systemd/user');
+  const answers = [null, { service: { id: 'other', instance: 'default' } }, me];
+  const reads = [];
+  const slept = [];
+  const read = async (o) => { reads.push(o); return answers.shift(); };
+  const file = await k.systemdInstall(UNIT, unit(), { unitDir: dir, run: recorder().run, platform: 'linux', origin, serviceId: 'example-agent', fetchWellKnown: read, sleep: async (ms) => { slept.push(ms); } });
+  assert.equal(file, path.join(dir, UNIT));
+  assert.deepEqual(reads, [origin, origin, origin]);
+  assert.deepEqual(slept, [500, 500]);
+  let now = 0;
+  const tick = async (ms) => { now += ms; };
+  const quick = { unitDir: dir, platform: 'linux', origin, serviceId: 'example-agent', timeout: 2, sleep: tick, clock: () => now };
+  await assert.rejects(k.systemdInstall(UNIT, unit(), { ...quick, run: recorder().run, fetchWellKnown: async () => new k.ForeignUserAnswer('foreign-user: uid 502 listens') }), /not this service's: foreign-user: uid 502/);
+  await assert.rejects(k.systemdInstall(UNIT, unit(), { ...quick, run: recorder().run, fetchWellKnown: async () => null }), /did not answer as example-agent\.default within 2 s/);
+  reads.length = 0;
+  assert.equal(await k.systemdInstall(UNIT, unit(), { unitDir: dir, run: recorder([], { 'is-enabled': 'disabled\n' }).run, platform: 'linux', origin, serviceId: 'example-agent', fetchWellKnown: read }), path.join(dir, UNIT));
+  assert.deepEqual(reads, [], 'a unit kept off is not started, so nothing is polled');
+  await assert.rejects(async () => k.systemdInstall(UNIT, unit(), { unitDir: dir, run: recorder().run, platform: 'linux', origin }), /serviceId/);
+  assert.equal(typeof k.systemdInstall(UNIT, unit(), { unitDir: dir, run: recorder().run, platform: 'linux' }), 'string', 'without an origin it stays synchronous');
+
+  const tasks = [null, me];
+  const got = await k.taskInstall(TASK, task(), { run: recorder(['/Query']).run, platform: 'win32', origin, serviceId: 'example-agent', fetchWellKnown: async () => tasks.shift(), sleep: async () => {} });
+  assert.deepEqual(got, me);
+  now = 0;
+  await assert.rejects(k.taskInstall(TASK, task(), { run: recorder(['/Query']).run, platform: 'win32', origin, serviceId: 'example-agent', timeout: 1, sleep: tick, clock: () => now, fetchWellKnown: async () => new k.ForeignUserAnswer('foreign-user: S-1-5-21-x') }), /not this service's/);
+  const disabled = task().replace('<Enabled>true</Enabled>\n    <ExecutionTimeLimit>', '<Enabled>false</Enabled>\n    <ExecutionTimeLimit>');
+  assert.equal(await k.taskInstall(TASK, task(), { run: recorder([], { '/Query': disabled }).run, platform: 'win32', origin, serviceId: 'example-agent', fetchWellKnown: async () => assert.fail('polled a task kept off') }), undefined);
+});
+
 test('a failed enable is reported, and systemd is refused off Linux', () => {
   assert.throws(() => k.systemdInstall('x.service', unit(), { unitDir: temp(), run: recorder(['enable']).run, platform: 'linux' }), k.ServiceError);
   assert.throws(() => k.systemdInstall('x.service', unit(), { unitDir: temp(), run: recorder().run, platform: 'darwin' }), /Linux only/);

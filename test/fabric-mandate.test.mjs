@@ -58,7 +58,7 @@ test('the lifetime and the codes', () => {
 });
 
 test('every kit cover', () => {
-  assert.equal(EXTRA.covers.length, 106);
+  assert.equal(EXTRA.covers.length, 125);
   for (const c of EXTRA.covers) assert.deepEqual(mandateCovers(c.input), c.expected, c.name);
 });
 
@@ -89,7 +89,7 @@ test('every hand-over', () => {
 });
 
 test('every action decision with a mandate', () => {
-  assert.equal(EXTRA.decisions.length, 22);
+  assert.equal(EXTRA.decisions.length, 34);
   for (const c of EXTRA.decisions) assert.deepEqual(actionDecision(c.input), c.expected, c.name);
 });
 

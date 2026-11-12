@@ -13,7 +13,8 @@ not re-export this module, so a service that does not run per context keeps the 
 An organization's instance whose context the record does not pin (``organizations``, DEC-0127) still starts: the helper
 checks the placement and its share grant, not the pin (decision D5 of 0.52.0). Its tokens are refused instead:
 ``fabric_estate.hub_key_certified`` reads a context's hub keys only while the record pins that organization (DL-14a,
-DEC-0128), so the service passes ``estate_context=info["context"]`` to its delegation gate. The contract lets Fabric
+DEC-0128), so the service passes ``context_gate_options(info, record)`` (its context and its pin's issuer, FAA-150) to its
+delegation gate. The contract lets Fabric
 write ``organizations`` only once every reader is pinned at or after DEC-0127, so a refusal at start would stop every
 organization instance on today's records."""
 from __future__ import annotations
@@ -33,7 +34,8 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 from fabric_base import ServiceError, _INSTANCE  # noqa: E402
 from fabric_descriptor import descriptor_path  # noqa: E402
 from fabric_estate import parse_context  # noqa: E402
-from fabric_lock import InstanceLock, hold_single_instance  # noqa: E402
+from fabric_lock import (InstanceLock, LOCK_BACKOFF_FIRST_SECONDS, LOCK_BACKOFF_MAX_SECONDS, hold_single_instance,  # noqa: E402
+                         lock_wait_budget_seconds, supervisor_marker)
 from fabric_paths import atomic_write, instance_dirs  # noqa: E402
 from fabric_share import instance_share_grant  # noqa: E402
 from fabric_time import clock_ms  # noqa: E402
@@ -125,9 +127,49 @@ def context_instance(service_id: str, context: Any, *, record: Optional[Dict[str
     return answer
 
 
-def _refuse(service_id: Any, context: Any, code: str) -> None:
-    print("%s will not run for %s (%s): %s." % (service_id, _shown(context), code, _REASONS[code]), file=sys.stderr, flush=True)
-    raise SystemExit(EXIT_CONTEXT_REFUSED)
+def context_gate_options(info: Any, record: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """What ``delegation_gate`` takes from this instance's context (FAA-150): ``estate_context``, and for an organization
+    whose context ``record`` pins, ``issuer``: the pin's context issuer (DL-14a, DEC-0128), so an organization's instance
+    refuses a token the personal hub key signed without wiring either by hand. ``info`` is ``context_instance``'s answer
+    (or ``hold_context_instance``'s); ``record`` the verified estate revision applied. Spread it after the service's own
+    estate issuer: ``delegation_gate(..., **{"issuer": estate_issuer, **context_gate_options(info, record)})``. Raises
+    ContextRefused (``context-invalid``) for an answer with no context."""
+    context = info.get("context") if isinstance(info, dict) else None
+    parsed = parse_context(context)
+    if parsed is None:
+        raise ContextRefused("context-invalid")
+    options: Dict[str, Any] = {"estate_context": context}
+    pins = record.get("organizations") if isinstance(record, dict) else None
+    if parsed["kind"] == "org" and isinstance(pins, list):
+        for pin in pins:
+            if isinstance(pin, dict) and pin.get("org") == context and isinstance(pin.get("iss"), str):
+                options["issuer"] = pin["iss"]
+                break
+    return options
+
+
+def _refuse(service_id: Any, context: Any, code: str, wait_seconds: Optional[float] = 0.0, *,
+            sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
+            env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None) -> None:
+    """One sentence naming the code, then exit 78. Under a supervisor that restarts on exit (launchd's KeepAlive with
+    ThrottleInterval 10, systemd's Restart=always) an exit at once is a respawn every few seconds, forever (FAA-279);
+    so a supervised copy first waits the lock's back-off (0.5 s doubling to 30 s, 300 s in all), holding nothing, and
+    exits 78 when it runs out: a few restarts an hour. ``wait_seconds`` overrides the choice as the lock's does."""
+    if wait_seconds is None:
+        wait_seconds = lock_wait_budget_seconds(supervisor_marker(env, argv))
+    wait_seconds = max(0.0, wait_seconds)
+    tail = " Waiting %.0f s before exiting, so its supervisor does not restart it every few seconds." % wait_seconds \
+        if wait_seconds > 0 else ""
+    print("%s will not run for %s (%s): %s.%s" % (service_id, _shown(context), code, _REASONS[code], tail),
+          file=sys.stderr, flush=True)
+    deadline = clock() + wait_seconds
+    delay = LOCK_BACKOFF_FIRST_SECONDS
+    while True:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise SystemExit(EXIT_CONTEXT_REFUSED)
+        sleep(min(delay, remaining))
+        delay = min(delay * 2, LOCK_BACKOFF_MAX_SECONDS)
 
 
 def _marker_matches(path: Path, expected: Dict[str, str]) -> Optional[bool]:
@@ -152,7 +194,7 @@ def hold_context_instance(service_id: str, context: Any, *, record: Optional[Dic
                           env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None,
                           services_directory: Optional[Path] = None) -> Tuple[Dict[str, Any], InstanceLock]:
     """Run as ``context``'s one instance, before any side effect (brief D17): ``context_instance`` (a refusal prints one
-    sentence naming the code and exits 78, nothing created); then ``hold_single_instance`` on the instance's data
+    sentence naming the code and exits 78, nothing created; a supervised copy backs off first, FAA-279); then ``hold_single_instance`` on the instance's data
     folder (its markers, its supervised wait, its exit 75); then the marker ``<data>/fabric-context.json``: absent, it
     is written (0600, atomic); equal, it is kept; another context or instance, or unreadable, releases the lock and
     exits 78 (``context-mismatch``). Returns the instance and the held lock."""
@@ -160,7 +202,7 @@ def hold_context_instance(service_id: str, context: Any, *, record: Optional[Dic
         info = context_instance(service_id, context, record=record, machine_id=machine_id, agent_ref=agent_ref, at=at,
                                 personal_instance=personal_instance, services_directory=services_directory)
     except ContextRefused as refused:
-        _refuse(service_id, context, refused.code)
+        _refuse(service_id, context, refused.code, wait_seconds, sleep=sleep, clock=clock, env=env, argv=argv)
     lock = hold_single_instance(info["dirs"]["data"], wait_seconds, sleep=sleep, clock=clock, env=env, argv=argv)
     expected = {"service": service_id, "instance": info["instance"], "context": context}
     marker = Path(info["dirs"]["data"]) / CONTEXT_MARKER
@@ -173,5 +215,5 @@ def hold_context_instance(service_id: str, context: Any, *, record: Optional[Dic
         raise
     if matches is False:
         lock.release()
-        _refuse(service_id, context, "context-mismatch")
+        _refuse(service_id, context, "context-mismatch", wait_seconds, sleep=sleep, clock=clock, env=env, argv=argv)
     return info, lock

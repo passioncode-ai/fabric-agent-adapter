@@ -6,7 +6,7 @@
 // An organization's instance whose context the record does not pin (`organizations`, DEC-0127) still starts: the helper
 // checks the placement and its share grant, not the pin (decision D5 of 0.52.0). Its tokens are refused instead:
 // hubKeyCertified reads a context's hub keys only while the record pins that organization (DL-14a, DEC-0128), so the
-// service passes `estateContext: context` to its delegation gate. A refusal at start would stop every organization
+// service passes contextGateOptions(info, record) (its context and its pin's issuer, FAA-150) to its delegation gate. A refusal at start would stop every organization
 // instance on today's records, which pin none until every reader is pinned at or after DEC-0127.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -14,7 +14,7 @@ import path from 'node:path';
 import { INSTANCE, ServiceError } from './fabric-base.mjs';
 import { descriptorPath } from './fabric-descriptor.mjs';
 import { parseContext } from './fabric-estate.mjs';
-import { InstanceLock, holdSingleInstance } from './fabric-lock.mjs';
+import { InstanceLock, LOCK_BACKOFF_FIRST_SECONDS, LOCK_BACKOFF_MAX_SECONDS, holdSingleInstance, lockWaitBudgetSeconds, supervisorMarker } from './fabric-lock.mjs';
 import { atomicWrite, instanceDirs, servicesDir } from './fabric-paths.mjs';
 import { instanceShareGrant } from './fabric-share.mjs';
 import { clockMs } from './fabric-time.mjs';
@@ -113,8 +113,28 @@ function markerMatches(file, expected) {
 }
 
 /**
+ * What delegationGate takes from this instance's context (FAA-150): `estateContext`, and for an organization whose
+ * context `record` pins, `issuer`: the pin's context issuer (DL-14a, DEC-0128), so an organization's instance refuses a
+ * token the personal hub key signed. `info` is contextInstance's (or holdContextInstance's) answer; spread it after the
+ * service's own estate issuer: `delegationGate({ ..., issuer: estateIssuer, ...contextGateOptions(info, record) })`.
+ * Throws ContextRefused (`context-invalid`) for an answer with no context.
+ */
+export function contextGateOptions(info, record) {
+  const context = info !== null && typeof info === 'object' ? info.context : undefined;
+  const parsed = parseContext(context);
+  if (!parsed) throw new ContextRefused('context-invalid');
+  const options = { estateContext: context };
+  const pins = record !== null && typeof record === 'object' && !Array.isArray(record) ? record.organizations : undefined;
+  if (parsed.kind === 'org' && Array.isArray(pins)) {
+    const pin = pins.find((p) => p !== null && typeof p === 'object' && p.org === context && typeof p.iss === 'string');
+    if (pin) options.issuer = pin.iss;
+  }
+  return options;
+}
+
+/**
  * Run as `context`'s one instance, before any side effect (brief D17): contextInstance (a refusal writes one sentence
- * naming the code and exits 78, nothing created); then holdSingleInstance on the instance's data folder (its markers,
+ * naming the code and exits 78, nothing created; a supervised copy backs off first, FAA-279); then holdSingleInstance on the instance's data folder (its markers,
  * its supervised wait, its exit 75); then `<data>/fabric-context.json`: absent, written (0600, atomic); equal, kept;
  * another context or instance, or unreadable, releases the lock and exits 78 (`context-mismatch`). Resolves to the
  * instance with its held `lock`; `exit` is injectable as holdSingleInstance has it, and its answer is returned.
@@ -123,8 +143,20 @@ export async function holdContextInstance(id, context, {
   record, machineId, agentRef, at, personalInstance = 'default', servicesDirectory, platform = process.platform,
   waitSeconds, sleep, clock, exit = (code) => process.exit(code), env, argv,
 } = {}) {
-  const refuse = (code) => {
-    process.stderr.write(`${id} will not run for ${shown(context)} (${code}): ${REASONS[code]}.\n`);
+  // FAA-279: under a supervisor that restarts on exit an exit 78 at once is a respawn every few seconds, forever; a
+  // supervised copy first waits the lock's back-off (0.5 s doubling to 30 s, 300 s in all), holding nothing.
+  const refuse = async (code) => {
+    const marker = supervisorMarker({ ...(env === undefined ? {} : { env }), ...(argv === undefined ? {} : { argv }) });
+    const wait = Math.max(0, waitSeconds ?? lockWaitBudgetSeconds(marker));
+    const tail = wait > 0 ? ` Waiting ${Math.round(wait)} s before exiting, so its supervisor does not restart it every few seconds.` : '';
+    process.stderr.write(`${id} will not run for ${shown(context)} (${code}): ${REASONS[code]}.${tail}\n`);
+    const now = clock ?? (() => performance.now() / 1000);
+    const pause = sleep ?? ((seconds) => new Promise((resolve) => { setTimeout(resolve, seconds * 1000); }));
+    const deadline = now() + wait;
+    for (let delay = LOCK_BACKOFF_FIRST_SECONDS, remaining = deadline - now(); remaining > 0; remaining = deadline - now()) {
+      await pause(Math.min(delay, remaining));
+      delay = Math.min(delay * 2, LOCK_BACKOFF_MAX_SECONDS);
+    }
     return exit(EXIT_CONTEXT_REFUSED);
   };
   let info;

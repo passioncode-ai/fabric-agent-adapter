@@ -18,7 +18,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fabric_jsvalue import indexed_objects, js_keys  # noqa: E402
-from fabric_secrets import JS_SPACE, JWT_SHAPE, SECRET_VALUE, _url_parts, raw_values, secret_argument, secret_url, secret_value  # noqa: E402
+from fabric_secrets import JS_SPACE, JWT_SHAPE, SECRET_VALUE, raw_values, secret_argument, secret_url, secret_value  # noqa: E402
+from fabric_secrets import url_parts as _whatwg_url_parts  # noqa: E402 - public since FAA-250
 import check_service_channel_agent_schema as cas  # noqa: E402
 
 KEY = "https://fabric.passioncode.ai/agent-contract/extensions/channel-agent/0.1"
@@ -62,6 +63,9 @@ _IGNORABLE = ((0x00AD, 0x00AD), (0x034F, 0x034F), (0x061C, 0x061C), (0x115F, 0x1
               (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x206F), (0x3164, 0x3164), (0xFE00, 0xFE0F), (0xFEFF, 0xFEFF),
               (0xFFA0, 0xFFA0), (0xFFF0, 0xFFF8), (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A), (0xE0000, 0xE0FFF))
 _FILLERS = frozenset("\u115f\u1160\u3164\uffa0\u2800\ufffc")
+#: Format characters (\p{Cf}) assigned after Unicode 13, which Python 3.9's unicodedata reads as unassigned (FAA-250):
+#: U+0890..0891 (Unicode 14) and U+13439..1343F (Unicode 15); the white-space and control categories gained none since.
+_LATER_FORMATS = ((0x0890, 0x0891), (0x13439, 0x1343F))
 
 
 def utf16(text: str) -> str:
@@ -75,7 +79,7 @@ def utf16(text: str) -> str:
 def _blank_char(char: str) -> bool:
     code = ord(char)
     return (char in JS_SPACE or char in _FILLERS or unicodedata.category(char) in ("Cf", "Cc", "Zs", "Zl", "Zp")
-            or any(low <= code <= high for low, high in _IGNORABLE))
+            or any(low <= code <= high for low, high in _IGNORABLE + _LATER_FORMATS))
 
 
 def blank(text: str) -> bool:
@@ -397,7 +401,7 @@ def url_parts(text: str) -> Optional[Tuple[str, str]]:
             return None
         if host and not _host_ok(host, special):
             return None
-    _, query, fragment = _url_parts(text)
+    _, query, fragment = _whatwg_url_parts(text)
     has_query = "?" in rest.partition("#")[0]
     has_fragment = "#" in rest
     return ("?" + query if has_query and query else "", "#" + fragment if has_fragment and fragment else "")
@@ -823,8 +827,9 @@ def declaration_verdict(manifest: Optional[Dict[str, Any]], manifest_named: bool
     where = "the manifest's provider.extensions" if site == "manifest" else "the well-known answer's extensions"
     shapes = _credential_shapes(others + copy)
     if shapes:  # a credential's shape in a copy no reader reads still sits in a document the service publishes (CA-5)
-        return "FAIL", "%d string(s) shaped like a credential outside the read declaration: %s (DEC-0150 CA-5)%s" % (
-            len(shapes), _shown(shapes), tail)
+        also = ("; on the read declaration itself, %d finding(s): %s" % (len(own), _shown(own))) if own else ""
+        return "FAIL", "%d string(s) shaped like a credential outside the read declaration: %s (DEC-0150 CA-5)%s%s" % (
+            len(shapes), _shown(shapes), also, tail)
     if declared and own:
         if not channel_agent_view(doc, site)["declared"] and not _credential_shapes(own):
             # D3: what the contract's reader reads as not declared (an older form, a repeat, a dangling reference) is

@@ -20,7 +20,7 @@
 // Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 import http from 'node:http';
-import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';
+import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED } from './fabric-peer-owner.mjs';
 
 export const RETRY_STATUSES = Object.freeze([408, 425, 429, 500, 502, 503, 504]);
 export const IDEMPOTENT_METHODS = Object.freeze(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
@@ -29,7 +29,7 @@ const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
 export class HttpError extends Error {
   constructor(message, { status = null, url = '', attempts = 0, retryAfterS = null, body = new Uint8Array(0),
-    kind = 'http' } = {}) {
+    kind = 'http', reason = null } = {}) {
     super(message);
     this.name = 'HttpError';
     this.status = status;
@@ -38,6 +38,8 @@ export class HttpError extends Error {
     this.retryAfterS = retryAfterS;
     this.body = body.slice(0, 2048);
     this.kind = kind; // http, connection, timeout, too-large, refused, foreign-user
+    // For foreign-user, why (FAA-272): table-restricted (never clears), the owner's kind, or the check's reason.
+    this.reason = reason;
   }
 }
 
@@ -186,7 +188,9 @@ export function checkedLoopbackTransport({ method, url, headers, body, timeoutS,
     req.on('error', (err) => {
       clearTimeout(timer);
       if (err instanceof ListenerRefused) {
-        reject(new HttpError(`${method} ${redactUrl(url)}: foreign-user: ${err.message}`, { url: redactUrl(url), kind: 'foreign-user' }));
+        const why = String(err.owner?.reason ?? err.owner?.kind ?? err.code ?? 'unknown');
+        const reason = why.startsWith(TABLE_RESTRICTED) ? TABLE_RESTRICTED : why.split(':', 1)[0];
+        reject(new HttpError(`${method} ${redactUrl(url)}: foreign-user: ${err.message}`, { url: redactUrl(url), kind: 'foreign-user', reason }));
       } else reject(err);
     });
     if (body) req.write(body);

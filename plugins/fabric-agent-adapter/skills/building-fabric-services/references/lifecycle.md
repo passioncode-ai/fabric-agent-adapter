@@ -206,6 +206,10 @@ if the holder leaves, and exits 75 only when the wait runs out: a few starts an 
 360. It touches nothing while it waits. Two installs sharing one data directory are still the
 defect to remove; the back-off only stops the loop from costing the machine.
 
+A context refusal (`fabric_context`, exit 78: no record, a revoked grant, a folder of another context) is the same
+loop under `KeepAlive`, so a supervised copy waits the same back-off, holding nothing and with the lock released,
+before it exits 78 (FAA-279); started by hand it exits 78 at once.
+
 The marker (contract DEC-0057, CT-01) is the variable `FABRIC_SERVICE_SUPERVISOR=<manager>` or
 the argument `--fabric-supervisor <manager>` (also `--fabric-supervisor=<manager>`), after the
 executable and before any `--`; `<manager>` is `launchd`, `systemd`, `task-scheduler` or `node`
@@ -324,7 +328,7 @@ descriptor says `"lifecycle": {"manager": "systemd", "unit": "<id>.<instance>.se
 
 | Verb | Command |
 |---|---|
-| install, upgrade | `systemd_install` / `systemdInstall`: write `~/.config/systemd/user/<unit>`, `daemon-reload`, `enable`, `restart` (so the new unit is what runs). A unit already installed that `is-enabled` reports `disabled` stays off: the file is rewritten and nothing starts (LC-14), unless `force_enable` |
+| install, upgrade | `systemd_install` / `systemdInstall`: write `~/.config/systemd/user/<unit>`, `daemon-reload`, `enable`, `restart` (so the new unit is what runs). A unit already installed that `is-enabled` reports `disabled` stays off: the file is rewritten and nothing starts (LC-14), unless `force_enable`. With `origin` and `service_id` it then polls the well-known answer as `launchd_install` does until this account's listener answers (another account's is refused, DEC-0154 HA-2; FAA-253); Node's `systemdInstall` then returns a promise |
 | stop, keep off | `systemctl --user disable --now <unit>` |
 | uninstall | `systemd_uninstall` / `systemdUninstall`: `disable --now`, remove the unit, `daemon-reload` |
 
@@ -341,7 +345,7 @@ CI job has the real `schtasks` create, read back and delete such a task. The des
 
 | Verb | Command |
 |---|---|
-| install, upgrade | `task_install` / `taskInstall`: `schtasks /Create /TN <task> /XML <file> /F` from a UTF-16 file it then removes, then `/End` (when it existed) and `/Run`. A task already installed and disabled stays off: it is recreated and disabled again (LC-14), unless `force_enable` |
+| install, upgrade | `task_install` / `taskInstall`: `schtasks /Create /TN <task> /XML <file> /F` from a UTF-16 file it then removes, then `/End` (when it existed) and `/Run`. A task already installed and disabled stays off: it is recreated and disabled again (LC-14), unless `force_enable`. With `origin` and `service_id` it then polls as `launchd_install` does and returns the answer (FAA-253); Node's `taskInstall` then returns a promise |
 | stop, keep off | `schtasks /End /TN <task>`, then `schtasks /Change /TN <task> /DISABLE` |
 | uninstall | `task_uninstall` / `taskUninstall`: `/End`, then `/Delete /F` |
 

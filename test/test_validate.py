@@ -1001,6 +1001,24 @@ class WorkflowGuardTests(unittest.TestCase):
         self.assertTrue(any("test_gated_example" in p for p in problems), problems)
         self.assertEqual(validate.contract_gated_modules(), ["test_contract_revisions", "test_dashboard_kit", "test_provider"])
 
+    def test_any_read_of_the_contract_variables_is_a_gate(self):
+        # FAA-189 (7): a gate over several lines, as skipIf(not ...), or as self.skipTest went unnoticed; any read of
+        # FABRIC_CONTRACT_NEW or _OLD in the code (not in a string) makes the module the contract job's.
+        files = {p.relative_to(ROOT).as_posix(): p.read_text(encoding="utf-8")
+                 for p in sorted((ROOT / ".github/workflows").glob("*.yml"))}
+        gates = {
+            "test_multi_line": 'import os, unittest\n@unittest.skipUnless(\n    os.environ.get("FABRIC_CONTRACT_NEW"),\n    "x")\nclass T(unittest.TestCase):\n    pass\n',
+            "test_skip_if": 'import os, unittest\n@unittest.skipIf(not os.environ.get("FABRIC_CONTRACT_OLD"), "x")\nclass T(unittest.TestCase):\n    pass\n',
+            "test_skip_test": 'import os, unittest\nclass T(unittest.TestCase):\n    def setUp(self):\n        if "FABRIC_CONTRACT_NEW" not in os.environ:\n            self.skipTest("x")\n',
+            "test_getenv": 'import os\nNEW = os.getenv("FABRIC_CONTRACT_NEW")\n',
+            "test_subscript": 'import os\nNEW = os.environ["FABRIC_CONTRACT_NEW"]\n',
+        }
+        files.update({"test/%s.py" % name: text for name, text in gates.items()})
+        files["test/test_only_a_string.py"] = 'TEXT = \'os.environ.get("FABRIC_CONTRACT_NEW")\'\n'
+        tmp, root = _tree(files)
+        with tmp:
+            self.assertEqual(validate.contract_gated_modules(root), sorted(gates))
+
     def test_a_per_push_trigger_fails(self):
         problems = self._problems(".github/workflows/validate.yml",
                                   lambda t: t.replace("  workflow_dispatch:\n", "  workflow_dispatch:\n  push:\n", 1))

@@ -745,6 +745,19 @@ class RecoveryFollowUpTests(Conversation):
         self.assertEqual([e[3]["data"]["value"] for e in self.events if e[0] == "board.slot.refused"],
                          [{"capability": "video.render", "reason": "capacity_exceeded"}])
 
+    def test_an_enroll_refused_for_its_epoch_reads_com_status_before_the_retry(self):
+        """FAA-186 (3): idempotency_window_expired is one capability's retry under the same epoch, and with no slot held
+        nothing else read com.status to refresh it; the refusal now reads it before the capability asks again."""
+        self.board.refuse_always[("com.enroll", "video.cut")] = "idempotency_window_expired"
+        r = self.responder()
+        r.step()
+        calls = [c[0] for c in self.board.calls]
+        refused = max(i for i, (tool, args) in enumerate(self.board.calls)
+                      if tool == "com.enroll" and args.get("capability") == "video.cut")
+        self.assertIn("com.status", calls[refused + 1:], calls)
+        self.assertEqual(r.slots["video.cut"]["state"], "retry")
+        self.assertEqual(r.slots["video.render"]["state"], "held")
+
     def test_a_refused_capability_asks_again_alone_with_a_growing_pause(self):
         self.board.refuse_always[("com.enroll", "video.cut")] = "capacity_exceeded"
         r = self.responder()
@@ -2022,6 +2035,17 @@ class MovedSlotTests(Conversation):
         r = self.responder()
         r.step()
         self.assertEqual(self.record()["video.render"], {"project": r.project, "generation": 1})
+
+    def test_shutdown_publishes_whether_it_drains(self):
+        """FAA-186 (2): the sample's join bound came from its own read of `current`, which a claim between the stop and
+        the shutdown made disagree with what shutdown did; shutdown now says what it found before it waits."""
+        r = self.responder()
+        r.step()
+        self.assertFalse(r.shutting_down.is_set())
+        self.assertIsNone(r.draining)
+        r.shutdown(0)
+        self.assertTrue(r.shutting_down.is_set())
+        self.assertIs(r.draining, False, "idle: nothing to drain")
 
     def test_a_clean_leave_forgets_the_record_so_a_rollback_never_reads_as_a_move(self):
         """Seam reading 3: a service stopped cleanly released its slot; a kit before 0.53.0 (or anyone) that enrolls it

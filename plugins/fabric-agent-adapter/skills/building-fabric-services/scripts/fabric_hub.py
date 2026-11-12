@@ -67,6 +67,20 @@ class HubError(Exception):
         return "HubError(%r, %r)" % (self.code, self.message)
 
 
+def listener_refusal(exc: Any) -> HubError:
+    """The HubError for a hub port the peer-owner check refused (DEC-0154 HA-2): code `foreign-user`, the pinned
+    contract's state name, with the owner's reason in the sentence and in `data.reason` (FAA-272): `table-restricted`
+    when this process's socket table hides other processes' sockets, which never clears, so it is not retryable;
+    otherwise the owner's kind or the check's reason (`another-account`, `no-row`), retryable as before."""
+    owner = getattr(exc, "owner", None)
+    why = (getattr(owner, "reason", None) or getattr(owner, "kind", None) or getattr(exc, "code", None) or "unknown")
+    reason = _po.TABLE_RESTRICTED if str(why).startswith(_po.TABLE_RESTRICTED) else str(why).split(":", 1)[0]
+    kind = getattr(owner, "kind", None)
+    shown = "%s: %s" % (kind, owner.reason) if kind and getattr(owner, "reason", None) else str(kind or why)
+    return HubError("foreign-user", "The hub's port is not held by this OS account's process (%s); nothing was sent." % shown,
+                    reason != _po.TABLE_RESTRICTED, {"reason": reason})
+
+
 # --- where Fabric is --------------------------------------------------------------------------------------------
 
 def fabric_root(platform: str = sys.platform, env: Optional[Dict[str, str]] = None) -> Path:
@@ -233,8 +247,7 @@ def post_mcp(origin: str, body: Dict[str, Any], bearer: str, session: Optional[s
         raw = resp.read(4 * 1024 * 1024)
         got = {k.lower(): v for k, v in resp.getheaders()}
     except _po.ListenerRefused as exc:
-        raise HubError("foreign-user", "The hub's port is not held by this OS account's process (%s); nothing was sent."
-                       % (exc.owner.kind if exc.owner else exc.code), True) from None
+        raise listener_refusal(exc) from None
     except (OSError, http.client.HTTPException) as exc:
         raise HubError("hub-unavailable", "Fabric's hub did not answer (%s)." % exc.__class__.__name__, True) from None
     finally:

@@ -141,12 +141,40 @@ def _check(result: Any, what: str) -> None:
         raise ServiceError("%s failed: %s" % (what, (getattr(result, "stderr", "") or getattr(result, "stdout", "") or "").strip()[:200]))
 
 
+def _poll_installed(origin: str, service_id: Optional[str], instance: str, timeout: float,
+                    read: Optional[Callable[[str], Any]], sleep: Callable[[float], None], clock: Callable[[], float]) -> Any:
+    """Poll the well-known answer at `origin` until this OS account's listener answers as `service_id`.`instance`, as
+    launchd_install does (the pinned contract's Install row: every supervisor polls, FAA-253). Another account's listener,
+    or one whose owner cannot be told, is never a successful install (DEC-0154 HA-2)."""
+    if not service_id:
+        raise ServiceError("polling the install at %s needs the service_id it must answer as" % origin)
+    read = read or well_known_of
+    deadline = clock() + max(0.0, timeout)
+    while True:
+        doc = read(origin)
+        foreign = doc.reason if isinstance(doc, ForeignUserAnswer) else None
+        if not foreign and _answers(doc, service_id, instance):
+            return doc
+        if clock() >= deadline:
+            break
+        sleep(0.5)
+    if foreign:
+        raise ServiceError("%s is not this service's: %s (DEC-0154 HA-2); the port is another OS account's or its owner "
+                           "cannot be told." % (origin, foreign))
+    raise ServiceError("%s did not answer as %s.%s within %.0f s; read its log." % (origin, service_id, instance, timeout))
+
+
 def systemd_install(unit: str, text: str, *, unit_dir: Optional[Path] = None, run: Callable[..., Any] = subprocess.run,
-                    system: str = sys.platform, force_enable: bool = False) -> Path:
+                    system: str = sys.platform, force_enable: bool = False, origin: Optional[str] = None,
+                    service_id: Optional[str] = None, instance: str = "default", timeout: float = 40.0,
+                    fetch_well_known: Optional[Callable[[str], Any]] = None, sleep: Callable[[float], None] = time.sleep,
+                    clock: Callable[[], float] = time.monotonic) -> Path:
     """Write the user unit, enable it so it comes back after a login, and (re)start it so the new unit is what runs.
 
     The operator's intent wins (LC-14): a unit already installed and disabled stays off — the file is rewritten, so
-    the new version is what starts once they enable it — unless ``force_enable`` (the operator asked for it on)."""
+    the new version is what starts once they enable it — unless ``force_enable`` (the operator asked for it on).
+    With ``origin`` (and ``service_id``), it then polls the well-known answer as ``launchd_install`` does, until this
+    account's listener answers within ``timeout`` (FAA-253); ``fetch_well_known(origin)`` reads it as ``well_known_of``."""
     if not system.startswith("linux"):
         raise ServiceError("systemd is the supervisor on Linux only")
     if not _UNIT.match(unit):
@@ -163,6 +191,8 @@ def systemd_install(unit: str, text: str, *, unit_dir: Optional[Path] = None, ru
         return path
     _check(run(["systemctl", "--user", "enable", unit], capture_output=True, text=True), "systemctl --user enable")
     _check(run(["systemctl", "--user", "restart", unit], capture_output=True, text=True), "systemctl --user restart")
+    if origin is not None:
+        _poll_installed(origin, service_id, instance, timeout, fetch_well_known, sleep, clock)
     return path
 
 
@@ -227,9 +257,13 @@ _TASK_DISABLED = re.compile(r"<Settings>(?:(?!</Settings>).)*<Enabled>false</Ena
 
 
 def task_install(task: str, xml_text: str, *, run: Callable[..., Any] = subprocess.run, system: str = sys.platform,
-                 force_enable: bool = False) -> None:
+                 force_enable: bool = False, origin: Optional[str] = None, service_id: Optional[str] = None,
+                 instance: str = "default", timeout: float = 40.0, fetch_well_known: Optional[Callable[[str], Any]] = None,
+                 sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic) -> Any:
     """Create (or replace) the task from its XML without administrator rights, then (re)start it so the new
-    definition is what runs. A task already installed and disabled stays off (LC-14) unless ``force_enable``."""
+    definition is what runs. A task already installed and disabled stays off (LC-14) unless ``force_enable``.
+    With ``origin`` (and ``service_id``), it then polls the well-known answer as ``launchd_install`` does and returns it
+    (FAA-253); without, it returns None as before."""
     if system != "win32":
         raise ServiceError("Task Scheduler is the supervisor on Windows only")
     query = run(["schtasks", "/Query", "/TN", task, "/XML"], capture_output=True, text=True)
@@ -248,6 +282,9 @@ def task_install(task: str, xml_text: str, *, run: Callable[..., Any] = subproce
     if existed:
         run(["schtasks", "/End", "/TN", task], capture_output=True, text=True)
     _check(run(["schtasks", "/Run", "/TN", task], capture_output=True, text=True), "schtasks /Run")
+    if origin is not None:
+        return _poll_installed(origin, service_id, instance, timeout, fetch_well_known, sleep, clock)
+    return None
 
 
 def task_uninstall(task: str, *, run: Callable[..., Any] = subprocess.run, system: str = sys.platform) -> None:
@@ -368,13 +405,16 @@ def launchd_loaded(label: str, domain: Optional[str] = None) -> bool:
     return _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label)).returncode == 0
 
 
-_PID_ROW = re.compile(r"^\s*pid\s*=\s*(\d+)\s*\Z")
+_PID_ROW = re.compile(r"^\s*pid\s*=\s*([0-9]+)\s*\Z")  # ASCII digits, as Node reads them (FAA-273)
 
 
 def launchd_pid(label: str, domain: Optional[str] = None) -> Optional[int]:
     """The running pid of this account's launchd job ``label`` (with ``domain="system"``, of the LaunchDaemon), or
     None (not running, or not readable). Reading needs no root."""
-    result = _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label))
+    try:
+        result = _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label))
+    except subprocess.TimeoutExpired:
+        return None  # a launchctl that hangs is a pid not read, never an error out of an install's poll (FAA-273)
     if result.returncode != 0:
         return None
     for line in (result.stdout or "").splitlines():

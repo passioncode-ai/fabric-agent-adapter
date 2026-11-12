@@ -163,7 +163,8 @@ current verified revision as `estate=` / `{ estate }`, as a value or as a functi
 - **Which hub key a token is checked against** (DL-14a, DEC-0128). An organization's tokens are signed by that
   organization context's own hub key (`machines[].contextHubKeys`), under the context issuer its pin names
   (`organizations[].iss`, `urn:fabric:context:<opaque>`, never the estate id). An instance that serves an organization
-  passes its context as `estate_context=` / `{ estateContext }` to `delegation_gate` or `verify_delegation`, once the
+  passes its context as `estate_context=` / `{ estateContext }` to `delegation_gate` or `verify_delegation`
+  (`fabric_context.context_gate_options` hands it and the pin's `iss` back, FAA-150), once the
   record pins its organization (until then its tokens are refused `kid-not-certified`, brief D5), and that pin's `iss`
   as `issuer`: the `kid` is then trusted only when one machine lists it for that context with that key and
   the record pins the organization. Without it, or with `personal`, the personal `hubKey` is read, so a context key

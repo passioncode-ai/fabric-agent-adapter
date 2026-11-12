@@ -66,7 +66,7 @@ class Vectors(unittest.TestCase):
 
 class KitInputs(unittest.TestCase):
     def test_every_cover(self):
-        self.assertEqual(len(EXTRA["covers"]), 106)
+        self.assertEqual(len(EXTRA["covers"]), 125)
         for case in EXTRA["covers"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fm.mandate_covers(case["input"])), js(case["expected"]))
@@ -103,7 +103,7 @@ class KitInputs(unittest.TestCase):
                     self.assertEqual(js(call()), js(case["expected"]))
 
     def test_every_action_decision_with_a_mandate(self):
-        self.assertEqual(len(EXTRA["decisions"]), 22)
+        self.assertEqual(len(EXTRA["decisions"]), 34)
         for case in EXTRA["decisions"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(fa.action_decision(case["input"])), js(case["expected"]))

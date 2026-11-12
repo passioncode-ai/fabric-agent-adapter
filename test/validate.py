@@ -895,13 +895,24 @@ WORKFLOW_USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$")
 PINNED_ACTION = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}")
 
 
-CONTRACT_GATE = re.compile(r"^\s*@unittest\.skipUnless\([^\n]*FABRIC_CONTRACT_NEW", re.MULTILINE)
+CONTRACT_VARIABLES = ("FABRIC_CONTRACT_NEW", "FABRIC_CONTRACT_OLD")
 CONTRACT_JOB_LINE = re.compile(r"^\s*python3 -m unittest -v (test_contract_revisions\b[^\n|]*)", re.MULTILINE)
 
 
+def _reads_contract_variables(text: str) -> bool:
+    """True when the code itself names FABRIC_CONTRACT_NEW or _OLD (FAA-189): a string constant that is exactly that
+    name, so a gate over several lines, `skipIf(not ...)`, `self.skipTest` or a module constant counts, and a test that
+    only holds the name inside a longer string (a fixture) does not."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return any(name in text for name in CONTRACT_VARIABLES)
+    return any(isinstance(node, ast.Constant) and node.value in CONTRACT_VARIABLES for node in ast.walk(tree))
+
+
 def contract_gated_modules(root: Path = ROOT) -> List[str]:
-    """The test modules holding a test gated on FABRIC_CONTRACT_NEW: only the contract job can run them."""
-    return sorted(path.stem for path in (root / "test").glob("test_*.py") if CONTRACT_GATE.search(path.read_text(encoding="utf-8")))
+    """The test modules reading FABRIC_CONTRACT_NEW or _OLD: only the contract job can run their gated tests."""
+    return sorted(path.stem for path in (root / "test").glob("test_*.py") if _reads_contract_variables(path.read_text(encoding="utf-8")))
 
 
 def workflow_problems(root: Path = ROOT) -> List[str]:
