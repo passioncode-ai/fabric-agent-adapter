@@ -193,7 +193,7 @@ export function readCredential(file) {
  * is HubError hub-unavailable (retryable); a listener that is not this OS account's process is HubError foreign-user
  * (retryable) before the bearer is sent (DEC-0154 HA-2): the connection is checked from the socket table first.
  */
-export function postMcp(origin, body, bearer, { session, timeout = 15000, method = 'POST', protocolVersion, agent = HUB_AGENT } = {}) {
+export function postMcp(origin, body, bearer, { session, timeout = 15000, method = 'POST', protocolVersion, agent = HUB_AGENT, deadline = 0 } = {}) {
   const m = LOOPBACK_ORIGIN.exec(origin);
   if (!m) return Promise.reject(new HubError('not-a-hub', 'Only the hub\'s loopback origin is used.'));
   const payload = method === 'DELETE' ? null : Buffer.from(JSON.stringify(body));
@@ -225,6 +225,9 @@ export function postMcp(origin, body, bearer, { session, timeout = 15000, method
       res.on('error', () => reject(new HubError('hub-unavailable', 'Fabric\'s hub did not answer (the answer broke off).', true)));
     });
     req.on('timeout', () => req.destroy(new Error('timeout')));
+    // `deadline` (ms) bounds the whole request, where `timeout` bounds each socket read (FAA-187 (12))
+    const timer = deadline > 0 ? setTimeout(() => req.destroy(new Error('deadline')), deadline) : null;
+    if (timer) req.on('close', () => clearTimeout(timer));
     req.on('error', (e) => reject(e instanceof ListenerRefused
       ? listenerRefusal(e)
       : new HubError('hub-unavailable', `Fabric's hub did not answer (${e.code ?? e.message}).`, true)));

@@ -99,17 +99,29 @@ class BoardSession:
         return value
 
     def close(self, timeout: Optional[float] = None) -> bool:
-        """Sends the DELETE (waiting `timeout` seconds at most when above 0, else the session's); True when Fabric answered it with a
+        """Sends the DELETE (waiting `timeout` seconds at most for the whole of it when above 0, FAA-187 (12), else the
+        session's per read); True when Fabric answered it with a
         2xx, so the slots are free now. False otherwise, a 404 (the session was already gone) included: a move made
         before it ended may be read only at the next com.status, so the slot records stay; the lease lapses in 60 s."""
         with self._lock:
             if self.mcp_session is None:
                 return False
+            got: List[Any] = []
+
+            def send() -> None:
+                try:
+                    got.append(self._send({}, method="DELETE", timeout=timeout))
+                except Exception:  # noqa: BLE001 - any failure is no release, as the Node twin's catch reads it
+                    pass
             try:
-                answer = self._send({}, method="DELETE", timeout=timeout)
+                if timeout is not None and timeout > 0:  # the whole DELETE, not each socket read (FAA-187 (12))
+                    worker = threading.Thread(target=send, name="board-leave", daemon=True)
+                    worker.start()
+                    worker.join(timeout)
+                else:
+                    send()
+                answer = got[0] if got else None
                 status = answer[0] if isinstance(answer, (tuple, list)) and answer and isinstance(answer[0], int) else 0
-            except Exception:  # noqa: BLE001 - any failure is no release, as the Node twin's catch reads it
-                status = 0
             finally:
                 self.mcp_session = None  # an answer it cannot read is no release, as the Node twin reads it
             return 200 <= status < 300

@@ -1971,3 +1971,26 @@ test('a capability named like an Object.prototype member is served, after a rest
   s = await h.state();
   assert.equal(s.requests[second].state, 'completed');
 });
+
+// FAA-187 (12): close(timeout) bounded each socket read, so a hub that trickles bytes held an idle stop past it; the
+// timeout now bounds the whole DELETE, which then reads as no release.
+test('FAA-187 (12): close bounds the whole DELETE', async (t) => {
+  const http = await import('node:http');
+  const sockets = new Set();
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    const timer = setInterval(() => res.write(' '), 100); // a byte at a time, each inside the socket's own timeout
+    res.on('close', () => clearInterval(timer));
+  });
+  server.on('connection', (s) => { sockets.add(s); s.on('close', () => sockets.delete(s)); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { for (const s of sockets) s.destroy(); server.close(); });
+  const grant = { origin: `http://127.0.0.1:${server.address().port}`, bearer: () => 'b'.repeat(43), capabilities: [] };
+  const post = (origin, body, bearer, options) => fh.postMcp(origin, body, bearer, { ...options, agent: false });
+  const session = new fb.BoardSession(grant, { post });
+  session.mcpSession = 'x';
+  const started = performance.now();
+  assert.equal(await session.close(300), false);
+  assert.ok(performance.now() - started < 2000, 'the whole DELETE is bounded, never each read');
+  assert.equal(session.mcpSession, null);
+});

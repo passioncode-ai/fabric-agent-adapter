@@ -2942,6 +2942,31 @@ class SampleWiringTests(unittest.TestCase):
                 self.assertFalse(session.close())
                 self.assertIsNone(session.mcp_session)
 
+    def test_close_bounds_the_whole_delete(self):
+        """FAA-187 (12): `close(3.0)` bounded each socket operation, so a hub that trickled bytes held an idle stop past
+        3 s; the timeout now bounds the whole DELETE, which then reads as no release."""
+        class Grant:
+            origin = "http://127.0.0.1:1"
+            capabilities = []
+
+            def bearer(self):
+                return "b" * 43
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def trickle(*a, **k):
+            release.wait(5)  # a hub that answers a byte at a time, each within the socket's own timeout
+            return 200, {}, None
+        session = fb.BoardSession(Grant(), post=trickle)
+        session.mcp_session = "x"
+        started = time.monotonic()
+        self.assertFalse(session.close(0.3))
+        self.assertLess(time.monotonic() - started, 2.0, "the whole DELETE is bounded, never each read")
+        self.assertIsNone(session.mcp_session)
+        quick = fb.BoardSession(Grant(), post=lambda *a, **k: (200, {}, None))
+        quick.mcp_session = "x"
+        self.assertTrue(quick.close(0.3), "an answer inside the bound is a release")
+
     def test_take_back_reads_the_record_while_fabric_is_down(self):
         """0.56.0 seam r3: after a restart, before the session reconnects, the checkpoint record alone knows the move;
         the relayed take-back forgets it, never answers 'not moved' while it stays."""

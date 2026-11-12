@@ -26,9 +26,9 @@ export class BoardSession {
     return run;
   }
 
-  async #send(body, method = 'POST', timeout = null) {
+  async #send(body, method = 'POST', timeout = null, deadline = 0) {
     try {
-      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout > 0 ? timeout : this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
+      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout > 0 ? timeout : this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined, ...(deadline > 0 ? { deadline } : {}) });
     } catch (e) {
       // FAA-252: another OS account's process holds the port; nothing was sent
       if (e instanceof HubError && e.code === 'foreign-user') throw new BoardError('foreign-user', 'The hub\'s port is held by another OS account\'s process; nothing was sent.', true);
@@ -71,13 +71,13 @@ export class BoardSession {
     });
   }
 
-  /** Sends the DELETE (waiting `timeout` ms at most); true when Fabric answered it with a 2xx, so the slots are free now (FAA-163). A 404 (already gone) is false: a move made before it ended is read at the next com.status, so the slot records stay. */
+  /** Sends the DELETE (waiting `timeout` ms at most for the whole of it, FAA-187 (12)); true when Fabric answered it with a 2xx, so the slots are free now (FAA-163). A 404 (already gone) is false: a move made before it ended is read at the next com.status, so the slot records stay. */
   close(timeout = null) {
     return this.#serial(async () => {
       if (!this.mcpSession) return false;
       let status = 0;
       try {
-        const answer = await this.#send({}, 'DELETE', timeout);
+        const answer = await this.#send({}, 'DELETE', timeout, timeout > 0 ? timeout : 0); // the whole DELETE (FAA-187 (12))
         status = Number.isInteger(answer?.status) ? answer.status : 0; // an answer it cannot read is no release, as in Python
       } catch {
         // best effort: the lease lapses in 60 s anyway
