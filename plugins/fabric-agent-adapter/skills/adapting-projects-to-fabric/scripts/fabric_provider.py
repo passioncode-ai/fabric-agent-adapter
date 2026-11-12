@@ -294,7 +294,7 @@ def _now() -> str:
 
 
 def entry_stem(path: str) -> str:
-    """CT-193 (FAC-SEM-014): the stem registry-rules.ts reads, `file.replace(/^.*[\\/]/, "").replace(/\.json$/, "")`,
+    """CT-193 (FAC-SEM-014): the stem registry-rules.ts reads, `file.replace(/^.*[\\/]/, "").replace(/\\.json$/, "")`,
     with ECMAScript's `.` (no line break: \\n, \\r, U+2028, U+2029) and `$` (the string's end) (FAA-189)."""
     return re.sub(r"\.json\Z", "", re.sub(r"\A[^\n\r\u2028\u2029]*[\\/]", "", path, count=1))
 
