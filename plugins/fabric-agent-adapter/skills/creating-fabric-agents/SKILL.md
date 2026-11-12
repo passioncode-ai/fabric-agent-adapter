@@ -57,6 +57,8 @@ and say in the report which skill was missing.
 
 No file is created until every row has an answer. An answer of "later" fails the grill.
 
+If your organization keeps a private catalogue of agent templates with an architect, ask it first: it names the template, version, variant and known traps; this skill runs after it.
+
 Once the grill names the capability and its consumer, consult the [agents database](references/agents-database.md): `agents-db.consult` on the
 board (or, with a grant, its scan tool over the source projects), and build from the template it names.
 

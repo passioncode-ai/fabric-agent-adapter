@@ -100,6 +100,7 @@ is unavailable, continue only through local structure and mark exact schema vali
 
 ### 3. Scaffold the provider bundle
 
+If your organization keeps a private catalogue of agent templates with an architect, ask it first: it names the template, version, variant and known traps; this skill runs after it.
 Before scaffolding, ask the [agents database](references/agents-database.md) for an audit of the project
 (`agents-db.audit`) and carry its `optimize` proposals into the completion report.
 Load [provider bundle](references/provider-bundle.md) before creating or mapping files.
