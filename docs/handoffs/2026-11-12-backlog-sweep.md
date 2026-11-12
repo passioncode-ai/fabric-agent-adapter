@@ -13,24 +13,26 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.79.0 | wave 1 (37 rows): the register sweep, working-with-fabric against Fabric v0.3.19, the catalogue line, kit fixes, FAA-293, dashboard kit 1.1.6 | PR #277, merge `97ca5b5e`, tag `v0.79.0`; its release run 43176165810 failed `floors` and `windows`, nothing published |
 | 0.79.1 | 0.79.0 plus the fixes its run and the blind seam reading found (Node 18 `localhost`, Windows dispatch tests and the open descriptor, `foreign-user` dropping a lost call's record, the default loopback port) | PR #278, merge `3b6519bc`, tag `v0.79.1`, npm `latest` 0.79.1, GitHub release `v0.79.1`; the run reads red only for the registry poll (FAA-307) |
 
+| 0.80.0, 0.80.1 | wave 2 and wave 3's first builders (session scripts, kit and docs, the three operator rules, FAA-307, 2B's kit rows, FAA-289, the docs rows) | PRs #279 and #280, tags `v0.80.0` and `v0.80.1`; each run failed a platform test (macOS-only paths, Windows separators), nothing published |
+| 0.80.2 | 0.80.0 shipped, its two cross-platform test fixes in | PR #281, merge `b8d2355a`, tag `v0.80.2`, npm `latest` 0.80.2 |
+| 0.81.0 | wave 3: the repin to contract `v0.1.0+2026-11-08.1` (FAA-258, DEC-0151 `SECRET_VALUE`), the `fabric-source/1` tree and `new` (FAA-261, FAA-270, G21), `fabric_holds` and `limits.holds` (FAA-265), FAA-298, FAA-227, FAA-251, parts of FAA-260 and FAA-286, the seam reading's five fixes; new rows FAA-311 to FAA-319 | branch `agent/faa-0.81.0`; receipts land in the CHANGELOG and below once tagged |
+
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
 
-## In flight (branch `agent/faa-0.80.0`)
-
-Wave 2 merged there: 2A (session scripts), 2C (kit and docs), 2D (the three operator rules), FAA-307. Waiting for 2B
-(`agent/faa-w2b-kit`: FAA-98, 149, 150, 186, 189, 250, 253, 272, 273, 279) and wave 3's first builders
-(`agent/faa-w3a-load`: FAA-289; `agent/faa-w3b-docs`: FAA-268, 280, 284, 238).
+Process note: wave 2's builder 2B force-pushed its own branch `agent/faa-w2b-kit`; the operator's rules forbid it.
+Recorded for the operator; later builder briefs name the rule.
 
 ## Next task
 
-1. Merge `agent/faa-w2b-kit`, `agent/faa-w3a-load` and `agent/faa-w3b-docs` into `agent/faa-0.80.0`; rebuild
-   `kit.json`; the CHANGELOG and the register for them; the three suites and both plugin validations; one blind seam
-   reading; PR, merge, tag `v0.80.0`; answer `bfc0e14e` with the version.
-2. Wave 3 proper: the repin (FAA-258) to the newest contract tag, then FAA-261 and FAA-270 (G21), FAA-265, FAA-292,
-   FAA-227, FAA-251, FAA-256, FAA-260, FAA-286, FAA-287, FAA-298.
-3. Wave 4: the recipes and the follow-up rows (FAA-10, 66, 116, 126, 153, 182, 187, 190, 192, 194, 196, 200, 206, 243,
-   264), each triaged against `main` first.
+1. 0.81.0: once validate is green on the branch's head, PR, merge, tag `v0.81.0`, watch the release run, confirm npm
+   and the GitHub release, release the agent-sync leases (`CHANGELOG.md`, `docs/backlog.md`,
+   `fabric-contract.lock.json`).
+2. Tell fabric-workspace on the board that G21 is done (FAA-270) with the version; tell the estate's two services
+   with usage budgets about `limits.holds` (FAA-319). Remove the merged worktrees and branches.
+3. Wave 4: FAA-292 (peer owner through libproc), the small new rows (FAA-303, 304, 306, 308, 309, 311 to 318), the
+   follow-up rows (FAA-187, 190, 192, 194, 196, 200, 264) and the recipes and the rest (FAA-10, 66, 116, 126, 135,
+   182, 189, 201, 206, 233, 243, 250, 256, 260, 286), each triaged against `main` first.
 
 ## Waits
 
@@ -42,5 +44,5 @@ Wave 2 merged there: 2A (session scripts), 2C (kit and docs), 2D (the three oper
 ## Checks run
 
 On each integration commit: `python3 test/validate.py`, `python3 -m unittest discover -s test`,
-`node --test 'test/*.test.mjs'`, both `claude plugin validate --strict`; 0.79.1 also under Node 22 with
+`node --test 'test/*.test.mjs'`, both `claude plugin validate --strict`; 0.79.1 and later also under Node 22 with
 `--no-network-family-autoselection` (standing in for Node 18). Each fix's new test was seen failing without the fix.
