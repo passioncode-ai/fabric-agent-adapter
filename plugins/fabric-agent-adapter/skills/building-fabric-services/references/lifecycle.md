@@ -106,11 +106,14 @@ systemd and Task Scheduler do not poll yet, FAA-253).
    then poll the well-known document until it answers with this `id.instance` on a listener of this OS account
    (DEC-0154 HA-2: another account's listener, or one whose owner cannot be told, is `foreign-user` and never a
    successful install; the error names it). Where the socket table hides other processes (macOS 27.2 under an
-   ad-hoc-signed interpreter), the installer vouches with its own job's pid from `launchctl print`, for a listen on
-   exactly `127.0.0.1` alone (DEC-0155 RT-3; a wildcard bind is never vouched for since FAA-312); a listener it
-   cannot prove reads `table-restricted` and the error names the way round it (FAA-267). The pid is the job's own, so a
-   `ProgramArguments` wrapper that starts the server as a child (`sh -c` without `exec`, `uv run`, `npm start`) cannot
-   vouch for it: on such a host start the server with `exec` or run the installer from Apple's `/usr/bin/python3`.
+   ad-hoc-signed interpreter), the job's accepted socket in one of this account's processes proves it first (DEC-0155
+   RT-2, `fabric_socket_proof`, FAA-292), then the installer vouches with its own job's pid from `launchctl print`,
+   for a listen on exactly `127.0.0.1` alone (RT-3; a wildcard bind is never vouched for since FAA-312); a listener
+   neither proves reads `table-restricted` (beside HA-2's `foreign-user`, which the pinned contract's definition
+   covers) and the error names the way round it (FAA-267). The vouch takes the job's own pid, so a `ProgramArguments`
+   wrapper that starts the server as a child (`sh -c` without `exec`, `uv run`, `npm start`) cannot vouch for it,
+   though RT-2 still proves its child's accepted socket: on such a host start the server with `exec`, or run the
+   installer from Apple's `/usr/bin/python3`.
    A LaunchDaemon reads its answer differently: *The system domain*, below.
 4. Upgrade = new release, rewrite the plist with the new path, `launchd_install`
    again, then `prune_releases(releases_dir, current=<new release>)`: the running release

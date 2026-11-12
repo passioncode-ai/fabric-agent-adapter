@@ -72,6 +72,43 @@ def vendor(model: str) -> str:
     return str(model).split("/", 1)[0] if "/" in str(model) else ""
 
 
+#: A base URL's path as both twins send it unchanged: URL path characters and %XX escapes only (FAA-187 (18)).
+_BASE_PATH = re.compile(r"(?:/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f]{2})*)*", re.ASCII)
+
+
+def _dialed_host(base: str) -> str:
+    """The base with a host outside ASCII written as urllib dials it, in IDNA (lower case), so attribution reads the
+    host the call reaches, as the Node twin's `new URL` does (FAA-187 (19)): `openrouter.ai` behind a zero-width space
+    or a soft hyphen is openrouter.ai. check_url has already refused a host the codec cannot write."""
+    scheme, sep, rest = base.partition("://")
+    authority, slash, path = rest.partition("/")
+    userinfo, at, hostport = authority.rpartition("@")
+    if not sep or hostport.isascii() or hostport.startswith("["):
+        return base
+    host, colon, port = hostport.partition(":")
+    return "%s://%s%s%s%s%s%s" % (scheme, userinfo, at, host.encode("idna").decode("ascii").lower(), colon, port, slash + path)
+
+
+def base_url_problem(base: str) -> Optional[str]:
+    """Why a base URL is not sent the same by both twins, read from the URL as sent (its ends trimmed, as `new URL` and
+    urllib trim them), or None: a backslash anywhere (`new URL` reads it as a slash), and after a `//` authority a
+    path holding anything but URL path characters and %XX escapes (Python refused a space or a character outside
+    ASCII, Node sent it percent-encoded; Node removes a tab or a line break) or a dot segment, escaped or not (Node
+    collapses it). The Node twin's `baseUrlProblem` is the same rule (FAA-187 (18), kit-openrouter-cases.json)."""
+    text = base.strip("".join(map(chr, range(0x21))))
+    if "\\" in text:
+        return "the base URL holds a backslash"
+    rest = text.partition(":")[2]
+    if not rest.startswith("//"):
+        return None  # no authority as written: check_url reads it
+    path = "/" + rest[2:].partition("/")[2] if "/" in rest[2:] else ""
+    if not _BASE_PATH.fullmatch(path):
+        return "the base URL's path holds a character outside URL path characters and %XX escapes"
+    if any(re.sub("%2[eE]", ".", seg) in (".", "..") for seg in path.split("/")[1:]):
+        return "the base URL's path holds a dot segment"
+    return None
+
+
 _DECIMAL = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][-+]?[0-9]+)?", re.ASCII)
 
 
@@ -170,6 +207,9 @@ class Client:
             raise fabric_http.HttpError("the URL does not parse", url="<unparseable url>", kind="refused")
         if "?" in base_url or "#" in base_url:
             raise OpenRouterError("the base URL holds no query or fragment", kind="config")
+        problem = base_url_problem(base_url)
+        if problem:
+            raise OpenRouterError(problem + " (both kits would not send it alike)", kind="config")
         fabric_http.check_url(base_url)
         _check_attribution(project_id, None)
         self.ceiling_usd = float(ceiling_usd)
@@ -179,7 +219,7 @@ class Client:
         self.window = window
         # The base URL as check_url read it and urllib would send it: its ends trimmed, so `.../v1\n` is not sent
         # as `.../v1\n/chat/completions` (0.56.0 seam r18; the Node twin trims the ends `new URL` does, product r20).
-        self.base_url = base_url.strip(fabric_http._URL_ENDS).rstrip("/")
+        self.base_url = _dialed_host(base_url.strip(fabric_http._URL_ENDS).rstrip("/"))
         self.attribution = attribution
         self.project_id = project_id
         self.unmeasured_call_usd = unmeasured_call_usd

@@ -88,7 +88,28 @@ function shapeProblems(value) {
 // The contract's KEY_SHAPE (src/connections.ts): a provider key where it starts a word, case-sensitive prefixes, the
 // `sk-` rules and a Telegram bot token.
 const KEY_SHAPE = /(?:^|[^A-Za-z0-9])(?:sk-(?=[A-Za-z0-9_-]*\d)(?:(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{16,}|[A-Za-z0-9_-]{32,})|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}|(?:bot)?\d{6,12}:(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[a-z])[A-Za-z0-9_-]{34,35}(?![A-Za-z0-9_-]))/;
-const SCHEME = /[a-z][a-z0-9+.-]*:\/\//gi;
+const SCHEME_CHAR = /[a-z0-9+.-]/i;
+const SCHEME_LETTER = /[a-z]/i;
+/**
+ * The [start, end] of each URL scheme and its `://` in a piece, where `/[a-z][a-z0-9+.-]*:\/\//gi` finds them left to
+ * right, read in linear time (FAA-322: the pattern tried every letter of a long run with no `://`). From each `://` the
+ * run of scheme characters before it is read back, and the match starts at its first letter at or after where the last
+ * match ended. The twin of fabric_connections._scheme_spans.
+ */
+export function schemeSpans(piece) {
+  const spans = [];
+  let after = 0;
+  for (let at = piece.indexOf('://'); at >= 0; at = piece.indexOf('://', at + 1)) {
+    let start = at;
+    while (start > after && SCHEME_CHAR.test(piece[start - 1])) start -= 1;
+    while (start < at && !SCHEME_LETTER.test(piece[start])) start += 1;
+    if (start < at) {
+      spans.push([start, at + 3]);
+      after = at + 3;
+    }
+  }
+  return spans;
+}
 const CLOSING = /[)\]}>"'.,;:!?]/;
 const TRIED_BACK = 1;
 /** The URLs a member may hold, from every scheme in each whitespace-delimited piece, without the closing brackets,
@@ -96,8 +117,8 @@ const TRIED_BACK = 1;
 function urlsIn(value) {
   const urls = [];
   for (const piece of value.split(/\s+/)) {
-    for (const match of piece.matchAll(SCHEME)) {
-      const url = piece.slice(match.index);
+    for (const [start] of schemeSpans(piece)) {
+      const url = piece.slice(start);
       let end = url.length;
       while (end > 0 && CLOSING.test(url[end - 1])) end -= 1;
       for (let back = 0; back <= TRIED_BACK && end + back <= url.length; back += 1) urls.push(url.slice(0, end + back));
@@ -108,8 +129,8 @@ function urlsIn(value) {
 /** A long secret-shaped run in a piece read whole; in a piece that holds a URL, the text before its first scheme's `://`. */
 const longRun = (value) =>
   value.split(/\s+/).some((piece) => {
-    const at = piece.search(SCHEME);
-    const cut = at < 0 ? -1 : piece.indexOf('://', at);
+    const found = schemeSpans(piece);
+    const cut = found.length ? found[0][1] - 3 : -1;
     return longSecret(cut < 0 ? piece : piece.slice(0, cut));
   });
 // hasJwt reads a JWT in one pass, where JWT_SHAPE backtracks from every `eyJ` of a long run (FAA-313).

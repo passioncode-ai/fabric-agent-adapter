@@ -230,23 +230,36 @@ and `/proc/net/tcp6`, Windows through `GetExtendedTcpTable` and the owner's toke
 on macOS, the same `/proc` files on Linux, and `netstat -ano` with the owner SID from PowerShell `GetOwnerSid` against `whoami /user` on Windows (SIDs, never names). Fail closed: everything but
 `this-account` refuses, `unknown` included.
 
-macOS 27.2 shows an ad-hoc-signed interpreter (a Homebrew Python, measured; a Homebrew Node is ad-hoc-signed too and was not measured) only its own sockets: sysctl lists this
+macOS 27.2 shows an ad-hoc-signed interpreter (a Homebrew Python, measured; a Homebrew Node is ad-hoc-signed too) only its own sockets: sysctl lists this
 process alone and netstat prints nothing. The Python calibration therefore also asks for a child process's listener,
 and a restricted table is `unknown` with a reason beginning `table-restricted` (never another account's): DEC-0155 RT-1
 reads so a netstat that prints nothing or only its header, one that fails or exits non-zero, a table holding no row of
 another uid (sysctl) or of another process (netstat), and a macOS table without the reader's own connection (FAA-312;
 Linux and Windows keep `no-row`). Under it `listener(port)` reads this account's listener as its own only on exactly
 `127.0.0.1` (RT-4). `fabric_peer_owner.py listener <port>` and `fabric-peer-owner.mjs listener <port>` print the kind
-(`--json` the whole owner; FAA-315). A caller that started the
-server itself may vouch with that pid: `lsof -p <pid>` asks the process, which the restriction leaves readable, and a
-listener of this account's pid on the port counts as this account's (`CheckedHTTPConnection(vouch_pid=...)`, Node
-`checkedSocket({vouchPid})`). The launchd installers vouch with their own job's pid; elsewhere a restricted table
-refuses (the probe, the hub client and `fabric_http` included, FAA-272), and Apple's `/usr/bin/python3` sees the
-whole table (FAA-267). A vouch is a weaker proof than the table's: it shows the job's pid listens on exactly `127.0.0.1`
-on the port, not that it accepted this connection. Since FAA-312 every vouch follows DEC-0155 RT-3: a wildcard or `::1`
-listener is never vouched for (`lsof` prints an IPv6-only wildcard as `*:<port>` too), and a reader whose real and
-effective uid differ vouches for nothing. The accepted socket itself (RT-2, libproc or `lsof` of established sockets)
-is not read yet (FAA-292; the repository's `docs/evidence/specs/2026-11-12-faa-292-libproc-decision.md`).
+(`--json` the whole owner; FAA-315).
+
+Under a restricted table the kit asks this account's own processes, which the restriction leaves readable
+(`fabric_socket_proof`, beside `fabric_peer_owner` in every kit install; FAA-292, FAA-272). A server end is this
+account's when one of its processes holds the very socket that accepted the connection (DEC-0155 RT-2, the
+accepted-socket proof; read for up to 0.5 s until the server has called `accept()`), and a listener when one of its
+processes listens on exactly `127.0.0.1:<port>`. Python reads them through libproc (`proc_listpids`, `PROC_PIDLISTFDS`,
+`PROC_PIDFDSOCKETINFO`, Project Observatory's `peer_owner` 1.3.1 reader, calibrated on a pair of its own) and through
+`lsof` when libproc is unavailable; Node through `lsof -nP -a -u <uid> -iTCP:<port> -sTCP:<state> -F pun`, the exact
+address pair and the numeric uid. The proof is "a process of this uid holds the descriptor": a socket another account
+accepted and passed with SCM_RIGHTS to one of this account's processes reads as this account's, which `expect_pid`
+closes; one socket several of its processes hold is proved with no pid (`several-processes`), which skips an
+`expect_pid` check, as a Linux row does. It never answers another account's, root's or nobody's, a set-uid reader gets
+none, and a project that vendors `fabric_peer_owner` alone answers as before. After it, a caller that started the
+server itself may vouch with that pid: `lsof -p <pid>` asks the process, and a listener of this account's pid on the
+port counts as this account's (`CheckedHTTPConnection(vouch_pid=...)`, Node `checkedSocket({vouchPid})`), taken only
+for a connection that reached `127.0.0.1` (one a caller spelled `::1` or `localhost` that reached `::1` is not; FAA-273);
+the launchd installers vouch with their own job's pid. The Node layout probe (`check_dashboard_layout.mjs`) on such a
+host reads this account's dashboard listener through the own-listener proof (`lsof -u`, FAA-272). What neither proves refuses (the probe, the hub client and `fabric_http`
+included, FAA-272), and Apple's `/usr/bin/python3` sees the whole table (FAA-267). A vouch is weaker than RT-2: it
+shows the pid listens on exactly `127.0.0.1` on the port, not that it accepted this connection. Since FAA-312 every
+vouch follows DEC-0155 RT-3: a wildcard or `::1` listener is never vouched for (`lsof` prints an IPv6-only wildcard as
+`*:<port>` too), and a reader whose real and effective uid differ vouches for nothing for its own account.
 
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
 a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`, its

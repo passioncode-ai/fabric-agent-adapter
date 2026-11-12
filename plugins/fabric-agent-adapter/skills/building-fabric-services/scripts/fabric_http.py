@@ -50,6 +50,8 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 from fabric_jsvalue import json_stringify  # noqa: E402 - beside this file
+import fabric_secrets  # noqa: E402 - beside this file: the WHATWG host reading (FAA-98, FAA-309)
+import fabric_socket_proof  # noqa: E402 - beside this file: the one loopback host rule (FAA-187 (15))
 import fabric_peer_owner as _po  # noqa: E402 - beside this file: the listener's owner (DEC-0154 HA-2)
 
 RETRY_STATUSES = (408, 425, 429, 500, 502, 503, 504)
@@ -211,28 +213,28 @@ def redact_url(url: str) -> str:
     return urllib.parse.urlunsplit((parts.scheme.lower(), netloc, path, "", ""))
 
 
-def _is_loopback(host: str) -> bool:
-    """Loopback as a WHATWG URL parser leaves the host: one trailing dot dropped from an IPv4 address, no whitespace,
-    and an IPv4-mapped IPv6 address not counted (Node writes it in hex and the Node twin refuses it)."""
-    if host == "localhost" or host.endswith(".localhost"):
+#: Loopback as a WHATWG URL parser leaves the host: the kit's one rule, shared with fabric_delegation (FAA-187 (15)).
+_is_loopback = fabric_socket_proof.loopback_host
+
+
+def _idna_sendable(host: Optional[str]) -> bool:
+    """Whether http.client can write the host: a non-ASCII one goes out in IDNA through Python's own codec, which refuses
+    some hosts `new URL` maps (U+180E, a fullwidth dot beside a dot), so such a URL would fail on every call (FAA-187
+    (16)); it is refused at the check instead."""
+    if not host or host.isascii():
         return True
-    if not host or any(c.isspace() for c in host):
-        return False
     try:
-        address = ipaddress.ip_address(host)
-        return address.is_loopback and not getattr(address, "ipv4_mapped", None)
-    except ValueError:
-        pass
-    host = host[:-1] if host.endswith(".") else host
-    try:  # the short IPv4 forms a WHATWG URL also reads (127.1, 2130706433, 0x7f.1)
-        return socket.inet_aton(host)[0] == 127
-    except (OSError, ValueError):
+        host.encode("idna")
+        return True
+    except UnicodeError:
         return False
 
 
 def check_url(url: str, *, insecure: bool = False) -> None:
     """Refuse what this client never sends: a scheme other than http or https, no host, credentials in the URL, or
-    plain http to a host that is not loopback (unless `insecure`)."""
+    plain http to a host that is not loopback (unless `insecure`). A host `new URL` refuses for its structure (a last
+    label that is a number but no IPv4 address, `a127.0.0.1`, `09`; a host UTS46 refuses, a joiner beside ASCII alone) is
+    refused as the Node twin refuses it, read by fabric_secrets.url_refused (FAA-187 (14))."""
     try:
         # The ends are trimmed as urllib trims what it sends (and `new URL` too); a URL ending in a line break, which
         # 0.55.0 sent, still passes (0.56.0 product r17).
@@ -242,7 +244,7 @@ def check_url(url: str, *, insecure: bool = False) -> None:
         parts = urllib.parse.urlsplit(sent)
         host = parts.hostname
         parts.port  # noqa: B018 - raises on a bad port
-        if not _authority_ok(parts.netloc):
+        if not _authority_ok(parts.netloc) or fabric_secrets.url_refused(sent) or not _idna_sendable(host):
             raise ValueError("authority")
     except (ValueError, TypeError):
         raise HttpError("the URL does not parse", url=redact_url(url), kind="refused")

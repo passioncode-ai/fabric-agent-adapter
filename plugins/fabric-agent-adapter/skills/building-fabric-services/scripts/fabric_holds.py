@@ -21,7 +21,8 @@ says so three ways:
 
 `HoldBook` keeps one JSON file (0600, written atomically); a ThreadingHTTPServer's handlers share it under the store
 lock. It holds caller names, work labels, reasons and the operator's words, never a credential: `hold` refuses a text
-the contract's detector reads as one.
+the contract's detector reads as one. A record written since 0.83.0 carries `squash: "ecmascript"`; one without it
+(0.81.0, 0.82.0) is matched under both squashes, since 0.81.0's Python twin squashed names with str.split() (FAA-320).
 """
 from __future__ import annotations
 
@@ -63,6 +64,27 @@ _SPACES = re.compile("[%s]+" % fabric_secrets.JS_SPACE)
 def _squash(text: str) -> str:
     """Runs of ECMAScript whitespace as one space, none at either end (the Node twin's `squash`)."""
     return _SPACES.sub(" ", text).strip(" ")
+
+
+#: What a record written since 0.83.0 carries: its names were squashed with ECMAScript's whitespace (FAA-320).
+SQUASH = "ecmascript"
+#: Python's str.isspace() class, the one 0.81.0's Python twin squashed a name with (`" ".join(text.split())`).
+_PY_SPACES = re.compile("[\t\n\x0b\x0c\r\x1c-\x1f \x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+")
+
+
+def _legacy_squash(text: str) -> str:
+    """A name as 0.81.0's Python twin wrote it (str.split()), written out so both twins read it alike."""
+    return _PY_SPACES.sub(" ", text).strip(" ")
+
+
+def _names(caller: Any, record: Dict[str, Any]) -> tuple:
+    """The stored forms `caller` matches in `record`: the ECMAScript squash, and for a record with no `squash` mark
+    (written before 0.83.0) also the squash 0.81.0's Python twin wrote (FAA-320). None matches only None."""
+    if not isinstance(caller, str):
+        return (caller,)
+    if record.get("squash") == SQUASH:
+        return (_squash(caller),)
+    return (_squash(caller), _legacy_squash(caller))
 
 
 def _instant(value: Any, name: str) -> str:
@@ -197,6 +219,7 @@ class HoldBook:
              job_id: Optional[str] = None, now: Optional[str] = None) -> Dict[str, Any]:
         """Hold `work` for `caller` by `reason`. Returns {hold, statusMessage, push}: `push` is the notify event when this
         call opened the hold, None when the work joined an open one (one push per hold)."""
+        raw_caller = caller
         caller, work = _text(caller, "caller"), _text(work, "work")
         if reason not in HOLD_REASONS:
             raise ServiceError("A hold's reason is one of %s." % ", ".join(HOLD_REASONS))
@@ -207,11 +230,11 @@ class HoldBook:
             data = self._load()
             self._expire(data, utc_time(at))
             hold = next((h for h in data["holds"] if h.get("closed") is None and h["reason"] == reason
-                         and h["caller"] == caller), None)
+                         and h["caller"] in _names(raw_caller, h)), None)
             opened = hold is None
             if opened:
                 hold = {"id": uuid.uuid4().hex, "reason": reason, "caller": caller, "work": work, "since": at,
-                        "until": until, "jobs": [], "closed": None}
+                        "until": until, "jobs": [], "closed": None, "squash": SQUASH}
                 data["holds"].append(hold)
             if job_id is not None and job_id not in hold["jobs"]:
                 hold["jobs"].append(str(job_id))
@@ -229,7 +252,7 @@ class HoldBook:
         with self._lock:
             data = self._load()
             hold = next((h for h in data["holds"] if h.get("closed") is None and h["reason"] == reason
-                         and h["caller"] == caller), None)
+                         and h["caller"] in _names(caller, h)), None)
             if hold is None:
                 return None
             hold["closed"], hold["closedAt"] = "released", at
@@ -269,14 +292,15 @@ class HoldBook:
             raise ServiceError("A raised limit needs its window's end (until): it falls back when the window ends.")
         record: Dict[str, Any] = {"id": uuid.uuid4().hex, "reason": reason, "caller": None if caller is None else _text(caller, "caller"),
                                   "job": None if job_id is None else str(job_id), "from": at, "until": until,
-                                  given[0]: size, "decision": dict(decision), "at": at}
+                                  given[0]: size, "decision": dict(decision), "at": at, "squash": SQUASH}
         if given[0] != "limit":
             record["left"] = size
         with self._lock:
             data = self._load()
             self._expire(data, utc_time(at))
             for hold in data["holds"]:
-                if hold.get("closed") is None and hold["reason"] == reason and record["caller"] in (None, hold["caller"]) and (
+                if hold.get("closed") is None and hold["reason"] == reason and (
+                        caller is None or hold["caller"] in _names(caller, hold)) and (
                         job_id is None or str(job_id) in hold["jobs"]):
                     hold["closed"], hold["closedAt"], hold["lift"] = "lifted", at, record["id"]
             data["lifts"].append(record)
@@ -291,7 +315,7 @@ class HoldBook:
     def _matching(self, data: Dict[str, Any], reason: str, caller: Optional[str], job_id: Optional[str], at: int,
                   kind: str) -> List[Dict[str, Any]]:
         return [l for l in data["lifts"] if l["reason"] == reason and kind in l and self._live(l, at)
-                and l.get("caller") in (None, caller) and l.get("job") in (None, job_id)]
+                and (l.get("caller") is None or l["caller"] in _names(caller, l)) and l.get("job") in (None, job_id)]
 
     def admit(self, *, reason: str, caller: str, job_id: Optional[str] = None, cost_usd: Optional[float] = None,
               now: Optional[str] = None) -> Dict[str, Any]:

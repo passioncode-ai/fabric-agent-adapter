@@ -392,3 +392,33 @@ test('DEC-0057: the descriptor names one supervisor and never a share; every kil
   assert.deepEqual(negatives.map((n) => n.name).sort(), Object.keys(reasons).sort());
   for (const item of negatives) assert.ok(k.validateDescriptor(item.descriptor).join(' ').includes(reasons[item.name]), item.name);
 });
+
+// FAA-273 item 9: the env rule reads the shared corpus as the Python twin and adapt_project do (their half, with the
+// agreement across all three, is test_fabric_service_supervisors.EnvRuleCorpus).
+test('the env rule reads the shared corpus', async () => {
+  const { secretEnvValue } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const { cases } = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/kit-env-rule-cases.json'), 'utf8'));
+  for (const c of cases) if (c.secret !== null) assert.equal(secretEnvValue(c.value), c.secret, c.note);
+});
+
+// FAA-273 item 25: wellKnownOf's restricted-table branches run, not only read: a restricted table is a ForeignUserAnswer
+// whose reason starts table-restricted, a vouched pid that listens (the real lsof, macOS) and the accepted-socket proof
+// each read the answer.
+test('wellKnownOf under a restricted table: refused, vouched, proved', async (t) => {
+  const { wellKnownOf, ForeignUserAnswer } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const po = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-peer-owner.mjs');
+  const http = await import('node:http');
+  const server = http.createServer((req, res) => res.end(JSON.stringify({ service: { id: 'example-agent', instance: 'default' } })));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const read = async () => { throw new po.TableUnreadable(`${po.TABLE_RESTRICTED}: netstat printed nothing to this process`); };
+  const refused = await wellKnownOf(origin, { ask: { read } });
+  assert.ok(refused instanceof ForeignUserAnswer);
+  assert.match(refused.reason, /^table-restricted: /);
+  const proved = await wellKnownOf(origin, { ask: { read, platform: 'darwin', ownUid: 501,
+    socketProof: { accepted: async () => ({ proved: true, pid: process.pid, method: 'lsof', reason: null }) } } });
+  assert.equal(proved.service.id, 'example-agent');
+  if (process.platform === 'darwin') assert.equal((await wellKnownOf(origin, { vouchPid: process.pid, ask: { read } })).service.id, 'example-agent');
+});

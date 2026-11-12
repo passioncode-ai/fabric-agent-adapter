@@ -445,6 +445,61 @@
    "http://[::ffff:127.0.0.1]/x",
    false,
    true
+  ],
+  [
+   "https://a127.0.0.1/x",
+   false,
+   true
+  ],
+  [
+   "https://09/x",
+   false,
+   true
+  ],
+  [
+   "https://example.09/x",
+   false,
+   true
+  ],
+  [
+   "https://\u00df127.0.0.1/x",
+   false,
+   true
+  ],
+  [
+   "https://a\u200cb.example/x",
+   false,
+   true
+  ],
+  [
+   "https://a\u200db.example/x",
+   false,
+   true
+  ],
+  [
+   "https://127.1/x",
+   false,
+   false
+  ],
+  [
+   "https://0x7f.1/x",
+   false,
+   false
+  ],
+  [
+   "https://example.com./x",
+   false,
+   false
+  ],
+  [
+   "https://\u4f8b.example/x",
+   false,
+   false
+  ],
+  [
+   "https://b\u00fccher.example/x",
+   false,
+   false
   ]
  ],
  "retryAfter": [

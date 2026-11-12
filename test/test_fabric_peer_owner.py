@@ -27,6 +27,10 @@ sys.path.insert(0, str(TEST))
 P = importlib.import_module("fabric_peer_owner")
 import peer_owner_fixtures as F  # noqa: E402
 
+# The tables these tests fake are not this host's: the accepted-socket proof (fabric_socket_proof, FAA-292) would read
+# this host's own processes, so it is off unless a test asks for it (AcceptedSocketProof).
+P._PROOF[0] = False
+
 SERVER = ("127.0.0.1", F.SERVER_PORT)
 
 
@@ -39,6 +43,11 @@ class FakeSocket:
 
     def getpeername(self):
         return self.peer
+
+
+def struct_error():
+    import struct
+    return struct.error("unpack requires a buffer")
 
 
 def ps_from_fixture(argv):
@@ -347,11 +356,26 @@ class Live(unittest.TestCase):
         listener.listen(1)
         client = socket.create_connection(listener.getsockname())
         accepted, _ = listener.accept()
+        self.addCleanup(P._PROOF.__setitem__, 0, False)
+        P._PROOF[0] = None  # this host's own processes: a restricted table proves this pair through RT-2 (FAA-292)
         try:
             want = "sysctl" if sys.platform == "darwin" else "proc"
-            self.assertEqual(P.method(), want, "the macOS record layout failed calibration on this host")
+            if sys.platform == "darwin" and P._SYSCTL_OK[0] is not True:
+                # FAA-273 item 24: a cold runner's calibration child may miss the 2 s deadline; calibrate once more with
+                # room, so the test reads the layout, not the runner's load.
+                with mock.patch.object(P, "TIMEOUT_SECONDS", 15.0):
+                    P._SYSCTL_OK[0] = None
+                    P.method()
+            if sys.platform == "darwin" and P.method() != "sysctl":
+                # macOS 27.2 under an ad-hoc-signed interpreter: the table is restricted, and this account's own
+                # processes prove the pair (FAA-273 item 14).
+                want = ("libproc", "lsof")
+            else:
+                self.assertEqual(P.method(), want, "the record layout failed calibration on this host")
+                want = (want,)
             for owner in (P.peer(accepted), P.server_end(client), P.listener(listener.getsockname()[1])):
-                self.assertEqual((owner.kind, owner.uid, owner.method), (P.THIS_ACCOUNT, os.getuid(), want))
+                self.assertEqual((owner.kind, owner.uid), (P.THIS_ACCOUNT, os.getuid()), owner)
+                self.assertIn(owner.method, want)
             if sys.platform == "darwin":
                 self.assertEqual(P.peer(accepted).pid, os.getpid())
         finally:
@@ -361,6 +385,8 @@ class Live(unittest.TestCase):
     def test_a_connection_not_yet_accepted_reads_its_listeners_owner(self):
         """0.74.0 unit reading 3: Linux prints a connection the server has not accept()ed with uid 0 and inode 0; it
         reads as its listener's owner (this account here), never as root's."""
+        if sys.platform == "darwin" and P.method() != "sysctl":
+            self.skipTest("a restricted table proves an accepted socket only (DEC-0155 RT-2), and none is accepted here")
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))
         listener.listen(8)
@@ -416,6 +442,9 @@ class SelfContained(unittest.TestCase):
             elif isinstance(node, ast.ImportFrom):
                 names.add((node.module or "").split(".")[0])
         names.discard("__future__")
+        # The one kit module it may ask, beside it and optional (FAA-292): without it the file stands alone.
+        names.discard("fabric_socket_proof")
+        self.assertIn("except ImportError:\n        _PROOF[0], proof = False, None", (SCRIPTS / "fabric_peer_owner.py").read_text())
         # sys.stdlib_module_names is 3.10's; on the kit's 3.9 floor the module's own list stands in.
         stdlib = set(getattr(sys, "stdlib_module_names", ())) or {
             "ctypes", "http", "ipaddress", "json", "os", "select", "selectors", "socket", "struct", "subprocess", "sys", "threading", "time",
@@ -569,6 +598,57 @@ class KitInstaller(unittest.TestCase):
             server.server_close()
 
 
+class WholeVouchChain(unittest.TestCase):
+    """FAA-273 item 1: the installer's read of its own job's answer under a restricted table, only the table mocked: the
+    real `ps` and `lsof` vouch for the pid, and the accepted-socket proof (FAA-292) proves it before any vouch."""
+
+    def setUp(self):
+        if sys.platform != "darwin" or not os.path.exists(P.LSOF):
+            self.skipTest("ps and lsof on macOS")
+        self.addCleanup(P._PROOF.__setitem__, 0, False)
+
+        class WellKnown(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802
+                body = b'{"service": {"id": "example-agent", "instance": "default"}}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), WellKnown)
+        threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.origin = "http://127.0.0.1:%d" % self.server.server_address[1]
+        self.sup = importlib.import_module("fabric_supervisors")
+        self.restricted = mock.patch.object(P, "read_table", side_effect=P.TableUnreadable(
+            P.TABLE_RESTRICTED + ": netstat printed nothing to this process"))
+
+    def test_the_vouch_reads_the_real_process(self):
+        P._PROOF[0] = False
+        with self.restricted:
+            doc, why = self.sup._read_well_known(self.origin, timeout=5, vouch_pid=os.getpid())
+            self.assertEqual((doc or {}).get("service", {}).get("id"), "example-agent", why)
+            self.assertIsNone(self.sup._read_well_known(self.origin, timeout=5)[0], "no vouch, no proof: refused")
+            other = __import__("subprocess").Popen(["/bin/sleep", "30"])
+            try:
+                doc, why = self.sup._read_well_known(self.origin, timeout=5, vouch_pid=other.pid)
+            finally:
+                other.kill()
+                other.wait()
+            self.assertIsNone(doc)
+            self.assertTrue(why.startswith(P.TABLE_RESTRICTED), why)
+
+    def test_the_accepted_socket_proves_it_before_any_vouch(self):
+        P._PROOF[0] = None
+        with self.restricted, mock.patch.object(P, "pid_listens", side_effect=AssertionError("no vouch needed")):
+            doc, why = self.sup._read_well_known(self.origin, timeout=5, vouch_pid=4242)
+        self.assertEqual((doc or {}).get("service", {}).get("id"), "example-agent", why)
+
+
 class RestrictedTable(unittest.TestCase):
     """FAA-267: a socket table that shows this process alone."""
 
@@ -645,6 +725,37 @@ class RestrictedTable(unittest.TestCase):
                     start = time.monotonic()
                     self.assertEqual(P._child_listener_seen(lambda: []), expected)
                     self.assertLess(time.monotonic() - start, deadline + 1.5, "one deadline, never a second wait")
+
+    @unittest.skipIf(sys.platform == "win32", "a shell script as the interpreter")
+    def test_a_pipe_that_cannot_be_read_and_a_table_that_fails_after_the_port(self):
+        """FAA-277 item 7: `_child_line`'s read error proves nothing (None), and a table that fails once the child gave its
+        port is no child seen (False); neither waits past its one deadline."""
+        import tempfile
+        import time
+        with tempfile.TemporaryDirectory() as d:
+            fake = os.path.join(d, "python3")
+            with open(fake, "w") as f:
+                f.write("#!/bin/sh\nprintf '12345\\n'\nexec cat >/dev/null\n")  # gone once its stdin closes
+            os.chmod(fake, 0o755)
+            with mock.patch.object(sys, "executable", fake), mock.patch.object(P, "TIMEOUT_SECONDS", 6.0):
+                class Unreadable:  # this module's os alone: subprocess reads its own pipes with the real one
+                    def __getattr__(self, name):
+                        return getattr(os, name)
+
+                    def read(self, fd, n):
+                        raise OSError(5, "EIO")
+                with mock.patch.object(P, "os", Unreadable()), mock.patch.object(P, "_child_line", wraps=P._child_line) as line:
+                    started = time.monotonic()
+                    self.assertIsNone(P._child_listener_seen(lambda: []))
+                    self.assertLess(time.monotonic() - started, 7.5)
+                    self.assertEqual(line.call_count, 1, "the child started and its pipe was read")
+                for failure in (P.TableUnreadable("sysctl: errno 1"), OSError("EPERM"), struct_error()):
+                    with self.subTest(failure=type(failure).__name__):
+                        def rows_of():
+                            raise failure
+                        started = time.monotonic()
+                        self.assertIs(P._child_listener_seen(rows_of), False)
+                        self.assertLess(time.monotonic() - started, 7.5)
 
     @unittest.skipUnless(sys.platform == "darwin", "the child check runs on macOS")
     def test_a_process_holding_more_than_1024_files_still_sees_its_child(self):
@@ -892,7 +1003,7 @@ class SharedCases(unittest.TestCase):
             table = self.CASES["tables"][case["table"]]
             with self.subTest(i=i, table=case["table"], ask=case["ask"]), \
                     mock.patch.object(P.os, "getuid", return_value=case.get("ownUid", self.CASES["ownUid"]), create=True), \
-                    mock.patch.object(P, "_own_pid", return_value=case.get("ownPid", os.getpid())):
+                    mock.patch.object(P.os, "getpid", return_value=case.get("ownPid", os.getpid())):
                 P._LISTENERS.clear()
                 try:
                     read = mock.patch.object(P, "read_table", return_value=self.rows(table))
@@ -913,6 +1024,165 @@ class SharedCases(unittest.TestCase):
         for raw, want in self.CASES["normHost"]:
             with self.subTest(raw=raw):
                 self.assertEqual(P.norm_host(raw), want)
+
+
+
+class FakeProof:
+    """A fabric_socket_proof that answers what a test says and records what it was asked."""
+
+    def __init__(self, proved=True, pid=4100, method="libproc", reason=None):
+        self.answer, self.asked = (proved, pid, method, reason), []
+
+    def _proof(self, *args, **kwargs):
+        return importlib.import_module("fabric_socket_proof").Proof(*self.answer)
+
+    def accepted(self, *args, **kwargs):
+        self.asked.append(("accepted", args, kwargs))
+        return self._proof()
+
+    def own_listener(self, *args, **kwargs):
+        self.asked.append(("own_listener", args, kwargs))
+        return self._proof()
+
+
+class AcceptedSocketProof(unittest.TestCase):
+    """FAA-292 (DEC-0155 RT-2) and FAA-272: on a restricted macOS table, the server end or listener this account's own
+    processes hold is this account's; anything else keeps the table's answer, and without fabric_socket_proof beside it
+    the file answers as before."""
+
+    RESTRICTED = P.TableUnreadable(P.TABLE_RESTRICTED + ": netstat printed nothing to this process")
+
+    def setUp(self):
+        P._LISTENERS.clear()
+        self.addCleanup(P._LISTENERS.clear)
+        self.addCleanup(P._PROOF.__setitem__, 0, False)
+
+    def ask(self, proof, question, platform="darwin", table=None):
+        P._PROOF[0] = proof
+        read = mock.patch.object(P, "read_table", side_effect=table or self.RESTRICTED)
+        with read, mock.patch.object(P.sys, "platform", platform), mock.patch.object(P, "method", return_value="netstat"):
+            return question()
+
+    def test_a_server_end_held_by_this_account_s_process_is_this_account_s(self):
+        proof = FakeProof()
+        got = self.ask(proof, lambda: P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)))
+        self.assertEqual((got.kind, got.pid, got.method, got.reason), (P.THIS_ACCOUNT, 4100, "libproc", None))
+        self.assertEqual(proof.asked, [("accepted", (SERVER, ("127.0.0.1", 50001)), {"wait": True})])
+
+    def test_a_peer_and_a_listener_are_proved_the_same_way(self):
+        proof = FakeProof(pid=None, reason="several-processes")
+        got = self.ask(proof, lambda: P.peer_at(SERVER, ("127.0.0.1", 50001)))
+        self.assertEqual((got.kind, got.pid, got.reason), (P.THIS_ACCOUNT, None, "several-processes"))
+        got = self.ask(proof, lambda: P.listener(F.SERVER_PORT))
+        self.assertEqual(got.kind, P.THIS_ACCOUNT)
+        self.assertEqual([q[0] for q in proof.asked], ["accepted", "own_listener"])
+        self.assertEqual(proof.asked[0][1:], ((("127.0.0.1", 50001), SERVER), {"wait": False}))
+
+    def test_nothing_proved_keeps_the_restricted_answer(self):
+        got = self.ask(FakeProof(proved=False, pid=None, reason=P.TABLE_RESTRICTED),
+                       lambda: P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)))
+        self.assertEqual((got.kind, got.reason), (P.UNKNOWN, str(self.RESTRICTED)))
+
+    def test_without_the_module_the_file_stands_alone(self):
+        got = self.ask(False, lambda: P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)))
+        self.assertEqual((got.kind, got.reason), (P.UNKNOWN, str(self.RESTRICTED)))
+
+    def test_it_is_asked_only_about_a_restricted_macos_table(self):
+        proof = FakeProof()
+        for platform, table in (("linux", self.RESTRICTED), ("darwin", P.TableUnreadable("proc: PermissionError"))):
+            got = self.ask(proof, lambda: P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)), platform, table)
+            self.assertEqual(got.kind, P.UNKNOWN)
+        self.assertEqual(proof.asked, [])
+
+    def test_a_proof_that_raises_keeps_the_restricted_answer(self):
+        class Broken(FakeProof):
+            def accepted(self, *args, **kwargs):
+                raise RuntimeError("boom")
+        got = self.ask(Broken(), lambda: P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)))
+        self.assertEqual(got.kind, P.UNKNOWN)
+
+    def test_the_proof_comes_before_the_vouch(self):
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(8)
+        self.addCleanup(server.close)
+        P._PROOF[0] = FakeProof(pid=None, reason="several-processes")
+        with mock.patch.object(P, "read_table", side_effect=self.RESTRICTED), \
+                mock.patch.object(P.sys, "platform", "darwin"), mock.patch.object(P, "method", return_value="netstat"), \
+                mock.patch.object(P, "pid_listens", return_value=False) as listens:
+            P.own_connection(server.getsockname()[1], timeout=2, vouch_pid=4242).close()
+        listens.assert_not_called()
+
+    def test_the_module_is_found_beside_this_file(self):
+        P._PROOF[0] = None
+        with mock.patch.object(P.sys, "platform", "linux"):  # not asked: only found
+            P._proved("accepted", SERVER, SERVER, fallback=P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED))
+        self.assertIsNone(P._PROOF[0], "found lazily, only for a restricted macOS answer")
+        with mock.patch.object(P.sys, "platform", "darwin"):
+            P._proved("own_listener", 1, fallback=P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED))
+        self.assertEqual(getattr(P._PROOF[0], "__name__", None), "fabric_socket_proof")
+
+    @unittest.skipUnless(sys.platform == "darwin", "this account's own processes, through libproc or lsof")
+    def test_live_a_restricted_table_still_proves_this_process_s_own_server(self):
+        """FAA-273 item 14: a listener in the caller's own process is proved again under a restricted table."""
+        P._PROOF[0] = None
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(8)
+        self.addCleanup(server.close)
+        taken = []
+        accepting = threading.Thread(target=lambda: taken.append(server.accept()[0]))
+        accepting.start()
+        try:
+            with mock.patch.object(P, "read_table", side_effect=self.RESTRICTED):
+                conn = P.own_connection(server.getsockname()[1], timeout=2)
+                conn.close()
+                self.assertEqual(P.listener(server.getsockname()[1]).kind, P.THIS_ACCOUNT)
+        finally:
+            accepting.join(5)
+            for s in taken:
+                s.close()
+
+
+class VouchAddressFamily(unittest.TestCase):
+    """FAA-273 item 12: the vouch proves a listener on exactly 127.0.0.1, so it is taken only for a connection that
+    reached 127.0.0.1; one a caller spelled `::1` or `localhost` that reached ::1 is never vouched for."""
+
+    def test_a_connection_to_ipv6_loopback_is_never_vouched_for(self):
+        try:
+            server = socket.socket(socket.AF_INET6)
+            server.bind(("::1", 0))
+        except OSError:
+            self.skipTest("no IPv6 loopback on this host")
+        server.listen(8)
+        self.addCleanup(server.close)
+        restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED + ": netstat printed nothing")
+        with mock.patch.object(P, "server_end", return_value=restricted), \
+                mock.patch.object(P, "pid_listens", return_value=True) as listens:
+            with self.assertRaises(P.ListenerRefused):
+                P.own_connection(server.getsockname()[1], host="::1", timeout=2, vouch_pid=4242)
+        listens.assert_not_called()
+
+
+class PidListensOwner(unittest.TestCase):
+    """FAA-286 (1): one lsof reader for the vouch and the LaunchDaemon's job, with an owner parameter."""
+
+    @unittest.skipIf(sys.platform == "win32", "ps and lsof")
+    def test_the_owner_is_this_account_by_default_another_uid_or_none(self):
+        uids = {"4242": os.getuid(), "4343": 0}
+
+        def run(argv):
+            return "%d\n" % uids[argv[-1]] if argv[0] == P.PS else "p%s\nf4\nn127.0.0.1:80\n" % argv[4]
+        with mock.patch.object(P, "_run", side_effect=run), mock.patch.object(P.sys, "platform", "darwin"):
+            self.assertTrue(P.pid_listens(4242, 80))
+            self.assertFalse(P.pid_listens(4343, 80), "root's job is not this account's")
+            self.assertTrue(P.pid_listens(4343, 80, owner=0))
+            self.assertFalse(P.pid_listens(4242, 80, owner=0))
+            self.assertTrue(P.pid_listens(4343, 80, owner=None), "the caller checks the uid itself")
+            self.assertFalse(P.pid_listens(4343, 81, owner=None))
+        for bad in ("0", True, -1, 1.5):
+            with self.assertRaises(ValueError):
+                P.pid_listens(4242, 80, owner=bad)
 
 
 if __name__ == "__main__":
