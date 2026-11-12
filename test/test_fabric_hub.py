@@ -57,6 +57,21 @@ class LocateTests(HubTestCase):
         self.assertEqual(cm.exception.code, "not-running")
         self.assertIn("not running", str(cm.exception))
 
+    def test_another_accounts_process_under_the_pid_is_not_verified(self):
+        """FAA-304: the session hooks' answer (FAA-254): EPERM is another OS account's process under a reused id, so
+        `not-a-hub` saying not verified, never `not-running`; retryable, as a restarted Fabric writes a new pid."""
+        from unittest import mock
+        if sys.platform != "win32":
+            with mock.patch.object(fh.os, "kill", side_effect=PermissionError(1, "Operation not permitted")):
+                self.assertIsNone(fh.pid_alive(4242))
+            with mock.patch.object(fh.os, "kill", side_effect=ProcessLookupError(3, "No such process")):
+                self.assertIs(fh.pid_alive(4242), False)
+        with self.assertRaises(fh.HubError) as cm:
+            fh.locate_hub(self.root, alive=lambda pid: None)
+        self.assertEqual((cm.exception.code, cm.exception.retryable), ("not-a-hub", True))
+        self.assertIn("another OS account", str(cm.exception))
+        self.assertIn("not verified", str(cm.exception))
+
     def test_refuses_what_is_not_fabrics_hub(self):
         cases = [
             {"protocol": "fabric-hub/0.2"},

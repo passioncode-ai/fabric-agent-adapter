@@ -75,14 +75,18 @@ export function fabricRoot(platform = process.platform, env = process.env) {
   return path.join(env.XDG_DATA_HOME || path.join(home, '.local/share'), 'passioncode-fabric');
 }
 
-/** Whether a process with this id runs as this user (Fabric hub.ts#pidAlive): EPERM is another user's process. */
+/**
+ * true: a process of this OS account runs under pid; false: none does. null (falsy): a process of another account does
+ * (EPERM), as when the id hub.json names was reused: not verified, never called running (FAA-304, the session hooks'
+ * answer since FAA-254). Never signals it.
+ */
 export function pidAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    return e?.code === 'EPERM' ? null : false;
   }
 }
 
@@ -108,7 +112,8 @@ function readSmall(file) {
 
 /**
  * hub.json read the way an agent must, every call. Answers {origin, mcpUrl, doorTokenFile, pid, startedAt, features} or
- * throws HubError (not-running, retryable; not-a-hub). Reads no token. `estate` is {record, applied}: with it, a hubKey
+ * throws HubError (not-running, retryable; not-a-hub, retryable when hub.json names another OS account's process, not
+ * verified, FAA-304). Reads no token. `estate` is {record, applied}: with it, a hubKey
  * the document names is checked by hubKeyCertified (DEC-0060); fabric-hub/0.1 names none.
  */
 export function locateHub(root = fabricRoot(), { alive = pidAlive, estate, now } = {}) {
@@ -142,7 +147,10 @@ export function locateHub(root = fabricRoot(), { alive = pidAlive, estate, now }
     sameRoot = false;
   }
   if (!sameRoot) throw notHub('names a door token outside the registry root');
-  if (!alive(doc.pid)) throw new HubError('not-running', `Fabric is not running: hub.json names process ${doc.pid}, which is not running.`, true);
+  const live = alive(doc.pid);
+  // FAA-304: another account's process under that id, so not this account's Fabric (as FAA-254)
+  if (live === null) throw new HubError('not-a-hub', `Fabric's hub.json names process ${doc.pid}, which runs under another OS account: not verified.`, true);
+  if (!live) throw new HubError('not-running', `Fabric is not running: hub.json names process ${doc.pid}, which is not running.`, true);
   const features = Array.isArray(doc.features) ? doc.features.filter((f) => typeof f === 'string') : [];
   if (estate && doc.hubKey && typeof doc.hubKey === 'object') {
     const verdict = hubKeyCertified(estate.record, doc.hubKey.kid, doc.hubKey.x, now ?? Date.now() / 1000, estate.applied ?? undefined);

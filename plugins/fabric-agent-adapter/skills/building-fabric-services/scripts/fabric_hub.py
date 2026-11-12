@@ -94,8 +94,10 @@ def fabric_root(platform: str = sys.platform, env: Optional[Dict[str, str]] = No
     return Path(env.get("XDG_DATA_HOME") or str(home / ".local/share")) / "passioncode-fabric"
 
 
-def pid_alive(pid: int) -> bool:
-    """Whether a process with this id runs as this user (Fabric `hub.ts#pidAlive`); never signals it."""
+def pid_alive(pid: int) -> Optional[bool]:
+    """True: a process of this OS account runs under `pid`; False: none does. None (falsy): a process of another account
+    does (EPERM), as when the id hub.json names was reused: not verified, never called running (FAA-304, the session
+    hooks' answer since FAA-254). Never signals it."""
     if pid <= 0:
         return False
     if sys.platform == "win32":
@@ -112,7 +114,7 @@ def pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
     except PermissionError:
-        return False  # another user's process under a reused id: not this user's Fabric
+        return None  # another account's process under a reused id: not verified, and not this account's Fabric
     except OSError:
         return False
     return True
@@ -142,7 +144,8 @@ def _read_small(path: Path) -> Optional[str]:
 def locate_hub(root: Optional[Path] = None, alive: Callable[[int], bool] = pid_alive, estate: Optional[Dict[str, Any]] = None,
                now: Optional[float] = None) -> Dict[str, Any]:
     """`hub.json` read the way an agent must, every call. Answers `{origin, mcpUrl, doorTokenFile, pid, startedAt,
-    features}` or raises `HubError` (`not-running`, retryable; `not-a-hub`). Reads no token. `estate` is
+    features}` or raises `HubError` (`not-running`, retryable; `not-a-hub`, retryable when hub.json names a process of
+    another OS account, which is not verified, FAA-304). Reads no token. `estate` is
     `{"record": <estate record>, "applied": {"revision", "digest"?} | None}`: with it, a `hubKey` the document names is
     checked by `hub_key_certified` (DEC-0060); fabric-hub/0.1 names none, and then nothing is checked."""
     root = Path(root) if root is not None else fabric_root()
@@ -174,7 +177,11 @@ def locate_hub(root: Optional[Path] = None, alive: Callable[[int], bool] = pid_a
     token_file = doc.get("doorTokenFile") if isinstance(doc.get("doorTokenFile"), str) else ""
     if not os.path.isabs(token_file) or os.path.realpath(os.path.dirname(token_file)) != os.path.realpath(str(root)):
         raise not_hub("names a door token outside the registry root")
-    if not alive(pid):
+    live = alive(pid)
+    if live is None:  # FAA-304: another account's process under that id, so not this account's Fabric (as FAA-254)
+        raise HubError("not-a-hub", "Fabric's hub.json names process %d, which runs under another OS account: not "
+                       "verified." % pid, True)
+    if not live:
         raise HubError("not-running", "Fabric is not running: hub.json names process %d, which is not running." % pid, True)
     features = doc.get("features")
     features = [f for f in features if isinstance(f, str)] if isinstance(features, list) else []
