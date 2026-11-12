@@ -169,7 +169,8 @@ deadline, safe retries and a size cap; `fabric_openrouter` with the agent's own 
 spend ceiling before every attempt, receipts and a fallback). The draft-and-check step of a
 support agent on the kit: [`recipes/support-agent/`](recipes/support-agent/README.md); the whole agent:
 creating-fabric-agents' `references/agents-that-answer-people.md`. A service that is only a dashboard:
-[`recipes/dashboard-only/`](recipes/dashboard-only/README.md).
+[`recipes/dashboard-only/`](recipes/dashboard-only/README.md); a door that hands a key on sealed:
+[`recipes/key-delivery-door/`](recipes/key-delivery-door/README.md).
 
 Startup order is the part that goes wrong; keep it exactly:
 

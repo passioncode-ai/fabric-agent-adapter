@@ -106,7 +106,7 @@ Beside the kit, not in `kit.json`: the probe (`check_service.py`, `check_service
 `service-channel-agent-extension.schema.json` it reads at run time), the sample
 (`sample_service.py`, `sample-remote-service.mjs`), `fabric_kit.py` itself and the dashboard tools. Recipes built on
 the kit live in `../recipes/` ([the draft-and-check step of a support agent](../recipes/support-agent/README.md), [a service that is only a
-dashboard](../recipes/dashboard-only/README.md)).
+dashboard](../recipes/dashboard-only/README.md), [a key-delivery door](../recipes/key-delivery-door/README.md)).
 
 ## What 0.39 code keeps
 
