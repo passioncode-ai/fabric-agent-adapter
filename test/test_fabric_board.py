@@ -406,7 +406,8 @@ class FailureTests(Conversation):
         self.assertNotIn("com.accept", self.tools())
         kinds = [e for e in self.events if e[0] == "board.access.needed"]
         self.assertTrue(kinds and kinds[0][3]["notify"])
-        self.assertIn("Agents & access", kinds[0][2])
+        self.assertIn("Settings → Agent access", kinds[0][2])
+        self.assertNotIn("Agents & access", kinds[0][2])
 
     def test_no_grant_at_join_backs_off(self):
         self.hub.grant = False

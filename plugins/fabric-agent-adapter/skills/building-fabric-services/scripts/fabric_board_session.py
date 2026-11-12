@@ -258,7 +258,7 @@ class Responder(SlotKeeper):
         status = self._status()
         if missing:
             self._emit("board.access.needed", "warning", "The operator has not let this service answer %s on this Project; ask in "
-                       "Fabric (Agents & access)." % ", ".join(missing), notify=True, episode=",".join(missing),
+                       "Fabric (Settings → Agent access)." % ", ".join(missing), notify=True, episode=",".join(missing),
                        capabilities=missing)
         self.slots = {}
         self._recover(status, [c for c in self.capabilities if c in grant.capabilities])
@@ -549,7 +549,7 @@ class Responder(SlotKeeper):
             self.state = "not-authorized"
             self._drop_session()
             self._emit("board.access.needed", "warning", "This service may not answer requests for this Project: the operator "
-                       "has to allow it in Fabric (Agents & access). Nothing is claimed until then.", notify=True,
+                       "has to allow it in Fabric (Settings → Agent access). Nothing is claimed until then.", notify=True,
                        episode="access", reason=code)
         elif code == "held":
             self.state = "paused"

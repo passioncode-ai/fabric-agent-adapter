@@ -196,7 +196,7 @@ export class Responder extends SlotKeeper {
     this.session = session;
     const status = await this.status();
     if (missing.length) {
-      this.emit('board.access.needed', 'warning', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Agents & access).`, { notify: true, episode: missing.join(','), capabilities: missing });
+      this.emit('board.access.needed', 'warning', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Settings → Agent access).`, { notify: true, episode: missing.join(','), capabilities: missing });
     }
     this.slots = {};
     await this.recover(status, this.capabilities.filter((c) => grant.capabilities.includes(c)));
@@ -496,7 +496,7 @@ export class Responder extends SlotKeeper {
     if (['not_authorized', 'authority_changed', 'credential'].includes(code)) {
       this.state = 'not-authorized';
       await this.dropSession();
-      this.emit('board.access.needed', 'warning', 'This service may not answer requests for this Project: the operator has to allow it in Fabric (Agents & access). Nothing is claimed until then.', { notify: true, episode: 'access', reason: code });
+      this.emit('board.access.needed', 'warning', 'This service may not answer requests for this Project: the operator has to allow it in Fabric (Settings → Agent access). Nothing is claimed until then.', { notify: true, episode: 'access', reason: code });
     } else if (code === 'held') {
       this.state = 'paused';
       this.emit('board.held', 'info', 'The operator holds new work on this Project; the responder waits and asks again with a growing pause.', { episode: 'held', reason: code });
