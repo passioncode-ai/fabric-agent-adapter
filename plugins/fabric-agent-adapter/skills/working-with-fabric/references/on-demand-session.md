@@ -6,9 +6,9 @@ does the one request, reports, completes it and ends. Nobody watches it, so it n
 dispatcher ships in Fabric 0.3.16 (released 2026-11-05, tag `v0.3.16` at `bcead0ef`), on by default since
 `a6f0ffda`. Fabric 0.3.17 (2026-11-08) adds CO-409 (`babb2dc1`, `09ddb2fc`), CO-506 (`027cb809`: a session's own
 Project is granted `board.respond` at `com.enroll`) and the slot condition in `board.read-at-start` and `com.enroll`'s
-description (`dbfbfce4`, `12d57bdd`, `4f3c742a`); the latest release is v0.3.19 (2026-11-11). "Fabric's main" below
-names the commit a change landed at, each in v0.3.17 or earlier unless it is called unreleased, as CO-563 is
-(`780022af`, expected in the release after v0.3.19). The hooks recognise a dispatched session from
+description (`dbfbfce4`, `12d57bdd`, `4f3c742a`); the latest release is v0.3.20 (2026-11-12, tag at `bcf3b4dd`), which
+ships CO-563 (`780022af`). "Fabric's main" below names the commit a change landed at, each in v0.3.17 or earlier
+unless it says otherwise. The hooks recognise a dispatched session from
 adapter 0.63.0 on, so a launcher can start one today.
 
 ## Contents
@@ -57,11 +57,14 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
 ## What the session does
 
 1. **Look, then read the packet.** `fabric_whoami` first, as in any session: until it, the session holds no other
-   Fabric tool, and it returns the session's rules. A headless Claude Code run (`claude -p`) that still sees only
-   `fabric_whoami` among Fabric's tools after that call met Fabric's CO-563 (`fabric-mcp` offered the rest only once the
-   session was admitted, and `-p` reads its list of tools once; fixed at `780022af`, expected in the release after
-   v0.3.19): it cannot read or answer the board, so it says so in its exit report (an `in_progress` checkpoint naming
-   CO-563 when it holds the lease, then the retro), never claims the board was read, and ends (FAA-296). Then `observatory_checkpoint_latest {workflowId}`. Its `goal`
+   Fabric tool, and it returns the session's rules. A run that still sees only `fabric_whoami` among Fabric's tools
+   after that call runs on a Fabric before 0.3.20 and met its CO-563: `fabric-mcp` offered the rest only once the
+   session was admitted, and a headless Claude Code run (`claude -p`) reads its list of tools once. Fabric 0.3.20
+   (2026-11-12) lists them from the first tool list, so the remedy is Fabric 0.3.20 or later; on an older Fabric an
+   interactive session can reconnect the `fabric` MCP server (`/mcp`) after `fabric_whoami`, which a headless run
+   cannot. Such a run cannot read or answer the board, so it says so in its exit report (an `in_progress` checkpoint
+   naming CO-563 and Fabric's version when it holds the lease, then the retro), never claims the board was read, and
+   ends (FAA-296). Then `observatory_checkpoint_latest {workflowId}`. Its `goal`
    describes the request (its text is on the board); its `constraints` carry the exit contract, the three floors and
    the operator's mandate when the request has one: obey them first. Its `artifacts` are references only,
    `kind: "other"` with `ref` `board-request:<uuid>`, `board-thread:<uuid>`, `capability:<name>`,
