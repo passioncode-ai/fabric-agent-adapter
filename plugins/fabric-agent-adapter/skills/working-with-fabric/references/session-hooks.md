@@ -72,9 +72,14 @@ Bash command `cd <absolute path>` and `git -C <path>`, split only in commands th
 characters of command text a turn. A relative `-C` is read against the folder the command last changed into with an absolute
 `cd`, else the session's folder; after a `cd` to a relative or unknown folder (`cd sub`, `cd ~`, `cd -`) it is left
 out (FAA-166). A `cd` inside `( )`, in a pipeline's stage or in a list sent to the background with `&` moves only a
-subshell, so a later relative `-C` is read against the folder before it; a newline ends a command, as `;` does (a `#` comment ends at its line, a `\` continuation joins two), a
-here-document's body is text, and `pushd` moves like `cd` (an unbalanced quote in a here-document's body, or a quoted
-lone `&`, pipe sign, `(` or `)`, can make the hook skip that command or read it wrongly, FAA-187). On Windows (FAA-175) Git Bash's paths
+subshell, so a later relative `-C` is read against the folder before it; a newline ends a command, as `;` does,
+unless the line ends in a pipe, `&&` or `||`; a `#` that starts a word is a comment to its line's end (one inside a
+word, `--grep=a#b`, is the word's), a `\` continuation joins two lines (an escaped backslash or a comment's does not); a
+here-document's body and terminator are cut out before the command is split (bash's terminator rules, `<<-` and a shift
+inside `(( ))` included), a quoted operator (`'&'`, `")"`) is a word, a `-C` word bash expands (`$`, a backtick, a
+leading `~`) is a folder not known here, and `pushd` moves like `cd` (FAA-187); a `case` pattern's `)` inside a
+subshell is still read as closing it. `git` is matched without case on macOS and Windows, whose file systems find
+`GIT` as git. On Windows (FAA-175) Git Bash's paths
 are read as drive paths: `/c/...`, `/cygdrive/c/...`, `C:/...` and a quoted `C:\...` (Git Bash reads an unquoted
 backslash as an escape, so `cd C:\work` goes to `C:work`, which is left out); another `/...` (Git's own root, which only
 `cygpath` resolves) is left out. A Cygwin or MSYS2 Python reads its own POSIX paths (FAA-177). These are the repositories the turn

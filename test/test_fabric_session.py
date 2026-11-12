@@ -1561,6 +1561,39 @@ class BashPaths(unittest.TestCase):
         MCP.bash_paths("cd /work/a; (cd /work/b", Path("/work"), ends=ends)
         self.assertEqual(ends, [None], "an unclosed subshell: not known")
 
+    def test_the_fourth_readings_lexing_edges(self):
+        """FAA-187 (1), (2), (5) to (9), (11): quoting kept for a lone separator, a `#` inside a word, here-document bodies
+        cut out before lexing, a line ending in a pipe or `&&`, escaped backslashes and comments before a newline, a
+        `-C` word bash expands, `$((1<<2))`, plain `<<` terminators, `<< -EOF`, `-C ""` and `GIT` on macOS."""
+        def paths(command, **kw):
+            return MCP.bash_paths(command, Path("/w"), windows=False, **kw)
+        cases = [
+            ("echo '&' cd /b", []), ("echo '|' cd /b", []), ('echo "&&" cd /b', []),  # (1) a quoted operator is a word
+            ("(cd /a; echo ')'; git -C b log)", ["/a", "/a/b"]),
+            ("git log --grep=a#b && cd /a", ["/a"]),  # (2) a `#` inside a word starts no comment
+            ("echo x # cd /c\ncd /a", ["/a"]),  # a comment ends at its line
+            ("cat <<EOF\nit's a body\nEOF\ncd /a", ["/a"]),  # (5) an apostrophe in a body
+            ("cat <<'EOF' > f\ncd /x \"\nEOF\ngit -C /a log", ["/a"]),
+            ("ls |\ncd /a\ngit -C b log", ["/a", "/w/b"]),  # (6) a line ending in a pipe continues the pipeline
+            ("true &&\ncd /a\ngit -C b log", ["/a", "/a/b"]),
+            ("echo x\\\\\ncd /a", ["/a"]),  # (7) an escaped backslash before a newline joins nothing
+            ("echo x # a note \\\ncd /a", ["/a"]),  # nor does a comment's
+            ("echo x \\\ncd /c", []),  # an odd backslash does: `cd` is an argument of echo
+            ("cd /a && git -C $REPO log && git -C ~/x log && git -C `pwd` log", ["/a"]),  # (8) bash expands these
+            ("echo $((1<<2)); cd /a", ["/a"]),  # (9) a shift is no here-document
+            ("cat <<EOF\n  EOF\ncd /x\nEOF\ncd /a", ["/a"]),  # an indented terminator ends no plain `<<`
+            ("cat <<EOF\n'EOF'\ncd /x\nEOF\ncd /a", ["/a"]),  # nor a quoted one
+            ("cat << -EOF\ncd /x\n-EOF\ncd /a", ["/a"]),  # `<< -EOF`: the delimiter is `-EOF`
+            ("cat <<-EOF\n\tcd /x\n\tEOF\ncd /a", ["/a"]),  # `<<-` strips the terminator's tabs
+            ("cd /a && git -C \"\" status", ["/a", "/a"]),  # `-C ""` runs where the shell is
+        ]
+        for command, want in cases:
+            with self.subTest(command=command):
+                self.assertEqual(paths(command, fold_case=False), want)
+        # (11) macOS's file system finds `GIT` as git; Linux's does not
+        self.assertEqual(paths("GIT -C /a log", fold_case=True), ["/a"])
+        self.assertEqual(paths("GIT -C /a log", fold_case=False), [])
+
     def test_cd_to_an_absolute_path_and_git_dash_c(self):
         cwd = Path("/work/start")
         got = MCP.bash_paths("cd /a/b && git -C ../c -c core.x=y status; (cd /d) | git --no-pager -C /e log -C "
