@@ -143,14 +143,21 @@ export class SlotKeeper {
    * com.claim asks whether the slot is its own. A claim that lands makes it held again and starts what it handed out; a
    * lease_expired one (the move reached this session but its lease lapsed) enrolls again; a fenced one is another
    * session's, recorded so the same generation is not asked about twice. Never an enroll or a replace on a slot another
-   * session holds: a slot moved off stays off unless it is handed back.
+   * session holds: a slot moved off stays off unless it is handed back. `shared` holds the tick's one com.status read,
+   * shared by every moved slot (FAA-194 (5)).
    */
-  async movedBack(capability) {
+  async movedBack(capability, shared = null) {
     if (this.current || this.stopping) return; // a claim now could hand out a second request, or start work while the responder stops
     const held = this.checkpoint.slots[capability] ?? {};
     if (held.project !== this.project || !isInt(held.moved, 1)) return;
     if (this.slots[capability]) this.slots[capability].renewedAt = this.now();
-    const now = ((await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
+    let status;
+    if (shared && 'status' in shared) status = shared.status;
+    else {
+      status = await this.status();
+      if (shared) shared.status = status;
+    }
+    const now = (status.responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if (!isInt(now, 1) || now <= held.moved) return;
     if (!this.probing.has(capability) || !this.claimKeys[capability]) { // a fresh key: one from before the move may hold a dead receipt
       this.claimKeys[capability] = this.key('claim');

@@ -131,13 +131,14 @@ class SlotKeeper:
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
         return True
 
-    def _moved_back(self, capability: str) -> None:
+    def _moved_back(self, capability: str, shared: Optional[Dict[str, Any]] = None) -> None:
         """A moved slot asked about once per later generation (FAA-165): the operator may move it back to this session
         (DEC-0140 PR-2), which this client cannot hear, so when com.status shows a generation past the recorded move, one
         `com.claim` asks whether the slot is its own. A claim that lands makes it held again and starts what it handed
         out; a `lease_expired` one (the move reached this session but its lease lapsed) enrolls again; a fenced one is
         another session's, recorded so the same generation is not asked about twice. Never an enroll or a replace on a
-        slot another session holds: a slot moved off stays off unless it is handed back."""
+        slot another session holds: a slot moved off stays off unless it is handed back. `shared` holds the tick's one
+        com.status read, shared by every moved slot (FAA-194 (5))."""
         if self.current is not None or self.stopping:
             return  # a claim now could hand out a second request, or start work while the responder stops
         held = self.checkpoint.slots.get(capability) or {}
@@ -145,7 +146,12 @@ class SlotKeeper:
         if held.get("project") != self.project or not _is_int(seen, 1):
             return
         (self.slots.get(capability) or {})["renewed_at"] = self.now()
-        status = self._status()
+        if shared is not None and "status" in shared:
+            status = shared["status"]
+        else:
+            status = self._status()
+            if shared is not None:
+                shared["status"] = status
         now = _whole(next((r.get("generation") for r in status.get("responders") or [] if isinstance(r, dict) and r.get("capability") == capability), None))
         if not _is_int(now, 1) or now <= seen:
             return

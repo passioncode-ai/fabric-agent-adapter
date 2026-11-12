@@ -236,3 +236,22 @@ test('FAA-272: a hub refusal keeps the owner\'s reason; a restricted table is no
     assert.ok(e.message.includes(who.kind), e.message);
   }
 });
+
+// FAA-194 (5): each moved slot read its own com.status once a renewal; a tick now reads it once for all of them.
+test('FAA-194 (5): moved slots share one com.status read a tick', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  const r = h.responder();
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.control({ op: 'move', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  assert.deepEqual(Object.fromEntries(Object.entries(r.slots).map(([c, s]) => [c, s.state])), { 'video.render': 'moved', 'video.cut': 'moved' });
+  for (let k = 0; k < 3; k += 1) {
+    const before = (await h.control({ op: 'state' })).calls.length;
+    await h.advance(20);
+    await r.step();
+    const calls = (await h.control({ op: 'state' })).calls.slice(before);
+    assert.equal(calls.filter((c) => c === 'com.status').length, 1, calls.join(', '));
+  }
+});

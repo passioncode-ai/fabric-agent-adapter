@@ -320,7 +320,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   Fabric release through v0.3.19 (2026-11-11) offers the operator's move (the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
   so today every move is another session taking the slot and take-back is the route back; the check below is ready
   for the move. While
-  a slot is moved the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the
+  a slot is moved the responder reads `com.status` once a renewal (20 s; one read a tick for every moved slot, FAA-194 (5)) and, when the slot's generation is past the
   recorded move, sends one `com.claim` under a fresh key, as PR-2's "Learning the slot is its own" says (FAA-165,
   0.60.0); the move itself drops the claim key of that capability, whose receipt the move made dead. A claim that
   lands is the slot held again: the record loses `moved`, the request it handed out is worked (with none, its own

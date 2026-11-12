@@ -589,10 +589,11 @@ class Responder(SlotKeeper):
         for capability in list(self._suspect):  # kept until com.status answered, so it is asked before any enroll
             self._gone(capability)
             self._suspect.discard(capability)
+        shared: Dict[str, Any] = {}  # one com.status read a tick for every moved slot (FAA-194 (5))
         for capability, slot in list(self.slots.items()):
             if slot.get("state") == "moved":  # never enrolled again on its own, even when the new holder lapses (FAA-155)
                 if self.now() - slot.get("renewed_at", 0) >= RENEW_SECONDS - 0.5:
-                    self._moved_back(capability)  # unless com.status shows a later generation it may hold (FAA-165)
+                    self._moved_back(capability, shared)  # unless com.status shows a later generation it may hold (FAA-165)
                 continue
             if slot.get("state") == "paused":
                 if capability != held_by_work and self.now() >= slot.get("retry_at", 0.0) and not self._gone(capability):

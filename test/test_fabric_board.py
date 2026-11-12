@@ -1408,6 +1408,21 @@ class MovedBackTwoCapabilitiesTests(Conversation):
         self.assertIsNotNone(r.session)
         self.assertEqual({c: s["holder"] for c, s in self.board.slots.items()}, {"video.render": mine, "video.cut": mine})
 
+    def test_moved_slots_share_one_status_read_a_tick(self):
+        """FAA-194 (5): each moved slot read its own com.status once a renewal; a tick now reads it once for all of them."""
+        r = self.responder()
+        r.step()
+        self.board.move("video.render")
+        self.board.move("video.cut")
+        self.board.advance(20)
+        r.step()
+        self.assertEqual({c: s["state"] for c, s in r.slots.items()}, {"video.render": "moved", "video.cut": "moved"})
+        for _ in range(3):
+            before = len(self.board.calls)
+            self.board.advance(20)
+            r.step()
+            self.assertEqual([t for t, _ in self.board.calls[before:]].count("com.status"), 1)
+
     def test_a_lost_probe_outlived_by_its_lease_no_longer_counts(self):
         """0.60.0 seam reading 5: a lost probe whose resend is postponed (here com.status names no generation) kept its
         send time past its lease, so one lost answer on the other, freshly renewed capability dropped the session."""

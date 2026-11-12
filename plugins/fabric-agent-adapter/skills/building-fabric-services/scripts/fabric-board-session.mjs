@@ -560,9 +560,10 @@ export class Responder extends SlotKeeper {
       await this.gone(capability);
       this.suspect.delete(capability);
     }
+    const shared = {}; // one com.status read a tick for every moved slot (FAA-194 (5))
     for (const [capability, slot] of Object.entries(this.slots)) {
       if (slot.state === 'moved') { // never enrolled again on its own, even when the new holder lapses (FAA-155)
-        if (this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.movedBack(capability); // unless com.status shows a later generation it may hold (FAA-165)
+        if (this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.movedBack(capability, shared); // unless com.status shows a later generation it may hold (FAA-165)
         continue;
       }
       if (slot.state === 'paused') {
