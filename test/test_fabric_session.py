@@ -141,7 +141,8 @@ class Base(unittest.TestCase):
                                  "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT", "FABRIC_DISPATCH_WORKFLOW",
                                  "FABRIC_DISPATCH_HANDOFF", "FABRIC_DISPATCH_REQUEST",
                                  "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID", "PASSIONCODE_APPLICATIONS",
-                                 "CLAUDE_CONFIG_DIR", "SWITCHBOARD_CLAUDE_SOURCE_DIR")}
+                                 "CLAUDE_CONFIG_DIR", "SWITCHBOARD_CLAUDE_SOURCE_DIR", "XDG_CONFIG_HOME",
+                                 "OPENCODE_CONFIG", "PI_CODING_AGENT_DIR")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"
@@ -2568,6 +2569,64 @@ class Status(Base):
         (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\nargs = []\n')
         self.assertIsNone(fs.codex_command(self.env))
         self.assertTrue(fs.codex_registered(self.env))
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_opencode_and_pi_registrations_are_checked_for_another_users_copy(self):
+        # FAA-233: OpenCode's opencode.json (`mcp.fabric`, a local entry's command array) and Pi's mcp.json
+        # (`mcpServers.fabric.command`) register fabric-mcp too; status reads their command and judges it
+        shared = self.base / "Shared" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        own = self.base / "no-fabric" / "fabric-mcp"
+        own.parent.mkdir()
+        own.write_text("")
+        opencode = self.home / ".config" / "opencode" / "opencode.json"
+        opencode.parent.mkdir(parents=True)
+        opencode.write_text(json.dumps({"mcp": {"fabric": {"type": "local", "command": [str(shared), "--runner", "opencode"]}}}))
+        pi = self.home / ".pi" / "agent" / "mcp.json"
+        pi.parent.mkdir(parents=True)
+        pi.write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared), "args": ["--runner", "pi"]}}}))
+        self.hub()
+        self.register(command=str(own))
+        theirs = os.path.realpath(str(shared))
+        self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["hostCommands"], {"opencode": str(shared), "pi": str(shared)})
+        self.assertEqual(report["hostCopies"], {"opencode": "another user's", "pi": "another user's"})
+        self.assertEqual(report["next"], "The fabric-mcp OpenCode has registered is another user's copy: %sin %s, set "
+                         'mcp.fabric.command[0] to "%s"' % ("", opencode, own))
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("OpenCode: fabric registered -> %s (another user's copy)" % shared, printed.getvalue())
+        self.assertIn("Pi: fabric registered -> %s (another user's copy)" % shared, printed.getvalue())
+        # a project's own file wins: OpenCode's opencode.json in the folder, Pi's .pi/mcp.json; Pi's override-only
+        # entry turns the global one off; a disabled or remote OpenCode entry names no command
+        (self.repo / "opencode.json").write_text(json.dumps({"mcp": {"fabric": {"type": "local", "command": [str(own)]}}}))
+        (self.repo / ".pi").mkdir()
+        (self.repo / ".pi" / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"enabled": False}}}))
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["hostCommands"], {"opencode": str(own)})
+        self.assertEqual(report["hostCopies"], {"opencode": "ok"})
+        (self.repo / "opencode.json").unlink()
+        (self.repo / ".pi" / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(own)}}}))
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["hostCopies"], {"opencode": "another user's", "pi": "ok"})
+        for entry in ({"type": "remote", "url": "http://127.0.0.1:1/mcp"}, {"type": "local", "command": [str(shared)],
+                                                                             "enabled": False}, {"type": "local", "command": []}):
+            opencode.write_text(json.dumps({"mcp": {"fabric": entry}}))
+            self.assertIsNone(fs.registered_command("opencode", self.repo, self.env), entry)
+        opencode.write_text("{ // a comment: JSONC is not read\n}")
+        self.assertIsNone(fs.registered_command("opencode", self.repo, self.env))
+        xdg = self.base / "xdg"
+        (xdg / "opencode").mkdir(parents=True)
+        (xdg / "opencode" / "opencode.json").write_text(json.dumps({"mcp": {"fabric": {"type": "local", "command": [str(shared)]}}}))
+        self.assertEqual(fs.registered_command("opencode", self.repo, dict(self.env, XDG_CONFIG_HOME=str(xdg))), str(shared))
+        agent = self.base / "pi-agent"
+        agent.mkdir()
+        (agent / "mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "fabric-mcp"}}}))
+        (self.repo / ".pi" / "mcp.json").unlink()
+        self.assertEqual(fs.registered_command("pi", self.repo, dict(self.env, PI_CODING_AGENT_DIR=str(agent))), "fabric-mcp")
 
     def test_one_next_action_per_state(self):
         report = fs.status(self.repo, self.env)
