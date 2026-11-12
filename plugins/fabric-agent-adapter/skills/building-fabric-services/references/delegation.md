@@ -53,8 +53,9 @@ the same owner; **T2** everyone else, and any call relayed onto loopback from of
 hub forwarding a T2 caller). DL-26: a T0 or T1 caller is never required to present a token; pass the tier,
 `gate(tool, headers, tier="T0")` or `server.handle(message, headers, tier="T0")`, and the call passes with no
 delegation. On a computer with more than one counted OS account, a loopback caller with no token is T0 only after the
-door checks the peer's account (the pinned DEC-0154 HA-3 and DL-25; the kit's own peer check is FAA-227), so pass
-`tier="T0"` there only for a caller the descriptor token authenticated. A token such a caller presents is still verified and refused when invalid. A T2 caller takes the whole
+door checks the peer's account (the pinned DEC-0154 HA-3 and DL-25): the kit's `LoopbackHTTPServer` with `peer_check="strict"` (Node
+`loopbackServer(app, {peerCheck: 'strict'})`, [protocol.md](protocol.md#the-listeners-owner-dec-0154-ha-2)) is that check;
+otherwise pass `tier="T0"` there only for a caller the descriptor token authenticated. A token such a caller presents is still verified and refused when invalid. A T2 caller takes the whole
 profile. Money limits and human gates bind at every tier.
 
 **The family and the agent network** (DEC-0130, wording settled by DEC-0137). The operator's family is every agent

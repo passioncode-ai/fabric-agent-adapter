@@ -82,7 +82,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_lock` | the instance lock and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |
-| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document |
+| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document, the loopback HTTP server that refuses another OS account's peer before reading it (`LoopbackHTTPServer`, Node `loopbackServer`; FAA-227) |
 | L3 | `fabric_context` | one instance per context (FAA-125, N-11): a context's instance, folders, descriptor, lock and marker; not in the facade, installed with `--module fabric_context` ([contexts](estate-record.md#one-instance-per-context-the-helper)) |
 | L3 | `fabric_auth` | the token, the network guard, login codes |
 | L3 | `fabric_events` | events, paging, the JSONL event log (DEC-0029) |

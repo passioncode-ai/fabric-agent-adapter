@@ -59,8 +59,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   the connection (a more specific bind by root over a wildcard job would pass; contract CT-261). A LaunchDaemon's root
   installer runs that `lsof` and `ps -o uid=` on its job's pid before it accepts an answer, and reads, never changes, every other
   plist in `/Library/LaunchDaemons` (to find another holder of its label, `plutil -convert xml1` for a binary one in
-  Node), `launchctl print system/<label>` and the `UserName`'s uid (`pwd`, or `id -u` in Node). A token-free loopback door is not yet protected against
-  another account's process (HA-3, FAA-227). An MCP client (Claude Code, Codex) sends the
+  Node), `launchctl print system/<label>` and the `UserName`'s uid (`pwd`, or `id -u` in Node). The kit's loopback server reads the table once per accepted
+  connection and closes a peer of another account before reading it (HA-3, FAA-227); a token-free door counts as
+  protected only under `peer_check="strict"`, which also refuses an owner it cannot tell. An MCP client (Claude Code, Codex) sends the
   token it was registered with on every later connection without this check (the contract's
   residue "a coding agent's bearer"): when the port may have changed hands, rotate the token
   and re-run `mcp-register` (one written as `references/surfaces-and-auth.md` says checks the

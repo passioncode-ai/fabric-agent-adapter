@@ -228,6 +228,8 @@ from fabric_descriptor import (  # noqa: F401
     _NOT_LAUNCHD,
     _AUTH_HEADER,
     LoopbackHTTPServer,
+    PEER_CHECKS,
+    connection_refusal,
     descriptor_path,
     read_descriptors,
     validate_descriptor,

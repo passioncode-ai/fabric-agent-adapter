@@ -248,8 +248,20 @@ a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub cl
 is never a successful install, except a LaunchDaemon's job as its root installer proves it; the systemd and Task Scheduler installers do not poll yet, FAA-253). A running board
 session reports a door another account holds as `board.down` with reason `unreachable` until FAA-252. On macOS the Node
 twin reads the pid from `netstat` and the uid from `ps` a few milliseconds apart, so a pid reused in between would be
-misread; the Python twin's `sysctl` reader takes both from one record. A service's own loopback server refusing another account's peer (HA-3) is FAA-227, and the port
-claim file (HA-1) waits on the contract's CT-228.
+misread; the Python twin's `sysctl` reader takes both from one record. The server side (HA-2, HA-3; FAA-227): the kit's `LoopbackHTTPServer` and Node's `loopbackServer(httpServer)` tell
+each accepted connection's peer (`peer`) before a byte of the request is read, in the connection's own thread or
+while the socket is still paused. `peer_check` / `peerCheck` (`PEER_CHECKS`): `refuse`, the default, closes a peer of
+another OS account unread and serves the rest; `strict` also refuses an owner nobody can tell (a restricted table
+included) and a system account other than root (uid 0, which can read every account's files anyway and installs a
+LaunchDaemon; a Windows service account is refused); `off` reads no table. Use `strict` for a dashboard, an MCP
+surface or a token-free door on a computer with several counted accounts, where the interpreter sees the whole
+table (Apple's `/usr/bin/python3`, not an ad-hoc-signed one on macOS 27.2). A refusal writes one line on stderr
+(kind, uid, pid, never the peer's bytes); a handler finds its peer's owner with `self.server.peer_owner()` or
+`connectionOwner(req.socket)`. The cost is one table read per connection, not per request: a few milliseconds from
+`sysctl` or `/proc` in-process; Node on macOS and Windows runs `netstat` and `ps` or PowerShell for each, tens to
+hundreds of milliseconds, so a Node service there that answers the well-known read within 100 ms keeps its
+connections alive or chooses `off` where one account uses the computer. The port claim file (HA-1) waits on the
+contract's CT-228.
 
 ## Semantic rules a host applies
 
