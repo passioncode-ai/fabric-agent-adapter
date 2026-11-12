@@ -288,3 +288,42 @@ test('FAA-194 (8): a move back is said', async (t) => {
   await r.step();
   assert.equal(h.events.filter((k) => k === 'board.slot.returned').length, 1, h.events.join(', '));
 });
+
+// FAA-194 (11): the Node twin of test_a_move_back_waits_while_other_work_runs: no move-back claim while work runs.
+test('FAA-194 (11): a move back waits while other work runs', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  t.after(() => release());
+  const r = new fb.Responder({ ...h.options(), handler: async (request) => {
+    if (request.capability === 'video.cut') await gate;
+    return { state: 'completed' };
+  } });
+  await r.step();
+  const mine = (await h.control({ op: 'state' })).slots['video.render'].holder;
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  const { request: cut } = await h.control({ op: 'queue', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step(); // video.cut is claimed and runs
+  assert.ok(r.current);
+  await h.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: render } = await h.control({ op: 'queue', capability: 'video.render' });
+  const before = (await h.control({ op: 'state' })).calls.length;
+  await h.advance(20);
+  await r.step();
+  const state = await h.control({ op: 'state' });
+  const claims = state.calls.slice(before).filter((c, k) => c === 'com.claim' && state.callArgs[before + k]?.capability === 'video.render');
+  assert.deepEqual(claims, [], 'no move-back claim while other work runs');
+  assert.equal(r.slots['video.render'].state, 'moved');
+  release();
+  for (let k = 0; k < 4; k += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await h.advance(20);
+    await r.step();
+  }
+  const done = await h.control({ op: 'state' });
+  assert.equal(done.requests[cut].state, 'completed');
+  assert.equal(done.requests[render].state, 'completed');
+});
