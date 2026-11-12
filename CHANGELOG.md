@@ -6,7 +6,8 @@ Wave 3 of the backlog sweep of 2026-11-12. **The contract pin moves to `93e7db16
 (`fabric-source/1`), CT-254 (HA-2's Linux source, the hybrid the kit already read), DEC-0151, DEC-0152, DEC-0155.
 Bundles pinned at `18f8d487` stay valid (FAA-258; impact map `docs/evidence/specs/2026-11-12-faa-258-repin-93e7db16-impact-map.md`).
 New kit modules: `fabric_holds` and `fabric-holds.mjs`. Kit modules change: `fabric_secrets`, `fabric_protocols`,
-`fabric_peer_owner` (`1.2.0+kit.5`), `fabric_package`, and their Node twins.
+`fabric_peer_owner` (`1.2.0+kit.5`), `fabric_package`, `fabric_descriptor`, `fabric_http`, `fabric_supervisors`, the
+facade `fabric_service`, and their Node twins.
 
 ### Added
 
@@ -33,6 +34,20 @@ New kit modules: `fabric_holds` and `fabric-holds.mjs`. Kit modules change: `fab
 
 ### Changed
 
+- **A kit service refuses a loopback peer of another OS account before it reads the request** (DEC-0154 HA-2 and HA-3,
+  FAA-227): `LoopbackHTTPServer` takes `peer_check` and Node's new `loopbackServer(httpServer, {peerCheck})` holds each
+  connection paused until the check passes; `refuse` (the default) closes another account's peer and serves the rest,
+  `strict` also refuses an owner it cannot tell, `off` reads nothing.
+- `fabric_http` and `fabric-http.mjs` check plain http that reaches loopback by its connected address, `insecure=True` and
+  a loopback proxy included (FAA-260). The probe times the well-known answer after the owner check, fails a deeply
+  nested body cleanly, compares port claims as ports (`:08080` is `:8080`), names the listener on a failed connect, and
+  no longer stops on a well-known body that is not an object; the layout probe opens a loopback page only after its
+  listener is this account's (FAA-260).
+- The dashboard link gate opens a raw loopback address in a browser only when `listener_owner` is `this-account` as
+  well as the host `not_installed` (FAA-251).
+- LaunchDaemon installs and uninstalls refuse contradicting domains, leftover LaunchAgents, another label's plist and an
+  unparseable or binary plist, and remove a plist a failed bootstrap wrote; the probe fails a LaunchDaemon without
+  `UserName`, with a `~` command, or loaded in both domains (FAA-286).
 - **The kit's credential detector is the contract's DEC-0151 `SECRET_VALUE`**, in both twins and the three dashboard
   link checkers: a provider prefix counts only in its canonical case and after a boundary; an `sk-` key needs a digit and
   an upper-case letter (16 characters or more) or a digit (32 or more), so `SK-...`, `sk-learn-...` and an `sk-` inside a
@@ -45,6 +60,9 @@ New kit modules: `fabric_holds` and `fabric-holds.mjs`. Kit modules change: `fab
 
 ### Upgrading
 
+- A service that serves loopback HTTP keeps serving its own account's callers; pass `peer_check="strict"` to refuse an
+  owner the table cannot tell. A caller of the dashboard link gate passes `listener_owner`. An outside test that runs
+  this checkout's probe needs a readable socket table.
 - A service that vendors the kit takes the changed `fabric_secrets`, `fabric_protocols` and `fabric_peer_owner` with
   `fabric_kit.py install`. A string the 0.80 detector called a key may no longer be one (see Changed).
 
