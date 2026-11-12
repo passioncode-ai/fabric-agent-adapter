@@ -327,7 +327,7 @@ descriptor says `"lifecycle": {"manager": "systemd", "unit": "<id>.<instance>.se
 
 | Verb | Command |
 |---|---|
-| install, upgrade | `systemd_install` / `systemdInstall`: write `~/.config/systemd/user/<unit>`, `daemon-reload`, `enable`, `restart` (so the new unit is what runs). A unit already installed that `is-enabled` reports `disabled` stays off: the file is rewritten and nothing starts (LC-14), unless `force_enable` |
+| install, upgrade | `systemd_install` / `systemdInstall`: write `~/.config/systemd/user/<unit>`, `daemon-reload`, `enable`, `restart` (so the new unit is what runs). A unit already installed that `is-enabled` reports `disabled` stays off: the file is rewritten and nothing starts (LC-14), unless `force_enable`. With `origin` and `service_id` it then polls the well-known answer as `launchd_install` does until this account's listener answers (another account's is refused, DEC-0154 HA-2; FAA-253); Node's `systemdInstall` then returns a promise |
 | stop, keep off | `systemctl --user disable --now <unit>` |
 | uninstall | `systemd_uninstall` / `systemdUninstall`: `disable --now`, remove the unit, `daemon-reload` |
 
@@ -344,7 +344,7 @@ CI job has the real `schtasks` create, read back and delete such a task. The des
 
 | Verb | Command |
 |---|---|
-| install, upgrade | `task_install` / `taskInstall`: `schtasks /Create /TN <task> /XML <file> /F` from a UTF-16 file it then removes, then `/End` (when it existed) and `/Run`. A task already installed and disabled stays off: it is recreated and disabled again (LC-14), unless `force_enable` |
+| install, upgrade | `task_install` / `taskInstall`: `schtasks /Create /TN <task> /XML <file> /F` from a UTF-16 file it then removes, then `/End` (when it existed) and `/Run`. A task already installed and disabled stays off: it is recreated and disabled again (LC-14), unless `force_enable`. With `origin` and `service_id` it then polls as `launchd_install` does and returns the answer (FAA-253); Node's `taskInstall` then returns a promise |
 | stop, keep off | `schtasks /End /TN <task>`, then `schtasks /Change /TN <task> /DISABLE` |
 | uninstall | `task_uninstall` / `taskUninstall`: `/End`, then `/Delete /F` |
 
