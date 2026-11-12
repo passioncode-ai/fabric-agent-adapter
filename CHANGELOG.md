@@ -54,6 +54,8 @@ Wave 2 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. Ki
 
 ### Fixed
 
+- The release waits 20 minutes, not 10, for the registry to serve a new version: 0.79.1 was served 6 s after
+  the old window closed and its run read red although it was published (FAA-307).
 - The dashboard link gate reads its handoff as UTF-8 bytes, drops a byte-order mark, caps it at 64 KiB and refuses a
   deep document plainly, so a Cyrillic handoff passes under any code page (FAA-210).
 
