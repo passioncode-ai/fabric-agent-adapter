@@ -216,6 +216,12 @@ leaves a held task still. The working-with-fabric skill's Step 5 carries it; Fab
    transaction, and log a transaction held long with the step that held it. Every blocking network
    wait is interruptible from outside, with its deadline on the socket, not between frames.
 
+13. **A routine fails its run when writing its result fails.** A scheduled or background routine (a digest, a
+   snapshot, a measurement, a sync) whose result file, row, report or board message cannot be written (a full disk,
+   a refused write, a lost connection, a schema the store refuses) exits non-zero and records the failure by its
+   code; it never logs success over a result nobody can read, and the next run sees the gap instead of yesterday's
+   value standing as today's. Its tests: a test makes the write fail and sees the run fail (FAA-294).
+
 ## Secrets and confinement
 
 1. **A secret never enters an environment, argv, URL or log a child can read.** The agent's own
@@ -268,7 +274,7 @@ Before the first release, answer each with a file and a test: where a limit paus
 `accept` each model call has; which vendors its fallback and checker use; where the attempt ledger
 and idempotency keys live; what happens to an unknown outcome; which waits are durable; who owns the
 run lock; what the next start sweeps; how a cancel reaches paid inner work; which outputs are
-capped; how a secret reaches a child; which test was seen failing for each fix; and, for an agent
+capped; which routine fails its run when its result cannot be written; how a secret reaches a child; which test was seen failing for each fix; and, for an agent
 that writes text for people, where its prompt says no em dash and which test fails on U+2014 in its
 output; and where each piece of work's retro is written (its lessons through `observatory_lesson`, or the agent's own retrospective
 file without Project Observatory; its insight/1 lines in `insights/`, practices.md *Reliability*) and which test shows it.

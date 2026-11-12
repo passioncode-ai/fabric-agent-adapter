@@ -6,6 +6,7 @@ only. The dashboard kit's fabric-button.js carries its own copy of the name and 
 
 It reads as the contract's ECMAScript does (FAA-136): ECMAScript's whitespace (Python's `\\s` also takes U+0085 and
 U+001C to U+001F, and not U+FEFF), `.` stopping at every line terminator, ASCII case folding, an ASCII word boundary."""
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 from __future__ import annotations
 

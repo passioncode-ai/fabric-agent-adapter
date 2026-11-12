@@ -45,7 +45,8 @@ Starting, stopping and restarting go through the supervisor and nothing else:
 atomic, mode 0600) and the uninstaller removes it; a running service never writes its own, except an app
 ([below](#an-apps-own-descriptor-and-the-node)). It names the supervisor and its file (`label` and `plist`, `unit`,
 or `task`; none for `node` and `person`), the `origin` `http://127.0.0.1:<port>` (a port is a claim: an installer
-refuses a port another instance declares), the service's directories, and commands as argument arrays that never
+refuses a port another instance declares, and one another OS account listens on, read with the kit's
+`fabric_peer_owner`, FAA-225; the recorded port per account and its claim file wait on contract DEC-0160), the service's directories, and commands as argument arrays that never
 carry a credential. Only `doctor` and `update` are commands a host may run.
 
 **Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
