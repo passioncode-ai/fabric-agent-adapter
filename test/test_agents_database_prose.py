@@ -30,6 +30,22 @@ class AgentsDatabase(unittest.TestCase):
             self.assertIn(word, text)
         self.assertNotIn("—", text)
 
+    def test_the_ask_s_edges_are_named(self):
+        # FAA-277 items 2 to 4 and 1: "already" a Project means before this ask; an accepted request with no reply
+        # never expires (project-board.md C4), so it is cancelled; no live responder, no ask; a dispatched run sends none
+        text = flat(SKILLS / NAMES[0] / "references" / "agents-database.md")
+        for word in ("Send it only from a folder that is already a Fabric Project",
+                     "a folder `fabric_whoami` would admit on the way to the ask is not one",
+                     "an unanswered request is cancelled (`com.cancel`) once the step it served is reported",
+                     "an accepted one never expires",
+                     "lists the capability with no `active` responder",
+                     "A run Fabric started on a board request sends no ask: its retro is its last write"):
+            with self.subTest(word=word[:40]):
+                self.assertIn(word, text)
+        board = flat(SKILLS / "working-with-fabric" / "references" / "project-board.md")
+        self.assertIn("an unanswered one is cancelled once the step it served is reported", board)
+        self.assertNotIn("left to expire", board)
+
     def test_each_skill_asks_at_its_step(self):
         hooks = {
             "creating-fabric-agents": ("Once the grill names the capability and its consumer, consult the [agents database]",
