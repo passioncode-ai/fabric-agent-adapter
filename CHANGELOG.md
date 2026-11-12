@@ -47,6 +47,9 @@ twins where they have one.
 
 ### Changed
 
+- **working-with-fabric's description names the relayed operator approval, a usage limit hit mid-run and its
+  exclusions (Fabric's own code, agent-sync leases) again**, within the 360-character budget: the trigger run goes from
+  86.4 % to 95.7 % with haiku, and 95.7 % with sonnet (`docs/evidence/evals/2026-11-12-faa-305.md`, FAA-305).
 - `remote-placement.md`: a cloud service registered from several hosts keeps one token per host, and revoking one ends
   only its sessions (FAA-280).
 - The Python connections reader refuses a non-ASCII host where every Node from 20 to 26 refuses it, with tables measured
