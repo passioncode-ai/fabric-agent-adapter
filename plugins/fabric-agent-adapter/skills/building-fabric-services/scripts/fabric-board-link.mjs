@@ -92,7 +92,7 @@ export class BoardSession {
 export class Checkpoint {
   constructor(file) {
     this.file = file;
-    this.slots = {}; // the responder's own record of each slot it held: {project, generation, moved?} (FAA-155)
+    this.slots = Object.create(null); // the responder's own record of each slot it held: {project, generation, moved?} (FAA-155); no prototype, so a capability named `constructor` reads as any other (FAA-196 (24))
     this.entries = this.#load();
   }
   #load() {
@@ -111,7 +111,7 @@ export class Checkpoint {
     }
     if (!isObj(doc) || doc.version !== 1 || !isObj(doc.requests)) throw new BoardError('checkpoint', `The board checkpoint ${this.file} is not one this kit writes.`);
     // a record that is not an object is ignored, as a file without one is
-    this.slots = isObj(doc.slots) ? Object.fromEntries(Object.entries(doc.slots).filter(([, v]) => isObj(v))) : {};
+    this.slots = Object.assign(Object.create(null), isObj(doc.slots) ? Object.fromEntries(Object.entries(doc.slots).filter(([, v]) => isObj(v))) : {});
     return doc.requests;
   }
   #write(entries, slots = this.slots) {
@@ -137,7 +137,8 @@ export class Checkpoint {
   }
   /** Writes the record of a slot this responder held (null forgets it); nothing is written when it is unchanged. */
   slot(capability, record) {
-    const { [capability]: _old, ...slots } = this.slots;
+    const slots = Object.assign(Object.create(null), this.slots);
+    delete slots[capability];
     if (record !== null) slots[capability] = JSON.parse(JSON.stringify(record));
     if (JSON.stringify(sortDeep(slots)) === JSON.stringify(sortDeep(this.slots))) return;
     this.#write(this.entries, slots);

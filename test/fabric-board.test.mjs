@@ -1731,7 +1731,7 @@ test('FAA-163: a lost enroll while another slot holds is asked again; a reconnec
   await hub.control({ op: 'fail', tool: 'com.status', code: 'capacity_exceeded' });
   await h.advance(60);
   await r.step();
-  assert.deepEqual(r.slots, {});
+  assert.deepEqual({ ...r.slots }, {}); // a map with no prototype (FAA-196 (24))
   assert.equal(r.session, null); // refused with no slot held: reconnects, never skips recovery
 });
 
@@ -1857,7 +1857,7 @@ c = fb.Checkpoint(${JSON.stringify(file)}); print(json.dumps(c.slots, sort_keys=
   assert.equal(py.status, 0, py.stderr);
   assert.deepEqual(JSON.parse(py.stdout), { 'video.render': { generation: 3, moved: 4, project: 'p' } });
   const back = new fb.Checkpoint(file);
-  assert.deepEqual(back.slots, { 'text.write': { generation: 1, project: 'p' }, 'video.render': { generation: 3, moved: 4, project: 'p' } });
+  assert.deepEqual({ ...back.slots }, { 'text.write': { generation: 1, project: 'p' }, 'video.render': { generation: 3, moved: 4, project: 'p' } });
   assert.deepEqual(Object.keys(back.entries), ['req_000000001']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -1909,4 +1909,24 @@ test('foreign-user keeps a lost call\'s record, never read as the board\'s refus
   const held = { project: 'p', generation: 1, asking: { op: 'com.enroll', args: { capability: 'video.render' } } };
   await assert.rejects(r.replay('video.render', held, 1), (e) => e.code === 'foreign-user');
   assert.deepEqual(noted, [], 'the asking record is not dropped');
+});
+
+// FAA-196 (24): a capability's name keys the responder's maps (its slots, claim keys, confirmations, transfers): a name
+// an Object.prototype member also has (`constructor`, `toString`, valid capability names) is served as any other.
+test('a capability named like an Object.prototype member is served, after a restart too', async (t) => {
+  const caps = ['constructor', 'tostring', 'valueof'];
+  const hub = await fakeHub(t, caps);
+  const h = harness(hub, { capabilities: caps });
+  const { request: first } = await hub.control({ op: 'queue', capability: 'constructor' });
+  await h.responder().step();
+  let s = await h.state();
+  assert.equal(s.requests[first].state, 'completed');
+  h.outcome = () => new Promise(() => {}); // dies inside the work
+  const { request: second } = await hub.control({ op: 'queue', capability: 'constructor' });
+  await h.responder().step();
+  await hub.control({ op: 'end-sessions' });
+  h.outcome = { state: 'completed', summary: 'Rendered after the restart.' };
+  await h.responder().step();
+  s = await h.state();
+  assert.equal(s.requests[second].state, 'completed');
 });

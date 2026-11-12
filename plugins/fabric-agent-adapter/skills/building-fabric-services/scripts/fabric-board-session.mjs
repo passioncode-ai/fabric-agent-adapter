@@ -104,16 +104,17 @@ export class Responder extends SlotKeeper {
     this.backoff = new Backoff({ rand });
     this.session = null;
     this.epoch = null;
-    this.slots = {};
+    // FAA-196 (24): maps keyed by a capability's name have no prototype, so `constructor` is a name like any other
+    this.slots = Object.create(null);
     this.current = null;
     this.state = 'idle';
     this.waitUntil = 0;
     this.stopping = false;
     /** Whether shutdown found work to drain, published before it waits; null before shutdown starts (FAA-186). */
     this.draining = null;
-    this.claimKeys = {};
+    this.claimKeys = Object.create(null);
     this.probing = new Set(); // moved slots whose move-back claim lost its answer: asked again under the same key
-    this.said = {};
+    this.said = Object.create(null);
     this.rr = 0;
     this.reconcileAt = 0;
     /** The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS. */
@@ -123,7 +124,7 @@ export class Responder extends SlotKeeper {
     this.fenceQueue = Promise.resolve();
     this.toResume = []; // transferred requests waiting until nothing runs (finding 39)
     this.suspect = new Set(); // capabilities a fenced call was refused on: com.status says whether they moved (FAA-155)
-    this.confirmed = {}; // this session's: the generation it held, or com.status showed unmoved
+    this.confirmed = Object.create(null); // this session's: the generation it held, or com.status showed unmoved
   }
 
   /** Runs fn after every fenced call queued before it (finding 36): an await inside a call never lets another in. */
@@ -195,8 +196,8 @@ export class Responder extends SlotKeeper {
 
   async connect() {
     this.state = 'connecting';
-    this.slots = {}; // the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
-    this.confirmed = {}; // nor its confirmations: a slot may have moved between the two sessions
+    this.slots = Object.create(null); // the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
+    this.confirmed = Object.create(null); // nor its confirmations: a slot may have moved between the two sessions
     this.probing = new Set(); // nor its lost move-back claims
     const grant = await this.hub.joinBoard(this.project, this.credentialFile);
     const missing = this.capabilities.filter((c) => !grant.capabilities.includes(c));
@@ -207,7 +208,7 @@ export class Responder extends SlotKeeper {
     if (missing.length) {
       this.emit('board.access.needed', 'warning', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Settings → Agent access).`, { notify: true, episode: missing.join(','), capabilities: missing });
     }
-    this.slots = {};
+    this.slots = Object.create(null);
     await this.recover(status, this.capabilities.filter((c) => grant.capabilities.includes(c)));
     this.state = 'ready';
     for (const kind of ['board.down', 'board.blocked', ...(missing.length ? [] : ['board.access.needed'])]) delete this.said[kind];
@@ -267,7 +268,7 @@ export class Responder extends SlotKeeper {
   }
 
   async recover(status, capabilities) {
-    const transfer = {};
+    const transfer = Object.create(null);
     const reconcile = [];
     for (const entry of Object.values(this.checkpoint.entries)) {
       if (!capabilities.includes(entry.capability)) continue;
@@ -286,7 +287,7 @@ export class Responder extends SlotKeeper {
       else reconcile.push(entry);
     }
     const responders = (status.responders ?? []).filter(isObj);
-    const generations = Object.fromEntries(responders.map((r) => [r.capability, r.generation ?? 0]));
+    const generations = Object.assign(Object.create(null), Object.fromEntries(responders.map((r) => [r.capability, r.generation ?? 0])));
     const onHold = new Set(responders.filter((r) => r.held === true).map((r) => r.capability)); // DEC-0079
     let failure = null;
     for (const capability of capabilities) {
@@ -586,7 +587,7 @@ export class Responder extends SlotKeeper {
   }
 
   async continueLapsed() {
-    const lapsed = {};
+    const lapsed = Object.create(null);
     for (const entry of Object.values(this.checkpoint.entries)) {
       if (entry.step === 'lapsed' && this.slots[entry.capability]?.state === 'held') (lapsed[entry.capability] ??= []).push(JSON.parse(JSON.stringify(entry)));
     }
