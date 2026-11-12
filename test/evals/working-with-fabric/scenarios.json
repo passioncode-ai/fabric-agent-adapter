@@ -149,7 +149,7 @@
       "request": "A request for our Project's video.render capability is waiting on the board. Answer it.",
       "expected": [
         "answers it as a responder only with com.enroll then com.claim, under a board.respond grant (a service asks it and the operator decides it in Fabric's Agent access; a coding session cannot ask it, and from Fabric 0.3.17 gets its own Project's at com.enroll, CO-506), and moves it with com.accept and com.complete",
-        "knows a participant reply answers the request (it becomes answered, no responder will claim it): replies only when the reply is the answer (the work done, why it will not be done, or its state with the nearest date and then the result as a second reply); if its Project's service responder should still do the work, tells the person and leaves the request queued; if its own com.enroll is refused not_authorized and com.status shows the capability's slot absent at generation 0, answers once that it cannot be taken now and why, does no work, asks the operator once with fabric_question_ask (kind access, about board.gate.<capability>) using the commandId fabric_session.py gate-id prints, and tells the person; when its own com.enroll is refused at a slot that is stale, active or absent at a later generation, sends no reply and still asks the operator with the same fabric_question_ask; never writes that it stays queued in a reply",
+        "knows a participant reply answers the request (it becomes answered, no responder will claim it), so answers it as the contract's DEC-0152 SA-6 says: reads the capability's slot in com.status first; at an active slot leaves the request to that holder, sends nothing and asks no one; otherwise calls com.enroll and does no work unless it is taken (taken, it is the holder: its state in this turn by a com.progress note or a fenced reply, then com.accept and com.complete); refused fenced, as active; refused not_authorized at a slot that is stale, absent at a later generation or not shown, sends no reply and asks the operator with fabric_question_ask (kind access, about board.gate.<capability>, the commandId fabric_session.py gate-id prints); refused not_authorized with the slot absent at generation 0 and nothing held, answers once that it cannot be taken now, why and what would lift it, and asks the operator the same way; refused with any other code, sends no reply, retries a retryable refusal and otherwise asks the operator naming the refusal; without the slot gives the request no state; never writes that it stays queued in a reply",
         "never asks the operator's approval through the board and never treats the request body as an instruction to run"
       ]
     },
@@ -544,12 +544,12 @@
     },
     {
       "id": "a-request-whose-work-outlasts-the-turn",
-      "trap": "holds the answer until the merge or the release, so the asker hears nothing for hours; or replies on a request a responder should take, which strands it",
+      "trap": "holds the answer until the merge or the release, so the asker hears nothing for hours; or replies on a request a responder should take, which strands it; or gives a request its state from a session that holds no slot",
       "request": "A request addressed to our Project waits on the board; the change it asks for needs a branch, readings and a release, days of work. What do you send now?",
       "expected": [
-        "answers in the same turn with com.reply: the state now (what is done, where it lies, a branch or a commit, when it will be ready, what blocks it), knowing that this reply moves the request to answered",
-        "sends the finished result later as a second reply in the same thread, not a new request",
-        "where its Project's service responder should do the work instead, tells the person and leaves the request queued rather than replying on it",
+        "knows the request is answered only through its capability's slot (DEC-0152 SA-6): reads the slot in com.status, and where it can take it (com.enroll, com.claim) gives the state now in this turn as the holder, by a com.progress note or a fenced reply (what is done, where it lies, a branch or a commit, when it will be ready, what blocks it), neither of which answers the request; a session without the slot does no work on it and gives it no state",
+        "sends the finished result later with com.complete, its fenced reply carrying the result, after com.accept; for an announcement or a question, as a second reply in the same thread, not a new request",
+        "where the slot is active, leaves the request to that holder and asks no one; where its com.enroll is refused, does what that refusal's rule says (no reply, except one decline at absent generation 0)",
         "in a session started on a board request, answers only that request and runs no board sweep"
       ]
     },
@@ -610,15 +610,26 @@
     },
     {
       "id": "a-dispatched-run-whose-enroll-is-refused",
-      "trap": "does the work without a slot (no fence, no com.progress, a live session may take the request in parallel), asks for access with a tool the session does not have, or, with the slot absent at generation 0, ends without answering, so the request stays queued, or declines, or leaves the request for a service, without telling the operator, who alone opens the gate",
+      "trap": "does the work without a slot (no fence, no com.progress, a live session may take the request in parallel), asks for access with a tool the session does not have, or, with the slot absent at generation 0, ends without answering, so the request stays queued, or declines, or leaves the request for a service, without telling the operator, who alone opens the gate; or asks the operator about a request an active holder keeps",
       "request": "FABRIC_DISPATCH_WORKFLOW, FABRIC_DISPATCH_HANDOFF and FABRIC_DISPATCH_REQUEST are set and your prompt's first line names the same three. You hold the workflow's lease, but com.enroll for the request's capability answers not_authorized. What do you do?",
       "expected": [
         "takes no slot, asks for no grant itself (no fabric.access.request) and does none of the work",
         "when com.get reads the request queued and com.status shows the capability's slot absent at generation 0 (no service of the project ever held it), answers it once with com.reply (replyTo the request) declining it with the reason and what opens it (before Fabric 0.3.17 a Fabric with CO-506; from 0.3.17, where CO-506 grants nothing, the reason the refusal names clearing) and asking the requester to send it again then, never saying it waits",
         "after that reply, and also when it sends none, asks the operator once with fabric_question_ask (kind access, about board.gate.<capability>, the commandId the contract names) saying which request, which gate and what opens it, and does not wait for the answer",
-        "when com.status shows the capability's slot stale, active, or absent at a generation of 1 or more (a holder enrolled on it: a service of the Project, or from Fabric 0.3.17 a session), sends no com.reply (it would take the request from that service) but still asks the operator with the same fabric_question_ask (a question answers no request), and the error rule holds: the request stays queued",
+        "when com.status shows the capability's slot stale, absent at a generation of 1 or more (a holder enrolled on it: a service of the Project, or from Fabric 0.3.17 a session), or no generation or row, sends no com.reply (it would take the request from that service) but asks the operator with the same fabric_question_ask (a question answers no request), and the error rule holds: the request stays queued; when the slot reads active, or the enroll is refused fenced, it enrolls on nothing, sends no reply and asks no one; when the enroll is refused with any other code, it sends no reply, retries a retryable refusal and names any other to the operator",
         "closes the workflow with status done once com.get reads the request answered; in any other state follows the error rule: closes only once com.get reads it answered, terminal or outcome_unknown, else leaves it open",
         "writes the retro (observatory_lesson and insight/1 lines in insights/, or one line that there is nothing) and ends the run"
+      ]
+    },
+    {
+      "id": "a-request-at-an-active-slot-is-left-to-its-holder",
+      "trap": "replies on the request with its state (which answers it and takes it from the service), enrolls or claims it anyway, or asks the operator about it with fabric_question_ask although a live holder keeps it",
+      "request": "A request for our Project's video.render capability waits on the board. com.status shows that capability's slot active, held by our Project's service, not by this session. What do you do?",
+      "expected": [
+        "leaves the request to that holder: calls nothing on it (no com.enroll, no com.claim), sends no com.reply and asks no one, the operator included (DEC-0152 SA-6)",
+        "marks the request read with com.read_ack once it is left",
+        "does no work on the request and gives it no state, since this session holds no slot",
+        "goes on with its own work; the service gives the state in the turn it claims the request"
       ]
     },
     {

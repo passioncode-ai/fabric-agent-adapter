@@ -2059,7 +2059,12 @@ class NoServicesLine(Base):
         for said in (context, fs.UNREAD_LINE % 1):  # FAA-205: what waits on the Project is answered in the same turn
             self.assertIn("in the same turn" if said is context else "in this turn", said)
             self.assertIn("the result later", said)
-        self.assertIn("a request your Project's service should take stays queued", context)
+        # FAA-311 (contract DEC-0152 SA-6): a request is answered through its slot, never by a slotless session's state
+        self.assertIn("An announcement or question waiting on your Project gets an answer in the same turn", context)
+        self.assertIn("A request to your Project: read its capability's slot in `com.status` first; `active`, leave it "
+                      "to that holder and ask no one; otherwise `com.enroll`, and only its holder gives its state "
+                      "(`com.progress`); without the slot, no work and no state on it", context)
+        self.assertNotIn("should take stays queued", context)
         # FAA-221: both cases, the decline and resend before Fabric 0.3.17 and CO-506's grant at com.enroll from it
         self.assertIn("Before Fabric 0.3.17 a run Fabric starts on a request no session can take declines it", context)
         self.assertIn("from 0.3.17 (CO-506) the session's own Project is granted `board.respond` at `com.enroll`", context)
