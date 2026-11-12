@@ -94,23 +94,33 @@ def fabric_root(platform: str = sys.platform, env: Optional[Dict[str, str]] = No
     return Path(env.get("XDG_DATA_HOME") or str(home / ".local/share")) / "passioncode-fabric"
 
 
+def _windows_pid_alive(pid: int, kernel: Any = None, last_error: Any = None) -> Optional[bool]:
+    """pid_alive on Windows, where os.kill(pid, 0) would send CTRL_C_EVENT: OpenProcess with query access only. Refused
+    with ERROR_ACCESS_DENIED (5), another account's or an elevated process: None, as Node's process.kill(pid, 0)
+    answers EPERM there (FAA-304); refused otherwise, no process. `kernel` and `last_error` stand in for kernel32 and
+    ctypes.get_last_error in a test."""
+    import ctypes
+    if kernel is None:
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+        last_error = ctypes.get_last_error  # type: ignore[attr-defined]
+    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None if last_error() == 5 else False  # ERROR_ACCESS_DENIED: not verified, never called running
+    try:
+        code = ctypes.c_ulong()
+        return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel.CloseHandle(handle)
+
+
 def pid_alive(pid: int) -> Optional[bool]:
     """True: a process of this OS account runs under `pid`; False: none does. None (falsy): a process of another account
-    does (EPERM), as when the id hub.json names was reused: not verified, never called running (FAA-304, the session
-    hooks' answer since FAA-254). Never signals it."""
+    does (EPERM; on Windows, OpenProcess refused with access denied), as when the id hub.json names was reused: not
+    verified, never called running (FAA-304, the session hooks' answer since FAA-254). Never signals it."""
     if pid <= 0:
         return False
     if sys.platform == "win32":
-        import ctypes
-        kernel = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-        if not handle:
-            return False
-        try:
-            code = ctypes.c_ulong()
-            return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
-        finally:
-            kernel.CloseHandle(handle)
+        return _windows_pid_alive(pid)
     try:
         os.kill(pid, 0)
     except PermissionError:

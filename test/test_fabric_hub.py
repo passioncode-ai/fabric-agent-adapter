@@ -21,6 +21,40 @@ from fake_fabric_hub import FakeHub, PROJECT  # noqa: E402
 VECTORS = json.loads((HERE / "fixtures/contract/hub-key-vectors.json").read_text(encoding="utf-8"))
 
 
+
+class FakeKernel:
+    """kernel32 as pid_alive calls it on Windows: OpenProcess answers a handle or 0 with a last error, GetExitCodeProcess
+    writes the exit code (259 is STILL_ACTIVE). Each case names what the OS would say."""
+    CASES = {"denied": (0, 5, None), "invalid": (0, 87, None), "running": (7, 0, 259), "exited": (7, 0, 0),
+             "unreadable": (7, 0, False)}
+
+    def __init__(self, case):
+        self.handle, self.error, self.code = self.CASES[case]
+        self.closed = []
+
+    def OpenProcess(self, access, inherit, pid):
+        assert access == 0x1000 and inherit is False and pid == 4242  # PROCESS_QUERY_LIMITED_INFORMATION only
+        return self.handle
+
+    def GetExitCodeProcess(self, handle, code):
+        if self.code is False:
+            return 0
+        code._obj.value = self.code
+        return 1
+
+    def CloseHandle(self, handle):
+        self.closed.append(handle)
+
+
+def windows_answers(read):
+    """Each FakeKernel case's answer, every handle opened closed once."""
+    answers = {}
+    for case in FakeKernel.CASES:
+        kernel = FakeKernel(case)
+        answers[case] = read(4242, kernel, lambda: kernel.error)
+        assert kernel.closed == ([kernel.handle] if kernel.handle else []), (case, kernel.closed)
+    return answers
+
 class HubTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
@@ -71,6 +105,13 @@ class LocateTests(HubTestCase):
         self.assertEqual((cm.exception.code, cm.exception.retryable), ("not-a-hub", True))
         self.assertIn("another OS account", str(cm.exception))
         self.assertIn("not verified", str(cm.exception))
+
+    def test_windows_answers_another_accounts_process_as_not_verified(self):
+        """FAA-304: on Windows, OpenProcess refused with ERROR_ACCESS_DENIED is another account's or an elevated
+        process, the third answer (None) Node's process.kill(pid, 0) gives as EPERM; any other refusal is no process.
+        The OS calls are faked, so this runs on every OS."""
+        self.assertEqual(windows_answers(fh._windows_pid_alive), {"denied": None, "invalid": False, "running": True,
+                                                                  "exited": False, "unreadable": False})
 
     def test_refuses_what_is_not_fabrics_hub(self):
         cases = [

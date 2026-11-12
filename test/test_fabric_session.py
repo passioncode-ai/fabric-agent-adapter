@@ -312,6 +312,15 @@ class Hub(Base):
         self.assertEqual(fs.locate_hub(self.root)["state"], "not-a-hub")
         self.assertLess(time.perf_counter() - started, 1.0)
 
+    def test_windows_answers_another_accounts_process_as_not_verified(self):
+        # FAA-304: the hooks' Windows reading gives the third answer too: OpenProcess refused with ERROR_ACCESS_DENIED
+        # is another account's or an elevated process (None); the OS calls are faked, so this runs on every OS
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_fabric_hub import windows_answers
+        env = sys.modules["fabric_session_env"]
+        self.assertEqual(windows_answers(env._windows_pid_alive), {"denied": None, "invalid": False, "running": True,
+                                                                   "exited": False, "unreadable": False})
+
     def test_another_account_s_process_under_the_pid_is_not_verified(self):
         # FAA-254: EPERM is a process of another OS account under the id hub.json names (a reused pid): never called
         # running, said as not verified
