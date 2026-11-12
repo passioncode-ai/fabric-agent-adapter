@@ -390,12 +390,24 @@ def package_findings(pkg: Dict[str, Any]) -> List[Dict[str, str]]:
 
 # --- the folder check and the verifier ------------------------------------------------------------------
 
+def _json_int(text: str) -> Any:
+    """An integer literal as JSON.parse reads it: one longer than a Python with `int_max_str_digits` reads is a float,
+    as a JavaScript number is (FAA-194 (36))."""
+    return int(text) if len(text) <= 4000 else float(text)
+
+
 def _parsed(data: Optional[bytes]) -> Optional[Dict[str, Any]]:
+    """A plugin or provider manifest as the contract's checkPackageFolder reads it: decoded with replacement characters
+    (`Buffer.toString`, FAA-194 (29)); NaN or Infinity, or nesting past MAX_NESTING (the limit both kits share, FAA-194
+    (27)), is no manifest."""
     if data is None:
         return None
+    text = data.decode("utf-8", "replace")
+    if _nesting(text) > MAX_NESTING:
+        return None
     try:
-        value = json.loads(data.decode("utf-8"), parse_constant=fd._no_constant)
-    except (ValueError, RecursionError):  # invalid UTF-8, NaN or Infinity is no manifest, in both kits
+        value = json.loads(text, parse_constant=fd._no_constant, parse_int=_json_int)
+    except (ValueError, RecursionError):
         return None
     return value if isinstance(value, dict) else None
 
@@ -419,7 +431,7 @@ def check_package_folder(pkg: Dict[str, Any], files: Dict[str, bytes]) -> List[D
             problems.append({"problem": "file-unlisted", "path": path})
     if PLUGIN_MANIFEST in files:
         plugin = _parsed(files.get(PLUGIN_MANIFEST))
-        if not plugin or not _same_member(plugin, "name", pkg.get("id", _UNDEFINED)) or not _same_member(plugin, "version", pkg.get("version", _UNDEFINED)):
+        if plugin is None or not _same_member(plugin, "name", pkg.get("id", _UNDEFINED)) or not _same_member(plugin, "version", pkg.get("version", _UNDEFINED)):
             problems.append({"problem": "plugin-manifest", "path": PLUGIN_MANIFEST})
     provider = pkg.get("provider")
     if isinstance(provider, str) and provider in files:

@@ -142,6 +142,16 @@ class DirectoryTests(unittest.TestCase):
         self.assertIn("FAC-SEM-014", str(caught.exception))
         self.assertFalse(self.providers.exists() and any(self.providers.iterdir()))
 
+    def test_a_manifest_holding_nan_does_not_resolve(self):
+        # FAA-194 (38): NaN and Infinity are no JSON, as pack, sign and verify read the provider manifest
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(constant):
+                self.manifest.write_text('{"provider": {"id": "https://agents.example/providers/example-agent"}, '
+                                         '"capabilities": [], "n": %s}' % constant)
+                problems = fp.manifest_problems(self.e())
+                self.assertEqual(len(problems), 1)
+                self.assertIn("does not resolve", problems[0])
+
     def test_validate_reads_the_file_name(self):
         path = fp.write_provider_entry(self.e(), self.providers, self.services)
         renamed = path.with_name("example-writer.json")

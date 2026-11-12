@@ -210,12 +210,17 @@ def _run_problems(run: Any) -> List[str]:
     return problems
 
 
+def _no_constant(name: str) -> Any:
+    raise ValueError("%s is no JSON" % name)
+
+
 def manifest_problems(entry: Dict[str, Any]) -> List[str]:
     """FAC-SEM-014 (DEC-0017), URI half: the manifest resolves and its provider.id equals providerId, compared by normal
     form (DEC-0076)."""
     try:
-        manifest = json.loads(Path(os.path.expanduser(str(entry["manifest"]))).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        manifest = json.loads(Path(os.path.expanduser(str(entry["manifest"]))).read_text(encoding="utf-8"),
+                              parse_constant=_no_constant)
+    except (OSError, ValueError, RecursionError):  # NaN or Infinity is no JSON, as pack reads it (FAA-194 (38))
         return ["the manifest %s does not resolve (FAC-SEM-014)" % entry["manifest"]]
     provider = manifest.get("provider") if isinstance(manifest, dict) else None
     if not isinstance(provider, dict) or not isinstance(manifest.get("capabilities"), list):

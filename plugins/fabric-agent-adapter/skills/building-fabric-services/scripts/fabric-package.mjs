@@ -269,10 +269,25 @@ export const packageFindings = (pkg) => [...whole(pkg), ...noSecret(pkg), ...age
 
 // --- the folder check and the verifier -------------------------------------------------------------------------------
 
+const replacingUtf8 = new TextDecoder('utf-8', { ignoreBOM: true });
+// How deep the arrays and objects of a JSON text nest, strings skipped (the Python kit's _nesting).
+const nestingOf = (text) => {
+  let depth = 0;
+  let deepest = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (c === '"') { i += 1; while (i < text.length && text[i] !== '"') i += text[i] === '\\' ? 2 : 1; } else if (c === '{' || c === '[') { depth += 1; deepest = Math.max(deepest, depth); } else if (c === '}' || c === ']') depth -= 1;
+  }
+  return deepest;
+};
+// A plugin or provider manifest as the contract's checkPackageFolder reads it: decoded with replacement characters
+// (FAA-194 (29)); nesting past MAX_NESTING, the limit both kits share, is no manifest (FAA-194 (27)).
 const parsed = (bytes) => {
   if (bytes === undefined) return undefined;
+  const text = replacingUtf8.decode(bytes);
+  if (nestingOf(text) > MAX_NESTING) return undefined;
   try {
-    const value = JSON.parse(strictUtf8.decode(bytes)); // invalid UTF-8 is no manifest, in both kits
+    const value = JSON.parse(text);
     return isObject(value) ? value : undefined;
   } catch {
     return undefined;
