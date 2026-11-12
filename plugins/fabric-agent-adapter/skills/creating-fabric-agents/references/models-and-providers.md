@@ -97,8 +97,10 @@ change an embedding model without re-indexing every stored vector (search silent
   (an organization's key follows its grant), and the agent's own
   stop sits a little under the key's limit, so the provider never refuses first (the kit's OpenRouter client counts a
   month with window="month"; its default window is a day).
-  Read it from the environment the service manager or the session gives the agent (Fabric Switchboard hands an agent
-  the key of the project it starts in).
+  Read it from the environment the service manager, a vault runner or the session gives the agent's own process
+  (Fabric Switchboard hands an agent the key of the project it starts in); never pass it on to a child the agent starts:
+  scrub the child's environment and hand a child a key over a file descriptor or a per-command vault run
+  (references/resilience-and-autonomy.md, *Secrets and confinement* 1).
 - **An organization's instance spends the organization's key** under its grant; a personal key never pays for an
   organization's work.
 - **Check every attempt against the ceiling before it is sent,** retries included, estimating at the full output
@@ -123,5 +125,6 @@ scope recorded next to the default. Re-run it when you change the model, the pro
 - Each lane: primary, fallback of another vendor, open-vendor where it reads user content, a declared class.
 - Each lane's input modalities checked in the catalog; media generation through one media service.
 - Budgets that survive reasoning; empty answers retried, never shipped.
-- One key per agent and context, read from the environment, with a ceiling checked before every call.
+- One key per agent and context, read from the agent's own environment and never passed to a child, with a ceiling
+  checked before every call.
 - The choice measured on real inputs, recorded with its date.
