@@ -405,13 +405,16 @@ def launchd_loaded(label: str, domain: Optional[str] = None) -> bool:
     return _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label)).returncode == 0
 
 
-_PID_ROW = re.compile(r"^\s*pid\s*=\s*(\d+)\s*\Z")
+_PID_ROW = re.compile(r"^\s*pid\s*=\s*([0-9]+)\s*\Z")  # ASCII digits, as Node reads them (FAA-273)
 
 
 def launchd_pid(label: str, domain: Optional[str] = None) -> Optional[int]:
     """The running pid of this account's launchd job ``label`` (with ``domain="system"``, of the LaunchDaemon), or
     None (not running, or not readable). Reading needs no root."""
-    result = _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label))
+    try:
+        result = _launchctl("print", "%s/%s" % (launchd_domain(domain=domain), label))
+    except subprocess.TimeoutExpired:
+        return None  # a launchctl that hangs is a pid not read, never an error out of an install's poll (FAA-273)
     if result.returncode != 0:
         return None
     for line in (result.stdout or "").splitlines():

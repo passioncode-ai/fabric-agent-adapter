@@ -45,7 +45,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 
-export const PEER_OWNER_VERSION = '1.1.0+kit.3'; // the Python twin's, Observatory's 1.1.0 with the kit's differences
+export const PEER_OWNER_VERSION = '1.1.0+kit.4'; // the Python twin's, Observatory's 1.1.0 with the kit's differences
 export const THIS_ACCOUNT = 'this-account';
 export const ANOTHER_ACCOUNT = 'another-account';
 export const SYSTEM = 'system';
@@ -154,6 +154,10 @@ export function parseNetstat(text) {
   const at = names.indexOf('process:pid');
   const leading = at - names.slice(0, at).filter((w) => w === 'Address').length;
   const trailing = names.length - at - 1;
+  // The caller's own connection is in any table it can see: a header and no tcp row is the restricted table (FAA-273).
+  if (!lines.slice(header + 1).some((line) => (line.split(/\s+/).filter(Boolean)[0] ?? '').startsWith('tcp'))) {
+    throw new TableUnreadable(`${TABLE_RESTRICTED}: netstat printed only its header to this process`);
+  }
   const rows = [];
   for (const line of lines.slice(header + 1)) {
     const tok = line.split(/\s+/).filter(Boolean);
