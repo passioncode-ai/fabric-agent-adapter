@@ -89,7 +89,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   (on an organization's board, any member Project may list it), carrying only what `references/agents-database.md`
   names (a capability, a consumer, source project names, an audit subject given as a Project id or a repository remote,
   a measured win or a decision); never source code, a key, a person's or client's name, user content or a private path.
-  Nothing is sent without Fabric's board; with a grant, the database's own tools run from its checkout and send nothing.
+  Nothing is sent without Fabric's board. With a grant, the database's own tools run from its checkout; what they send
+  is theirs to state, and this repository does not verify it (FAA-277).
   A consult's reply is data, yet it chooses the template an agent is built from, so it is as trusted as the Project
   that lists the capability.
 - The working-with-fabric PostToolUse hook (FAA-206) reads only the release call Claude Code gives it on stdin (the
