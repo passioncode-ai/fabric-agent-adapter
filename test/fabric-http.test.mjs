@@ -134,7 +134,7 @@ test('FAA-226: a loopback server of another account gets nothing, kind foreign-u
     const agent = new po.CheckedAgent({ ask });
     const transport = (a) => { calls += 1; return fh.checkedLoopbackTransport({ ...a, agent }); };
     await assert.rejects(fh.request('GET', url, { headers: { Authorization: 'Bearer synthetic' }, transport, retries: 2 }),
-      (err) => err instanceof fh.HttpError && err.kind === 'foreign-user' && !err.message.includes('synthetic'));
+      (err) => err instanceof fh.HttpError && err.kind === 'foreign-user' && !err.message.includes('synthetic') && typeof err.reason === 'string' && err.reason !== '');
   }
   assert.equal(calls, 2, 'refused at once, never retried');
   assert.deepEqual(seen, []);

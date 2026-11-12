@@ -425,7 +425,7 @@
     "fabric_peer_owner",
     "fabric_service"
    ],
-   "sha256": "c261a81616c52f603eb28cc12ec4034dc479f0517328a65f0dc48d436cf0708b"
+   "sha256": "484d0480e2ae2b82f62647104e1383576646f226045a444d4c9dc1c5e5c7eee2"
   },
   {
    "module": "fabric_board_shapes",
@@ -502,7 +502,7 @@
     "fabric_jsvalue",
     "fabric_peer_owner"
    ],
-   "sha256": "b11b9930c3f0ab911a9cd325086a4c07a5ed4c246799d290f6085245669f4994"
+   "sha256": "12670f783b8d4865e5cdc51d422a1081d024941473d51c586e01f08921df2af5"
   },
   {
    "module": "fabric_openrouter",
@@ -928,7 +928,7 @@
     "fabric-peer-owner",
     "fabric-service"
    ],
-   "sha256": "73ab07f72320a50042f39b52893b563157be2ac94615614416df45a796eac988"
+   "sha256": "081d5b2fda552fe6ee737c22e1e87fa113568cb4e9d864c110a6a0aec758b22f"
   },
   {
    "module": "fabric-board-shapes",
@@ -1004,7 +1004,7 @@
    "imports": [
     "fabric-peer-owner"
    ],
-   "sha256": "b83b4c0c208763d56c3eebda5fe9e4a46d595cd91227699bf6876e65a3c7f9b9"
+   "sha256": "a9cbb614b5080347450d9bd4175df716f696f4c6c9eff64fece181005ea441cf"
   },
   {
    "module": "fabric-openrouter",
@@ -6581,14 +6581,14 @@
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
    "fabric_interop.py": "2b4d6c144f496dbd8788f616de9956bb8b6e89290713c406aa601511c82f4a46",
-   "fabric_hub.py": "c261a81616c52f603eb28cc12ec4034dc479f0517328a65f0dc48d436cf0708b",
+   "fabric_hub.py": "484d0480e2ae2b82f62647104e1383576646f226045a444d4c9dc1c5e5c7eee2",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "37aacd7afb0b7971c60f434d489fbfc556a70d8da87257179d891be4d2b661b0",
    "fabric_board_slots.py": "377407183d91f5cfe264274024f0895e58fa97a84cbcead51eaa78c671d5806d",
    "fabric_board_session.py": "8c9f574329b5306f0ca29935c463f93dd94e3fbebef7e5b114e855a605432107",
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "f86c40b8291f8c818f6924910f4022b013d5fd107abaf8825dd0aa6c5e418638",
-   "fabric_http.py": "b11b9930c3f0ab911a9cd325086a4c07a5ed4c246799d290f6085245669f4994",
+   "fabric_http.py": "12670f783b8d4865e5cdc51d422a1081d024941473d51c586e01f08921df2af5",
    "fabric_openrouter.py": "a415db7475c3359fa15c85979a63a3a223a0ad7f85f878bcc2d638acccb44090",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
@@ -6626,14 +6626,14 @@
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458",
    "fabric-interop.mjs": "989040aed33b2712a258244192bdf70e811a51076aa1b62f2adc2a6db051dbed",
-   "fabric-hub.mjs": "73ab07f72320a50042f39b52893b563157be2ac94615614416df45a796eac988",
+   "fabric-hub.mjs": "081d5b2fda552fe6ee737c22e1e87fa113568cb4e9d864c110a6a0aec758b22f",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
    "fabric-board-link.mjs": "a21fcfe6f4e701b1f5142a008ceeb7eea42c251a01688f9022539235b6f80b62",
    "fabric-board-slots.mjs": "721c5f3ddb0bd76d6b5d9e08807e50392302e71efa4385e351d9bee2ad06c103",
    "fabric-board-session.mjs": "ccce0f335e85ce676edbaf15dc6c048e7fb50a9e34310724759b84cafd4139a0",
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
    "fabric-board.mjs": "15fbb4441fcf7d2f285375b75de64ad6cffea129c515084c110245376b07775f",
-   "fabric-http.mjs": "b83b4c0c208763d56c3eebda5fe9e4a46d595cd91227699bf6876e65a3c7f9b9",
+   "fabric-http.mjs": "a9cbb614b5080347450d9bd4175df716f696f4c6c9eff64fece181005ea441cf",
    "fabric-openrouter.mjs": "4e3e73a1b8882bdde4cbb311f6f4a5e2f048fa81fa245409a16df1e6cab03e19",
    "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
    "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0"
