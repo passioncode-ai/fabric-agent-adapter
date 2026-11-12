@@ -31,5 +31,25 @@ class QuickStartPort(unittest.TestCase):
         self.assertNotIn("\u2014", text)
 
 
+class ItsOwnMachine(unittest.TestCase):
+    """FAA-230 (placement and own-vault parts): the recipe for an agent on a machine of its own. The port part waits on
+    contract DEC-0160 and the row stays open for it."""
+
+    def test_the_recipe_names_the_placement_record_the_refusal_and_the_own_vault(self):
+        text = " ".join(WHERE.read_text(encoding="utf-8").split())
+        recipe = text.split("## Its own machine: placement, keys and port", 1)[1].split("## ", 1)[0]
+        for words in ("`${XDG_DATA_HOME:-~/.local/share}/project-observatory/placement.json`",
+                      "`observatory-placement/1`", "`elsewhere`", "`serviceId`", "`label`", "`placedOn`", "`machine`",
+                      "refuses to start", "`placed-elsewhere`", "no file", "`placement-unreadable`",
+                      "`full machine-move leave LABEL --to MACHINE`", "`full machine-move cutover LABEL`",
+                      "Its tests start one copy placed elsewhere and see it refuse", "its own vault", "never copied", "`use_secret.py run`", "issued anew",
+                      "DEC-0160", "FAA-225"):
+            self.assertIn(words, recipe, words)
+        self.assertNotIn("base + uid - 501", text, "the superseded port rule (the 0.73.0 audit, item 1)")
+        checklist = text.split("## The checklist", 1)[1]
+        self.assertIn("the machine `placement.json` names", checklist)
+        self.assertIn("[Its own machine: placement, keys and port](#its-own-machine-placement-keys-and-port)", text)
+        self.assertNotIn("\u2014", text)
+
 if __name__ == "__main__":
     unittest.main()
