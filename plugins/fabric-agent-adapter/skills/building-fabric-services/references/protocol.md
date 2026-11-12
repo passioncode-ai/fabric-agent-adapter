@@ -118,7 +118,7 @@ No auth; the Host/Origin guard applies; answered from memory in under 100 ms.
   DEC-0122 refuses the member. The kits build it with `a2a_surface()` / `a2aSurface()` (`fabric_a2a`), read it with
   `a2a_view` / `a2aView`, and `build_well_known(a2a=...)` / `buildWellKnown({a2a})` refuse one that is not the
   schema's, passed either way; `agent_card_findings` / `agentCardFindings` say what a public card must not carry
-  ([surfaces and auth](surfaces-and-auth.md#a2a-for-remote-agents)). The kits do not serve a card yet (FAA-10).
+  ([surfaces and auth](surfaces-and-auth.md#a2a-for-remote-agents)). Since 0.83.0 `fabric_a2a_server` / `fabric-a2a-server.mjs` serve the card and the A2A JSON-RPC binding ([A2A](a2a.md), FAA-10).
 - `extensions` MAY carry the embedded dashboard declaration under
   `https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1` (`fabric-dashboard/0.1`,
   ED-9): `minWidth` 360…1280 (required), `appearance` ⊆ `scheme`, `theme`, `themes`, `kit`
