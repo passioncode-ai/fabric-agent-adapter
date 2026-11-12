@@ -136,6 +136,79 @@ class Served(unittest.TestCase):
         self.assertIn("could not connect", got["evidence"])
         self.assertIn("TimeoutError", got["evidence"])
 
+    def test_a_connect_that_times_out_names_the_listener_and_fails_on_another_accounts(self):
+        """FAA-260 item 12 (0.74.0 product reading 10): a connect that fails still names who listens, from the table;
+        another account's or root's listener is foreign-user without a connection."""
+        rules = importlib.import_module("check_service_rules")
+        for held, verdict, words in ((po.Owner(po.SYSTEM, 0, 1, "x"), "FAIL", "a system account's process"),
+                                     (po.Owner(po.ANOTHER_ACCOUNT, 502, 9, "x"), "FAIL", "another OS account's"),
+                                     (po.Owner(po.UNKNOWN, None, None, "x", "table-restricted"), "NOT_RUN",
+                                      "listener reads as unknown (table-restricted)"),
+                                     (po.Owner(po.THIS_ACCOUNT, 501, 9, "x"), "NOT_RUN", "listener reads as this-account")):
+            with self.subTest(kind=held.kind):
+                self.probe.results.clear()
+                with mock.patch.object(rules.socket, "create_connection", side_effect=TimeoutError()), \
+                        mock.patch.object(po, "listener", return_value=held):
+                    self.assertEqual(self.probe.listener_rule(), verdict != "FAIL")
+                got = self.verdict()
+                self.assertEqual(got["verdict"], verdict)
+                self.assertIn(words, got["evidence"])
+                self.assertIn("TimeoutError", got["evidence"])
+
+    def test_the_well_known_is_timed_after_the_owner_check(self):
+        """FAA-260 item 9 (0.74.0 unit reading 11): the table read inside connect() is not timed as the answer."""
+        slow = po.Owner(po.THIS_ACCOUNT, 501, 9, "x")
+
+        def checked(sock):
+            import time
+            time.sleep(0.15)
+            return slow
+        with mock.patch.object(po, "server_end", side_effect=checked):
+            self.probe.well_known_rules()
+        fast = next(r for r in self.probe.results if r["rule"] == "well-known.fast")
+        self.assertEqual(fast["verdict"], "PASS", fast["evidence"])
+
+    def test_a_deeply_nested_well_known_body_fails_without_a_traceback(self):
+        """FAA-260 item 10 (0.74.0 unit reading 10): Python 3.9 to 3.13 raise RecursionError on a deep document."""
+        deep = b"[" * 200000 + b"]" * 200000
+        with mock.patch.object(cs.Probe, "request", return_value=(200, {}, deep)):
+            self.probe.well_known_rules()
+        got = next(r for r in self.probe.results if r["rule"] == "well-known.answers")
+        self.assertEqual((got["verdict"], got["evidence"]), ("FAIL", "body is not JSON"))
+
+    def test_a_remote_body_that_is_not_an_object_fails_and_judges_the_tokenless_answer(self):
+        """FAA-260 item 10: the remote branch of the not-an-object body."""
+        remote = {"id": "example-agent", "instance": "default", "origin": "https://agent.example.com",
+                  "placement": "remote"}
+        probe = cs.Probe(Path("x.json"), remote, Path(self.tmp.name), skip_login=True)
+        judged = []
+
+        def token(self):
+            self.token = "synthetic"
+        with mock.patch.object(cs.Probe, "request", return_value=(200, {}, b"[1]")), \
+                mock.patch.object(cs.Probe, "read_token", token), \
+                mock.patch.object(cs.Probe, "add_no_token", lambda self, first, wk: judged.append(wk)):
+            probe.well_known_rules()
+        got = next(r for r in probe.results if r["rule"] == "well-known.answers")
+        self.assertEqual((got["verdict"], got["evidence"]), ("FAIL", "body is not a JSON object"))
+        self.assertEqual(judged, [None])
+        self.assertIsNone(probe.wk)
+
+    def test_the_port_claim_compares_ports(self):
+        """FAA-260 item 11 (0.74.0 seam reading 10): `:08080` beside `:8080` is one port, as the writers read it."""
+        rules = importlib.import_module("check_service_rules")
+        root = Path(self.tmp.name) / "claims"
+        root.mkdir()
+        mine = {"id": "example-agent", "instance": "default", "origin": "http://127.0.0.1:8080"}
+        (root / "example-agent.default.json").write_text(json.dumps(mine))
+        (root / "other-agent.default.json").write_text(json.dumps(
+            {"id": "other-agent", "instance": "default", "origin": "http://127.0.0.1:08080"}))
+        verdict, evidence = rules.port_claim_verdict(root / "example-agent.default.json", mine, root, 8080, False)
+        self.assertEqual((verdict, evidence), ("FAIL", "port 8080 also claimed by other-agent.default"))
+        (root / "other-agent.default.json").write_text(json.dumps(
+            {"id": "other-agent", "instance": "default", "origin": "http://127.0.0.1:8081"}))
+        self.assertEqual(rules.port_claim_verdict(root / "example-agent.default.json", mine, root, 8080, False)[0], "PASS")
+
     def test_a_listener_swapped_after_the_rule_is_refused_on_the_connection(self):
         """The rule reads the port's listener; every request checks its own connection again (CheckedHTTPConnection),
         and a refusal there is a ConnectionError naming foreign-user, with nothing sent."""

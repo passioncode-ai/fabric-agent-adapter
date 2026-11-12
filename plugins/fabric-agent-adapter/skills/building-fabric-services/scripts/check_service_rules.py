@@ -47,7 +47,17 @@ def listener_owner_verdict(port: int) -> Tuple[str, str]:
     except ConnectionRefusedError:
         return "NOT_RUN", "nothing listens on %s (down)" % where
     except OSError as exc:  # a full backlog, a timeout: the well-known rule reports what answers, each call checked
-        return "NOT_RUN", "could not connect to %s to tell its owner (%s)" % (where, type(exc).__name__)
+        # The listener table still names who holds the port (0.74.0 product reading 10, FAA-260 item 12): another
+        # account's or root's listener is foreign-user without a connection; any other owner is named beside NOT_RUN.
+        held = po.listener(port)
+        if held.kind in (po.ANOTHER_ACCOUNT, po.SYSTEM):
+            why = "another OS account's process" if held.kind == po.ANOTHER_ACCOUNT else "a system account's process"
+            return "FAIL", ("foreign-user: %s is listened on by %s (its listener read by %s; the connect failed with %s); "
+                            "no credential was sent and nothing it answers is read as this service's"
+                            % (where, why, held.method, type(exc).__name__))
+        named = held.kind if held.kind != po.UNKNOWN else "unknown (%s)" % held.reason
+        return "NOT_RUN", "could not connect to %s to tell its owner (%s); its listener reads as %s" % (
+            where, type(exc).__name__, named)
     try:
         owner = po.server_end(sock)
     finally:
@@ -59,6 +69,39 @@ def listener_owner_verdict(port: int) -> Tuple[str, str]:
         owner.kind, "a process whose owner cannot be told (%s)" % owner.reason)
     return "FAIL", ("foreign-user: %s is held by %s (read by %s); no credential was sent and nothing it answers is read "
                     "as this service's" % (where, why, owner.method))
+
+def port_claim_verdict(path: Path, d: Dict[str, Any], directory: Path, port: int, remote: bool) -> Tuple[str, str]:
+    """`descriptor.port-claim`: (verdict, evidence). Another descriptor here declares this `id.instance`, or a local
+    origin on the same port, compared by the port as the writers refuse it, so `:08080` beside `:8080` is one port
+    (0.74.0 seam reading 10, FAA-260)."""
+    me = "%s.%s" % (d.get("id"), d.get("instance", "default"))
+    clashes = []
+    for other_path, other in fs.read_descriptors(directory):
+        key = "%s.%s" % (other.get("id"), other.get("instance", "default"))
+        if other_path.resolve() == path.resolve():
+            continue
+        if key == me:
+            clashes.append("%s declared again in %s" % (me, other_path.name))
+        # DEC-0069: a descriptor without an origin (an app's) claims no port, so two of them never clash.
+        elif not remote and "origin" in d and fs.placement_of(other) != "remote" and port and _port_or_none(
+                other.get("origin")) == port:
+            clashes.append("port %d also claimed by %s" % (port, key))
+    if remote:
+        unique = "a remote origin claims no port here"
+    elif "origin" not in d:
+        unique = "an app's descriptor names no origin, so it claims no port (FAC-SEM-010)"
+    else:
+        unique = "no other descriptor here declares port %d (HA-1's claim on the computer is FAA-225)" % port
+    return ("FAIL" if clashes else "PASS"), ("; ".join(clashes) or unique)
+
+
+def _port_or_none(origin: Any) -> Optional[int]:
+    """The port a local origin claims, or None for an origin the descriptor rules refuse (descriptor.valid names it)."""
+    try:
+        return fs.port_of(str(origin))
+    except fs.ServiceError:
+        return None
+
 
 _LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
 _SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path

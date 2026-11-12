@@ -48,11 +48,12 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   restricted table, to a port that pid listens on there (the weaker vouch below): a departure from the pinned HA-2 and
   the contract's later RT-3, accepted in principle by the contract owner as DEC-0161 (proposed; the restricted-table vouch
   included) and kept as a departure until the next repin (FAA-288). They read, never change:
-  macOS `sysctl net.inet.tcp.pcblist_n` in the process, or the programs `/usr/sbin/netstat
+  macOS `sysctl net.inet.tcp.pcblist_n` in the process (the TCP table in the record layout `netstat -anv` reads;
+  the pinned HA-2 table names `netstat -anv` and `pcblist64`, an older layout of the same table), or the programs `/usr/sbin/netstat
   -anv -p tcp` and `/bin/ps -o uid= -p <pid>` (the Node twin always); Linux
   `/proc/net/tcp` and `/proc/net/tcp6`; Windows `GetExtendedTcpTable` and the process
-  token (Python), or `netstat -ano`, `whoami /user` and one PowerShell `GetOwnerSid` query
-  per new connection (Node). On macOS the Python reader calibrates once per process with a
+  token (Python), or `netstat -ano` and one PowerShell `GetOwnerSid` query per new connection,
+  with `whoami /user` once a process (Node). On macOS the Python reader calibrates once per process with a
   short-lived child of its own interpreter listening on a random `127.0.0.1` port; when the
   table is restricted (macOS 27.2, FAA-267) the launchd installers also run `/usr/sbin/lsof
   -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. That vouch shows the job listens on the port, not that it accepted
@@ -67,7 +68,20 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   and re-run `mcp-register` (one written as `references/surfaces-and-auth.md` says checks the
   listener first; the kit ships none). On Linux `/proc` names a socket's creator and
   no pid, so a listening socket root created and handed to another account (systemd
-  socket activation with `User=`) reads as root's: a client running as root sends to it.
+  socket activation with `User=`) reads as root's: a client running as root sends to it. Such a system unit's
+  connection reads as root's until the service accepts it and as the service's account after, so two runs of the
+  probe can disagree on it (0.74.0 product reading 10).
+- Credential-free loopback http is checked too (FAA-260 item 16, deliberate): `fabric_http` / `fabric-http.mjs` refuse
+  plain http to a loopback listener of another OS account or root (another account's Ollama, a `docker-proxy`) with
+  kind `foreign-user` whether or not the request carries a credential, because HA-2 reads nothing such a listener
+  answers as the service's, and an answer from another account's process is not this account's data. A caller that
+  means to read such a daemon says so with its own connection. With `insecure=True` a URL not spelled as loopback
+  (a hosts-file name, `0.0.0.0`, `[::ffff:127.0.0.1]`) and a request through a loopback `http_proxy` are checked by the
+  connected peer's address, so the Authorization header never reaches another account's proxy (FAA-260 items 1, 8).
+- The layout probe (`check_dashboard_layout.mjs`) reads a raw loopback page's listener from the socket table just
+  before its headless browser opens it, the one-time login URL included, and opens nothing on another account's,
+  root's or an untellable listener (FAA-260 items 2, 14). The browser then connects on its own: a listener swapped
+  between the read and the browser's connect is a residue, bounded by the login code's 120 s and single use.
 - The agents database (FAA-275): creating-fabric-agents, adapting-projects-to-fabric, building-fabric-services and
   working-with-fabric may send board requests to whichever Project the board lists under an `agents-db.*` capability
   (on an organization's board, any member Project may list it), carrying only what `references/agents-database.md`

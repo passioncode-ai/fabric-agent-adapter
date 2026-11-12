@@ -361,13 +361,43 @@ class _CheckedHTTPConnection(_po.CheckedHTTPConnection):
         self.vouch_pid = None  # a loopback URL is never a process this caller started (FAA-267)
 
 
+def _peer_is_loopback(sock: Any) -> bool:
+    """Whether a connected socket reached this computer's loopback, by the address it connected to, not by the URL's
+    spelling: a name the hosts file maps to 127.0.0.1, `0.0.0.0`, `::ffff:127.0.0.1` and a proxy on loopback all
+    arrive here (0.74.0 unit readings 7, 8 and 11; FAA-260)."""
+    try:
+        host = str(sock.getpeername()[0]).split("%", 1)[0]
+        address = ipaddress.ip_address(host)
+    except (OSError, ValueError, TypeError, IndexError, AttributeError):
+        return False
+    mapped = getattr(address, "ipv4_mapped", None)
+    return bool((mapped or address).is_loopback or address.is_unspecified)
+
+
+class _PlainHTTPConnection(http.client.HTTPConnection):
+    """Plain http to a host not spelled as loopback (`insecure=True`) or to a proxy from the environment: when the
+    connected socket's peer is a loopback address, its server end is told as `_CheckedHTTPConnection` tells it, and
+    another account's, root's or an unknown owner is refused before a byte is sent (DEC-0154 HA-2, FAA-260)."""
+
+    def connect(self) -> None:
+        super().connect()
+        if not _peer_is_loopback(self.sock):
+            return
+        owner = _po.server_end(self.sock)
+        port = self.sock.getpeername()[1]
+        refused = _po.refusal(owner, port, None)
+        if refused is not None:
+            self.close()
+            raise _po.ListenerRefused(refused[0], "%s; nothing was sent" % refused[1], owner)
+
+
 def _opener(watchdog: _Watchdog, direct: bool = False) -> urllib.request.OpenerDirector:
     """`direct`: a loopback URL never goes through a proxy from the environment (`http_proxy`), so the connection the
     owner check reads is the one to the URL's own port (DEC-0154 HA-2), and a bearer never reaches a proxy."""
     class Http(urllib.request.HTTPHandler):
         def http_open(self, req):
             local = _is_loopback((urllib.parse.urlsplit(req.full_url).hostname or "").lower())
-            return self.do_open(_watched(_CheckedHTTPConnection if local else http.client.HTTPConnection, watchdog), req)
+            return self.do_open(_watched(_CheckedHTTPConnection if local else _PlainHTTPConnection, watchdog), req)
 
     class Https(urllib.request.HTTPSHandler):
         def https_open(self, req):

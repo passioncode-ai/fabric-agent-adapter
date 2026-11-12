@@ -80,7 +80,7 @@ import fabric_connections as fcn  # noqa: E402
 from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
-from check_service_rules import ForeignUser, PORT_RULES_UNREAD, listener_owner_verdict  # noqa: E402 - DEC-0154 HA-2
+from check_service_rules import ForeignUser, PORT_RULES_UNREAD, listener_owner_verdict, port_claim_verdict  # noqa: E402 - DEC-0154 HA-2
 
 Result = Dict[str, str]
 
@@ -152,7 +152,8 @@ class Probe:
         self.results.append({"rule": rule, "verdict": verdict, "evidence": evidence})
 
     def request(self, method: str, path: str, headers: Optional[Dict[str, str]] = None,
-                body: Optional[bytes] = None) -> Tuple[int, Dict[str, str], bytes]:
+                body: Optional[bytes] = None, timed: Optional[List[float]] = None) -> Tuple[int, Dict[str, str], bytes]:
+        """`timed` gets the ms from after a local connect and its owner check to the last byte (unit reading 11)."""
         if self.remote:
             context = ssl.create_default_context(cafile=self.ca_file) if self.ca_file else ssl.create_default_context()
             if self.connect:
@@ -167,9 +168,16 @@ class Probe:
             base = {"Host": "127.0.0.1:%d" % self.port}
         base.update(headers or {})
         try:
+            started = time.perf_counter()
+            if timed is not None and not self.remote:
+                conn.connect()
+                started = time.perf_counter()
             conn.request(method, path, body=body, headers=base)
             resp = conn.getresponse()
-            return resp.status, merge_headers(resp.getheaders()), resp.read()
+            answer = resp.status, merge_headers(resp.getheaders()), resp.read()
+            if timed is not None:
+                timed.append((time.perf_counter() - started) * 1000)
+            return answer
         except po.ListenerRefused as exc:
             raise ForeignUser("foreign-user: %s" % exc) from None
         finally:
@@ -203,25 +211,7 @@ class Probe:
         else:
             mode = stat.S_IMODE(os.stat(self.path).st_mode)
             self.add("descriptor.private", "PASS" if mode & 0o077 == 0 else "FAIL", "mode %o" % mode)
-        me = "%s.%s" % (self.d.get("id"), self.d.get("instance", "default"))
-        clashes = []
-        for path, other in fs.read_descriptors(self.dir):
-            key = "%s.%s" % (other.get("id"), other.get("instance", "default"))
-            if path.resolve() == self.path.resolve():
-                continue
-            if key == me:
-                clashes.append("%s declared again in %s" % (me, path.name))
-            # DEC-0069: a descriptor without an origin (an app's) claims no port, so two of them never clash.
-            elif (not self.remote and "origin" in self.d and fs.placement_of(other) != "remote"
-                  and other.get("origin") == self.d.get("origin")):
-                clashes.append("port %d also claimed by %s" % (self.port, key))
-        if self.remote:
-            unique = "a remote origin claims no port here"
-        elif "origin" not in self.d:
-            unique = "an app's descriptor names no origin, so it claims no port (FAC-SEM-010)"
-        else:
-            unique = "no other descriptor here declares port %d (HA-1's claim on the computer is FAA-225)" % self.port
-        self.add("descriptor.port-claim", "FAIL" if clashes else "PASS", "; ".join(clashes) or unique)
+        self.add("descriptor.port-claim", *port_claim_verdict(self.path, self.d, self.dir, self.port, self.remote))
         # FAA-198: the repository that links the agent to its project; a new install is refused without it, an installed one
         # is named here (NOT_RUN is no pass) until its owner adds it.
         # A source descriptor.valid refuses is no pass either, and the evidence never carries a URL's userinfo or query,
@@ -260,9 +250,7 @@ class Probe:
         try:
             timings = []
             for _ in range(3):
-                started = time.perf_counter()
-                status, headers, body = self.request("GET", "/.well-known/fabric-service", protected)
-                timings.append((time.perf_counter() - started) * 1000)
+                status, headers, body = self.request("GET", "/.well-known/fabric-service", protected, timed=timings)
         except OSError as exc:
             if self.remote:
                 self.add_no_token(no_token, None)
@@ -276,7 +264,7 @@ class Probe:
         try:
             self.wk = json.loads(body)
             self.wk_bytes = len(body)  # D4 of the 0.73.0 brief: a well-known answer shares a 2 MiB cap
-        except ValueError:
+        except (ValueError, RecursionError):  # Python 3.9 to 3.13 raise RecursionError on deep nesting (unit reading 10)
             if self.remote:
                 self.add_no_token(no_token, None)
             self.add("well-known.answers", "FAIL", "body is not JSON")

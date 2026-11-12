@@ -224,7 +224,8 @@ well-known `process.pid` is never proof (`docs/specification/service.md#ha-2` at
 The kit's module is `fabric_peer_owner` / `fabric-peer-owner.mjs` (layer L0, [kit modules](kit-modules.md)): `listener(port)`,
 `server_end(sock)` / `serverEnd(socket)`, `peer`, and a connection checked before a byte is written
 (`CheckedHTTPConnection`; Node `checkedSocket`, `CheckedAgent`). Python reads macOS through `sysctl
-net.inet.tcp.pcblist_n` (calibrated on a connected pair of its own, else `netstat -anv`), Linux through `/proc/net/tcp`
+net.inet.tcp.pcblist_n` (calibrated on a connected pair of its own, else `netstat -anv`; the pinned HA-2 table names
+`netstat -anv` and `pcblist64`, an older record layout of the same kernel table), Linux through `/proc/net/tcp`
 and `/proc/net/tcp6`, Windows through `GetExtendedTcpTable` and the owner's token SID; Node reads `netstat -anv` and `ps`
 on macOS, the same `/proc` files on Linux, and `netstat -ano` with the owner SID from PowerShell `GetOwnerSid` against `whoami /user` on Windows (SIDs, never names). Fail closed: everything but
 `this-account` refuses, `unknown` included.

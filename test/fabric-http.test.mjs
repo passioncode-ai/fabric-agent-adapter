@@ -159,3 +159,44 @@ test('FAA-226 seam reading 1: a loopback body goes with its Content-Length, neve
   assert.equal((await fh.request('POST', url, { body: 'xyz', headers: { 'Content-Length': '3' } })).status, 200);
   assert.deepEqual(got, [{ cl: '7', te: null, body: '{"a":1}' }, { cl: '3', te: null, body: 'xyz' }]);
 });
+
+test('FAA-260 items 1 and 8: insecure http that reaches loopback is checked by the connected address', async (t) => {
+  const po = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-peer-owner.mjs');
+  const net = await import('node:net');
+  const seen = [];
+  const server = http.createServer((req, res) => { seen.push(req.headers.authorization ?? null); res.end('ok'); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const port = server.address().port;
+  for (const [address, loop] of [['127.0.0.1', true], ['127.9.9.9', true], ['::1', true], ['::ffff:127.0.0.1', true],
+    ['::ffff:7f00:1', true], ['0.0.0.0', true], ['::ffff:a00:1', false], ['10.0.0.1', false], ['fe80::1%lo0', false], [undefined, false]]) {
+    assert.equal(fh.peerIsLoopback(address), loop, String(address));
+  }
+  const reaches = async (host) => new Promise((resolve) => {
+    const s = net.connect({ host, port }, () => { s.destroy(); resolve(true); });
+    s.on('error', () => resolve(false));
+  });
+  const hosts = ['0.0.0.0', '[::ffff:127.0.0.1]'];
+  const urls = [];
+  for (const h of hosts) if (await reaches(h.replace(/^\[|\]$/g, ''))) urls.push(`http://${h}:${port}/ok`);
+  const other = new fh.PeerCheckedAgent({ ask: { ownUid: 424242, ownSid: 'S-1-5-21-9-9-9-424242' } });
+  for (const url of urls) {
+    const transport = (a) => fh.checkedLoopbackTransport({ ...a, agent: other });
+    await assert.rejects(fh.request('GET', url, { headers: { Authorization: 'Bearer synthetic' }, transport, insecure: true, retries: 0 }),
+      (err) => err instanceof fh.HttpError && err.kind === 'foreign-user' && !err.message.includes('synthetic'), url);
+  }
+  // a name not spelled as loopback whose resolver answers 127.0.0.1, as a hosts-file entry does
+  const lookup = (host, opts, cb) => (opts?.all ? cb(null, [{ address: '127.0.0.1', family: 4 }]) : cb(null, '127.0.0.1', 4));
+  const viaHosts = (agent) => new Promise((resolve, reject) => {
+    const req = http.request({ host: 'service.example', port, path: '/ok', agent, lookup, headers: { Authorization: 'Bearer synthetic' } },
+      (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+    req.on('error', reject);
+    req.end();
+  });
+  await assert.rejects(viaHosts(other), (err) => err instanceof po.ListenerRefused);
+  assert.deepEqual(seen, []);
+  // this account's listener is served, through the default transport too
+  assert.equal(await viaHosts(new fh.PeerCheckedAgent()), 200);
+  for (const url of urls) assert.equal((await fh.request('GET', url, { insecure: true })).status, 200);
+  assert.equal(seen.length, 1 + urls.length);
+});

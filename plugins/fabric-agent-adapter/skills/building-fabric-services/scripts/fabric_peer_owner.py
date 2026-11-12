@@ -122,7 +122,8 @@ KINDS = (THIS_ACCOUNT, ANOTHER_ACCOUNT, SYSTEM, UNKNOWN, NONE)
 
 #: The most table bytes one read accepts. The spec of this module asked for 1 MB; measured,
 #: `pcblist_n` costs about 860 bytes a socket, so 1 MB would hold about 1,200 sockets and a busy
-#: developer machine passes that. 4 MiB holds about 4,800.
+#: developer machine passes that. 4 MiB holds about 6,800 at the 616 bytes a socket measured on macOS 26
+#: (0.74.0 product reading 11, FAA-260).
 MAX_TABLE_BYTES = 4 * 1024 * 1024
 #: Every subprocess this module starts is stopped after this many seconds.
 TIMEOUT_SECONDS = 2.0
