@@ -84,3 +84,7 @@ test('a real connected pair of this process is proved by lsof', { skip: process.
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+test('one loopback rule reads the shared URLs as in Python (FAA-187 (15))', () => {
+  for (const [url, want] of C.loopbackUrls) assert.equal(sp.loopbackHost(new URL(url).hostname), want, url);
+});

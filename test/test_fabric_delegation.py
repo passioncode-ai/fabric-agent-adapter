@@ -318,6 +318,21 @@ class JwksCacheTests(unittest.TestCase):
         dl.JwksCache("https://\u4f8b.example/j")  # an IDN host is sent in IDNA
         with self.assertRaisesRegex(ValueError, "https URL"):  # a leading space fails the scheme test, as in 0.55.0
             dl.JwksCache(" https://hub.example/j")
+        # FAA-187 (14), (16): a host `new URL` refuses for its structure, or one Python's IDNA codec cannot write, is
+        # refused when the cache is built, as check_url refuses it, never read and failed on every call.
+        for bad in ("https://a127.0.0.1/j", "https://09/j", "https://\u00df127.0.0.1/j", "https://a\u200cb.example/j",
+                    "https://a\u180eb.example/j", "https://a.\uff0e.example/j"):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "does not parse"):
+                dl.JwksCache(bad)
+        # FAA-187 (15): one loopback rule with fabric_http, over the source list the Node suite reads too.
+        shared = json.loads((Path(__file__).resolve().parent / "fixtures/peer-owner/socket-proof-cases.json").read_text())
+        for url, loopback in shared["loopbackUrls"]:
+            with self.subTest(url=url):
+                if loopback:
+                    dl.JwksCache(url)
+                else:
+                    with self.assertRaisesRegex(ValueError, "loopback only|does not parse"):
+                        dl.JwksCache(url)
         # The two kits trim the same ends (fabric_delegation may not import fabric_http).
         self.assertEqual(dl._URL_ENDS, load("fabric_http")._URL_ENDS)
         with tempfile.TemporaryDirectory() as temp:

@@ -22,6 +22,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED, UNKNOWN, method as tableMethod, owner as ownerOf, refusal, serverEnd } from './fabric-peer-owner.mjs';
+import { loopbackHost } from './fabric-socket-proof.mjs';
 
 export const RETRY_STATUSES = Object.freeze([408, 425, 429, 500, 502, 503, 504]);
 export const IDEMPOTENT_METHODS = Object.freeze(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
@@ -78,11 +79,8 @@ export function redactUrl(url) {
   return `${parts.protocol}//${parts.host}${parts.pathname}`;
 }
 
-function isLoopback(host) {
-  const h = host.replace(/^\[|\]$/g, '');
-  if (h === 'localhost' || h.endsWith('.localhost') || h === '::1') return true;
-  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
-}
+// Loopback as new URL leaves the host: the kit's one rule, shared with fabric-delegation (FAA-187 (15)).
+const isLoopback = loopbackHost;
 
 // Refuse what this client never sends: another scheme, no host, credentials in the URL, plain http off loopback.
 export function checkUrl(url, { insecure = false } = {}) {

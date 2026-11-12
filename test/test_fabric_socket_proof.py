@@ -208,6 +208,20 @@ class Live(unittest.TestCase):
                 s.close()
 
 
+class LoopbackHost(unittest.TestCase):
+    """FAA-187 (15): one loopback rule for fabric_http's check_url and fabric_delegation's key set source."""
+
+    def test_the_vectors(self):
+        import urllib.parse
+        for url, want in CASES["loopbackUrls"]:
+            with self.subTest(url=url):
+                self.assertIs(SP.loopback_host(urllib.parse.urlsplit(url).hostname or ""), want)
+
+    def test_a_zone_and_whitespace_are_no_loopback(self):
+        for host in ("::1%eth0", " 127.0.0.1", "127.0.0.1 ", "", "127.0.0.1\n"):
+            self.assertFalse(SP.loopback_host(host), repr(host))
+
+
 class Module(unittest.TestCase):
     def test_it_imports_no_other_kit_module(self):
         text = (SCRIPTS / "fabric_socket_proof.py").read_text(encoding="utf-8")

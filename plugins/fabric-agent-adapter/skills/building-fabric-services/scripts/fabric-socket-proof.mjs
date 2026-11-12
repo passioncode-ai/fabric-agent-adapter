@@ -55,6 +55,16 @@ function host(text) {
   return v4 === '0.0.0.0' ? '*' : v4;
 }
 
+// Whether `new URL(...).hostname` names this computer's loopback: localhost or a name under .localhost, ::1, or an IPv4
+// address in 127/8 (new URL has already read 127.1, 2130706433, 0x7f.1 and a trailing dot as 127.x.y.z); never an
+// IPv4-mapped address, which new URL writes in hex. The one rule fabric-http's checkUrl and fabric-delegation's key set
+// source read (FAA-187 (15)); the twin of fabric_socket_proof.loopback_host.
+export function loopbackHost(hostname) {
+  const h = String(hostname ?? '').toLowerCase().replace(/^\[(.*)\]$/, '$1');
+  if (h === 'localhost' || h.endsWith('.localhost') || h === '::1') return true;
+  return /^127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test(h) && h.split('.').every((x) => Number(x) <= 255);
+}
+
 function lsofAddress(text) {
   const at = text.lastIndexOf(':');
   if (at < 0) return null;

@@ -62,6 +62,16 @@ class Cases(unittest.TestCase):
                 else:
                     fh.check_url(url, insecure=insecure)
 
+    def test_check_url_refuses_a_host_pythons_idna_codec_cannot_write(self):
+        """FAA-187 (16): http.client writes a non-ASCII host in IDNA through Python's own codec, which refuses some hosts
+        `new URL` maps (U+180E, a fullwidth dot beside a dot); such a URL failed on every call (kind connection) and is
+        refused at the check now. A host the codec writes is still sent."""
+        for host in ("a\u180eb.example", "a.\uff0e.example", "a\uff0e.example"):
+            with self.subTest(host=host), self.assertRaises(fh.HttpError) as caught:
+                fh.check_url("https://%s/x" % host)
+            self.assertEqual(caught.exception.kind, "refused")
+        fh.check_url("https://b\u00fccher.example/x")
+
     def test_check_url_refuses_an_authority_it_would_send_elsewhere_than_it_logs(self):
         # 0.56.0 seam r12: urllib sends `https://api.example\v1/items` to host `api.example\v1` while redact_url, read
         # as WHATWG reads it, logs `https://api.example/v1/items`. Python refuses it; the Node twin sends it to

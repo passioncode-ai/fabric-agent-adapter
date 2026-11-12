@@ -15,10 +15,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
-import net from 'node:net';
 import { hubKeyCertified } from './fabric-estate.mjs';
 import { atomicWrite } from './fabric-paths.mjs'; // the kit's private writer (FAA-85)
 import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs'; // a loopback key set from this account's listener only (FAA-255)
+import { loopbackHost } from './fabric-socket-proof.mjs';
 import { effectClosure } from './fabric-mandate.mjs'; // defined once beside the mandate that reads it too (DEC-0125)
 
 export const REFUSAL_CODES = Object.freeze([
@@ -413,7 +413,8 @@ export function readDelegationToken(headers) {
 /** The digest an approval binds: sha256: and the hex SHA-256 of the action's RFC 8785 form. */
 export const actionDigest = (action) => `sha256:${crypto.createHash('sha256').update(jcs(action), 'utf8').digest('hex')}`;
 
-const loopback = (host) => host === 'localhost' || (net.isIP(host.replace(/^\[|\]$/g, '')) !== 0 && (/^127\./.test(host) || host.replace(/^\[|\]$/g, '') === '::1'));
+// A key set source's loopback host: the kit's one rule, shared with fabric-http's checkUrl (FAA-187 (15)).
+const loopback = loopbackHost;
 
 const KEY_SET_MAX = 65536;
 const KEY_SET_AGENT = new CheckedAgent({ keepAlive: false });

@@ -128,6 +128,30 @@ def _digits(text: str) -> bool:
     return text != "" and text.isascii() and text.isdigit()
 
 
+def loopback_host(host: str) -> bool:
+    """Whether a URL's host, as a URL parser leaves it (urlsplit's `hostname`, lower case, no brackets), names this
+    computer's loopback the way a WHATWG parser reads it: `localhost` or a name under `.localhost` (which resolves to
+    loopback), ::1, or an IPv4 address in 127/8 in any form `new URL` reads (`127.1`, `2130706433`, `0x7f.1`, one
+    trailing dot). Never an IPv4-mapped address (Node writes it in hex and refuses it), one with a zone, or whitespace.
+    The one rule fabric_http's check_url and fabric_delegation's key set source read (FAA-187 (15)); the Node twin's
+    `loopbackHost` reads `new URL`'s hostname."""
+    host = (host or "").lower()
+    if host == "localhost" or host.endswith(".localhost"):
+        return True
+    if not host or any(c.isspace() for c in host) or "%" in host:
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+        return address.is_loopback and not getattr(address, "ipv4_mapped", None)
+    except ValueError:
+        pass
+    host = host[:-1] if host.endswith(".") else host
+    try:  # the short IPv4 forms a WHATWG URL also reads (127.1, 2130706433, 0x7f.1)
+        return socket.inet_aton(host)[0] == 127
+    except (OSError, ValueError):
+        return False
+
+
 # -- parsers: pure functions over captured records and text (test/fixtures/peer-owner/socket-proof-cases.json) -------
 
 def parse_socket_fdinfo(blob: bytes) -> Optional[Tuple[Address, Address, int, int]]:

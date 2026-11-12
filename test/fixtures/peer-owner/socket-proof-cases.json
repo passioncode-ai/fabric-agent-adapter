@@ -1,5 +1,5 @@
 {
- "about": "FAA-292 (DEC-0155 RT-2) and FAA-272: this OS account's own sockets and the two proofs read from them, for fabric_socket_proof.py and fabric-socket-proof.mjs. `records` are proc_pidfdinfo(PROC_PIDFDSOCKETINFO) records (struct socket_fdinfo, 792 bytes) captured on macOS 26.6 from a connected pair, an IPv6 listener and a UDP socket of one process, with every byte the module does not read zeroed and the ports and socket handles replaced; only the Python twin reads them (libproc). `lsof` are texts of `lsof -nP -a -u <uid> -iTCP:<port> -sTCP:<state> -F pun` as macOS 26.6 prints them, the first captured, the rest written in its format; both twins read them. `questions` hold this account's sockets and what each proof answers; both twins answer them. Every expectation is stated by hand.",
+ "about": "FAA-292 (DEC-0155 RT-2) and FAA-272: this OS account's own sockets and the two proofs read from them, for fabric_socket_proof.py and fabric-socket-proof.mjs. `records` are proc_pidfdinfo(PROC_PIDFDSOCKETINFO) records (struct socket_fdinfo, 792 bytes) captured on macOS 26.6 from a connected pair, an IPv6 listener and a UDP socket of one process, with every byte the module does not read zeroed and the ports and socket handles replaced; only the Python twin reads them (libproc). `lsof` are texts of `lsof -nP -a -u <uid> -iTCP:<port> -sTCP:<state> -F pun` as macOS 26.6 prints them, the first captured, the rest written in its format; both twins read them. `questions` hold this account's sockets and what each proof answers; both twins answer them. Every expectation is stated by hand. `loopbackUrls` (FAA-187 (15)): plain http URLs and whether their host is this computer's loopback, read by both kits' one rule (fabric_socket_proof.loopback_host, loopbackHost) after each kit's own URL parser, and by both delegation suites as key set sources.",
  "ownUid": 501,
  "records": [
   {
@@ -481,5 +481,75 @@
     "reason": "table-restricted"
    }
   }
+ ],
+ "loopbackUrls": [
+  [
+   "http://127.0.0.1:7777/j",
+   true
+  ],
+  [
+   "http://127.1/j",
+   true
+  ],
+  [
+   "http://2130706433/j",
+   true
+  ],
+  [
+   "http://0x7f.1/j",
+   true
+  ],
+  [
+   "http://127.0.0.1./j",
+   true
+  ],
+  [
+   "http://127.255.255.254/j",
+   true
+  ],
+  [
+   "http://localhost/j",
+   true
+  ],
+  [
+   "http://LOCALHOST:8080/j",
+   true
+  ],
+  [
+   "http://app.localhost/j",
+   true
+  ],
+  [
+   "http://[::1]/j",
+   true
+  ],
+  [
+   "http://128.0.0.1/j",
+   false
+  ],
+  [
+   "http://10.0.0.1/j",
+   false
+  ],
+  [
+   "http://example.com/j",
+   false
+  ],
+  [
+   "http://localhost.example/j",
+   false
+  ],
+  [
+   "http://[::ffff:127.0.0.1]/j",
+   false
+  ],
+  [
+   "http://[::2]/j",
+   false
+  ],
+  [
+   "http://0.0.0.0/j",
+   false
+  ]
  ]
 }
