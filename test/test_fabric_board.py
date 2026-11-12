@@ -2555,6 +2555,13 @@ class SampleWiringTests(unittest.TestCase):
                     proc.terminate()
                     proc.wait(timeout=10)
 
+            def failed(rules):
+                # FAA-308: well-known.fast times this machine (a 100 ms median), not the board's wiring; under a load
+                # near 110 the sample's median crossed it and this test failed alone of the run. As in
+                # test_probe_interop, it is the one verdict allowed either way here; every other rule must pass.
+                self.assertIn(rules.get("well-known.fast"), ("PASS", "FAIL"))
+                return [r for r, st in rules.items() if st == "FAIL" and r != "well-known.fast"]
+
             def register(board):
                 subprocess.run([sys.executable, sample.__file__, "register", *common, "--services-dir", str(services)]
                                + (["--board-project", PROJECT] if board else []), env=env, check=True, capture_output=True)
@@ -2569,7 +2576,7 @@ class SampleWiringTests(unittest.TestCase):
             rules = probed(board=True)
             self.assertEqual(rules["interop.well-known-capabilities"], "PASS")
             self.assertEqual(rules["interop.tools-match"], "PASS")
-            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+            self.assertEqual(failed(rules), [])
             self.assertEqual(out_of_step(), [])
             rules = probed(board=False)  # the board off: serve never writes the manifest, it says so
             self.assertEqual((data / "fabric-agent.json").read_bytes(), written)
@@ -2578,7 +2585,7 @@ class SampleWiringTests(unittest.TestCase):
             register(board=False)
             rules = probed(board=False)
             self.assertNotIn("board.take-back", names())
-            self.assertEqual([r for r, st in rules.items() if st == "FAIL"], [])
+            self.assertEqual(failed(rules), [])
             self.assertEqual(len(out_of_step()), 1)
             written = (data / "fabric-agent.json").read_bytes()
             rules = probed(board=True)  # unit r29: the other way, registered without the board and served with it
