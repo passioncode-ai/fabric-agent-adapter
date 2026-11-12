@@ -833,11 +833,12 @@ class Probe:
         if sys.platform != "darwin" or not shutil.which("launchctl"):
             self.add("lifecycle.one-copy", "NOT_RUN", "launchctl is not available")
             return
-        out = subprocess.run(["launchctl", "print", "gui/%d/%s" % (os.getuid(), life.get("label"))], capture_output=True, text=True)
+        domain = fs.launchd_domain(plist_path)  # a plist in /Library/LaunchDaemons is a LaunchDaemon (FAA-278)
+        out = subprocess.run(["launchctl", "print", "%s/%s" % (domain, life.get("label"))], capture_output=True, text=True)
         match = re.search(r"^\s*pid = (\d+)", out.stdout, re.MULTILINE)
         served = ((self.wk or {}).get("process") or {}).get("pid")
         if out.returncode != 0:
-            self.add("lifecycle.one-copy", "FAIL", "launchd job %s is not loaded" % life.get("label"))
+            self.add("lifecycle.one-copy", "FAIL", "launchd job %s is not loaded in %s" % (life.get("label"), domain))
         elif not match:
             self.add("lifecycle.one-copy", "FAIL", "launchd job loaded but not running")
         else:

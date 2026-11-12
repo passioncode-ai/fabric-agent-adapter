@@ -13,6 +13,7 @@ PassionCode.ai the same rules make up the organization's product lifecycle contr
 - [The rules](#the-rules)
 - [launchd plist](#launchd-plist-generate-it-with-launchd_plist-or-launchdplist-both-kits-write-the-same-bytes)
 - [Install, upgrade, uninstall](#install-upgrade-uninstall)
+- [The system domain](#the-system-domain)
 - [One copy under a supervisor](#one-copy-under-a-supervisor)
 - [An app's own descriptor and the node](#an-apps-own-descriptor-and-the-node)
 - [Directories](#directories)
@@ -49,7 +50,8 @@ carry a credential. Only `doctor` and `update` are commands a host may run.
 
 **Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
 authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's,
-on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers).
+on a listener of this OS account (DEC-0154 HA-2: another account's listener is `foreign-user` whatever it answers; a
+LaunchDaemon's root installer reads it as *The system domain* says).
 `status` is `starting`, `ready`, `degraded` or `stopping`; `degraded` is always present, and an empty list asserts
 full health. A process that cannot serve does not answer, and a host derives `down`. An install or upgrade polls
 that document until `service.id` matches (at most 40 s) before it calls the service started (the launchd installers;
@@ -76,7 +78,7 @@ systemd and Task Scheduler do not poll yet, FAA-253).
 |---|---|---|
 | `Label` | reverse-DNS, stable (`com.example.example-agent`) | the host controls the job by label |
 | `ProgramArguments` | absolute interpreter + module/script inside a **release** directory | a worktree or checkout path breaks the day it moves |
-| `RunAtLoad` | `true` | back at every login |
+| `RunAtLoad` | `true` | back at every login (a LaunchDaemon: at every boot) |
 | `KeepAlive` | `true` | `{SuccessfulExit:false}` leaves a cleanly exited service down |
 | `ThrottleInterval` | `10` | bounds a crash loop |
 | `ExitTimeOut` | above the drain and its hard exit (15 s default; `Drain` ends by 10 s) | SIGKILL arrives after it, so it must never come first |
@@ -102,11 +104,13 @@ systemd and Task Scheduler do not poll yet, FAA-253).
    cannot prove reads `table-restricted` and the error names the way round it (FAA-267). The pid is the job's own, so a
    `ProgramArguments` wrapper that starts the server as a child (`sh -c` without `exec`, `uv run`, `npm start`) cannot
    vouch for it: on such a host start the server with `exec` or run the installer from Apple's `/usr/bin/python3`.
+   A LaunchDaemon reads its answer differently: *The system domain*, below.
 4. Upgrade = new release, rewrite the plist with the new path, `launchd_install`
    again, then `prune_releases(releases_dir, current=<new release>)`: the running release
    and the one before it stay for rollback, older ones go (LC-11, LC-15).
 5. Uninstall = `launchd_uninstall` (Node: `await launchdUninstall(...)`) + `remove_descriptor`. Data stays; `purge=True`
-   (with `service_id`) removes data, logs and cache when the operator asks.
+   (with `service_id`) removes data, logs and cache when the operator asks; a LaunchDaemon refuses `purge` (*The system
+   domain*, below).
 
 **The operator's intent wins (LC-14).** A host stops a service with `bootout` **and**
 `disable` (off survives a login) and starts it with `enable` + `bootstrap`; restart is
@@ -122,6 +126,68 @@ timeout), removes the plist, and resets the override to `enabled`. launchctl has
 that deletes an override, and a leftover `disabled` would make a later fresh install stay
 off. Tests use a throwaway label or a fake `launchctl` first on `PATH`, never the
 operator's real jobs.
+
+## The system domain
+
+A `gui/<uid>` job (a LaunchAgent) runs only while its user is logged in. A headless Mac that a FileVault restart
+(`fdesetup authrestart`) leaves with no GUI login, or an SSH session of a user with no GUI login, has none: `bootstrap`
+answers error 125 ("Domain does not support specified action") and the installer's error says to remove the LaunchAgent
+it wrote (`launchd_uninstall`) and use the system domain (FAA-278). There the job is a **LaunchDaemon**: launchd starts
+it at boot, before any login, as the account its `UserName` names.
+
+- **The plist**: `launchd_plist(..., user_name="<short name>")` (Node: `userName`) writes `UserName`, which a system
+  install requires (without it the job would run as root, which every client refuses); the file goes in
+  `/Library/LaunchDaemons/<label>.plist`. A plist there is in the system domain by its path (the folder's case is
+  ignored); `domain="system"` (Node: `domain: 'system'`) says so for any path, and an explicit domain wins over the
+  path. Everything else is a LaunchAgent's.
+  `UserName` is the account whose Fabric and agents call the service: clients of another account refuse it (HA-2).
+- **Who runs which step.** The release, the descriptor and the service token are written as the `UserName` (steps 1 and
+  2 above, for example with `sudo -u <user> -H`), so they live in that user's home with its modes, and the plist's
+  working directory and log paths name that home; only the plist, `launchd_install` and `launchd_uninstall` run as root,
+  and at uninstall `remove_descriptor` runs as the `UserName` again. A service moved from a LaunchAgent is uninstalled
+  as one first, so launchd never holds both. The descriptor's `lifecycle.plist` names the path exactly,
+  `/Library/LaunchDaemons/<label>.plist`: a host that reads the folder by its spelling then knows the domain too.
+- **The label is the machine's.** `/Library/LaunchDaemons` and the system domain are shared by every account of the
+  Mac, so a LaunchDaemon's label is unique on the machine, not per account (put the account in it on a Mac with a
+  personal and an organization account); an install refuses, before writing anything, a label another plist holds
+  (the one launchd loaded the job from, or any plist of that label in the same folder) and the plist at its path when it
+  names another `UserName` or another label; an uninstall refuses a label another plist holds before its `bootout`,
+  which would stop that plist's job, so pass it the label the plist at its path names.
+- **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
+  anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
+  `launchctl bootout system/<label>`, removing the plist and `launchctl enable system/<label>`, as `launchd_uninstall`
+  does). `purge` is refused: the data belongs to the `UserName`, so remove it as that user. Upgrade is the same install
+  again as root, so a descriptor's `commands.update` for a LaunchDaemon runs as root, writes the new release (and any
+  descriptor it rewrites) as the `UserName` as an install does, and runs only the plist and `launchd_install` as root; a
+  host without root reports it as the operator's. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
+  `bootout` + `disable system/<label>`, start is `enable` + `bootstrap system <plist>`, restart is
+  `kickstart -k system/<label>`; a host or broker without root reports the job read-only.
+- **Status and pid read without root**: `launchd_loaded(label, "system")` and `launchd_pid(label, "system")` ask
+  `launchctl print system/<label>`, and `launchd_override(label, "system")` asks `launchctl print-disabled system`
+  (Node: the `domain: 'system'` option), both of which any account may read; the probe's `lifecycle.one-copy` reads the
+  domain from the descriptor's plist the same way.
+- **The answer the installer waits for**: root reads the service's listener as another account's, so the installer takes
+  the job's pid from `launchctl print system/<label>` and reads the token-free well-known document only on a connection
+  that pid accepted, while the pid runs as the `UserName`'s uid (`ps`) and listens on exactly `127.0.0.1` (`lsof -p`);
+  an install refuses a `UserName` that is not a short name, no account of the Mac or root, and an origin other than
+  `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that
+  pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that
+  starts the server as a child cannot pass either check, and the refusal says so: start the server with `exec`. An
+  install refused after its bootstrap leaves the job loaded, and its plist starts it again at boot; the error says so,
+  and as root `launchctl bootout system/<label>` and removing the plist (or `launchd_uninstall`) take it away. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist must live
+  in `/Library/LaunchDaemons` even when the installer is given `domain="system"`: the installer neither moves nor checks
+  it. A descriptor field for the domain is the contract's CT-234, open.
+- **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another
+  account's and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The
+  root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
+  bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential; under a restricted socket table the
+  first proof is the CT-261 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
+  principle as DEC-0161 (RT-3 extended to launchd's system domain, the restricted-table vouch included; proposed, its
+  text after its readings), so it stays a departure from the pin until the next repin (FAA-288).
+  Every other client keeps HA-2 as written.
+- **Hosts.** A host or broker that reads launchd only in `gui/<uid>` sees a LaunchDaemon as not loaded and must not load
+  its plist into `gui/<uid>`. Fabric Dashboards from 0.8.39 takes the domain from the plist's folder and offers no verbs
+  for a system job; the lifecycle broker is still asked (FAA-287).
 
 ## One copy under a supervisor
 

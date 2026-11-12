@@ -79,6 +79,11 @@ watch the gate fail.
   "used before honoured" write); memory works for one process.
 - **Behind a router**: check the platform-set forwarded scheme; `Host` is preserved by common
   platforms and must equal the origin's host.
+- **A provider key** the remote service needs is issued and kept in Project Observatory, pushed to the platform, and
+  the movement recorded with
+  `python3 "$(project-observatory full-path)/tools/vault.py" moved <project> <env> <NAME> --how "<what moved, where, evidence>" --at <provider>`,
+  so the platform's copy is known rather than invisible. Without Project Observatory, record where the key lives in
+  the person's own secret manager.
 
 ## Checking it
 

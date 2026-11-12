@@ -86,7 +86,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_auth` | the token, the network guard, login codes |
 | L3 | `fabric_events` | events, paging, the JSONL event log (DEC-0029) |
 | L3 | `fabric_logs` | rotating logs, the stop signal and the drain (LC-12) |
-| L3 | `fabric_supervisors` | launchd, systemd user units, Task Scheduler (DEC-0032, LC-14) |
+| L3 | `fabric_supervisors` | launchd (a LaunchAgent, or a LaunchDaemon in the system domain, FAA-278), systemd user units, Task Scheduler (DEC-0032, LC-14) |
 | L3 | `fabric_service` | the facade: every name 0.39.1 exported, re-exported from the modules above |
 | L3 | `fabric_profiles` | runner and model profiles ([profiles](profiles.md)) |
 | L3 | `fabric_interop_rules` | `fabric-interop/0.1` rules without a service: constants, `InteropError`, trace context, job limits (DEC-0087; FAA-92), a job's approval step under the mandate (`job_step`, C3.3) |

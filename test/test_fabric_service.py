@@ -618,6 +618,38 @@ class DocumentTests(unittest.TestCase):
             self.assertIn("exits 75", verdicts["old"]["evidence"])
 
 
+    def test_probe_reads_a_launch_daemon_in_the_system_domain(self):
+        """FAA-278: lifecycle.one-copy asks launchctl in the domain the plist's folder names."""
+        checker = load("check_service")
+        sup = sys.modules["fabric_supervisors"]
+        with tempfile.TemporaryDirectory() as tmp:
+            daemons = Path(tmp) / "LaunchDaemons"
+            daemons.mkdir()
+            plist = daemons / "a.b.c.plist"
+            plist.write_bytes(fs.launchd_plist("a.b.c", ["/bin/true"], working_directory=Path("/"),
+                                               stdout_path=Path("/tmp/l"), user_name="agentuser"))
+            d = descriptor(47110, data=tmp)
+            d["lifecycle"] = {"manager": "launchd", "label": "a.b.c", "plist": str(plist)}
+            p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
+            p.wk = {"process": {"pid": 4242}}
+            asked = []
+
+            real_run = subprocess.run
+
+            def launchctl(argv, **kw):
+                if argv[0] != "launchctl":
+                    return real_run(argv, **kw)
+                asked.append(argv)
+                return subprocess.CompletedProcess(argv, 0, "%s = {\n\tpid = 4242\n}\n" % argv[2], "")
+            with mock.patch.object(sup, "SYSTEM_DAEMONS", daemons), mock.patch.object(checker.sys, "platform", "darwin"), \
+                    mock.patch.object(checker.shutil, "which", return_value="/bin/launchctl"), \
+                    mock.patch.object(checker.subprocess, "run", side_effect=launchctl):
+                p.lifecycle_rules()
+            verdict = {r["rule"]: r for r in p.results}["lifecycle.one-copy"]
+            self.assertEqual(asked, [["launchctl", "print", "system/a.b.c"]])
+            self.assertEqual(verdict["verdict"], "PASS", verdict)
+
+
 class LiveServiceTests(unittest.TestCase):
     """The sample service, probed by check_service.py, with defects planted on purpose."""
 

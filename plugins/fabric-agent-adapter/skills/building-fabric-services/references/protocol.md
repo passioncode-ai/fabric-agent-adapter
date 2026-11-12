@@ -212,7 +212,9 @@ Loopback is one per computer, not one per OS account. Before a client sends any 
 `http://127.0.0.1:<port>` (a descriptor's token, a delegation token, a login code's request, a session cookie, a door's
 token), and before a host calls a local service healthy, it tells the owner of the server end of its own connection
 from the computer's socket table. A listener of another OS account, of root, SYSTEM or a service account, or one whose
-owner cannot be told, is `foreign-user`: nothing is sent and nothing it answers is read as the service's. The order of
+owner cannot be told, is `foreign-user`: nothing is sent and nothing it answers is read as the service's. One exception:
+a LaunchDaemon's root installer reads its own job's token-free well-known answer, proved by the job's pid, uid and exact
+`127.0.0.1` bind (lifecycle.md, *The system domain*; DEC-0161 accepted in principle, proposed; FAA-288). The order of
 a local service's states is `down`, `foreign-user`, `foreign` (`FAC-SEM-009`), then the well-known `status`; the
 well-known `process.pid` is never proof (`docs/specification/service.md#ha-2` at the pin).
 
@@ -232,14 +234,14 @@ listener of this account's pid on the port counts as this account's (`CheckedHTT
 `checkedSocket({vouchPid})`). The launchd installers vouch with their own job's pid; elsewhere a restricted table
 refuses (the probe, the hub client and `fabric_http` included, FAA-272), and Apple's `/usr/bin/python3` sees the
 whole table (FAA-267). A vouch is a weaker proof than the table's: it shows the job's pid listens on the port (`127.0.0.1` or the
-IPv4 wildcard), not that it accepted this connection, so a more specific bind by root over a wildcard job would pass;
+IPv4 wildcard for a LaunchAgent's installer, exactly `127.0.0.1` for a LaunchDaemon's), not that it accepted this connection, so a more specific bind by root over a wildcard job would pass;
 the contract's ruling on vouching is CT-261.
 
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
 a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`),
 `fabric_http` / `fabric-http.mjs` for a plain `http://` loopback URL (`HttpError` kind `foreign-user`, never retried),
 `check_dashboard_layout.mjs` before a local login code, and the launchd installers' poll (a listener of another account
-is never a successful install; the systemd and Task Scheduler installers do not poll yet, FAA-253). A running board
+is never a successful install, except a LaunchDaemon's job as its root installer proves it; the systemd and Task Scheduler installers do not poll yet, FAA-253). A running board
 session reports a door another account holds as `board.down` with reason `unreachable` until FAA-252. On macOS the Node
 twin reads the pid from `netstat` and the uid from `ps` a few milliseconds apart, so a pid reused in between would be
 misread; the Python twin's `sysctl` reader takes both from one record. A service's own loopback server refusing another account's peer (HA-3) is FAA-227, and the port

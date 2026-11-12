@@ -70,6 +70,7 @@ STDLIB_IMPORTS = {
     "collections", "queue",  # native bridge mappings and isolated no-model host probes (FAA-48)
     "inspect", "functools",  # the board responder reads whether a service's emit takes a subject (0.56.0 seam r31)
     "unicodedata",  # the page-link port maps a host that is not ASCII as UTS 46 does (DEC-0123, FAA-132)
+    "pwd",  # a LaunchDaemon's UserName to its uid, the job's proof (DEC-0161, FAA-278); POSIX only, guarded
 }
 RECIPES = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes"
 KIT_MODULES = {e["module"] for e in json.loads(

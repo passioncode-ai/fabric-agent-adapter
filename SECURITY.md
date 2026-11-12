@@ -25,7 +25,13 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
 - The service kits create the service token (0600) and the instance lock in the
   service's own data directory, and write supervisor files only when an installer calls
   them: a launchd plist in `~/Library/LaunchAgents` (macOS), a systemd user unit (Linux) or
-  a per-user Scheduled Task (Windows), plus one descriptor in the services directory. The
+  a per-user Scheduled Task (Windows), plus one descriptor in the services directory. A LaunchDaemon in
+  `/Library/LaunchDaemons` (FAA-278) is written only by an installer running as root, which the kits never become:
+  without root they refuse before writing and name the command, and refuse a plist without `UserName` (except one written
+  there with an explicit `domain="gui"`, not refused yet, FAA-286 item 21); the job runs as the account its `UserName`
+  names. The installer accepts the job's answer only on a connection launchd's own job accepted
+  (its pid from `launchctl print system/<label>`) or, where the socket table is restricted, on a port that pid listens
+  on (`lsof -p`, the weaker vouch below, CT-261). The
   token is readable by any process of the same user; the protocol defends against web pages
   and mistakes, not against hostile local code.
 - The kits' connectors (`fabric_http`, `fabric_openrouter` and their Node twins) reach the
@@ -36,7 +42,12 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   `check_dashboard_layout.mjs` (a local login code) and the launchd installers' poll send
   anything to `127.0.0.1:<port>`, they read the computer's socket table to tell which OS
   account owns the listener (DEC-0154 HA-2, `fabric_peer_owner`), and send nothing to
-  another account's, root's, SYSTEM's or an untellable listener. They read, never change:
+  another account's, root's, SYSTEM's or an untellable listener; the one exception is a LaunchDaemon's installer
+  (root, FAA-278), which sends a token-free well-known GET only on a connection the pid launchd names for its job
+  accepted while it runs as the plist's `UserName` and listens on exactly `127.0.0.1` (`lsof -p`), or, under a
+  restricted table, to a port that pid listens on there (the weaker vouch below): a departure from the pinned HA-2 and
+  the contract's later RT-3, accepted in principle by the contract owner as DEC-0161 (proposed; the restricted-table vouch
+  included) and kept as a departure until the next repin (FAA-288). They read, never change:
   macOS `sysctl net.inet.tcp.pcblist_n` in the process, or the programs `/usr/sbin/netstat
   -anv -p tcp` and `/bin/ps -o uid= -p <pid>` (the Node twin always); Linux
   `/proc/net/tcp` and `/proc/net/tcp6`; Windows `GetExtendedTcpTable` and the process
@@ -45,7 +56,10 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   short-lived child of its own interpreter listening on a random `127.0.0.1` port; when the
   table is restricted (macOS 27.2, FAA-267) the launchd installers also run `/usr/sbin/lsof
   -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. That vouch shows the job listens on the port, not that it accepted
-  the connection (a more specific bind by root over a wildcard job would pass; contract CT-261). A token-free loopback door is not yet protected against
+  the connection (a more specific bind by root over a wildcard job would pass; contract CT-261). A LaunchDaemon's root
+  installer runs that `lsof` and `ps -o uid=` on its job's pid before it accepts an answer, and reads, never changes, every other
+  plist in `/Library/LaunchDaemons` (to find another holder of its label, `plutil -convert xml1` for a binary one in
+  Node), `launchctl print system/<label>` and the `UserName`'s uid (`pwd`, or `id -u` in Node). A token-free loopback door is not yet protected against
   another account's process (HA-3, FAA-227). An MCP client (Claude Code, Codex) sends the
   token it was registered with on every later connection without this check (the contract's
   residue "a coding agent's bearer"): when the port may have changed hands, rotate the token
