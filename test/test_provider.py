@@ -92,22 +92,31 @@ class DirectoryTests(unittest.TestCase):
         self.manifest.write_text(json.dumps({"contractVersion": "0.1.0", "provider": {"id": "https://agents.example/providers/example-agent"}, "capabilities": []}))
 
     def e(self, **extra):
-        return entry(manifest=str(self.manifest), **extra)
+        return entry(manifest=self.manifest.as_posix(), **extra)
 
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_default_directory_is_beside_services(self):
-        with mock.patch.dict(os.environ, {"FABRIC_SERVICES_DIR": str(self.services)}, clear=False):
-            os.environ.pop("FABRIC_PROVIDERS_DIR", None)
-            self.assertEqual(fp.providers_dir(), self.services.parent / "providers")
-        with mock.patch.dict(os.environ, {"FABRIC_PROVIDERS_DIR": str(self.providers)}):
+    def test_the_directory_follows_fabrics_registry_dirs(self):
+        # FAA-189 (2): Fabric's registryDirs reads FABRIC_PROVIDERS_DIR, else the platform's Fabric root; a set
+        # FABRIC_SERVICES_DIR moves the services folder only, never the providers folder beside it.
+        base = Path(self.temp.name)
+        env = {k: v for k, v in os.environ.items() if k not in ("FABRIC_SERVICES_DIR", "FABRIC_PROVIDERS_DIR", "XDG_DATA_HOME")}
+        with mock.patch.dict(os.environ, dict(env, FABRIC_SERVICES_DIR=str(self.services), XDG_DATA_HOME=str(base / "data")),
+                             clear=True), mock.patch.object(fp.sys, "platform", "linux"):
+            self.assertEqual(fp.services_dir(), self.services)
+            self.assertEqual(fp.providers_dir(), base / "data" / "passioncode-fabric" / "providers")
+        with mock.patch.dict(os.environ, dict(env, FABRIC_PROVIDERS_DIR=str(self.providers))):
             self.assertEqual(fp.providers_dir(), self.providers)
+        home = dict(env, FABRIC_PROVIDERS_DIR="~/p", HOME=str(base), USERPROFILE=str(base))  # every home a platform reads
+        with mock.patch.dict(os.environ, home, clear=True), mock.patch.object(fp.Path, "home", return_value=base):
+            self.assertEqual(fp.providers_dir(), base / "p")
 
     def test_write_is_private_and_reinstall_is_allowed(self):
         path = fp.write_provider_entry(self.e(), self.providers, self.services)
         self.assertEqual(path, self.providers / "example-agent.json")
-        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        if os.name == "posix":  # a mode is POSIX's; Windows keeps the file in the user's own folder
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         self.assertEqual(json.loads(path.read_text())["id"], "example-agent")
         fp.write_provider_entry(self.e(name="Example Agent 2"), self.providers, self.services)
         self.assertEqual(json.loads(path.read_text())["name"], "Example Agent 2")
@@ -129,7 +138,7 @@ class DirectoryTests(unittest.TestCase):
             fp.write_provider_entry(self.e(providerId="https://agents.example/providers/example-writer"), self.providers, self.services)
         self.assertIn("FAC-SEM-014", str(caught.exception))
         with self.assertRaises(fp.ProviderError) as caught:
-            fp.write_provider_entry(entry(manifest=str(self.manifest.parent / "missing" / "fabric-agent.json")), self.providers, self.services)
+            fp.write_provider_entry(entry(manifest=(self.manifest.parent / "missing" / "fabric-agent.json").as_posix()), self.providers, self.services)
         self.assertIn("FAC-SEM-014", str(caught.exception))
         self.assertFalse(self.providers.exists() and any(self.providers.iterdir()))
 
@@ -165,6 +174,15 @@ class DirectoryTests(unittest.TestCase):
                 mock.patch.object(fp.Path, "home", return_value=base):
             self.assertEqual(fp.providers_dir(), base / "AppData" / "Local" / "passioncode-fabric" / "providers")
 
+    def test_a_drive_relative_argument_is_read_by_the_file_it_names(self):
+        # FAA-189 (8): on Windows `C:example-agent.json` names example-agent.json in drive C's folder; its stem is
+        # example-agent, never `C:example-agent` (off Windows a colon is part of a name).
+        self.assertEqual(fp.argument_stem("C:example-agent.json", "win32"), "example-agent")
+        self.assertEqual(fp.argument_stem("c:sub\\example-agent.json", "win32"), "example-agent")
+        self.assertEqual(fp.argument_stem("C:\\x\\example-agent.json", "win32"), "example-agent")
+        self.assertEqual(fp.argument_stem("C:example-agent.json", "linux"), "C:example-agent")
+        self.assertEqual(fp.argument_stem("/x/example-agent.json", "darwin"), "example-agent")
+
     @unittest.skipIf(sys.platform == "win32", "a file name holding a backslash exists only off Windows")
     def test_validate_reads_the_stem_after_either_separator(self):
         # CT-193 (FAC-SEM-014, registry-rules.ts): the stem is what follows the last / or \\, on every platform.
@@ -194,7 +212,7 @@ class DirectoryTests(unittest.TestCase):
     def test_cli_writes_and_removes(self):
         env = dict(os.environ, FABRIC_PROVIDERS_DIR=str(self.providers), FABRIC_SERVICES_DIR=str(self.services))
         write = subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "write", "--id", "example-agent",
-                                "--name", "Example Agent", "--manifest", str(self.manifest),
+                                "--name", "Example Agent", "--manifest", self.manifest.as_posix(),
                                 "--provider-id", "https://agents.example/providers/example-agent",
                                 "--installed-by", "test", "--env", "EXAMPLE_API_KEY=secret-ref:example-agent/EXAMPLE_API_KEY",
                                 "--stdio", "~/.local/bin/example-agent", "mcp"], capture_output=True, text=True, env=env)
@@ -202,7 +220,7 @@ class DirectoryTests(unittest.TestCase):
         written = json.loads((self.providers / "example-agent.json").read_text())
         self.assertEqual(written["run"]["mcp"]["stdio"]["command"], ["~/.local/bin/example-agent", "mcp"])
         refused = subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "write", "--id", "example-writer",
-                                  "--name", "W", "--manifest", str(self.manifest), "--provider-id", "https://agents.example/providers/example-writer", "--installed-by", "t",
+                                  "--name", "W", "--manifest", self.manifest.as_posix(), "--provider-id", "https://agents.example/providers/example-writer", "--installed-by", "t",
                                   "--env", "K=literal-value", "--stdio", "/bin/x"], capture_output=True, text=True, env=env)
         self.assertEqual(refused.returncode, 1)
         self.assertNotIn("literal-value", refused.stderr)
@@ -324,7 +342,7 @@ class CliRefusalTests(unittest.TestCase):
 
     def run_writer(self, *tail):
         return subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "write", "--id", "example-agent", "--name", "Example Agent",
-                               "--manifest", str(self.manifest), "--provider-id", "https://agents.example/providers/example-agent",
+                               "--manifest", self.manifest.as_posix(), "--provider-id", "https://agents.example/providers/example-agent",
                                "--installed-by", "test"] + list(tail), capture_output=True, text=True, env=self.env)
 
     def test_env_with_url_is_refused(self):

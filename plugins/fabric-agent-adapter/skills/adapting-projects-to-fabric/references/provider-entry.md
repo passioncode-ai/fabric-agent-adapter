@@ -12,7 +12,7 @@ directory:
 | macOS | `~/Library/Application Support/ai.passioncode.fabric/providers/` |
 | Linux | `${XDG_DATA_HOME:-~/.local/share}/passioncode-fabric/providers/` |
 | Windows | `%LOCALAPPDATA%\passioncode-fabric\providers\` (the same root as the services folder, DEC-0032; `~\AppData\Local` when `LOCALAPPDATA` is unset) |
-| any | `FABRIC_PROVIDERS_DIR` when set |
+| any | `FABRIC_PROVIDERS_DIR` when set; `FABRIC_SERVICES_DIR` moves the services folder only, as Fabric's `registryDirs` reads them (FAA-189) |
 
 A service uses a descriptor instead (the `building-fabric-services` skill). One id is a
 service or a provider, never both.
@@ -25,7 +25,7 @@ and refuses what the contract refuses.
 ```bash
 python3 scripts/fabric_provider.py write --id example-agent --provider-id https://agents.example/providers/example-agent \
   --name "Example Agent" \
-  --manifest ~/.local/share/example-agent/fabric-agent.json --installed-by "example-agent 1.0.0" \
+  --manifest '~/.local/share/example-agent/fabric-agent.json' --installed-by "example-agent 1.0.0" \
   --env EXAMPLE_API_KEY=secret-ref:example-agent/EXAMPLE_API_KEY \
   --stdio ~/.local/bin/example-agent mcp
 python3 scripts/fabric_provider.py write ... --url http://127.0.0.1:47201/mcp
@@ -33,6 +33,8 @@ python3 scripts/fabric_provider.py validate ~/Library/Application\ Support/ai.pa
 python3 scripts/fabric_provider.py remove example-agent      # the uninstaller
 ```
 
+The manifest is quoted so the entry keeps `~/`, which every Fabric release reads: unquoted, a shell expands it, and
+Git Bash on Windows hands Python `C:/Users/...`, which Fabric v0.3.15 and earlier refuse (FAA-189).
 `--stdio` comes last and takes the rest of the line as the argument array; there is no shell string. A writer
 option after it (`--env`, `--name`, ...) is refused rather than swallowed into argv; write `--stdio -- EXECUTABLE ...`
 when the server itself takes an option of that name. `--env` belongs to a stdio server and is refused with `--url`. An entry may carry

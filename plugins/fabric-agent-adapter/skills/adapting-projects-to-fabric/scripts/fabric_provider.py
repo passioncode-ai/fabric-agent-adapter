@@ -93,26 +93,29 @@ class ProviderError(Exception):
     """An entry was refused; the message is one readable sentence and never quotes a value."""
 
 
-def services_dir() -> Path:
-    override = os.environ.get("FABRIC_SERVICES_DIR")
-    if override:
-        return Path(override).expanduser()
+def fabric_root() -> Path:
+    """The platform's Fabric root, as Fabric's registryDirs computes it: the folder `services/` and `providers/` sit in
+    when neither override is set."""
     home = Path.home()
     if sys.platform == "darwin":
-        return home / "Library/Application Support/ai.passioncode.fabric/services"
+        return home / "Library/Application Support/ai.passioncode.fabric"
     if sys.platform == "win32":
         # provider.md "Where the directory is" (DEC-0032): LOCALAPPDATA, never the roaming APPDATA.
         local = os.environ.get("LOCALAPPDATA")
-        return (Path(local) if local else home / "AppData" / "Local") / "passioncode-fabric" / "services"
-    return Path(os.environ.get("XDG_DATA_HOME") or str(home / ".local/share")) / "passioncode-fabric/services"
+        return (Path(local) if local else home / "AppData" / "Local") / "passioncode-fabric"
+    return Path(os.environ.get("XDG_DATA_HOME") or str(home / ".local/share")) / "passioncode-fabric"
+
+
+def services_dir() -> Path:
+    override = os.environ.get("FABRIC_SERVICES_DIR")
+    return Path(override).expanduser() if override else fabric_root() / "services"
 
 
 def providers_dir() -> Path:
-    """FABRIC_PROVIDERS_DIR, else `providers/` in the same root as `services/`."""
+    """FABRIC_PROVIDERS_DIR, else `providers/` in the platform's Fabric root, as Fabric's registryDirs reads it: a set
+    FABRIC_SERVICES_DIR moves the services folder only (FAA-189 (2))."""
     override = os.environ.get("FABRIC_PROVIDERS_DIR")
-    if override:
-        return Path(override).expanduser()
-    return services_dir().parent / "providers"
+    return Path(override).expanduser() if override else fabric_root() / "providers"
 
 
 def looks_like_credential(value: str) -> bool:
@@ -300,6 +303,14 @@ def entry_stem(path: str) -> str:
     return re.sub(r"\.json\Z", "", re.sub(r"\A[^\n\r\u2028\u2029]*[\\/]", "", path, count=1))
 
 
+def argument_stem(path: str, platform: Optional[str] = None) -> str:
+    """The stem of the file a `validate` argument names: CT-193's, after a Windows drive-relative prefix (`C:name.json`
+    is name.json in that drive's folder) is set aside, which the registry never meets (FAA-189 (8))."""
+    if (platform or sys.platform) == "win32":
+        path = re.sub(r"\A[A-Za-z]:(?![\\/])", "", path)
+    return entry_stem(path)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -335,7 +346,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             entry = json.loads(args.path.read_text(encoding="utf-8"))
             problems = validate_provider_entry(entry)
             # CT-193 (FAC-SEM-014): the stem is what follows the last / or \ and loses .json, on every platform.
-            stem = entry_stem(str(args.path))
+            stem = argument_stem(str(args.path))
             if isinstance(entry, dict) and entry.get("id") != stem:
                 problems.append("the file name %s is not <id>.json for %s (FAC-SEM-014)" % (args.path.name, entry.get("id")))
             if not problems:

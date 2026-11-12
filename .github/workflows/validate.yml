@@ -187,6 +187,12 @@ jobs:
       - name: The source check on Windows (FAA-188)
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_source_check.py" -v
+      - name: The provider entry on Windows (FAA-189; manifests written with / before the name)
+        if: ${{ !cancelled() }}
+        run: python -m unittest discover -s test -p "test_provider.py" -v
+      - name: The identifiers' normal form on Windows (FAA-189)
+        if: ${{ !cancelled() }}
+        run: python -m unittest discover -s test -p "test_fabric_identifiers.py" -v
       - name: The listener's owner on Windows (FAA-226, DEC-0154 HA-2)
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_fabric_peer_owner.py" -v
@@ -199,6 +205,11 @@ jobs:
       - name: The whole Node suite on Windows (FAA-72)
         if: ${{ !cancelled() }}
         run: node --test "test/*.test.mjs"
+      # FAA-256: a measurement, never a gate. Its JSON line (per-connection cost of the owner check, both sides) is
+      # recorded under docs/evidence/runs/ from the nightly log.
+      - name: The owner check's cost per loopback connection on Windows (FAA-256)
+        if: ${{ !cancelled() }}
+        run: node test/measure_owner_check.mjs 20
 
   # FAA-72: launchd is the first supervisor the kit writes, so macOS runs both suites. The lifecycle tests put a
   # fake launchctl first on PATH and never touch the runner's own jobs (LC-14).
