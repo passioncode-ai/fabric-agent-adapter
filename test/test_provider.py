@@ -52,7 +52,7 @@ class ValidationTests(unittest.TestCase):
             "both transports": entry(run={"mcp": {"url": "http://127.0.0.1:47201/mcp", "stdio": {"command": ["/bin/x"]}}}),
             "a stdio server started in every session (FAC-SEM-056, LC-19)": entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "scope": "session"}}}),
             "an unknown stdio scope": entry(run={"mcp": {"stdio": {"command": ["/bin/x"], "scope": "always"}}}),
-            "a key in an argument (LC-21)": entry(run={"mcp": {"stdio": {"command": ["/bin/x", "--api-key=" + "s" + "k-" + "x" * 24]}}}),
+            "a key in an argument (LC-21)": entry(run={"mcp": {"stdio": {"command": ["/bin/x", "--api-key=" + "s" + "k-" + "X1" + "x" * 22]}}}),
             "a bearer header in an argument (LC-21)": entry(run={"mcp": {"stdio": {"command": ["/bin/x", "--header=Authorization: Bea" + "rer abcdef123456"]}}}),
             "bad id": entry(provider_id="Example_Agent"),
             "manifest is not fabric-agent.json": entry(manifest="~/x/manifest.json"),

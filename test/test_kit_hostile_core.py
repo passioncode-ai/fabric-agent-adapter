@@ -14,9 +14,9 @@ FIXTURE = json.loads((Path(__file__).resolve().parent / "fixtures/kit-hostile-in
 
 
 def built(value):
-    """{"fakeKey": prefix} becomes prefix + "sk-" + 24 "q" (a key-shaped value made here, never stored in the fixture)."""
+    """{"fakeKey": prefix} becomes prefix + "sk-" + "Q1" + 22 "q" (a digit and an upper-case letter: a key under DEC-0151) (a key-shaped value made here, never stored in the fixture)."""
     if isinstance(value, dict) and set(value) == {"fakeKey"}:
-        return value["fakeKey"] + "s" + "k-" + "q" * 24
+        return value["fakeKey"] + "s" + "k-" + "Q1" + "q" * 22
     if isinstance(value, list):
         return [built(v) for v in value]
     if isinstance(value, dict):

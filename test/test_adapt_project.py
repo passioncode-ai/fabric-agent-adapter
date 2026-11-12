@@ -260,7 +260,7 @@ class LifecycleRuleTests(unittest.TestCase):
             self.scaffold(root, mcp_mode="stdio", runtime_arg=["--verbose"])
             self.assertEqual(self.receipts(root)["status"], "PASS")
             manifest = json.loads((root / "fabric-agent.json").read_text())
-            manifest["capabilities"][0]["profile"]["connection"]["args"] = ["--api-key=" + "s" + "k-" + "y" * 24]
+            manifest["capabilities"][0]["profile"]["connection"]["args"] = ["--api-key=" + "s" + "k-" + "Y1" + "y" * 22]
             (root / "fabric-agent.json").write_text(json.dumps(manifest))
             gate = self.receipts(root)
             self.assertEqual(gate["status"], "FAIL")
@@ -305,7 +305,7 @@ class LifecycleRuleTests(unittest.TestCase):
                 return self.receipts(root)
 
             self.assertFalse(any("LC-21" in r for r in env(release)["receipts"]), "a release folder is a path")
-            self.assertTrue(any("LC-21" in r for r in env("s" + "k-" + "y" * 24)["receipts"]))
+            self.assertTrue(any("LC-21" in r for r in env("s" + "k-" + "Y1" + "y" * 22)["receipts"]))
             key = "2rHJkKR3HPKhvnZRjBcyYugNz2g0gTAKrWDEmg" + "/hqbs="  # its `/` splits it, yet it is no path
             self.assertTrue(any("LC-21" in r for r in env(key)["receipts"]), "LC-21 has no name check to fall back on")
 
