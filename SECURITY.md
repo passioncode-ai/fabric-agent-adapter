@@ -31,7 +31,7 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   there with an explicit `domain="gui"`, not refused yet, FAA-286 item 21); the job runs as the account its `UserName`
   names. The installer accepts the job's answer only on a connection launchd's own job accepted
   (its pid from `launchctl print system/<label>`) or, where the socket table is restricted, on a port that pid listens
-  on (`lsof -p`, the weaker vouch below, CT-261). The
+  on (`lsof -p`, the weaker vouch below, DEC-0155 RT-3). The
   token is readable by any process of the same user; the protocol defends against web pages
   and mistakes, not against hostile local code.
 - The kits' connectors (`fabric_http`, `fabric_openrouter` and their Node twins) reach the
@@ -56,7 +56,7 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   short-lived child of its own interpreter listening on a random `127.0.0.1` port; when the
   table is restricted (macOS 27.2, FAA-267) the launchd installers also run `/usr/sbin/lsof
   -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. That vouch shows the job listens on the port, not that it accepted
-  the connection (a more specific bind by root over a wildcard job would pass; contract CT-261). A LaunchDaemon's root
+  the connection (a more specific bind by root over a wildcard job would pass; the pin's DEC-0155 RT-3 vouches only for exactly `127.0.0.1`, a departure FAA-258 filed). A LaunchDaemon's root
   installer runs that `lsof` and `ps -o uid=` on its job's pid before it accepts an answer, and reads, never changes, every other
   plist in `/Library/LaunchDaemons` (to find another holder of its label, `plutil -convert xml1` for a binary one in
   Node), `launchctl print system/<label>` and the `UserName`'s uid (`pwd`, or `id -u` in Node). A token-free loopback door is not yet protected against

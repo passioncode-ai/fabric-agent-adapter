@@ -177,17 +177,17 @@ it at boot, before any login, as the account its `UserName` names.
   that pid accepted, while the pid runs as the `UserName`'s uid (`ps`) and listens on exactly `127.0.0.1` (`lsof -p`);
   an install refuses a `UserName` that is not a short name, no account of the Mac or root, and an origin other than
   `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that
-  pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that
+  pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (DEC-0155 RT-3). A `ProgramArguments` wrapper that
   starts the server as a child cannot pass either check, and the refusal says so: start the server with `exec`. An
   install refused after its bootstrap leaves the job loaded, and its plist starts it again at boot; the error says so,
   and as root `launchctl bootout system/<label>` and removing the plist (or `launchd_uninstall`) take it away. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist must live
   in `/Library/LaunchDaemons` even when the installer is given `domain="system"`: the installer neither moves nor checks
   it. A descriptor field for the domain is the contract's CT-234, open.
 - **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another
-  account's and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The
+  account's and nothing it answers as the service's; the pin's RT-3 (DEC-0155) vouches only for the caller's own uid. The
   root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
   bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential; under a restricted socket table the
-  first proof is the CT-261 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
+  first proof is the RT-3 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
   principle as DEC-0161 (RT-3 extended to launchd's system domain, the restricted-table vouch included; proposed, its
   text after its readings), so it stays a departure from the pin until the next repin (FAA-288).
   Every other client keeps HA-2 as written.
