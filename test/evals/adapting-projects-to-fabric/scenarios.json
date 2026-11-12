@@ -69,7 +69,7 @@
     },
     {
       "id": "provider-entry-on-windows",
-      "trap": "an installer in Git Bash passed --manifest ~/... unquoted, so the entry named C:/Users/.../fabric-agent.json, which Fabric v0.3.15 refused as manifest-invalid, and another wrote C:\\Agents\\example\\fabric-agent.json",
+      "trap": "an installer in Git Bash passed --manifest ~/... unquoted, so the entry named C:/Users/<name>/.../fabric-agent.json, which Fabric v0.3.15 refused as manifest-invalid, and another wrote C:\\Agents\\example\\fabric-agent.json",
       "request": "Install example-agent's provider entry on a Windows laptop from Git Bash; it runs as `example-agent mcp` over stdio.",
       "expected": [
         "on Windows writes the manifest path with / before the name and under ~/ while Fabric v0.3.15 is in use, never C:\\ or ~\\",
