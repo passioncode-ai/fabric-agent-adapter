@@ -198,6 +198,17 @@ class Verdict(unittest.TestCase):
         self.assertIn("outside the read declaration", evidence)
         self.assertIn("on the read declaration itself", evidence)
 
+    def test_an_empty_host_ended_by_a_colon_is_no_url(self):
+        """`new URL` throws on an empty host ended by `:`, whatever the port: url_parts answers None and the head is read
+        by secret_argument alone (shared vectors: test_fabric_profiles.py URL_HOSTS)."""
+        for value in ("foo://:/?token=abcdef", "git://:/r?access_token=abcdef", "foo://:80/?token=abcdef",
+                      "foo://:/#token=abcdef"):
+            with self.subTest(value=value):
+                self.assertIsNone(ca.url_parts(value))
+                self.assertFalse(ca.shaped_read(value))
+        self.assertEqual(ca.url_parts("foo:///?token=abcdef"), ("?token=abcdef", ""))
+        self.assertEqual(ca.url_parts("foo://h:/?token=abcdef"), ("?token=abcdef", ""))
+
     def test_format_characters_newer_than_this_pythons_unicode_are_blank(self):
         """FAA-250 (1): Python 3.9 (Unicode 13) reads U+0890 and U+1343F as unassigned; the contract's \\p{Cf} and newer
         Pythons read them as format characters, so a text of them is blank on every Python."""

@@ -55,6 +55,14 @@ LIFT_ACTION = "limit.lift"
 _MAX_STATUS_MESSAGE = 500
 _WAITING = re.compile(r"^waiting (daily-quota|caller-share|concurrency|money) since ([0-9][0-9TZ:.-]*?)(?:: ([\s\S]+))?\Z")
 _SIZES = ("jobs", "usd", "limit")
+#: One run of ECMAScript's whitespace, the class both twins squash with (FAA-316): Python's str.split() also takes
+#: U+001C to U+001F and U+0085 and not U+FEFF, so the twins wrote different statusMessages.
+_SPACES = re.compile("[%s]+" % fabric_secrets.JS_SPACE)
+
+
+def _squash(text: str) -> str:
+    """Runs of ECMAScript whitespace as one space, none at either end (the Node twin's `squash`)."""
+    return _SPACES.sub(" ", text).strip(" ")
 
 
 def _instant(value: Any, name: str) -> str:
@@ -75,10 +83,10 @@ def waiting_message(reason: str, since: str, until: Optional[str] = None, messag
     text = "waiting %s since %s" % (reason, since)
     head = len(QUOTA_EXHAUSTED) + (0 if until is None else len(" until ") + len(until)) + len(": ")
     if message is not None:
-        message = " ".join(str(message).split())
+        message = _squash(str(message))
         room = _MAX_STATUS_MESSAGE - head - len(text) - len(": ")
         if message and room > 0:
-            text += ": " + (message if len(message) <= room else message[:room - 3].rstrip() + "...")
+            text += ": " + (message if len(message) <= room else message[:room - 3].rstrip(" ") + "...")
     return pause_message(until, text)
 
 
@@ -124,11 +132,11 @@ def hold_sentence(caller: str, work: str, reason: str, until: Optional[str]) -> 
 
 
 def _text(value: Any, name: str, high: int = 200) -> str:
-    if not isinstance(value, str) or not value.strip() or len(value) > high:
+    if not isinstance(value, str) or not _squash(value) or len(value) > high:
         raise ServiceError("%s is a text of 1 to %d characters." % (name, high))
     if fabric_secrets.secret_value(value):
         raise ServiceError("%s looks like a credential; a hold names callers and work, never a secret." % name)
-    return " ".join(value.split())
+    return _squash(value)
 
 
 class HoldBook:

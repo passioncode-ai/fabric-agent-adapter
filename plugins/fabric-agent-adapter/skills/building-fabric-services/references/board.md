@@ -37,7 +37,8 @@ refuses it with `invalid_arguments` (FAA-244).
    binding credential, shown once, goes into `credential_file` (0600, atomic) and never into the answer, a log or argv.
    Keep the file in the service's data directory or the operator's vault.
 3. Each connection joins with `fabric.board.join {projectId}` (`join_board` / `joinBoard`). It re-reads `hub.json`,
-   checks the pid it names is alive, tells the owner of the door's listener from the socket table (DEC-0154 HA-2:
+   checks the pid it names is alive (a process of another OS account under that id is `HubError` code `not-a-hub`,
+   retryable, saying not verified, as the session hooks say it, FAA-304; none at all is `not-running`), tells the owner of the door's listener from the socket table (DEC-0154 HA-2:
    another OS account's process, or one whose owner cannot be told, is `HubError` code `foreign-user`, retryable, with
    nothing sent; a restricted macOS table, which a retry never clears, is `data.reason` `table-restricted` and not
    retryable, protocol.md, FAA-272), and only then sends the credential (a session already running carries that refusal as `BoardError` code
@@ -403,7 +404,8 @@ Python (`fabric_hub`): `fabric_root(platform, env)`, `locate_hub(root=None, aliv
 `read_door_token(location)`, `read_credential(path)`, `HubClient(root=None, *, alive, timeout, estate, post)` with
 `request_board_access(agent_id, project_id, capabilities, reason)`, `poll_access(request_id, poll_secret,
 credential_file)`, `join_board(project_id, credential_file) -> BoardGrant`, `call_door(tool, args)`,
-`call_binding(tool, args, credential_file)`; `Backoff(first=2, cap=300, jitter=0.2, floor=1)`; `HubError(code,
+`call_binding(tool, args, credential_file)`; `pid_alive(pid)` answers True, False, or None for another OS account's
+process (not verified); `Backoff(first=2, cap=300, jitter=0.2, floor=1)`; `HubError(code,
 message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,

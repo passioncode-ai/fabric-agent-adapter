@@ -73,8 +73,9 @@ class HttpError(Exception):
         self.retry_after_s = retry_after_s
         self.body = bytes(body[:2048])
         self.kind = kind  # http (an answer), connection, timeout, too-large, refused, foreign-user
-        #: For foreign-user, why (FAA-272): `table-restricted` (this process sees no other process's sockets, which
-        #: never clears), the owner's kind (`another-account`, `system`) or the check's reason (`no-row`).
+        #: For foreign-user, why (FAA-272): `table-restricted` (this process sees no other process's sockets, or on
+        #: macOS no row for this connection, DEC-0155 RT-1; it never clears), the owner's kind (`another-account`,
+        #: `system`) or the check's reason (`no-row`, from Linux and Windows only).
         self.reason = reason
 
 

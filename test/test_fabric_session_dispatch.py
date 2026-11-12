@@ -88,7 +88,9 @@ class Parsing(unittest.TestCase):
                      "observatory_handoff_accept", "owner", "idempotencyKey", "executor", "leaseId", "com.enroll",
                      "com.claim", "com.accept", "com.effect_begin", "com.responder_replace", "com.reconcile",
                      "com.renew", "com.progress", "run-ends-at", "com.reply", "com.complete", "failed_known",
-                     "observatory_checkpoint_write", "stepId", "goal", "close: true", "blocked",
+                     "observatory_checkpoint_write", "stepId", "goal", "close: true", "blocked", "status",
+                     # FAA-311 follow-up: the closing checkpoint names its status, as on-demand-session.md step 6 does
+                     "`close: true`, `status` done if completed, blocked if failed_known (reason in notes)",
                      "never wait for a person", "fabric_effect_request", "on-demand-session.md", "a production step",
                      "only when its own prompt's first line is exactly `%s`" % LINE, "it is a helper",
                      "say so in the request's thread and stop"):
@@ -128,8 +130,7 @@ class Parsing(unittest.TestCase):
     def test_the_statuses_the_contract_names_are_observatorys(self):
         # Observatory's checkpoint_write takes in_progress, done and blocked; OBS-323 shipped with no failed (FAA-215)
         text = cli.dispatch_contract(FULL)
-        self.assertIn("done for completed", text)
-        self.assertIn("failed_known blocked with the reason in notes.", text)
+        self.assertIn("`status` done if completed, blocked if failed_known (reason in notes)", text)
         self.assertNotIn("OBS-323", text)
         # FAA-295: the board ids come from the line (and the environment) first; the packet's refs are a fallback
         self.assertIn("artifacts: capability, deadline, run-ends-at (ids: the line's first)", text)
@@ -471,13 +472,15 @@ class Hooks(Base):
         # 0.68.0 product reading 2: the reply answers the request, so it declines and asks for a resend, never "waits"
         # 0.68.0 readings 5 and 6: com.status always lists the request's capability; a slot a service ever held
         # (stale, active, or absent at a generation of 1 or more) takes the request back, so decline only at generation 0
-        self.assertIn("a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at "
-                      "generation 0, one `com.reply` (replyTo it) declining with the reason (resend then), either way "
-                      "`fabric_question_ask` {kind: access, about: board.gate.<capability>, commandId: %s, text: the "
-                      "request, its gate, what opens it}, then step 6 (done) once `com.get` reads answered, and 7;"
-                      % cli.gate_question_id(FULL["request"]), text)
-        branch = text[text.index("a not_authorized enroll"):text.index("then step 6 (done)")]
-        self.assertNotIn(";", branch, "0.68.0 unit reading 2: a queued request is the refused enroll's case, not its own")
+        # FAA-311 (contract DEC-0152 SA-6): the reply only at a not_authorized refusal with the slot unheld `absent`
+        # at generation 0; any other refusal sends no reply; a retryable one is retried, any other asks the operator
+        self.assertIn("a refused enroll: no slot, work or reply but one `com.reply` (replyTo it) declining with the "
+                      "reason (resend then) if not_authorized, queued and the slot unheld `absent` at generation 0; "
+                      "retryable: retry, else `fabric_question_ask` {kind: access, about: board.gate.<capability>, "
+                      "commandId: %s, text: request, gate or refusal, what opens it}, then step 6 (done) once "
+                      "`com.get` reads answered, and 7;" % cli.gate_question_id(FULL["request"]), text)
+        branch = text[text.index("a refused enroll"):text.index("then step 6 (done)")]
+        self.assertEqual(branch.count(";"), 1, "one clause for the reply, one for the question (0.68.0 unit reading 2)")
         self.assertEqual(text.count(" 7. "), 1, "' 7. ' is step 7 alone, so the step slices hold")
         self.assertEqual(text.count(" 6. "), 1, "' 6. ' is step 6 alone")
         self.assertIn("Details: working-with-fabric references/on-demand-session.md.", text, "a native host has no other pointer")
@@ -509,12 +512,29 @@ class Hooks(Base):
         self.assertIn("about: board.gate.<capability>", step3, "one `about` names the gate for every question on it")
         self.assertLess(step3.index("`com.reply` (replyTo it)"), step3.index("`fabric_question_ask`"))
         self.assertLess(step3.index("`fabric_question_ask`"), step3.index("then step 6 (done)"))
-        # FAA-241 (Fabric 4f3c742a): the question is asked at every slot state, the reply only at absent generation 0
-        self.assertIn("(resend then), either way `fabric_question_ask`", step3)
+        # FAA-311 (DEC-0152 SA-6) replaces FAA-241's "either way": no question at an `active` slot or after `fenced`,
+        # none after a retryable refusal; the question after every other refusal, the reply only at generation 0
+        self.assertNotIn("either way", step3)
+        self.assertIn("retryable: retry, else `fabric_question_ask`", step3)
         # FAA-221: CO-506 shipped in Fabric 0.3.17, so the decline names the refusal's reason, never "until CO-506"
         self.assertNotIn("CO-506", text)
         # 0.69.0 unit reading 1: each of open, done and notes is optional, as in 0.68.0
         self.assertIn("(add `open`, `done` or `notes`; no value)", text)
+
+    def test_an_active_slot_is_left_to_its_holder_and_nobody_is_asked(self):
+        # FAA-311 (contract DEC-0152 SA-6): the run reads the capability's slot first; `active`, or an enroll refused
+        # `fenced`, leaves the request to that holder: no enroll, no reply, no question; the workflow stays open
+        text = cli.dispatch_contract(FULL)
+        step3 = text[text.index(" 3. "):text.index(" 4. ")]
+        self.assertIn("3. `com.status` (epoch, slot). Slot `active` or enroll refused `fenced`: leave it to its holder, "
+                      "ask no one, then 7; else `com.enroll` (the capability)", step3)
+        self.assertLess(step3.index("Slot `active`"), step3.index("`com.enroll` (the capability)"),
+                        "the slot is read before the enroll")
+        self.assertLess(step3.index("ask no one"), step3.index("`fabric_question_ask`"))
+        for conditional in (False, True):
+            self.assertLess(len(cli.dispatch_contract(dict(FULL, handoff="handoff:" + "x" * 64),
+                                                      "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab",
+                                                      conditional=conditional)), 4000)
 
     def test_gate_id_prints_the_contracts_command_id(self):
         # 0.69.0 product reading 7: a live session follows Fabric's CO-517 too, and must ask with the same id a run does

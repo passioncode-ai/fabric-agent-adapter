@@ -157,6 +157,16 @@ test('hub: locate, the door ask, the credential saved once, join, refusals', asy
   const loc = fh.locateHub(hub.root);
   assert.match(loc.origin, /^http:\/\/127\.0\.0\.1:\d+$/);
   assert.throws(() => fh.locateHub(hub.root, { alive: () => false }), (e) => e.code === 'not-running' && e.retryable);
+  // FAA-304: another OS account's process under the pid (EPERM) is not verified, never not-running, as the hooks say
+  assert.throws(() => fh.locateHub(hub.root, { alive: () => null }),
+    (e) => e.code === 'not-a-hub' && e.retryable && /another OS account/.test(e.message) && /not verified/.test(e.message));
+  // process.kill(pid, 0) is the probe on every OS (libuv answers EPERM on Windows when OpenProcess is denied), so the
+  // faked call runs everywhere; the Python twin's Windows reading is held to the same answers (test_fabric_hub.py).
+  t.mock.method(process, 'kill', () => { throw Object.assign(new Error('EPERM'), { code: 'EPERM' }); });
+  assert.equal(fh.pidAlive(4242), null);
+  process.kill.mock.mockImplementation(() => { throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' }); });
+  assert.equal(fh.pidAlive(4242), false);
+  process.kill.mock.restore();
   const client = new fh.HubClient(hub.root);
   const asked = await client.requestBoardAccess('example-agent', hub.project.toUpperCase(), ['video.render'], 'answers render requests');
   assert.equal(asked.status, 'pending');

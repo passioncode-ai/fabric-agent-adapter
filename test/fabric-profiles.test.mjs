@@ -27,6 +27,28 @@ test('0.56.0 unit r1: a URL is trimmed only of U+0000 to U+0020, as the Python t
     ['ht\ttps://h.example/?token=abc', true]]) assert.equal(s.secretUrl(value), expected, JSON.stringify(value));
 });
 
+// FAA-309: a URL whose host or port `new URL` refuses is no URL, in both twins (test_fabric_profiles.py URL_HOSTS holds
+// the same list): the Python twin reads its host through the IDNA reading of FAA-98.
+test('a URL whose host or port new URL refuses is read as an argument only, as the Python twin does', () => {
+  for (const [value, expected] of [
+    ['https://u:pw@ex\u00a0ample.com/', false], ['https://u:pw@b\u00fccher.example/', true],
+    ['https://h.example\u00a0/?token=abc', false], ['https://u:pw@ex%C2%A0ample.com/', false],
+    ['https://u:pw@h:99999/', false], ['https://u:pw@/x', false], ['https://u:pw@h:8a/', false],
+    ['foo://u:pw@h\u00a0/', true], ['foo://u:pw@h x/', false], ['file://ex\u00a0ample/x?token=abc', false],
+    ['https:u:pw@ex\u00a0ample.com', false], ['https://u:pw@[::1/', false],
+    ['https://u:pw@\uff11\uff12\uff17.\uff10.\uff10.\uff11/', true], ['https://u:pw@1.2.3.999/', false],
+    ['foo://u:pw@[zz]/', false], ['foo://u:pw@:80/', false], ['foo://:@/?token=abc', false], ['https://u:pw@h:/', true],
+    ['https://u:pw@%zz/', false], ['https://u:pw@h%41/', true], ['https://u:pw@a\u200db/', false],
+    ['https:///?token=abc', false], ['https://u:pw@[::1]:8080/', true],
+    // An empty host ended by `:` is refused whatever follows: an empty port, a port, a query or a fragment.
+    ['foo://:/?token=abcdef', false], ['git://:/r?access_token=abcdef', false], ['foo://:80/?token=abcdef', false],
+    ['foo://:/#token=abcdef', false]]) assert.equal(s.secretUrl(value), expected, JSON.stringify(value));
+  // The ground truth is Node's own parser: each of these throws in `new URL`.
+  for (const value of ['foo://:/?token=abcdef', 'git://:/r?access_token=abcdef', 'foo://:80/?token=abcdef', 'foo://:/#token=abcdef']) {
+    assert.throws(() => new URL(value), TypeError, value);
+  }
+});
+
 test('every resolution and every rule case answers as the contract does', () => {
   for (const c of V.resolutions) assert.deepEqual(plain(p.resolveModelProfile(c.input)), c.expected, c.name);
   for (const c of V.rules) assert.deepEqual(p.profileProblems(c.kind, JSON.parse(decode(c.valueHex))), c.expected, c.name);

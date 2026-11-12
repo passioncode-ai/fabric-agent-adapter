@@ -103,6 +103,83 @@ test('a lock file that keeps moving is a clear error, not a stale lock (FAA-293)
   assert.equal(moves, k.InstanceLock.INODE_RETRIES);
 });
 
+// FAA-303: Node holds a file descriptor only on macOS (O_EXLOCK); on Linux and Windows the path-keyed name keeps a
+// second copy out, the descriptor is null and watch() has nothing to watch.
+const noWatch = process.platform !== 'darwin' && 'macOS only: elsewhere the lock is a path-keyed name, not a held file';
+
+test('a holder notices when its folder is swapped (FAA-303)', { skip: noWatch }, async () => {
+  // The 0.79.0 seam reading: FAA-293's inode check covers two copies starting at once, not a folder swapped under a
+  // copy already holding the lock; a second copy then locks the new file and starts. The holder's watch notices.
+  const root = temp();
+  const data = path.join(root, 'data');
+  fs.mkdirSync(data);
+  const seen = [];
+  let noticed;
+  const lost = new Promise((resolve) => { noticed = resolve; });
+  const holder = (await new k.InstanceLock(data).acquire()).watch({ onLost: (lock) => { seen.push(lock); noticed(); }, intervalSeconds: 0.02 });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(seen.length, 0, 'an unmoved path is never reported lost');
+    fs.renameSync(data, path.join(root, 'data.old'));
+    fs.mkdirSync(data);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(seen.length, 0, 'nothing at the path yet: no second copy can have started');
+    fs.writeFileSync(path.join(data, 'service.lock'), ''); // the imported folder's lock file, or the one a second copy makes
+    const timer = setTimeout(() => noticed('timeout'), 30000);
+    assert.equal(await lost, undefined, 'the holder noticed the swap');
+    clearTimeout(timer);
+    assert.deepEqual(seen, [holder], 'reported once, with the lock');
+  } finally {
+    holder.release();
+  }
+});
+
+test('a released lock is never reported lost (FAA-303)', { skip: noWatch }, async () => {
+  const root = temp();
+  const data = path.join(root, 'data');
+  fs.mkdirSync(data);
+  let lost = false;
+  const holder = (await new k.InstanceLock(data).acquire()).watch({ onLost: () => { lost = true; }, intervalSeconds: 0.02 });
+  holder.release();
+  fs.renameSync(data, path.join(root, 'data.old'));
+  fs.mkdirSync(data);
+  fs.writeFileSync(path.join(data, 'service.lock'), '');
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(lost, false);
+});
+
+test('a holder whose folder is swapped stops with 75 (FAA-303)', { skip: noWatch }, async () => {
+  // End to end, no launchd: a plain child holds the lock with holdSingleInstance; a data import swaps its folder; it
+  // stops with 75 and one sentence naming the path, so a copy started on the new folder runs alone.
+  const root = temp();
+  const data = path.join(root, 'data');
+  fs.mkdirSync(data);
+  const kit = pathToFileURL(path.join(scripts, 'fabric-service.mjs')).href;
+  const child = spawn(process.execPath, ['--input-type=module', '-e',
+    `import * as k from ${JSON.stringify(kit)}; await k.holdSingleInstance(${JSON.stringify(data)}, { waitSeconds: 0 }); console.log('held'); setTimeout(() => {}, 120000);`],
+  { env: { ...process.env, [k.SUPERVISOR_ENV]: '' } });
+  let stderr = '';
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
+  try {
+    await new Promise((resolve, reject) => {
+      child.stdout.on('data', (chunk) => { if (String(chunk).includes('held')) resolve(); });
+      child.on('exit', () => reject(new Error(`the holder exited before it held the lock: ${stderr}`)));
+    });
+    fs.renameSync(data, path.join(root, 'data.old'));
+    fs.mkdirSync(data);
+    const second = await new k.InstanceLock(data).acquire(); // macOS: the new file is free, so this copy starts
+    let timer;
+    const status = await Promise.race([exited, new Promise((resolve) => { timer = setTimeout(() => resolve('timeout'), 60000); })]);
+    clearTimeout(timer);
+    second.release();
+    assert.equal(status, k.EXIT_ALREADY_RUNNING);
+    assert.match(stderr, /service\.lock/);
+  } finally {
+    if (child.exitCode === null) child.kill();
+  }
+});
+
 test('a close that fails too still lets the lock go, the first error standing (0.61.0 seam reading 7)', { skip: process.platform !== 'darwin' }, async () => {
   const dir = temp();
   const { fsyncSync, closeSync } = fs;

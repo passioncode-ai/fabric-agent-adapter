@@ -1,5 +1,15 @@
 """One copy of a service, locked before any side effect (LC-01, DEC-0057): the instance lock, the supervisor marker
-in both its forms, and the wait budget under a supervisor. Part of the service kit (FAA-65, layer L3)."""
+in both its forms, and the wait budget under a supervisor. Part of the service kit (FAA-65, layer L3).
+
+A lock that moves under its holder (FAA-303). Linux and Windows hold a name keyed by the lock's path beside the file
+lock (an abstract unix socket, a named pipe), so a folder swapped under a running copy cannot let a second copy in.
+macOS has no such name: flock (and the Node twin's O_EXLOCK) lock an inode, so after a data import swaps the data
+folder a second copy locks the new file and starts. There the holder watches its lock instead
+(``InstanceLock.watch``, started by ``hold_single_instance``): every ``LOCK_WATCH_SECONDS`` it compares the inode it
+locked with the file at the path, and once the path names another file it stops with 75 and one sentence naming the
+path, before writing anything more into a folder that is no longer the one it read. Two copies then overlap for at
+most one interval. A path-keyed name on macOS was weighed and left: it needs a file in a folder outside the data folder
+that the system never cleans and every copy can write, which the standard library cannot promise."""
 from __future__ import annotations
 
 import errno
@@ -10,6 +20,7 @@ import posixpath
 import re
 import socket
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
@@ -46,6 +57,11 @@ LOCK_BACKOFF_FIRST_SECONDS = 0.5
 LOCK_BACKOFF_MAX_SECONDS = 30.0
 
 
+#: How often a holder that has no path-keyed name (macOS) compares the inode it locked with the file at the lock's
+#: path (FAA-303): one stat and one fstat; two copies overlap for at most this long after a folder swap.
+LOCK_WATCH_SECONDS = 2.0
+
+
 class AlreadyRunning(ServiceError):
     def __init__(self, holder_pid: Optional[int], lock_path: Path):
         self.holder_pid = holder_pid
@@ -67,6 +83,7 @@ class InstanceLock:
         self.path = Path(data_dir) / "service.lock"
         self._fd: Optional[int] = None
         self._name: Any = None
+        self._watch: Optional[threading.Event] = None
 
     #: Windows locks a byte range, not the file: one byte far past the pid the file holds, so the
     #: holder may rewrite the pid and another process may still read it (locking past the end of
@@ -157,13 +174,63 @@ class InstanceLock:
         self._fd = fd
         return True
 
+    def watch(self, on_lost: Optional[Callable[["InstanceLock"], None]] = None,
+              interval: float = LOCK_WATCH_SECONDS) -> "InstanceLock":
+        """Re-check, every ``interval`` seconds on a daemon thread, that the file this copy locked is still the file at
+        the path (FAA-303); the first time the path names another file (a swapped folder's lock, or the one a second
+        copy made), call ``on_lost(lock)`` once and stop watching. The default stops the process with 75 and one
+        sentence (``stop_lost_holder``): it runs on the watch thread, so it cannot raise into the service. A path that
+        is gone or cannot be read now is read as nothing there yet and tried again next time: a second copy has to make
+        a file there to start, and the watch then sees that file. ``release`` ends the watch. Windows does not rename a
+        folder holding an open file: there it is a no-op, as for a lock not held."""
+        if WINDOWS or self._fd is None or self._watch is not None:
+            return self
+        fd, stop, react = self._fd, threading.Event(), on_lost or stop_lost_holder
+
+        def run() -> None:
+            while not stop.wait(interval):
+                try:
+                    here, held = os.stat(str(self.path)), os.fstat(fd)
+                except OSError:
+                    continue
+                # release() sets the event before it closes the descriptor, so a number reused after the close is never
+                # read as this lock's file: the event is checked after the stat.
+                if (here.st_dev, here.st_ino) == (held.st_dev, held.st_ino) or stop.is_set():
+                    continue
+                stop.set()
+                react(self)
+                return
+
+        self._watch = stop
+        threading.Thread(target=run, name="fabric-lock-watch", daemon=True).start()
+        return self
+
     def release(self) -> None:
+        if self._watch is not None:
+            self._watch.set()
+            self._watch = None
         if self._fd is not None:
             os.close(self._fd)
             self._fd = None
         if self._name is not None:
             _drop_lock_name(self._name)
             self._name = None
+
+
+def lost_lock_message(lock_path: Path) -> str:
+    """The one sentence a holder whose lock moved under it stops with (FAA-303)."""
+    return ("%s is no longer the file this copy locked (the data folder moved or was swapped?): stopping, so a copy "
+            "started on the folder now at that path runs alone." % lock_path)
+
+
+def stop_lost_holder(lock: InstanceLock) -> None:
+    """``InstanceLock.watch``'s default: print ``lost_lock_message`` and end the process with 75 at once. ``os._exit``,
+    not a graceful stop: a shutdown would write this copy's state into the folder now at the path, which is not the
+    one it read; the kit's journals make an abrupt stop recoverable (LC-03)."""
+    try:
+        print(lost_lock_message(lock.path), file=sys.stderr, flush=True)
+    finally:
+        os._exit(EXIT_ALREADY_RUNNING)
 
 
 def lock_name(lock_path: Path, platform: str = sys.platform) -> Optional[str]:
@@ -329,7 +396,8 @@ def add_supervisor_argument(parser: Any) -> Any:
 def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *,
                          sleep: Callable[[float], None] = time.sleep,
                          clock: Callable[[], float] = time.monotonic,
-                         env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None) -> InstanceLock:
+                         env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None,
+                         on_lost: Optional[Callable[[InstanceLock], None]] = None) -> InstanceLock:
     """Take the lock or exit 75 with one sentence naming the holder (DEC-0057, FAC-SEM-078).
 
     Markers that disagree exit 75 at once, before the lock, naming them. Started by hand (no
@@ -337,7 +405,10 @@ def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *
     exit is a respawn every few seconds, forever; so a supervised copy first backs off in-process
     (0.5 s doubling to 30 s, ``LOCK_WAIT_SUPERVISED_SECONDS`` in all), takes over if the holder
     leaves, and exits 75 only when the wait runs out. Nothing has been touched while it waits.
-    ``wait_seconds`` overrides the choice (0 = never wait); ``env`` and ``argv`` default to this process's."""
+    ``wait_seconds`` overrides the choice (0 = never wait); ``env`` and ``argv`` default to this process's.
+
+    Where the lock has no path-keyed name (macOS) the held lock is watched (``InstanceLock.watch``, FAA-303): a folder
+    swapped under the running copy stops it with 75; ``on_lost`` replaces that reaction."""
     marker = supervisor_marker(env, argv)
     if marker["kind"] == "conflict":
         print(marker_conflict_message(marker), file=sys.stderr)
@@ -349,7 +420,7 @@ def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *
     announced = False
     while True:
         try:
-            return InstanceLock(data_dir).acquire()
+            lock = InstanceLock(data_dir).acquire()
         except AlreadyRunning as exc:
             remaining = deadline - clock()
             if remaining <= 0:
@@ -360,3 +431,5 @@ def hold_single_instance(data_dir: Path, wait_seconds: Optional[float] = None, *
                 announced = True
             sleep(min(delay, remaining))
             delay = min(delay * 2, LOCK_BACKOFF_MAX_SECONDS)
+            continue
+        return lock.watch(on_lost) if lock_name(lock.path) is None else lock

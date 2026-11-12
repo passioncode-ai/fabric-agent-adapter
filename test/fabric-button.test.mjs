@@ -25,6 +25,57 @@ function load() {
 }
 const plain = (value) => JSON.parse(JSON.stringify(value));
 
+// FAA-314 (dashboard kit 1.1.7): the button's credential checks answer the contract's own vectors, as the kit's
+// fabric-secrets.mjs does: DEC-0151's SECRET_VALUE (canonical-case prefixes after a boundary, `Bearer ` only at the
+// start), not the earlier, broader detector.
+test('the button reads a credential as the contract does (DEC-0151, FAA-314)', () => {
+  const fb = load();
+  const secrets = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/profile-vectors.json'), 'utf8')).secrets;
+  const decode = (hex) => Buffer.from(hex, 'hex').toString('utf8');
+  let read = 0;
+  for (const name of ['secretValue', 'credentialName']) {
+    for (const c of secrets[name]) {
+      assert.equal(fb[name](decode(c.inputHex)), c.expected, `${name}(${JSON.stringify(decode(c.inputHex).slice(0, 40))})`);
+      read += 1;
+    }
+  }
+  assert.ok(read >= 40, `read ${read} vectors`);
+  // The earlier detector refused these; DEC-0151 does not (a prefix in another case, a key inside a word).
+  for (const value of ['SK-' + 'a1B2'.repeat(6), 'xsk-' + 'a1B2'.repeat(6), 'GHP_' + 'a'.repeat(24)]) assert.equal(fb.secretValue(value), false, value);
+  assert.equal(fb.secretValue('Bearer abc'), true);
+  assert.equal(fb.secretValue('x ghp_' + 'a'.repeat(24)), true);
+  assert.ok(SOURCE.startsWith('/* fabric-dashboard-kit@1.1.7 '), 'the kit that carries the change is 1.1.7');
+});
+
+// FAA-313 follow-up: the button reads a JWT in one pass, with the answers its JWT_SHAPE gives; the expression
+// backtracks from every `eyJ` of a long run (sixteen times the work for four times the text).
+test('the button reads a JWT in one pass, in linear time, with the expression\'s answers (FAA-313)', () => {
+  const fb = load();
+  const shape = /eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*/;
+  // These pieces hold no key prefix, no `Bearer ` and no digit, so secretValue answers exactly whether a JWT is there.
+  const parts = ['eyJ', 'e', 'y', 'J', 'a', '_', '-', '.', ' ', 'b'];
+  let seed = 313;
+  const next = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed; };
+  const texts = ['', 'ey' + 'J' + 'ab.cd.', 'x ey' + 'J' + 'ab.c.d', 'ey' + 'J' + 'ab.cd'];
+  for (let i = 0; i < 3000; i += 1) {
+    let text = '';
+    for (let n = next() % 15; n > 0; n -= 1) text += parts[next() % parts.length];
+    texts.push(text);
+  }
+  assert.deepEqual(texts.filter((text) => fb.secretValue(text) !== shape.test(text)), []);
+  const long = { 4000: 'eyJ'.repeat(4000), 16000: 'eyJ'.repeat(16000) };
+  const best = { 4000: Infinity, 16000: Infinity };
+  for (let r = 0; r < 3; r += 1) { // each size's fastest of three, measured in turn (FAA-209's rule)
+    for (const n of [4000, 16000]) {
+      const started = performance.now();
+      assert.equal(fb.secretValue(long[n]), false);
+      best[n] = Math.min(best[n], performance.now() - started);
+    }
+  }
+  // four times the text costs about four times as much; the regular expression cost sixteen
+  assert.ok(best[16000] / Math.max(best[4000], 1e-6) < 9, `${best[4000]} ms, ${best[16000]} ms`);
+});
+
 test('every link the contract parses, the button parses the same way (FL-1…FL-5)', () => {
   const fb = load();
   assert.ok(VECTORS.parse.length >= 40);

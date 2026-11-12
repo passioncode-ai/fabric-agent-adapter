@@ -1,6 +1,6 @@
 {
   "name": "fabric-dashboard-kit",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "profile": "fabric-dashboard/0.1",
   "decision": "DEC-0036",
   "declarationKey": "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1",
@@ -15,9 +15,9 @@
     "contrast"
   ],
   "files": {
-    "fabric-dashboard.css": "7a90bbe1f1a2170df5dac0f596a3f302167bef9a7243457bb21dd0eb34f4d359",
-    "fabric-dashboard.js": "146ec9a0fd50af2df3245c02ec7dfba75b7d4e8cb5476fedb5ef727869fef1cc",
-    "fabric-button.js": "60c2b6d44571213e0237c29a94a4cf220f9de3efcfa697ac6a33777d1ad25fd6",
+    "fabric-dashboard.css": "549c1c1546bc9f8d2c1a579e7ad1035d009c94c3324b91d89d892afc437d5800",
+    "fabric-dashboard.js": "fa966a8f3b228391c2dae33674887a0d44b102cb58e42dbe6331f08bab57b391",
+    "fabric-button.js": "220c5c9719a9f6e35851d8748e2abb1d6606ffdb9fc43f3aff2b01f34637d925",
     "themes.json": "511839f1a1a83eb37fadfd132791474497d5c28c5091700b9aa31ad076e359b5"
   },
   "history": {
@@ -59,6 +59,11 @@
       "fabric-dashboard.css": "7a90bbe1f1a2170df5dac0f596a3f302167bef9a7243457bb21dd0eb34f4d359",
       "fabric-dashboard.js": "146ec9a0fd50af2df3245c02ec7dfba75b7d4e8cb5476fedb5ef727869fef1cc",
       "fabric-button.js": "60c2b6d44571213e0237c29a94a4cf220f9de3efcfa697ac6a33777d1ad25fd6"
+    },
+    "1.1.7": {
+      "fabric-dashboard.css": "549c1c1546bc9f8d2c1a579e7ad1035d009c94c3324b91d89d892afc437d5800",
+      "fabric-dashboard.js": "fa966a8f3b228391c2dae33674887a0d44b102cb58e42dbe6331f08bab57b391",
+      "fabric-button.js": "220c5c9719a9f6e35851d8748e2abb1d6606ffdb9fc43f3aff2b01f34637d925"
     }
   }
 }

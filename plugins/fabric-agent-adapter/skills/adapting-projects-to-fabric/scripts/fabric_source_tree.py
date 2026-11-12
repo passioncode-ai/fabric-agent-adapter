@@ -328,20 +328,7 @@ def _credential_in(written: str) -> int:
 
 def _jwt_spans(text: str) -> List[Tuple[int, int]]:
     """`jwtSpans`: `JWT_SHAPE`'s leftmost, non-overlapping matches, read as the contract's one pass reads them."""
-    spans = []
-    run = re.compile(r"[A-Za-z0-9_-]*")
-    at = text.find("eyJ")
-    while at >= 0:
-        one = run.match(text, at + 3).end()
-        start_next = one
-        if one - at - 3 >= 2 and text[one:one + 1] == ".":
-            two = run.match(text, one + 1).end()
-            if two - one - 1 >= 2 and text[two:two + 1] == ".":
-                three = run.match(text, two + 1).end()
-                spans.append((at, three))
-                start_next = three
-        at = text.find("eyJ", start_next)
-    return spans
+    return _secrets.jwt_spans(text)
 
 
 def credential_at(line: str) -> int:
@@ -366,7 +353,7 @@ def _credential_url_spans(line: str) -> List[Tuple[int, int]]:
 
 
 def _own_secret_value(text: str) -> bool:
-    return bool(_secrets.JWT_SHAPE.search(text) or _check.URL_SECRET_VALUE.search(text) or _secrets._long_secret(text))
+    return bool(_secrets.has_jwt(text) or _check.URL_SECRET_VALUE.search(text) or _secrets._long_secret(text))
 
 
 def credential_shaped(text: str) -> bool:
@@ -374,7 +361,7 @@ def credential_shaped(text: str) -> bool:
 
 
 def _prose_secret_value(text: str) -> bool:
-    return bool(_secrets.JWT_SHAPE.search(text) or any(True for _ in _check._provider_keys(text))
+    return bool(_secrets.has_jwt(text) or any(True for _ in _check._provider_keys(text))
                 or _secrets._BEARER_INSIDE.search(text) or _secrets._long_secret(text))
 
 

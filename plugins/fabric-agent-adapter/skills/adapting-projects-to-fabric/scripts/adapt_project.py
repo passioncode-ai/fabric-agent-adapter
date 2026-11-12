@@ -659,6 +659,13 @@ import {SCHEMA_PREFIX} from './src/contract.ts';
     return "PASS", ["manifest validated by selected contract schema at %s" % selected_commit]
 
 
+def _stored_url_credential(url: str) -> bool:
+    """A credential in a URL a manifest or plugin.json STORES (LC-21): secret_url's reading with the host not checked,
+    as repository_credential reads a repository. secret_url reads a URL whose host `new URL` refuses as an argument only
+    (FAA-309), right for a reader, but storage is the closed side: a password stays a password whatever its host."""
+    return _secrets._url_credential(url, hosts=False)
+
+
 def _credential_problems(manifest: Dict[str, Any]) -> List[str]:
     """LC-21 (FAA-23): no credential in a launch argument or in a URL the manifest names."""
     problems: List[str] = []
@@ -670,7 +677,7 @@ def _credential_problems(manifest: Dict[str, Any]) -> List[str]:
             if isinstance(arg, str) and _secrets.secret_argument(arg):
                 problems.append("LC-21: capability[%d] passes a credential in a launch argument; argv is visible to every process" % index)
         for field in ("url", "agentCardUrl"):
-            if isinstance(connection.get(field), str) and _secrets.secret_url(connection[field]):
+            if isinstance(connection.get(field), str) and _stored_url_credential(connection[field]):
                 problems.append("LC-21: capability[%d].%s carries a credential in the URL; a query lands in every log" % (index, field))
     return problems
 
@@ -712,7 +719,7 @@ def _plugin_problems(root: Path) -> List[str]:
             if "command" in entry:
                 problems.append("LC-19: plugin %s declares the stdio MCP server %s, which starts in every session that enables the plugin; serve it over HTTP from one resident process or register it at project scope" % (name, server))
             argv = [entry.get("command")] + list(entry.get("args") or [])
-            if any(isinstance(a, str) and _secrets.secret_argument(a) for a in argv) or (isinstance(entry.get("url"), str) and _secrets.secret_url(entry["url"])):
+            if any(isinstance(a, str) and _secrets.secret_argument(a) for a in argv) or (isinstance(entry.get("url"), str) and _stored_url_credential(entry["url"])):
                 problems.append("LC-21: plugin %s's MCP server %s carries a credential in its argv or URL" % (name, server))
             env = entry.get("env") if isinstance(entry.get("env"), dict) else {}
             if any(isinstance(v, str) and _secret_env_value(v) for v in env.values()):  # path-aware for a path (FAA-266)

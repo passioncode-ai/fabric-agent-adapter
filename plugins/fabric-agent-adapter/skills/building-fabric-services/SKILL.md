@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.81.0"
+  version: "0.82.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
@@ -310,7 +310,8 @@ reference's *A2A for remote agents* section), `channel-agent.declaration` (DEC-0
 `board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
-and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured).
+and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured; also `NOT_RUN`
+and exit 3 where the socket table is restricted, `table-restricted`, since 0.81.0: FAA-318).
 
 Then prove the lock: start a second copy by hand against the same data directory; it
 must exit 75 while the first keeps serving. Prove recovery: `kill -9` the launchd pid;

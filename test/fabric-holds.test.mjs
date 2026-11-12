@@ -81,6 +81,9 @@ test('a freed, expired or other hold pushes again; a credential is refused', () 
     assert.equal(log.filter((e) => e.kind === h.HOLD_EVENT_KIND).length, 5);
     assert.throws(() => b.hold({ caller: `sk-or-v1-${'a1B2'.repeat(12)}`, work: 'w', reason: 'money', now: NOW }), ServiceError);
     assert.throws(() => b.hold({ caller: 'a', work: 'w', reason: 'rate', now: NOW }), ServiceError);
+    // U+FEFF alone is whitespace in both twins; U+0085 is not (FAA-316).
+    assert.throws(() => b.hold({ caller: '\ufeff', work: 'w', reason: 'money', now: NOW }), ServiceError);
+    assert.ok(b.hold({ caller: '\u0085', work: 'w', reason: 'money', now: NOW }));
   } finally { done(); }
 });
 

@@ -106,7 +106,8 @@ systemd and Task Scheduler do not poll yet, FAA-253).
    then poll the well-known document until it answers with this `id.instance` on a listener of this OS account
    (DEC-0154 HA-2: another account's listener, or one whose owner cannot be told, is `foreign-user` and never a
    successful install; the error names it). Where the socket table hides other processes (macOS 27.2 under an
-   ad-hoc-signed interpreter), the installer vouches with its own job's pid from `launchctl print`; a listener it
+   ad-hoc-signed interpreter), the installer vouches with its own job's pid from `launchctl print`, for a listen on
+   exactly `127.0.0.1` alone (DEC-0155 RT-3; a wildcard bind is never vouched for since FAA-312); a listener it
    cannot prove reads `table-restricted` and the error names the way round it (FAA-267). The pid is the job's own, so a
    `ProgramArguments` wrapper that starts the server as a child (`sh -c` without `exec`, `uv run`, `npm start`) cannot
    vouch for it: on such a host start the server with `exec` or run the installer from Apple's `/usr/bin/python3`.
@@ -380,6 +381,26 @@ holds the same name beside its file lock, so the two kits exclude each other eve
 `WaitNamedPipeW`); it never takes the name, so it cannot make a service that is starting fail. On Linux the Node kit's
 name needs Node 22 or later: Node 18 and early 20 collapse every abstract socket name into one, and later 20 pads it so
 no Python copy or probe sees it, so the Node kit refuses to start there with a sentence naming Node 22 (FAA-72).
+
+**A lock that moves under its holder (FAA-303).** `acquire` checks that the inode it locked is the file at the path
+(FAA-293), which closes the race between two copies starting at once. A folder swapped under a copy that already holds
+the lock (a data import replacing the data folder) is a second case. On Linux and Windows the path-keyed name above
+still keeps a second copy out. On macOS the lock is `flock` (Python) or `O_EXLOCK` (Node), both on an inode, so a
+second copy locks the new file and starts. There `hold_single_instance` / `holdSingleInstance` start a watch on the
+held lock (`InstanceLock.watch` / `InstanceLock#watch`): every `LOCK_WATCH_SECONDS` (2 s; one `stat` and one `fstat`)
+the holder compares the inode it locked with the file at the path, and once the path names another file (the imported
+folder's lock, or the one a second copy made) it stops at once with 75 and one sentence naming the path
+(`lost_lock_message` / `lostLockMessage`), so the copy started on the new folder runs alone. The two copies overlap for
+at most one interval. The stop is abrupt on purpose (`stop_lost_holder` / `stopLostHolder`: `os._exit`,
+`process.exit`): a graceful shutdown would write the old copy's state into the folder now at the path, which is not the
+one it read. Under a supervisor the stopped copy is restarted and takes the new folder's lock, or waits as above while
+another copy holds it. A path that is gone or cannot be
+read now (a folder removed, a permission, an I/O error) is read as nothing there yet and tried again next time: a
+second copy has to make a file there to start, and the watch then sees that file. `release` ends the watch. Pass
+`on_lost` / `onLost` to `hold_single_instance` / `holdSingleInstance` (or call `watch` yourself on an `InstanceLock`) to
+react otherwise. A path-keyed name on macOS was weighed and left: it needs a file outside the data folder, in a folder
+the system never cleans and every copy of every user can write, which the standard library cannot promise; and a
+watch also stops a holder that would otherwise go on writing stale state into the imported folder.
 
 **Token files on Windows.** The privacy of `service.token` is its ACL (service.md *Windows
 token files*): the kits write a protected list: the user, SYSTEM and Administrators, set before the

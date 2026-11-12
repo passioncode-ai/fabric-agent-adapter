@@ -4,10 +4,7 @@
 `degraded[]`. Part of the service kit (FAA-62, layer L3). Standard library only."""
 from __future__ import annotations
 
-import bisect
-import ipaddress
 import re
-import unicodedata
 import urllib.parse
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
@@ -18,7 +15,12 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_secrets import (  # noqa: E402
-    JWT_SHAPE, _BEARER_INSIDE as _BEARER, _long_secret, credential_name, raw_values, secret_argument, secret_value,
+    _BEARER_INSIDE as _BEARER, _long_secret, credential_name, has_jwt, raw_values, secret_argument, secret_value,
+)
+# The WHATWG host reading and its IDNA tables (FAA-98) live in fabric_secrets since FAA-309, where secret_url reads a
+# URL's host with them; the names stay here for code and tests that reached them.
+from fabric_secrets import (  # noqa: E402,F401
+    _FORBIDDEN_DOMAIN, _FORBIDDEN_HOST, _IDNA_DISALLOWED, _IDNA_IGNORED, _domain_ok, _idna_host, _ipv4_number, _ipv6_ok,
 )
 
 CONNECTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1"
@@ -171,153 +173,6 @@ _credential_name, _secret_value, _secret_argument = credential_name, secret_valu
 
 
 _SPECIAL = ("http", "https", "ws", "wss", "ftp", "file")
-_FORBIDDEN_HOST = set("\x00\t\n\r #/:<>?@[\\]^|")
-_FORBIDDEN_DOMAIN = _FORBIDDEN_HOST | set(chr(c) for c in range(0x20)) | {"%", "\x7f"}
-
-
-# FAA-98: UTS46 narrowed, not ported. A non-ASCII host is refused only where every Node from 20 to 26 refuses it, so
-# the doubt stays on the closed side (its URL's credentials are read). The two tables are measured by
-# test/fixtures/idna/make_idna_tables.mjs (idna-tables.json, held equal by test_the_idna_tables_are_the_measured_ones):
-# code points refused in every context, and code points removed between letters. The contextual rules read Unicode 3.2
-# classes (`unicodedata.ucd_3_2_0`) and skip what that Unicode does not know, since Node's own UTS46 data lags its
-# Unicode: an Arabic letter of Unicode 14 is no right-to-left letter to it.
-_IDNA_DISALLOWED = (
-    (0x80, 0xa0), (0xa8, 0xa8), (0xaf, 0xaf), (0xb4, 0xb4), (0xb8, 0xb8), (0x2d8, 0x2dd), (0x37a, 0x37a),
-    (0x384, 0x385), (0x600, 0x605), (0x61c, 0x61c), (0x6dd, 0x6dd), (0x70f, 0x70f), (0x890, 0x891), (0x8e2, 0x8e2),
-    (0x1680, 0x1680), (0x1fbd, 0x1fbd), (0x1fbf, 0x1fc1), (0x1fcd, 0x1fcf), (0x1fdd, 0x1fdf), (0x1fed, 0x1fee),
-    (0x1ffd, 0x1ffe), (0x2000, 0x200a), (0x200e, 0x200f), (0x2017, 0x2017), (0x2024, 0x2026), (0x2028, 0x202f),
-    (0x203e, 0x203e), (0x2047, 0x2049), (0x205f, 0x205f), (0x2066, 0x2069), (0x2100, 0x2101), (0x2105, 0x2106),
-    (0x2488, 0x249b), (0x2a74, 0x2a74), (0x2ff0, 0x3000), (0x309b, 0x309c), (0x31ef, 0x31ef), (0x33c2, 0x33c2),
-    (0x33c7, 0x33c7), (0x33d8, 0x33d8), (0xe000, 0xf8ff), (0xfc5e, 0xfc63), (0xfdfa, 0xfdfb), (0xfe12, 0xfe13),
-    (0xfe16, 0xfe16), (0xfe19, 0xfe19), (0xfe30, 0xfe30), (0xfe47, 0xfe4c), (0xfe52, 0xfe52), (0xfe55, 0xfe56),
-    (0xfe5f, 0xfe5f), (0xfe64, 0xfe65), (0xfe68, 0xfe68), (0xfe6a, 0xfe6b), (0xfe70, 0xfe70), (0xfe72, 0xfe72),
-    (0xfe74, 0xfe74), (0xfe76, 0xfe76), (0xfe78, 0xfe78), (0xfe7a, 0xfe7a), (0xfe7c, 0xfe7c), (0xfe7e, 0xfe7e),
-    (0xff03, 0xff03), (0xff05, 0xff05), (0xff0f, 0xff0f), (0xff1a, 0xff1a), (0xff1c, 0xff1c), (0xff1e, 0xff20),
-    (0xff3b, 0xff3e), (0xff5c, 0xff5c), (0xffe3, 0xffe3), (0xfff9, 0xfffd), (0x110bd, 0x110bd), (0x110cd, 0x110cd),
-    (0x13430, 0x1343f), (0x1f100, 0x1f100), (0xe0001, 0xe0001), (0xe0020, 0xe007f), (0xf0000, 0xffffd),
-    (0x100000, 0x10fffd),
-)
-_IDNA_IGNORED = (
-    (0xad, 0xad), (0x34f, 0x34f), (0x180b, 0x180d), (0x180f, 0x180f), (0x200b, 0x200b), (0x2060, 0x2060),
-    (0x2064, 0x2064), (0xfe00, 0xfe0f), (0xfeff, 0xfeff), (0x1bca0, 0x1bca3), (0xe0100, 0xe01ef),
-)
-_IDNA_DOTS = re.compile("[.\u3002\uff0e\uff61]")
-_U32 = unicodedata.ucd_3_2_0
-_RTL_OK = {"R", "AL", "AN", "EN", "ES", "CS", "ET", "ON", "BN", "NSM"}
-_JOINERS = "\u200c\u200d"
-
-
-def _in_ranges(ranges: Sequence[tuple], cp: int) -> bool:
-    i = bisect.bisect_right(ranges, (cp, 0x10ffff)) - 1
-    return i >= 0 and ranges[i][0] <= cp <= ranges[i][1]
-
-
-def _known(c: str) -> bool:
-    return _U32.category(c) != "Cn" and unicodedata.category(c) != "Cn"
-
-
-def _joiner_refused(label: str, i: int) -> bool:
-    """CheckJoiners as Node 20 to 26 all read it: they find a joining context, or a virama, anywhere in the label
-    (`\u0628a\u200c\u0627` and `\u0628\u200c\u0627\u200d` parse), so only a joiner with nothing but ASCII beside it
-    in its label has none for certain."""
-    return all(c.isascii() for j, c in enumerate(label) if j != i)
-
-
-def _bidi_refused(label: str) -> bool:
-    """RFC 5893 as Node 20 to 26 all read it: only a label holding R, AL or AN is judged, and its first code point is
-    not (Node 26 alone refuses a label opening with a digit or a hyphen)."""
-    if not label or not all(_known(c) for c in label) or any(c in _JOINERS for c in label):
-        return False  # Node 20 to 26 pass a label holding a joiner over (`\u05d0a\u094d\u200d` parses)
-    k = [_U32.bidirectional(c) for c in label]
-    if not any(x in ("R", "AL", "AN") for x in k):
-        return False
-    body = list(k)
-    while body and body[-1] == "NSM":
-        body.pop()
-    if not body or body[-1] not in ("R", "AL", "EN", "AN"):
-        return True
-    return k[0] in ("R", "AL") and (any(x not in _RTL_OK for x in k) or ("EN" in k and "AN" in k))
-
-
-def _idna_host(host: str) -> Optional[str]:
-    """None where WHATWG's domain-to-ASCII refuses a non-ASCII host for certain; else the host as UTS46 maps it, read
-    as NFKC with case folding (exact enough for the ASCII rules that follow, which read digits and dots)."""
-    if any(_in_ranges(_IDNA_DISALLOWED, ord(c)) for c in host):
-        return None
-    kept = "".join(c for c in host if not _in_ranges(_IDNA_IGNORED, ord(c)))
-    if kept == "":
-        return None  # nothing left: an empty host
-    if not all(_known(c) for c in kept):
-        return host  # a code point this Python's Unicode does not know: the contextual rules are not read
-    mapped = unicodedata.normalize("NFC", unicodedata.normalize("NFKC", unicodedata.normalize("NFKC", kept).casefold()))
-    for label in _IDNA_DOTS.split(mapped):
-        first = label[:1]
-        if first and first not in "\u17b4\u17b5" and _U32.category(first)[0] == "M" and unicodedata.category(first)[0] == "M":
-            return None  # a label opening with a mark (U+17B4 and U+17B5 are ignored by the newer Nodes)
-        if any(c in _JOINERS and _joiner_refused(label, i) for i, c in enumerate(label)):
-            return None
-        if _bidi_refused(label):
-            return None
-    return _IDNA_DOTS.sub(".", mapped)
-
-
-def _ipv4_number(part: str) -> Optional[int]:
-    if part == "":
-        return None  # an empty part fails WHATWG's IPv4 parser (`1..2`); `0x` alone is 0
-    base = 10
-    if part[:2].lower() == "0x":
-        part, base = part[2:], 16
-    elif len(part) > 1 and part[0] == "0":
-        part, base = part[1:], 8
-    if part == "":
-        return 0
-    digits = {10: "0123456789", 16: "0123456789abcdefABCDEF", 8: "01234567"}[base]
-    return int(part, base) if all(c in digits for c in part) else None
-
-
-def _domain_ok(host: str) -> bool:
-    """The WHATWG host parser on a special scheme's host, enough to know when `new URL` refuses it."""
-    if host.startswith("["):
-        return host.endswith("]") and _ipv6_ok(host[1:-1])
-    if re.search(r"%(?![0-9A-Fa-f]{2})", host) is None:
-        try:
-            host = urllib.parse.unquote_to_bytes(host).decode("utf-8")
-        except UnicodeDecodeError:
-            return False
-    if any(c in _FORBIDDEN_DOMAIN for c in host):
-        return False
-    # A non-ASCII host goes through UTS46 in WHATWG; this module reads it narrowly (_idna_host, FAA-98). When unsure,
-    # the host is taken as valid, so its URL's credentials are read: the doubt then hides a list rather than publish one
-    # (round-2 reading). A host UTS46 maps to ASCII is read by the ASCII rules below (`１２７.０.０.１` is an address).
-    if any(ord(c) > 0x7f for c in host):
-        mapped = _idna_host(host)
-        if mapped is None:
-            return False
-        if not mapped.isascii() or any(c in _FORBIDDEN_DOMAIN for c in mapped):
-            return True
-        host = mapped
-    labels = host.split(".")
-    if labels and labels[-1] == "" and len(labels) > 1:
-        labels = labels[:-1]
-    last = labels[-1] if labels else ""
-    if not (last and (last.isdigit() and last.isascii() or re.fullmatch(r"0[xX][0-9A-Fa-f]*", last))):
-        return host != ""
-    numbers = [_ipv4_number(label) for label in labels]
-    if len(numbers) > 4 or any(n is None for n in numbers):
-        return False
-    return all(n <= 255 for n in numbers[:-1]) and numbers[-1] < 256 ** (5 - len(numbers))
-
-
-def _ipv6_ok(text: str) -> bool:
-    if "%" in text:
-        return False  # a zone id: `ipaddress` takes one, WHATWG does not
-    try:
-        ipaddress.IPv6Address(text)
-        return True
-    except ValueError:
-        return False
-
-
 _SURROGATE = re.compile("[\ud800-\udfff]")
 _QUERY_ENCODE = set(chr(c) for c in range(0x21)) | set('"#<>')
 _FRAGMENT_ENCODE = set(chr(c) for c in range(0x21)) | set('"<>`')
@@ -388,7 +243,7 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
             return None
     elif any(c in _FORBIDDEN_HOST for c in host):
         return None
-    elif host == "" and ("@" in authority or port):
+    elif host == "" and ("@" in authority or ":" in hostport):
         return None
     return {"password": password, "query": query, "fragment": fragment}
 
@@ -424,7 +279,7 @@ def _secret_url(value: str) -> bool:
 
 
 def _credential(value: str, runs: bool) -> bool:
-    return bool(JWT_SHAPE.search(value) or _KEY_SHAPE.search(value) or _BEARER.search(value)
+    return bool(has_jwt(value) or _KEY_SHAPE.search(value) or _BEARER.search(value)  # has_jwt: one pass (FAA-313)
                 or (runs and _long_run(value)) or any(_secret_url(url) for url in _urls_in(value)))
 
 

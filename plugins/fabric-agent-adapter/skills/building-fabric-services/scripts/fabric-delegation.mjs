@@ -9,6 +9,8 @@
 //     effects: { 'example.write': 'draft' }, issuer: wk.auth.delegation.issuer });
 //   const verdict = await gate(toolName, req.headers);   // before the tool runs
 //   if (!verdict.ok) return refusalToolResult(verdict);
+//
+// Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 import crypto from 'node:crypto';
 import fs from 'node:fs';

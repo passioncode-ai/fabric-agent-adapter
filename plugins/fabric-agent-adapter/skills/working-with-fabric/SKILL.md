@@ -13,7 +13,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.81.0"
+  version: "0.82.0"
 ---
 
 # Working with Fabric
@@ -123,7 +123,7 @@ A dispatched session skips the `com.list` sweep, Step 4 and Step 7: [on-demand s
 
 `com.status` (can the board be read, how many unread), then `com.list` (`unread: true` where listed); `com.read_ack`
 only what you read and handled. A reply reaches the sender it answers; add `deliverTo: "thread"` when
-every participant needs it (DEC-0135); an older board refuses it: post a new thread message. Answer what waits on your Project this turn (state now, result later; leave a request your Project's service should take queued, as project-board.md says from Fabric 0.3.17); a request is your next task. Ask another Project
+every participant needs it (DEC-0135); an older board refuses it: post a new thread message. Answer what waits on your Project this turn (state now, result later); a request to your Project goes as project-board.md's SA-6 rule says (an `active` slot's holder keeps it and nobody is asked), and is your next task. Ask another Project
 only through `com.submit`, addressed to its Project id (never a session or a folder), the same idempotency key on a
 retry. When nobody answers, project-board.md's *When nobody answers* says when you make a small change in the owner's
 repository yourself (reply *adapted by* with the merge commit, then cancel the request) and when it waits for its deadline. The target Project's reply to a request answers it (`answered`):

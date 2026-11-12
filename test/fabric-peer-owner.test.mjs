@@ -36,7 +36,7 @@ test('every shared case reads the owner the Python twin reads', async () => {
   for (const [i, c] of CASES.cases.entries()) {
     if (!(c.twins ?? ['python', 'node']).includes('node')) continue;
     const table = CASES.tables[c.table];
-    let o = { ...opts(table), ...(c.ownUid !== undefined ? { ownUid: c.ownUid } : {}) };
+    let o = { ...opts(table), ...(c.ownUid !== undefined ? { ownUid: c.ownUid } : {}), ...(c.ownPid !== undefined ? { ownPid: c.ownPid } : {}) };
     try {
       parsed(table);
     } catch (err) {
@@ -232,7 +232,7 @@ test('a /proc read that missed the row is read once more; netstat is taken as it
   assert.deepEqual([who.kind, reads], [po.THIS_ACCOUNT, 2]);
   let netstatReads = 0;
   const netstat = { ...opts(CASES.tables.netstatMulti), read: async () => { netstatReads += 1; return { rows: [], how: 'netstat' }; } };
-  assert.equal((await po.serverEnd(fakeSocket(c.client, c.server), netstat)).reason, 'no-row');
+  assert.equal((await po.serverEnd(fakeSocket(c.client, c.server), netstat)).reason, po.NO_ROW_RESTRICTED);
   assert.equal(netstatReads, 1);
 });
 
@@ -282,25 +282,81 @@ test('a restricted table answers table-restricted, and a vouched pid that listen
   // No vouch: unknown, fail closed.
   await assert.rejects(po.checkedSocket(port, restricted), (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
   // A vouched pid that does not listen on this port: still refused.
-  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, run: lsof(port + 1) }),
+  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, ownEuid: 501, run: lsof(port + 1) }),
     (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
   // A vouched pid of another account: refused.
-  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 502, run: lsof(port) }),
+  await assert.rejects(po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 502, ownEuid: 502, run: lsof(port) }),
     (err) => err instanceof po.ListenerRefused && err.code === po.SERVER_UNVERIFIED);
   // This account's vouched pid holds the listener: the socket is handed over.
-  const socket = await po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, run: lsof(port) });
+  const socket = await po.checkedSocket(port, { ...restricted, vouchPid: 4242, platform: 'darwin', ownUid: 501, ownEuid: 501, run: lsof(port) });
   socket.destroy();
   assert.deepEqual(received, []);
 });
 
 test('a vouch is an integer pid of this account, and lsof is asked for IPv4 alone (FAA-267)', async () => {
   const calls = [];
-  const run = async (file, args) => { calls.push(args); return file === po.PS ? '501\n' : 'p4242\nf4\nn*:80\n'; };
+  let listens = 'p4242\nf4\nn127.0.0.1:80\n';
+  const run = async (file, args) => { calls.push(args); return file === po.PS ? '501\n' : listens; };
   for (const pid of ['4242', true, null, 1, 0, -5]) {
-    assert.equal(await po.pidListens(pid, 80, { run, platform: 'darwin', ownUid: 501 }), false, String(pid));
+    assert.equal(await po.pidListens(pid, 80, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), false, String(pid));
   }
-  assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501 }), true);
-  assert.equal(await po.pidListens(4242, 81, { run, platform: 'darwin', ownUid: 501 }), false);
-  assert.equal(await po.pidListens(4242, 80, { run, platform: 'linux', ownUid: 501 }), false);
+  assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), true);
+  assert.equal(await po.pidListens(4242, 81, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), false);
+  assert.equal(await po.pidListens(4242, 80, { run, platform: 'linux', ownUid: 501, ownEuid: 501 }), false);
+  // FAA-312, DEC-0155 RT-3: only a listen on exactly 127.0.0.1 is vouched for, never the IPv4 wildcard nor ::1.
+  for (const text of ['p4242\nf4\nn*:80\n', 'p4242\nf4\nn[::1]:80\n']) {
+    listens = text;
+    assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501, ownEuid: 501 }), false, text);
+  }
+  listens = 'p4242\nf4\nn127.0.0.1:80\n';
+  // DEC-0155: a reader whose real and effective uid differ vouches for nothing.
+  assert.equal(await po.pidListens(4242, 80, { run, platform: 'darwin', ownUid: 501, ownEuid: 0 }), false);
   assert.ok(calls.at(-1).includes('-i4TCP') && !calls.at(-1).includes('-iTCP'), calls.at(-1).join(' '));
+});
+
+test('a netstat that fails is a restricted table (FAA-312, DEC-0155 RT-1)', async () => {
+  for (const failure of ['netstat: exit 1', 'netstat: timeout', 'netstat: ENOENT']) {
+    const run = async (file) => { if (file === po.NETSTAT) throw new po.TableUnreadable(failure); return '501\n'; };
+    await assert.rejects(po.readTable({ run, platform: 'darwin' }), (err) => err instanceof po.TableUnreadable
+      && err.message === `${po.TABLE_RESTRICTED}: ${failure}`);
+  }
+  // A Linux or Windows reader never reads its table so.
+  assert.equal(po.restricted([], 'proc'), false);
+  assert.equal(po.restricted([], 'netstat-windows'), false);
+});
+
+test('a table of this process alone is restricted (FAA-312, DEC-0155 RT-1)', () => {
+  const row = (pid) => ({ local: ['127.0.0.1', 47311], remote: ['*', 0], listening: true, uid: null, pid, timeWait: false });
+  assert.equal(po.restricted([row(77)], 'netstat', { ownPid: 77 }), true);
+  assert.equal(po.restricted([row(77), row(78)], 'netstat', { ownPid: 77 }), false);
+  assert.equal(po.restricted([row(null)], 'netstat', { ownPid: 77 }), true);
+  assert.equal(po.restricted([], 'netstat', { ownPid: 77 }), true);
+  assert.equal(po.restricted([row(78)], 'netstat'), process.pid === 78);
+});
+
+test('the CLI prints the listener\'s kind (FAA-315)', async () => {
+  const { execFileSync, spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const script = fileURLToPath(new URL('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-peer-owner.mjs', import.meta.url));
+  const server = net.createServer(() => {});
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  try {
+    const kind = execFileSync(process.execPath, [script, 'listener', String(server.address().port)],
+      { encoding: 'utf8' }).trim();
+    assert.ok(po.KINDS.includes(kind), kind);
+    if (process.platform !== 'darwin') assert.equal(kind, po.THIS_ACCOUNT);
+    const json = JSON.parse(execFileSync(process.execPath, [script, 'listener',
+      String(server.address().port), '--json'], { encoding: 'utf8' }));
+    assert.equal(json.kind, kind);
+  } finally {
+    server.close();
+  }
+  for (const args of [[], ['listener'], ['listener', 'x'], ['listener', '0'], ['listener', '65536'], ['peer', '1']]) {
+    const done = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+    assert.equal(done.status, 2, args.join(' '));
+    assert.match(done.stderr, /usage/);
+  }
+  const out = [];
+  assert.equal(await po.main(['listener', '47311'], { listener: async () => po.owner(po.NONE), write: (t) => out.push(t) }), 0);
+  assert.deepEqual(out, ['none\n']);
 });

@@ -123,6 +123,9 @@ class OnePushPerHold(unittest.TestCase):
             self.book.hold(caller="sk-or-v1-" + "a1B2" * 12, work="w", reason="money", now=NOW)
         with self.assertRaises(holds.ServiceError):
             self.book.hold(caller="a", work="w", reason="rate", now=NOW)
+        with self.assertRaises(holds.ServiceError):  # U+FEFF alone is whitespace in both twins (FAA-316)
+            self.book.hold(caller="\ufeff", work="w", reason="money", now=NOW)
+        self.assertTrue(self.book.hold(caller="\u0085", work="w", reason="money", now=NOW))
 
     def test_the_book_file_is_owner_only(self):
         import os

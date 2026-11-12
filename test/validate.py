@@ -21,7 +21,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric; observing-products builds nothing, it watches a product.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.81.0"
+VERSION = "0.82.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -863,11 +863,8 @@ HTTPS_LEGEND = re.compile(r"^\s*(?:#|//) Example URLs write their scheme in angl
                           re.MULTILINE)
 SCRIPT_PLACES = re.compile(r"^(?:plugins/[^/]+/skills/[^/]+/scripts|bin)/")
 # A script that writes the example and is owned by another change this wave; each entry names why, and an entry that
-# is no longer needed fails.
-HTTPS_LEGEND_PENDING = {
-    "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs":
-        "the delegation modules belong to another builder in wave 2; its legend lands with that change",
-}
+# is no longer needed fails. Empty since fabric-delegation.mjs took its legend (FAA-306).
+HTTPS_LEGEND_PENDING: Dict[str, str] = {}
 
 
 def https_legend_problems(root: Path = ROOT, pending: Optional[Dict[str, str]] = None) -> List[str]:

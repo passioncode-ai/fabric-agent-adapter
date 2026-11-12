@@ -70,8 +70,9 @@ class HubError(Exception):
 def listener_refusal(exc: Any) -> HubError:
     """The HubError for a hub port the peer-owner check refused (DEC-0154 HA-2): code `foreign-user`, the pinned
     contract's state name, with the owner's reason in the sentence and in `data.reason` (FAA-272): `table-restricted`
-    when this process's socket table hides other processes' sockets, which never clears, so it is not retryable;
-    otherwise the owner's kind or the check's reason (`another-account`, `no-row`), retryable as before."""
+    when this process's socket table hides other processes' sockets, or, on macOS, holds no row for this connection
+    (DEC-0155 RT-1, FAA-312), which never clears, so it is not retryable; otherwise the owner's kind or the check's
+    reason (`another-account`, or `no-row`, which only Linux and Windows give), retryable."""
     owner = getattr(exc, "owner", None)
     why = (getattr(owner, "reason", None) or getattr(owner, "kind", None) or getattr(exc, "code", None) or "unknown")
     reason = _po.TABLE_RESTRICTED if str(why).startswith(_po.TABLE_RESTRICTED) else str(why).split(":", 1)[0]
@@ -94,25 +95,37 @@ def fabric_root(platform: str = sys.platform, env: Optional[Dict[str, str]] = No
     return Path(env.get("XDG_DATA_HOME") or str(home / ".local/share")) / "passioncode-fabric"
 
 
-def pid_alive(pid: int) -> bool:
-    """Whether a process with this id runs as this user (Fabric `hub.ts#pidAlive`); never signals it."""
+def _windows_pid_alive(pid: int, kernel: Any = None, last_error: Any = None) -> Optional[bool]:
+    """pid_alive on Windows, where os.kill(pid, 0) would send CTRL_C_EVENT: OpenProcess with query access only. Refused
+    with ERROR_ACCESS_DENIED (5), another account's or an elevated process: None, as Node's process.kill(pid, 0)
+    answers EPERM there (FAA-304); refused otherwise, no process. `kernel` and `last_error` stand in for kernel32 and
+    ctypes.get_last_error in a test."""
+    import ctypes
+    if kernel is None:
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+        last_error = ctypes.get_last_error  # type: ignore[attr-defined]
+    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None if last_error() == 5 else False  # ERROR_ACCESS_DENIED: not verified, never called running
+    try:
+        code = ctypes.c_ulong()
+        return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def pid_alive(pid: int) -> Optional[bool]:
+    """True: a process of this OS account runs under `pid`; False: none does. None (falsy): a process of another account
+    does (EPERM; on Windows, OpenProcess refused with access denied), as when the id hub.json names was reused: not
+    verified, never called running (FAA-304, the session hooks' answer since FAA-254). Never signals it."""
     if pid <= 0:
         return False
     if sys.platform == "win32":
-        import ctypes
-        kernel = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-        if not handle:
-            return False
-        try:
-            code = ctypes.c_ulong()
-            return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
-        finally:
-            kernel.CloseHandle(handle)
+        return _windows_pid_alive(pid)
     try:
         os.kill(pid, 0)
     except PermissionError:
-        return False  # another user's process under a reused id: not this user's Fabric
+        return None  # another account's process under a reused id: not verified, and not this account's Fabric
     except OSError:
         return False
     return True
@@ -142,7 +155,8 @@ def _read_small(path: Path) -> Optional[str]:
 def locate_hub(root: Optional[Path] = None, alive: Callable[[int], bool] = pid_alive, estate: Optional[Dict[str, Any]] = None,
                now: Optional[float] = None) -> Dict[str, Any]:
     """`hub.json` read the way an agent must, every call. Answers `{origin, mcpUrl, doorTokenFile, pid, startedAt,
-    features}` or raises `HubError` (`not-running`, retryable; `not-a-hub`). Reads no token. `estate` is
+    features}` or raises `HubError` (`not-running`, retryable; `not-a-hub`, retryable when hub.json names a process of
+    another OS account, which is not verified, FAA-304). Reads no token. `estate` is
     `{"record": <estate record>, "applied": {"revision", "digest"?} | None}`: with it, a `hubKey` the document names is
     checked by `hub_key_certified` (DEC-0060); fabric-hub/0.1 names none, and then nothing is checked."""
     root = Path(root) if root is not None else fabric_root()
@@ -174,7 +188,11 @@ def locate_hub(root: Optional[Path] = None, alive: Callable[[int], bool] = pid_a
     token_file = doc.get("doorTokenFile") if isinstance(doc.get("doorTokenFile"), str) else ""
     if not os.path.isabs(token_file) or os.path.realpath(os.path.dirname(token_file)) != os.path.realpath(str(root)):
         raise not_hub("names a door token outside the registry root")
-    if not alive(pid):
+    live = alive(pid)
+    if live is None:  # FAA-304: another account's process under that id, so not this account's Fabric (as FAA-254)
+        raise HubError("not-a-hub", "Fabric's hub.json names process %d, which runs under another OS account: not "
+                       "verified." % pid, True)
+    if not live:
         raise HubError("not-running", "Fabric is not running: hub.json names process %d, which is not running." % pid, True)
     features = doc.get("features")
     features = [f for f in features if isinstance(f, str)] if isinstance(features, list) else []

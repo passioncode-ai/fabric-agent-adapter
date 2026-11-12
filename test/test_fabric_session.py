@@ -312,6 +312,15 @@ class Hub(Base):
         self.assertEqual(fs.locate_hub(self.root)["state"], "not-a-hub")
         self.assertLess(time.perf_counter() - started, 1.0)
 
+    def test_windows_answers_another_accounts_process_as_not_verified(self):
+        # FAA-304: the hooks' Windows reading gives the third answer too: OpenProcess refused with ERROR_ACCESS_DENIED
+        # is another account's or an elevated process (None); the OS calls are faked, so this runs on every OS
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_fabric_hub import windows_answers
+        env = sys.modules["fabric_session_env"]
+        self.assertEqual(windows_answers(env._windows_pid_alive), {"denied": None, "invalid": False, "running": True,
+                                                                   "exited": False, "unreadable": False})
+
     def test_another_account_s_process_under_the_pid_is_not_verified(self):
         # FAA-254: EPERM is a process of another OS account under the id hub.json names (a reused pid): never called
         # running, said as not verified
@@ -2059,7 +2068,12 @@ class NoServicesLine(Base):
         for said in (context, fs.UNREAD_LINE % 1):  # FAA-205: what waits on the Project is answered in the same turn
             self.assertIn("in the same turn" if said is context else "in this turn", said)
             self.assertIn("the result later", said)
-        self.assertIn("a request your Project's service should take stays queued", context)
+        # FAA-311 (contract DEC-0152 SA-6): a request is answered through its slot, never by a slotless session's state
+        self.assertIn("An announcement or question waiting on your Project gets an answer in the same turn", context)
+        self.assertIn("A request to your Project: read its capability's slot in `com.status` first; `active`, leave it "
+                      "to that holder and ask no one; otherwise `com.enroll`, and only its holder gives its state "
+                      "(`com.progress`); without the slot, no work and no state on it", context)
+        self.assertNotIn("should take stays queued", context)
         # FAA-221: both cases, the decline and resend before Fabric 0.3.17 and CO-506's grant at com.enroll from it
         self.assertIn("Before Fabric 0.3.17 a run Fabric starts on a request no session can take declines it", context)
         self.assertIn("from 0.3.17 (CO-506) the session's own Project is granted `board.respond` at `com.enroll`", context)

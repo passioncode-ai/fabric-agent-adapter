@@ -66,15 +66,24 @@ for _name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTOR
     os.environ.pop(_name, None)
 
 
+#: The clock a growth ratio reads (FAA-308): this thread's CPU time, so the time the thread waits for a core does not
+#: count. A wall-clock ratio of two sizes, fastest of three, still failed under a load average near 110 (7.6 against a
+#: bound of 6.5, 2026-11-12, 90 busy processes on 14 cores). In CPU time, under a load average of 150 to 187, the
+#: minified JSON line read 3.9 to 4.5 in ten rounds, and 0.58.0's quadratic `_quoted` read 9.8 and 9.9.
+#: Windows keeps the wall clock: its thread time moves in scheduler ticks (about 15.6 ms), coarser than the work.
+CPU_CLOCK = time.perf_counter if sys.platform == "win32" else time.thread_time
+
+
 def growth(work, small, large, runs=3):
     """How much longer `work(large)` takes than `work(small)`: each size's fastest of `runs`, measured in turn so a load
-    that slows the machine slows both (FAA-209: a wall-clock bound fails under load, a ratio of two sizes does not)."""
+    that slows the machine slows both (FAA-209: a wall-clock bound fails under load, a ratio of two sizes does not), in
+    CPU time where the clock allows (FAA-308, CPU_CLOCK)."""
     best = {small: None, large: None}
     for _ in range(runs):
         for size in (small, large):
-            started = time.perf_counter()
+            started = CPU_CLOCK()
             work(size)
-            took = time.perf_counter() - started
+            took = CPU_CLOCK() - started
             best[size] = took if best[size] is None else min(best[size], took)
     return best[large] / max(best[small], 1e-9)
 
@@ -385,6 +394,17 @@ class Findings(Tree):
         lines = {n: "{" + ",".join('"f%d":"%s"' % (i, "0123456789abcdef" * 4) for i in range(n)) + "}" for n in (14000, 56000)}
         # four times the line costs about four times as much; copying the rest of the line per member cost nine
         self.assertLess(growth(lambda n: self.assertIsNone(sc._secret_finding(lines[n])), 14000, 56000), 6.5)
+
+    def test_a_long_run_of_jwt_starts_is_read_in_linear_time(self):
+        """FAA-313 follow-up: the line, span and URL-value readers read a JWT through fabric_secrets' one-pass reader,
+        not JWT_SHAPE's backtracking search, which cost sixteen times the work for four times the text."""
+        texts = {n: "eyJ" * n for n in (4000, 16000)}
+        for name, read in (("_secret_in", sc._secret_in), ("_secret_spans", sc._secret_spans),
+                           ("_url_secret", lambda text: sc._url_secret("https://h.example/?a=" + text))):
+            with self.subTest(read=name):
+                self.assertFalse(read(texts[4000]))
+                # four times the text costs about four times as much; the regular expression cost sixteen
+                self.assertLess(growth(lambda n: read(texts[n]), 4000, 16000), 9)
 
     def test_the_litter_files_the_check_skips_are_packs(self):
         packer = _package_module()

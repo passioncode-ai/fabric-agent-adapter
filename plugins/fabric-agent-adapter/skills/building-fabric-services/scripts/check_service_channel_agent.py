@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fabric_jsvalue import indexed_objects, js_keys  # noqa: E402
-from fabric_secrets import JS_SPACE, JWT_SHAPE, SECRET_VALUE, raw_values, secret_argument, secret_url, secret_value  # noqa: E402
+from fabric_secrets import JS_SPACE, SECRET_VALUE, has_jwt, raw_values, secret_argument, secret_url, secret_value  # noqa: E402
 from fabric_secrets import url_parts as _whatwg_url_parts  # noqa: E402 - public since FAA-250
 import check_service_channel_agent_schema as cas  # noqa: E402
 
@@ -208,9 +208,9 @@ def read_as_url(read: str) -> bool:
 
 
 def _url_reading(read: str) -> bool:
-    """secretUrl where read_as_url admits the head, secretArgument otherwise. The kit's secret_url also reads a URL the
-    WHATWG parser refuses (the safe direction for its own callers); the contract's `new URL` throws there and finds only
-    what secretArgument finds, so a refused URL is read by secret_argument alone here."""
+    """secretUrl where read_as_url admits the head, secretArgument otherwise. A URL the WHATWG parser refuses makes the
+    contract's `new URL` throw, which finds only what secretArgument finds, so such a URL is read by secret_argument
+    alone: url_parts answers None for it here, as the kit's secret_url reads it as an argument only since FAA-309."""
     if not read_as_url(read):
         return secret_argument(read)
     return secret_argument(read) or (url_parts(read) is not None and secret_url(read))
@@ -222,7 +222,7 @@ def shaped_read(read: str) -> bool:
 
 def _key_shaped(text: str) -> bool:
     read = head(text)
-    return bool(JWT_SHAPE.search(read) or SECRET_VALUE.search(read))
+    return bool(has_jwt(read) or SECRET_VALUE.search(read))
 
 
 def plain_name(name: str) -> bool:
@@ -397,6 +397,8 @@ def url_parts(text: str) -> Optional[Tuple[str, str]]:
             return None
         if at and hostport == "":
             return None
+        if host == "" and colon > bracket:
+            return None  # an empty host ended by `:`, with an empty port or a port: `new URL` throws
         if host == "" and special and lowered != "file":
             return None
         if host and not _host_ok(host, special):

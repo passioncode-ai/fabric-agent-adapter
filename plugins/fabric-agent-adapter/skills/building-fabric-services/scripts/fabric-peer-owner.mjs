@@ -40,12 +40,14 @@
 // privilege. The parsers are pure functions over captured text (test/fixtures/peer-owner/).
 
 import { execFile } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { open } from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-export const PEER_OWNER_VERSION = '1.2.0+kit.5'; // the Python twin's, Observatory's 1.2.0 with the kit's differences
+export const PEER_OWNER_VERSION = '1.2.0+kit.6'; // the Python twin's, Observatory's 1.2.0 with the kit's differences
 export const THIS_ACCOUNT = 'this-account';
 export const ANOTHER_ACCOUNT = 'another-account';
 export const SYSTEM = 'system';
@@ -62,6 +64,8 @@ export const LSOF = '/usr/sbin/lsof';
 // The reason a socket table hides other processes' sockets from this one (FAA-267): macOS 27.2 gives an ad-hoc-signed
 // runtime an empty netstat.
 export const TABLE_RESTRICTED = 'table-restricted';
+// A macOS table that lists sockets but not the reader's own connection (DEC-0155 RT-1, FAA-312).
+export const NO_ROW_RESTRICTED = `${TABLE_RESTRICTED}: no row for this connection`;
 export const SERVER_NOT_OWN = 'server-not-own';
 export const SERVER_UNVERIFIED = 'server-unverified';
 export const SERVER_NOT_THIS_WORKSPACE = 'server-not-this-workspace';
@@ -290,10 +294,10 @@ export function runProgram(file, args, timeout = TIMEOUT_MS) {
   });
 }
 
-export function method() {
-  if (process.platform === 'darwin') return 'netstat';
-  if (process.platform === 'linux') return 'proc';
-  if (process.platform === 'win32') return 'netstat-windows';
+export function method(platform = process.platform) {
+  if (platform === 'darwin') return 'netstat';
+  if (platform === 'linux') return 'proc';
+  if (platform === 'win32') return 'netstat-windows';
   return 'none';
 }
 
@@ -319,9 +323,18 @@ async function readProc(name) {
   return Buffer.concat(chunks);
 }
 
-export async function readTable({ run = runProgram } = {}) {
-  const how = method();
-  if (how === 'netstat') return { rows: parseNetstat(await run(NETSTAT, ['-anv', '-p', 'tcp'])), how };
+export async function readTable({ run = runProgram, platform = process.platform } = {}) {
+  const how = method(platform);
+  if (how === 'netstat') {
+    let text;
+    try {
+      text = await run(NETSTAT, ['-anv', '-p', 'tcp']);
+    } catch (err) {
+      // A netstat that fails, exits non-zero or times out is a restricted table (DEC-0155 RT-1, FAA-312).
+      throw new TableUnreadable(`${TABLE_RESTRICTED}: ${err instanceof TableUnreadable ? err.message : `netstat: ${err?.name ?? 'error'}`}`);
+    }
+    return { rows: parseNetstat(text), how };
+  }
   if (how === 'proc') {
     const rows = [];
     for (const [name, family] of [['/proc/net/tcp', 4], ['/proc/net/tcp6', 6]]) {
@@ -387,6 +400,21 @@ export async function resolve(row, how, { run = runProgram, ownUid: mine, ownSid
 
 // -- the questions ----------------------------------------------------------------------------------------------------
 
+// DEC-0155 RT-1 (FAA-312): a macOS table holding no row of another uid (sysctl, the Python twin's, which carries uids)
+// or of another process (netstat, which carries pids) is restricted, and a missing row proves nothing. Never on Linux
+// or Windows, which carry the owner on each row.
+export function restricted(rows, how, { ownUid: mine, ownPid } = {}) {
+  if (how === 'sysctl') {
+    const own = mine ?? ownUid();
+    return !rows.some((r) => r.uid !== null && r.uid !== undefined && r.uid !== own);
+  }
+  if (how === 'netstat') {
+    const own = ownPid ?? process.pid;
+    return !rows.some((r) => r.pid !== null && r.pid !== undefined && r.pid !== own);
+  }
+  return false;
+}
+
 // The live connected rows with exactly this local and remote address: one, or the caller cannot tell.
 // A row printed twice is one socket: Linux resumes a /proc read that sockets came and went under by position, and can
 // print the same row again (0.74.0 seam reading 6); rows equal in every field count once.
@@ -414,7 +442,8 @@ async function ownerOf(local, remote, opts = {}, server = false) {
     // A /proc read under churn can skip a row or print one twice; one more read before answering unknown.
     if (table.how !== 'proc' || found.length === 1) break;
   }
-  if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: 'no-row' });
+  // A macOS table without the reader's own connection is restricted (DEC-0155 RT-1, FAA-312).
+  if (found.length === 0) return owner(UNKNOWN, { method: table.how, reason: ['sysctl', 'netstat'].includes(table.how) ? NO_ROW_RESTRICTED : 'no-row' });
   if (found.length > 1) return owner(UNKNOWN, { method: table.how, reason: 'several-rows' });
   if (table.how === 'proc' && server && found[0].uid === null) {
     // Linux: a connection not yet accept()ed is printed with uid 0 and inode 0; it belongs to the listener on its local
@@ -491,21 +520,26 @@ export async function listener(port, opts = {}) {
   const at = now();
   const hit = injected ? undefined : listeners.get(port);
   if (hit && at - hit[0] < LISTENER_TTL_MS) return hit[1];
-  let found;
-  let how;
   let table;
   try {
     table = await (read ?? readTable)(opts);
-    how = table.how;
-    found = pickListener(table.rows, port);
   } catch (err) {
     const who = owner(UNKNOWN, { method: method(), reason: err instanceof TableUnreadable ? err.message : `table: ${err.name}` });
     if (!injected) listeners.set(port, [at, who]);
     return who;
   }
-  const who = await oneOwner(found, how, opts);
+  const who = restricted(table.rows, table.how, opts) ? await restrictedListener(table.rows, port, table.how, opts)
+    : await oneOwner(pickListener(table.rows, port), table.how, opts);
   if (!injected) listeners.set(port, [at, who]);
   return who;
+}
+
+// DEC-0155 RT-4 (FAA-312): under a restricted table only this account's own bind on exactly 127.0.0.1 is its own; its
+// wildcard or ::1 listener, root's, and a port with no row are an owner that cannot be told.
+async function restrictedListener(rows, port, how, opts) {
+  const who = await oneOwner(rows.filter((r) => r.listening && r.local[0] === '127.0.0.1' && r.local[1] === port), how, opts);
+  if (who.kind === THIS_ACCOUNT) return who;
+  return owner(UNKNOWN, { method: how, reason: `${TABLE_RESTRICTED}: no listener of this account on exactly 127.0.0.1:${port}` });
 }
 
 // [code, why] when a client must not send on a connection whose server end is `who`, else null.
@@ -518,16 +552,20 @@ export function refusal(who, port, expectPid = null) {
   return null;
 }
 
-// macOS, when the socket table is restricted (FAA-267): whether process `pid`, this account's, listens on 127.0.0.1:<port>
-// or the IPv4 wildcard (IPv4 alone: a v6-only wildcard never vouches for a 127.0.0.1 connection). `lsof -p` asks the process itself, which the restriction does not hide. Only a caller that started
-// `pid` itself (a launchd job it installed) may vouch with it.
-export async function pidListens(pid, port, { run = runProgram, platform = process.platform, ownUid: mine } = {}) {
+// macOS, when the socket table is restricted (FAA-267, DEC-0155 RT-3): whether process `pid`, this account's, listens on
+// exactly 127.0.0.1:<port> (never the IPv4 wildcard, which lsof prints as it prints an IPv6-only one, nor ::1; FAA-312).
+// `lsof -p` asks the process itself, which the restriction does not hide. Only a caller that started `pid` itself (a
+// launchd job it installed) may vouch with it, and never a set-uid one (its real and effective uid differ, DEC-0155).
+export async function pidListens(pid, port, { run = runProgram, platform = process.platform, ownUid: mine, ownEuid } = {}) {
   if (platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
+  const real = mine ?? ownUid();
+  const effective = ownEuid ?? (typeof process.geteuid === 'function' ? process.geteuid() : real);
+  if (effective !== real) return false;
   try {
     const uid = parsePsUid(await run(PS, ['-o', 'uid=', '-p', String(pid)]));
-    if (uid === null || uid !== (mine ?? ownUid())) return false;
+    if (uid === null || uid !== real) return false;
     const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
-    return parseLsofListeners(out).some(([host, p]) => (host === '127.0.0.1' || host === '*') && p === port);
+    return parseLsofListeners(out).some(([host, p]) => host === '127.0.0.1' && p === port);
   } catch {
     return false;
   }
@@ -586,4 +624,33 @@ export class CheckedAgent extends http.Agent {
     checkedSocket(Number(options.port), { host: options.host ?? '127.0.0.1', timeoutMs: options.timeout ?? 10000,
       expectPid: this.expectPid, vouchPid: this.vouchPid, ...this.ask }).then((socket) => callback(null, socket), (err) => callback(err));
   }
+}
+
+const USAGE = 'usage: fabric-peer-owner.mjs listener <port> [--json]\n';
+
+// `listener <port> [--json]`: the kind of who listens on 127.0.0.1:<port>, which the dashboard link gate takes as
+// listener_owner (FAA-315), or the whole owner as JSON; 2 on a usage error. `listener` and `write` are the tests'.
+export async function main(argv, { listener: ask = listener, write = (text) => process.stdout.write(text) } = {}) {
+  const asJson = argv.length === 3 && argv[2] === '--json';
+  const port = Number(argv[1]);
+  if (argv.length !== 2 + Number(asJson) || argv[0] !== 'listener' || !/^[0-9]+$/.test(argv[1] ?? '') || port < 1 || port > 65535) {
+    process.stderr.write(USAGE);
+    return 2;
+  }
+  const who = await ask(port);
+  write(asJson ? `${JSON.stringify({ kind: who.kind, uid: who.uid, pid: who.pid, method: who.method, reason: who.reason })}\n` : `${who.kind}\n`);
+  return 0;
+}
+
+// Whether node was started on this file, by real paths (a symlinked install folder, as check_dashboard_layout.mjs).
+function startedDirectly() {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (startedDirectly()) {
+  main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (err) => { process.stderr.write(`${err?.message ?? err}\n`); process.exitCode = 1; });
 }

@@ -57,7 +57,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   short-lived child of its own interpreter listening on a random `127.0.0.1` port; when the
   table is restricted (macOS 27.2, FAA-267) the launchd installers also run `/usr/sbin/lsof
   -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. That vouch shows the job listens on the port, not that it accepted
-  the connection (a more specific bind by root over a wildcard job would pass; the pin's DEC-0155 RT-3 vouches only for exactly `127.0.0.1`, a departure FAA-258 filed). A LaunchDaemon's root
+  the connection; it counts only a listen on exactly `127.0.0.1`, as the pin's DEC-0155 RT-3 asks (since FAA-312; a wildcard
+  or `::1` listener is never vouched for, and a set-uid reader vouches for nothing). A LaunchDaemon's root
   installer runs that `lsof` and `ps -o uid=` on its job's pid before it accepts an answer, and reads, never changes, every other
   plist in `/Library/LaunchDaemons` (to find another holder of its label, `plutil -convert xml1` for a binary one in
   Node), `launchctl print system/<label>` and the `UserName`'s uid (`pwd`, or `id -u` in Node). The kit's loopback server reads the table once per accepted
@@ -80,7 +81,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   connected peer's address, so the Authorization header never reaches another account's proxy (FAA-260 items 1, 8).
 - The layout probe (`check_dashboard_layout.mjs`) reads a raw loopback page's listener from the socket table just
   before its headless browser opens it, the one-time login URL included, and opens nothing on another account's,
-  root's or an untellable listener (FAA-260 items 2, 14). The browser then connects on its own: a listener swapped
+  root's or an untellable listener (FAA-260 items 2, 14); under a restricted table (DEC-0155) that is every listener,
+  so it measures nothing there and never vouches by a pid it did not start (FAA-318). The browser then connects on its own: a listener swapped
   between the read and the browser's connect is a residue, bounded by the login code's 120 s and single use.
 - The agents database (FAA-275): creating-fabric-agents, adapting-projects-to-fabric, building-fabric-services and
   working-with-fabric may send board requests to whichever Project the board lists under an `agents-db.*` capability
