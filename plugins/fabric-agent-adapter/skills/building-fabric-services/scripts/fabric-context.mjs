@@ -6,7 +6,7 @@
 // An organization's instance whose context the record does not pin (`organizations`, DEC-0127) still starts: the helper
 // checks the placement and its share grant, not the pin (decision D5 of 0.52.0). Its tokens are refused instead:
 // hubKeyCertified reads a context's hub keys only while the record pins that organization (DL-14a, DEC-0128), so the
-// service passes `estateContext: context` to its delegation gate. A refusal at start would stop every organization
+// service passes contextGateOptions(info, record) (its context and its pin's issuer, FAA-150) to its delegation gate. A refusal at start would stop every organization
 // instance on today's records, which pin none until every reader is pinned at or after DEC-0127.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -110,6 +110,26 @@ function markerMatches(file, expected) {
   let found;
   try { found = JSON.parse(text); } catch { return false; }
   return found !== null && typeof found === 'object' && Object.entries(expected).every(([key, value]) => found[key] === value);
+}
+
+/**
+ * What delegationGate takes from this instance's context (FAA-150): `estateContext`, and for an organization whose
+ * context `record` pins, `issuer`: the pin's context issuer (DL-14a, DEC-0128), so an organization's instance refuses a
+ * token the personal hub key signed. `info` is contextInstance's (or holdContextInstance's) answer; spread it after the
+ * service's own estate issuer: `delegationGate({ ..., issuer: estateIssuer, ...contextGateOptions(info, record) })`.
+ * Throws ContextRefused (`context-invalid`) for an answer with no context.
+ */
+export function contextGateOptions(info, record) {
+  const context = info !== null && typeof info === 'object' ? info.context : undefined;
+  const parsed = parseContext(context);
+  if (!parsed) throw new ContextRefused('context-invalid');
+  const options = { estateContext: context };
+  const pins = record !== null && typeof record === 'object' && !Array.isArray(record) ? record.organizations : undefined;
+  if (parsed.kind === 'org' && Array.isArray(pins)) {
+    const pin = pins.find((p) => p !== null && typeof p === 'object' && p.org === context && typeof p.iss === 'string');
+    if (pin) options.issuer = pin.iss;
+  }
+  return options;
 }
 
 /**

@@ -300,7 +300,7 @@
     "fabric_share",
     "fabric_time"
    ],
-   "sha256": "a739d136dd35889b11f932710de7fb256dc8b49e4ee8952d098737fde362339b"
+   "sha256": "59e39fb9fd91f713f6e92ea3ec7e8252107efd148847f05934892158b326db4d"
   },
   {
    "module": "fabric_auth",
@@ -810,7 +810,7 @@
     "fabric-share",
     "fabric-time"
    ],
-   "sha256": "78eb4d9c34d1934025b4daf1a23153d99ec792b4471e4e0ddc0ae75c193c64c4"
+   "sha256": "ac88273a7ff0010a122c9bd309012a484c439ffd6e9e16923f103a3f8de7a539"
   },
   {
    "module": "fabric-auth",
@@ -6572,7 +6572,7 @@
    "fabric_usage.py": "5cc2e03ccc5b06e81987ed7bc3eead7a7e6cbf1a7cb8e05c6c64315eed9d91b6",
    "fabric_backups.py": "1f3f0d7ecf361b29e9101e07f1c53e5dc304d598bf26fd59ec89f16b9fed2420",
    "fabric_descriptor.py": "16de580eb299ea9213d3e6711bf463cfeb47fcff6b9a4af42f0e95beee481b65",
-   "fabric_context.py": "a739d136dd35889b11f932710de7fb256dc8b49e4ee8952d098737fde362339b",
+   "fabric_context.py": "59e39fb9fd91f713f6e92ea3ec7e8252107efd148847f05934892158b326db4d",
    "fabric_auth.py": "74ccc10239b65a3567cec5213a7b344cbd88d6eee1fd1c5f7be1d6daf985993c",
    "fabric_events.py": "da3fe3e3e19d4c9754b90c719e9c069a3ac85e080b9fffd07adbaf63b5bfcf0d",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
@@ -6617,7 +6617,7 @@
    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7",
    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
    "fabric-descriptor.mjs": "a2d9cf633d49085a3d455a489dcc6c41b14d41f1f28a8de45f0690cd6c332d51",
-   "fabric-context.mjs": "78eb4d9c34d1934025b4daf1a23153d99ec792b4471e4e0ddc0ae75c193c64c4",
+   "fabric-context.mjs": "ac88273a7ff0010a122c9bd309012a484c439ffd6e9e16923f103a3f8de7a539",
    "fabric-auth.mjs": "10ff37a39f9e3adb4d0f05db66c45f49b10eef582e9220c213907964109d7e52",
    "fabric-events.mjs": "c95c07e2745e52fddbb7237b89824123f240d4f8d6b14f5cb269a09e1845c3ba",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",

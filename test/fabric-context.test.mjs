@@ -8,6 +8,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { INSTANCE, ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
 import * as fc from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-context.mjs';
+import { delegationGate } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs';
 import { descriptorPath } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 import { placementGrantFindings } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-estate.mjs';
 import { abstractNames, EXIT_ALREADY_RUNNING, InstanceLock, LOCK_WAIT_SUPERVISED_SECONDS } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
@@ -245,4 +246,32 @@ test('instanceShareGrant answers and never throws; placementGrantFindings is pub
   assert.deepEqual(findings.map((f) => [f.code, f.instancePath]), [['FAC-SEM-111', '/grant']]);
   assert.deepEqual(placementGrantFindings(RECORD, { agentRef: A }), []);
   assert.deepEqual(placementGrantFindings(null, null), [], 'answers, never throws');
+});
+
+// FAA-150: the delegation gate of an instance is built from its context (DL-14a, DEC-0128).
+const HUB = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/hub-key-vectors.json', import.meta.url), 'utf8'));
+test('an organization instance takes its context and its pin\'s issuer into its delegation gate', async () => {
+  const cases = Object.fromEntries(HUB.contextVerifier.map((c) => [c.name, c]));
+  const orgToken = cases['an organization token in its own context'];
+  const personalToken = cases['a personal token in an organization context'];
+  const estateIssuer = personalToken.issuer;
+  const gate = (info, c) => delegationGate({ audience: 'example-media', jwks: HUB.contextJwks, effects: { 'media.render': 'draft' },
+    clock: () => c.now, estate: () => c.estate, issuer: estateIssuer, ...fc.contextGateOptions(info, c.estate) });
+  const org = { context: 'org:org_3fh9p1zc', kind: 'org', org: 'org_3fh9p1zc' }; // as contextInstance answers it
+  assert.deepEqual(fc.contextGateOptions(org, orgToken.estate), { estateContext: 'org:org_3fh9p1zc', issuer: orgToken.issuer });
+  let got = await gate(org, orgToken)('media.render', { 'Fabric-Delegation': orgToken.token });
+  assert.deepEqual([got.ok, got.kid], [true, 'hub-ctx-a-1']);
+  got = await gate(org, personalToken)('media.render', { 'Fabric-Delegation': personalToken.token });
+  assert.deepEqual([got.ok, got.code], [false, 'unauthenticated'], 'the personal hub key is refused');
+  const personal = fc.contextInstance(SERVICE, 'personal');
+  assert.deepEqual(fc.contextGateOptions(personal, orgToken.estate), { estateContext: 'personal' });
+  const mine = cases['a personal token in the personal context'];
+  got = await gate(personal, mine)('media.render', { 'Fabric-Delegation': mine.token });
+  assert.deepEqual([got.ok, got.kid], [true, 'hub-m-4c1e-1']);
+  got = await gate(personal, orgToken)('media.render', { 'Fabric-Delegation': orgToken.token });
+  assert.equal(got.ok, false, "an organization's token is refused by the personal instance");
+  const unpinned = { context: 'org:org_unpinned', kind: 'org', org: 'org_unpinned' };
+  assert.deepEqual(fc.contextGateOptions(unpinned, { organizations: [] }), { estateContext: 'org:org_unpinned' });
+  assert.deepEqual(fc.contextGateOptions(unpinned), { estateContext: 'org:org_unpinned' });
+  for (const bad of [null, {}, { context: 'Org:x' }, 'personal']) assert.throws(() => fc.contextGateOptions(bad), fc.ContextRefused, JSON.stringify(bad));
 });

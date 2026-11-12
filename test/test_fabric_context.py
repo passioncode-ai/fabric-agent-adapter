@@ -153,6 +153,46 @@ class Dirs(TempHome):
             fabric_paths.instance_dirs("Bad Id", "default")
 
 
+class GateOptions(unittest.TestCase):
+    """FAA-150: the delegation gate of an instance is built from its context, so an organization instance refuses a
+    token the personal hub key signed (DL-14a, DEC-0128) without wiring `estate_context` by hand."""
+    HUB = json.loads((ROOT / "test/fixtures/contract/hub-key-vectors.json").read_text(encoding="utf-8"))
+
+    def gate(self, info, case, estate_issuer):
+        dl = importlib.import_module("fabric_delegation")
+        options = {"issuer": estate_issuer, **fc.context_gate_options(info, case["estate"])}
+        return dl.delegation_gate(audience="example-media", jwks=self.HUB["contextJwks"], effects={"media.render": "draft"},
+                                  clock=lambda: case["now"], estate=lambda: case["estate"], **options)
+
+    def test_an_organization_instance_takes_its_context_and_its_pins_issuer(self):
+        cases = {c["name"]: c for c in self.HUB["contextVerifier"]}
+        org_token = cases["an organization token in its own context"]
+        personal_token = cases["a personal token in an organization context"]
+        estate_issuer = personal_token["issuer"]
+        org = {"context": "org:org_3fh9p1zc", "kind": "org", "org": "org_3fh9p1zc"}  # as context_instance answers it
+        self.assertEqual(fc.context_gate_options(org, org_token["estate"]),
+                         {"estate_context": "org:org_3fh9p1zc", "issuer": org_token["issuer"]})
+        got = self.gate(org, org_token, estate_issuer)("media.render", {"Fabric-Delegation": org_token["token"]})
+        self.assertEqual((got["ok"], got["kid"]), (True, "hub-ctx-a-1"))
+        got = self.gate(org, personal_token, estate_issuer)("media.render", {"Fabric-Delegation": personal_token["token"]})
+        self.assertEqual((got["ok"], got["code"]), (False, "unauthenticated"), "the personal hub key is refused")
+        personal = fc.context_instance(SERVICE, "personal")
+        self.assertEqual(fc.context_gate_options(personal, org_token["estate"]), {"estate_context": "personal"})
+        mine = cases["a personal token in the personal context"]
+        got = self.gate(personal, mine, estate_issuer)("media.render", {"Fabric-Delegation": mine["token"]})
+        self.assertEqual((got["ok"], got["kid"]), (True, "hub-m-4c1e-1"))
+        got = self.gate(personal, org_token, estate_issuer)("media.render", {"Fabric-Delegation": org_token["token"]})
+        self.assertFalse(got["ok"], "an organization's token is refused by the personal instance")
+
+    def test_an_unpinned_organization_keeps_the_issuer_the_service_names(self):
+        org = {"context": "org:org_unpinned", "kind": "org", "org": "org_unpinned"}
+        self.assertEqual(fc.context_gate_options(org, {"organizations": []}), {"estate_context": "org:org_unpinned"})
+        self.assertEqual(fc.context_gate_options(org), {"estate_context": "org:org_unpinned"})
+        for bad in (None, {}, {"context": "Org:x"}, "personal"):
+            with self.subTest(bad=bad), self.assertRaises(fc.ContextRefused):
+                fc.context_gate_options(bad)
+
+
 class Hold(TempHome):
     def hold(self, context, **kwargs):
         options = dict(NO_SUPERVISOR, **kwargs)

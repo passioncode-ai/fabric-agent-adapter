@@ -98,6 +98,15 @@ gate = fd.delegation_gate(audience=..., jwks=keys, issuer=pin["iss"], effects=..
                           estate_context="org:acme-rehearsal")     # the context fabric_context started it for
 ```
 
+`fabric_context.context_gate_options(info, record)` / `contextGateOptions(info, record)` hands both back from the
+instance `hold_context_instance` started (FAA-150): `estate_context` always, and `issuer` when the record pins that
+organization; spread it after the estate issuer, so a personal instance keeps the estate's:
+
+```python
+gate = fd.delegation_gate(audience=..., jwks=keys, effects=..., estate=lambda: current,
+                          **{"issuer": estate_issuer, **fabric_context.context_gate_options(info, current)})
+```
+
 The `kid` is then certified only when exactly one machine lists it for that context with the published key and the
 revision pins the organization; omitted or `personal`, the personal `hubKey` is read. A context key never verifies a
 personal token, the personal key never an organization's, and a context that is neither (`Org:x`, a trailing space, a

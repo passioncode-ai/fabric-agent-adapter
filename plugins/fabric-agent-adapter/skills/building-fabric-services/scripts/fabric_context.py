@@ -13,7 +13,8 @@ not re-export this module, so a service that does not run per context keeps the 
 An organization's instance whose context the record does not pin (``organizations``, DEC-0127) still starts: the helper
 checks the placement and its share grant, not the pin (decision D5 of 0.52.0). Its tokens are refused instead:
 ``fabric_estate.hub_key_certified`` reads a context's hub keys only while the record pins that organization (DL-14a,
-DEC-0128), so the service passes ``estate_context=info["context"]`` to its delegation gate. The contract lets Fabric
+DEC-0128), so the service passes ``context_gate_options(info, record)`` (its context and its pin's issuer, FAA-150) to its
+delegation gate. The contract lets Fabric
 write ``organizations`` only once every reader is pinned at or after DEC-0127, so a refusal at start would stop every
 organization instance on today's records."""
 from __future__ import annotations
@@ -124,6 +125,27 @@ def context_instance(service_id: str, context: Any, *, record: Optional[Dict[str
         raise ContextRefused(checked["code"], checked["detail"])
     answer["grant"] = checked["grant"]
     return answer
+
+
+def context_gate_options(info: Any, record: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """What ``delegation_gate`` takes from this instance's context (FAA-150): ``estate_context``, and for an organization
+    whose context ``record`` pins, ``issuer``: the pin's context issuer (DL-14a, DEC-0128), so an organization's instance
+    refuses a token the personal hub key signed without wiring either by hand. ``info`` is ``context_instance``'s answer
+    (or ``hold_context_instance``'s); ``record`` the verified estate revision applied. Spread it after the service's own
+    estate issuer: ``delegation_gate(..., **{"issuer": estate_issuer, **context_gate_options(info, record)})``. Raises
+    ContextRefused (``context-invalid``) for an answer with no context."""
+    context = info.get("context") if isinstance(info, dict) else None
+    parsed = parse_context(context)
+    if parsed is None:
+        raise ContextRefused("context-invalid")
+    options: Dict[str, Any] = {"estate_context": context}
+    pins = record.get("organizations") if isinstance(record, dict) else None
+    if parsed["kind"] == "org" and isinstance(pins, list):
+        for pin in pins:
+            if isinstance(pin, dict) and pin.get("org") == context and isinstance(pin.get("iss"), str):
+                options["issuer"] = pin["iss"]
+                break
+    return options
 
 
 def _refuse(service_id: Any, context: Any, code: str, wait_seconds: Optional[float] = 0.0, *,
