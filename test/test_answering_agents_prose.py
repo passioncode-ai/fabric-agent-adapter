@@ -301,7 +301,7 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
 
     def test_the_completion_report_has_a_line_per_checklist_item(self):  # FAA-180 (2)
         completion = section("creating-fabric-agents", "Completion format")
-        for words in ("for an agent that answers people, one line per item of [the checklist](references/agents-that-answer-people.md#checklist)",
+        for words in ("for an agent that answers people, one line per item of the *Checklist* in [agents that answer people](references/agents-that-answer-people.md)",
                       "each with a file and a test or `NOT_RUN`",
                       "first-reply time measured from the person's message"):
             self.assertIn(words, completion, words)
