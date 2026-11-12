@@ -356,10 +356,11 @@ test('FAA-135: reading is linear in the body (0.61.0 readings 3)', () => {
     const request = new BoardRequest({ body: { text }, request: { id: 'r' },
       sender: { project: OTHER_PROJECT, principal: { provenance: 'trusted' } } }, 'video.render');
     let best = Infinity;
-    for (let k = 0; k < 5; k += 1) {
-      const start = performance.now();
+    for (let k = 0; k < 5; k += 1) { // CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+      const start = process.cpuUsage();
       readMandate(request, _PB, 'example-agent');
-      best = Math.min(best, performance.now() - start);
+      const used = process.cpuUsage(start);
+      best = Math.min(best, (used.user + used.system) / 1000);
     }
     return best;
   };

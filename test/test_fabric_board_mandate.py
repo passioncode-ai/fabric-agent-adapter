@@ -321,10 +321,10 @@ class BoardMandateTests(Conversation):
             request = fb.BoardRequest({"body": {"text": text}, "request": {"id": "r"},
                                        "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
             best = float("inf")
-            for _ in range(5):
-                start = time.perf_counter()
+            for _ in range(5):  # CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+                start = time.process_time()
                 link.read_mandate(request, link.PERSONAL_BOARD, "example-agent")
-                best = min(best, time.perf_counter() - start)
+                best = min(best, time.process_time() - start)
             return best
 
         for shape in ("unclosed", "nested"):  # nested: every inner opener closed by the same fence (unit reading 4)
@@ -477,34 +477,39 @@ class BoardMandateTests(Conversation):
         shared = [3]
         for _ in range(22):  # 23 objects, 2**22 paths: json.loads never shares, so it is no estimate (seam reading 22)
             shared = [shared, shared]
-        started = time.monotonic()
+        started = time.process_time()  # CPU time throughout: a bound a load average cannot break (FAA-196 (23))
         free = mandate(scope={"capabilities": ["video.render"], "effects": ["draft"]})
         self.assertTrue(fm.mandate_covers({"mandate": free, "tier": "T1", "now": AT, "self": "example-agent",
                                            "call": {"capability": "video.render", "effect": "draft", "spendUsd": shared}})["ok"])
         self.assertFalse(fm._json_data(shared))
         got = at_depth(0, shared)
         self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
-        self.assertLess(time.monotonic() - started, 1.0, "no ceiling, no walk; under one, a shared structure refused at once")
+        self.assertLess(time.process_time() - started, 1.0, "no ceiling, no walk; under one, a shared structure refused at once")
         with mock.patch.object(fm, "js_to_number", side_effect=RecursionError):  # the guard, on every Python (seam reading 22)
             got = at_depth(0, [3])
         self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
-        started = time.monotonic()
+        started = time.process_time()
         self.assertTrue(math.isnan(jsv.js_to_number("1" * 20000 + "x")))  # the decimal pattern costs its length
-        self.assertLess(time.monotonic() - started, 0.5, "seconds on a backtracking pattern, a millisecond on this one")
+        self.assertLess(time.process_time() - started, 0.5, "seconds on a backtracking pattern, a millisecond on this one")
         long = "7" * 16000  # one string repeated: Number() of the list read without building the join (seam reading 24)
-        started = time.monotonic()
+        cases = (([long] * 16000, "ok"), ([[["100"]]], "outside-mandate: spend"), ([[None]], "ok"), ([[1, 2]], "ok"))
+        # FAA-196 (31): the reads are timed on their own run, outside tracemalloc, which slows every allocation; the
+        # memory is measured on a second run
+        started = time.process_time()
         self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": 3, "project": "site-a"}), "ok")
+        for spend, want in cases:
+            got = at_depth(0, spend)
+            self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want)
+        self.assertLess(time.process_time() - started, 0.5)
         tracemalloc = importlib.import_module("tracemalloc")
         tracemalloc.start()
         try:
-            for spend, want in (([long] * 16000, "ok"), ([[["100"]]], "outside-mandate: spend"), ([[None]], "ok"), ([[1, 2]], "ok")):
-                got = at_depth(0, spend)
-                self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want)
+            for spend, _ in cases:
+                at_depth(0, spend)
             peak = tracemalloc.get_traced_memory()[1]
         finally:
             tracemalloc.stop()
         self.assertLess(peak, 8 * 1024 * 1024, "the join is never built (it would be 256 MB)")
-        self.assertLess(time.monotonic() - started, 0.5)
         for spend in ([[100, 100]], [True], [[True]], [{}]):  # Number(list): two items NaN, one read as String() reads it
             self.assertTrue(math.isnan(fm._spend_number(spend)), spend)
         self.assertEqual((fm._spend_number([]), fm._spend_number([[None]]), fm._spend_number(["7"])), (0.0, 0.0, 7.0))
