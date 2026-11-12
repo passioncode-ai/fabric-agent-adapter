@@ -232,3 +232,39 @@ class Schemas(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+TEMPLATES = SKILL / "templates"
+REFERENCE = SKILL / "references/communication-agent-template.md"
+
+
+class ShippedTemplates(unittest.TestCase):
+    """FAA-265: the communication agent template moved from one reference into its folder, which passes the check."""
+
+    def test_every_shipped_template_folder_passes_without_legacy(self):
+        folders = sorted(p for p in TEMPLATES.iterdir() if p.is_dir())
+        self.assertIn(TEMPLATES / "communication-agent", folders)
+        for folder in folders:
+            with self.subTest(folder=folder.name):
+                self.assertEqual(tc.check_folder(folder), [])
+
+    def test_the_prompt_lives_in_the_folder_and_the_reference_points_at_it(self):
+        template = (TEMPLATES / "communication-agent/TEMPLATE.md").read_text(encoding="utf-8")
+        reference = REFERENCE.read_text(encoding="utf-8")
+        for section in ("## 0. The brief", "## 3. The inbound pipeline", "## 9. Acceptance"):
+            with self.subTest(section=section):
+                self.assertIn(section, template)
+                self.assertNotIn(section, reference)
+        self.assertIn("../templates/communication-agent/TEMPLATE.md", reference)
+        self.assertIn("../../references/communication-agent-template.md", template)
+
+    def test_the_reference_names_the_database_question_as_open_for_its_owner(self):
+        reference = " ".join(REFERENCE.read_text(encoding="utf-8").split())
+        self.assertIn("Open for the agents database's owner (FAA-265)", reference)
+        self.assertIn("one source holds each kind of agent", reference)
+
+    def test_the_folder_check_runs_from_the_command_line(self):
+        run = subprocess.run([sys.executable, str(SCRIPT), "--json", str(TEMPLATES / "communication-agent")],
+                             capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertTrue(json.loads(run.stdout)["ok"])

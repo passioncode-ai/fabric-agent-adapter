@@ -1082,6 +1082,8 @@ def validate_repo() -> List[str]:
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/SKILL.md"))
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/references/*.md"))
     people += sorted((ROOT / "plugins/fabric-agent-adapter/skills").glob("*/recipes/*/README.md"))  # FAA-111
+    people += sorted(p for p in (ROOT / "plugins/fabric-agent-adapter/skills").glob("*/templates/**/*")  # FAA-265
+                     if p.suffix in (".md", ".json"))
     people += sorted((ROOT / "test/evals").glob("*/*.json"))
     # What the installer, the CLI and the kit's demo print or show to a person (code comments elsewhere are not scanned).
     people += [ROOT / "install.sh", ROOT / "bin/fabric-agent-adapter.js"]
@@ -1116,7 +1118,30 @@ def validate_repo() -> List[str]:
     errors.extend(credential_url_problems())
     errors.extend(shipped_pattern_problems())
     errors.extend(https_legend_problems())
+    errors.extend(shipped_template_problems())
     return errors
+
+
+def shipped_template_problems(root: Path = ROOT) -> List[str]:
+    """FAA-265: every template folder a skill ships passes its own template_check.py, strict (no --legacy)."""
+    import importlib.util
+    problems = []
+    for skill in sorted((root / "plugins/fabric-agent-adapter/skills").iterdir()):
+        templates = skill / "templates"
+        if not templates.is_dir():
+            continue
+        script = skill / "scripts/template_check.py"
+        if not script.is_file():
+            problems.append("%s: ships templates/ without scripts/template_check.py" % skill.name)
+            continue
+        spec = importlib.util.spec_from_file_location("template_check_%s" % skill.name.replace("-", "_"), script)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for folder in sorted(p for p in templates.iterdir() if p.is_dir()):
+            for finding in module.check_folder(folder):
+                problems.append("%s/templates/%s: %s %s %s: %s" % (skill.name, folder.name, finding["level"],
+                                                                     finding["file"], finding["path"], finding["message"]))
+    return problems
 
 
 def validator_self_test() -> List[str]:

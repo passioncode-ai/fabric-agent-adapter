@@ -5,7 +5,10 @@ one organization (fabric-workspace `knowledge/system/templates.md`, decision W0-
 format, versioned with it: the JSON Schemas in [`schemas/template/`](../schemas/template/) and the check
 [`scripts/template_check.py`](../scripts/template_check.py). The templates themselves live in the agents database
 (format v2, see [agents-database.md](agents-database.md)); the adapter keeps one neutral example for its tests,
-`test/fixtures/templates/example-agent/`.
+`test/fixtures/templates/example-agent/`, and one public template, the communication agent
+([`templates/communication-agent/`](../templates/communication-agent/), released as one file in 0.75.0 and moved into
+its folder by FAA-265). Whether the agents database takes that folder as its template of the kind or merges it into a
+close one is its owner's decision, open; `test/validate.py` runs the check on every folder a skill ships.
 
 ## The folder
 

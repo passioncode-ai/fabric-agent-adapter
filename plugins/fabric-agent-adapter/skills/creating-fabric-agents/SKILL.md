@@ -116,9 +116,10 @@ prior art of its own:
   calling other agents, stops for a person, learning loops, the loop guard.
 - [agents-that-answer-people.md](references/agents-that-answer-people.md): what an agent that
   answers people carries from its first release, each part with the check that proves it.
-- [communication-agent-template.md](references/communication-agent-template.md): the template prompt
-  for an agent that talks with people on a channel (support, sales and leads, community, inbox, reviews): the measured
-  inbound pipeline, business patterns, knowledge, the learning loop and acceptance.
+- [communication-agent-template.md](references/communication-agent-template.md): how to use the template
+  for an agent that talks with people on a channel (support, sales and leads, community, inbox, reviews); its prompt
+  (the measured inbound pipeline, business patterns, knowledge, the learning loop and acceptance) is the folder
+  `templates/communication-agent/`.
 - [agent-templates.md](references/agent-templates.md): a template folder for a kind of agent, its schema and
   `scripts/template_check.py`, which a template passes before it is done.
 

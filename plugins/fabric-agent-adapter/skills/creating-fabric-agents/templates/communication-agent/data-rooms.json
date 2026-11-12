@@ -1,0 +1,9 @@
+[
+  {"room": "knowledge room", "blocks": ["answers", "closed rule sets"], "access": "read", "level": "the asker's level",
+   "use": "facts for replies, cited as [KB:<id>]"},
+  {"room": "the agent's data home", "blocks": ["tickets", "offline set", "replay samples", "eval tickets"],
+   "access": "read-write", "scope": "its own block; never in its repository or tests (source-and-instance.md)",
+   "classes": ["restated questions", "codes and counts"]},
+  {"room": "quality room", "blocks": ["support.quality_daily"], "access": "write", "scope": "aggregate cells only",
+   "required": false, "notes": "where the organization keeps a metrics room; otherwise the events alone"}
+]
