@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.81.0 (2026-11-12)
+
+Wave 3 of the backlog sweep of 2026-11-12. **The contract pin moves to `93e7db16` (`v0.1.0+2026-11-08.1`)**: DEC-0149
+(`fabric-source/1`), CT-254 (HA-2's Linux source, the hybrid the kit already read), DEC-0151, DEC-0152, DEC-0155.
+Bundles pinned at `18f8d487` stay valid (FAA-258; impact map `docs/evidence/specs/2026-11-12-faa-258-repin-93e7db16-impact-map.md`).
+Kit modules change: `fabric_secrets`, `fabric_protocols`, `fabric_peer_owner` (`1.2.0+kit.5`), and their Node twins.
+
+### Changed
+
+- **The kit's credential detector is the contract's DEC-0151 `SECRET_VALUE`**, in both twins and the three dashboard
+  link checkers: a provider prefix counts only in its canonical case and after a boundary; an `sk-` key needs a digit and
+  an upper-case letter (16 characters or more) or a digit (32 or more), so `SK-...`, `sk-learn-...` and an `sk-` inside a
+  word are no longer keys. Repository names keep their own boundary-free key shapes, as DEC-0151 asks (FAA-258).
+- `fabric_protocols` lists `fabric-source/1`; `fabric_peer_owner` is `1.2.0+kit.5`, one version line with Observatory's
+  1.2.0, the Linux reading unchanged (FAA-258).
+- Every vendored contract vector is regenerated at the new pin with the contract's own generators;
+  `make_load_vectors.mjs` reads the pin from the lock file. SECURITY.md, lifecycle.md and protocol.md name DEC-0155 RT-3
+  for the vouch; SA-6 (DEC-0152) is the accepted board rule (FAA-258).
+
+### Upgrading
+
+- A service that vendors the kit takes the changed `fabric_secrets`, `fabric_protocols` and `fabric_peer_owner` with
+  `fabric_kit.py install`. A string the 0.80 detector called a key may no longer be one (see Changed).
+
 ## 0.80.2 (2026-11-12)
 
 0.80.1 was tagged and never published: its `windows` job (run 43212508702) failed one test, so `release` and `publish`
