@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.5 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+/* fabric-dashboard-kit@1.1.6 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
    Load it same-origin, after fabric-dashboard.css, with the service it opens Fabric on:
      <script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
              data-project="project-a" data-project-name="Project A"></script>
@@ -11,7 +11,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '1.1.5';
+  var VERSION = '1.1.6';
   var COOKIE = 'fabric_button';
   var GET_FABRIC = 'https://passioncode.ai/fabric';
   var ABSENT_AFTER_MS = 1500;
@@ -69,7 +69,10 @@
       if (piece === '') return;
       var at = piece.indexOf('=');
       var name = firstKey(at < 0 ? piece : piece.slice(0, at));
-      values.set(name, (values.get(name) || []).concat(at < 0 ? '' : decodeKeepingPlus(piece.slice(at + 1))));
+      var value = at < 0 ? '' : decodeKeepingPlus(piece.slice(at + 1));
+      var list = values.get(name);
+      if (list) list.push(value); // appended in place, as the contract's secret-shape.ts does (FAA-245)
+      else values.set(name, [value]);
     });
     return values;
   }
