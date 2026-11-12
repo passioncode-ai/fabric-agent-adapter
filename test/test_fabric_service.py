@@ -124,6 +124,84 @@ class LockTests(unittest.TestCase):
             self.assertIn("service.lock", str(caught.exception))
             self.assertEqual(len(moves), sys.modules[fs.InstanceLock.__module__].InstanceLock.INODE_RETRIES)
 
+    @unittest.skipIf(sys.platform == "win32", "a folder holding an open file is not renamed on Windows")
+    def test_a_holder_notices_when_its_folder_is_swapped(self):
+        """FAA-303 (the 0.79.0 seam reading): the inode check at acquire covers two copies starting at once, not a
+        folder swapped under a copy that already holds the lock. On macOS a second copy then locks the new file and
+        starts. The holder's watch re-reads its inode and reports the lock lost once the path is another file."""
+        import threading
+        with tempfile.TemporaryDirectory() as temp:
+            data = Path(temp) / "data"
+            data.mkdir()
+            lost = threading.Event()
+            seen = []
+
+            def on_lost(lock):
+                seen.append(lock)
+                lost.set()
+
+            holder = fs.InstanceLock(data).acquire().watch(on_lost=on_lost, interval=0.02)
+            try:
+                time.sleep(0.1)
+                self.assertFalse(lost.is_set(), "an unmoved path is never reported lost")
+                data.rename(Path(temp) / "data.old")
+                data.mkdir()
+                time.sleep(0.1)
+                self.assertFalse(lost.is_set(), "nothing at the path yet: no second copy can have started")
+                (data / "service.lock").write_text("")  # the imported folder's lock file, or the one a second copy makes
+                self.assertTrue(lost.wait(30), "the holder noticed the swap")
+                self.assertEqual(seen, [holder], "reported once, with the lock")
+            finally:
+                holder.release()
+
+    @unittest.skipIf(sys.platform == "win32", "a folder holding an open file is not renamed on Windows")
+    def test_a_released_lock_is_never_reported_lost(self):
+        """FAA-303: release stops the watch, so a folder removed after a clean stop never reads as a lost lock."""
+        import threading
+        with tempfile.TemporaryDirectory() as temp:
+            data = Path(temp) / "data"
+            data.mkdir()
+            lost = threading.Event()
+            holder = fs.InstanceLock(data).acquire().watch(on_lost=lambda lock: lost.set(), interval=0.02)
+            holder.release()
+            data.rename(Path(temp) / "data.old")
+            data.mkdir()
+            (data / "service.lock").write_text("")
+            self.assertFalse(lost.wait(0.3))
+
+    @unittest.skipUnless(sys.platform == "darwin", "macOS only: elsewhere the lock's path-keyed name (an abstract "
+                         "socket on Linux) keeps a second copy out and the watch is not started; Windows does not rename "
+                         "a folder holding an open file")
+    def test_a_holder_whose_folder_is_swapped_stops_with_75(self):
+        """FAA-303, end to end: a copy started with hold_single_instance watches its lock; a data import swaps its
+        folder; the copy stops with 75 and one sentence naming the path, so a copy started on the new folder runs
+        alone. No launchd: the holder is a plain child process."""
+        with tempfile.TemporaryDirectory() as temp:
+            data = Path(temp) / "data"
+            data.mkdir()
+            code = ("import sys, time; sys.path.insert(0, %r); import fabric_service as fs; "
+                    "fs.hold_single_instance(%r, wait_seconds=0); print('held', flush=True); time.sleep(120)"
+                    % (str(SCRIPTS), str(data)))
+            child = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     text=True, env=dict(os.environ, **{fs.SUPERVISOR_ENV: ""}))
+            try:
+                self.assertEqual(child.stdout.readline().strip(), "held")
+                data.rename(Path(temp) / "data.old")
+                data.mkdir()
+                second = fs.InstanceLock(data).acquire()  # macOS: the new file is free, so this copy starts
+                try:
+                    status = child.wait(timeout=60)
+                finally:
+                    second.release()
+                self.assertEqual(status, fs.EXIT_ALREADY_RUNNING)
+                self.assertIn("service.lock", child.stderr.read())
+            finally:
+                if child.poll() is None:
+                    child.kill()
+                    child.wait()
+                child.stdout.close()
+                child.stderr.close()
+
     def test_a_failed_pid_write_lets_the_lock_go(self):
         """A board finding of 2026-11-03 from a service that vendors the kit: os.ftruncate, os.write or os.fsync raising after the lock was taken
         left it held with no descriptor kept, so release() freed nothing and the same process could not start again."""

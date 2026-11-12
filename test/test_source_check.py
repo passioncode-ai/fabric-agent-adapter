@@ -66,15 +66,24 @@ for _name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTOR
     os.environ.pop(_name, None)
 
 
+#: The clock a growth ratio reads (FAA-308): this thread's CPU time, so the time the thread waits for a core does not
+#: count. A wall-clock ratio of two sizes, fastest of three, still failed under a load average near 110 (7.6 against a
+#: bound of 6.5, 2026-11-12, 90 busy processes on 14 cores). In CPU time, under a load average of 150 to 187, the
+#: minified JSON line read 3.9 to 4.5 in ten rounds, and 0.58.0's quadratic `_quoted` read 9.8 and 9.9.
+#: Windows keeps the wall clock: its thread time moves in scheduler ticks (about 15.6 ms), coarser than the work.
+CPU_CLOCK = time.perf_counter if sys.platform == "win32" else time.thread_time
+
+
 def growth(work, small, large, runs=3):
     """How much longer `work(large)` takes than `work(small)`: each size's fastest of `runs`, measured in turn so a load
-    that slows the machine slows both (FAA-209: a wall-clock bound fails under load, a ratio of two sizes does not)."""
+    that slows the machine slows both (FAA-209: a wall-clock bound fails under load, a ratio of two sizes does not), in
+    CPU time where the clock allows (FAA-308, CPU_CLOCK)."""
     best = {small: None, large: None}
     for _ in range(runs):
         for size in (small, large):
-            started = time.perf_counter()
+            started = CPU_CLOCK()
             work(size)
-            took = time.perf_counter() - started
+            took = CPU_CLOCK() - started
             best[size] = took if best[size] is None else min(best[size], took)
     return best[large] / max(best[small], 1e-9)
 

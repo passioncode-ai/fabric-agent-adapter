@@ -1,5 +1,15 @@
 // One copy of a service, locked before any side effect (LC-01, DEC-0057): the instance lock and the supervisor marker.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_lock.py. Node 20+ (22+ for the Linux lock), no dependency.
+//
+// A lock that moves under its holder (FAA-303). Linux and Windows hold a name keyed by the lock's path (an abstract
+// unix socket, a named pipe), so a folder swapped under a running copy cannot let a second copy in. macOS has no such
+// name: O_EXLOCK (and the Python twin's flock) lock an inode, so after a data import swaps the data folder a second
+// copy locks the new file and starts. There the holder watches its lock instead (InstanceLock#watch, started by
+// holdSingleInstance): every LOCK_WATCH_SECONDS it compares the inode it locked with the file at the path, and once
+// the path names another file it stops with 75 and one sentence naming the path, before writing anything more into a
+// folder that is no longer the one it read. Two copies then overlap for at most one interval. A path-keyed name on
+// macOS was weighed and left: it needs a file in a folder outside the data folder that the system never cleans and
+// every copy can write, which Node alone cannot promise.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -14,6 +24,12 @@ export const LOCK_WAIT_SUPERVISED_SECONDS = 300;
 export const LOCK_BACKOFF_FIRST_SECONDS = 0.5;
 
 export const LOCK_BACKOFF_MAX_SECONDS = 30;
+
+/**
+ * How often a holder that has no path-keyed name (macOS) compares the inode it locked with the file at the lock's path
+ * (FAA-303): one stat and one fstat; two copies overlap for at most this long after a folder swap.
+ */
+export const LOCK_WATCH_SECONDS = 2;
 
 const O_EXLOCK = 0x20; // BSD/macOS: open(2) takes flock(LOCK_EX); absent from fs.constants
 
@@ -34,6 +50,7 @@ export class InstanceLock {
     this.path = path.join(dataDir, 'service.lock');
     this.fd = null;
     this.server = null;
+    this.timer = null;
   }
 
   async acquire() {
@@ -124,11 +141,62 @@ export class InstanceLock {
     return true;
   }
 
+  /**
+   * Re-check, every `intervalSeconds` on an unref'd timer, that the file this copy locked is still the file at the path
+   * (FAA-303); the first time the path names another file (a swapped folder's lock, or the one a second copy made),
+   * call `onLost(lock)` once and stop watching. The default stops the process with 75 and one sentence
+   * (stopLostHolder). A path that is gone or cannot be read now is read as nothing there yet and tried again next time:
+   * a second copy has to make a file there to start, and the watch then sees that file. `release` ends the watch. Only
+   * a lock held as a file is watched (macOS): elsewhere the descriptor is null and the path-keyed name keeps a second
+   * copy out, so this is a no-op, as for a lock not held.
+   */
+  watch({ onLost, intervalSeconds = LOCK_WATCH_SECONDS } = {}) {
+    if (this.fd === null || this.timer !== null) return this;
+    const fd = this.fd;
+    const react = onLost ?? stopLostHolder;
+    this.timer = setInterval(() => {
+      let here;
+      let held;
+      try {
+        here = fs.statSync(this.path);
+        held = fs.fstatSync(fd);
+      } catch {
+        return;
+      }
+      if (here.dev === held.dev && here.ino === held.ino) return;
+      clearInterval(this.timer);
+      this.timer = null;
+      react(this);
+    }, intervalSeconds * 1000);
+    this.timer.unref();
+    return this;
+  }
+
   release() {
+    if (this.timer !== null) clearInterval(this.timer);
     if (this.fd !== null) fs.closeSync(this.fd);
     if (this.server) this.server.close();
+    this.timer = null;
     this.fd = null;
     this.server = null;
+  }
+}
+
+/** The one sentence a holder whose lock moved under it stops with (FAA-303). */
+export function lostLockMessage(lockPath) {
+  return `${lockPath} is no longer the file this copy locked (the data folder moved or was swapped?): stopping, so a copy started on the folder now at that path runs alone.`;
+}
+
+/**
+ * InstanceLock#watch's default: write lostLockMessage and end the process with 75 at once. Not a graceful stop: a
+ * shutdown would write this copy's state into the folder now at the path, which is not the one it read; the kit's
+ * journals make an abrupt stop recoverable (LC-03).
+ */
+export function stopLostHolder(lock) {
+  try {
+    fs.writeSync(2, `${lostLockMessage(lock.path)}\n`);
+  } finally {
+    process.exit(EXIT_ALREADY_RUNNING);
   }
 }
 
@@ -253,10 +321,12 @@ const sleepSeconds = (s) => new Promise((resolve) => setTimeout(resolve, s * 100
  * supervisor that restarts on exit (launchd's KeepAlive) an immediate exit is a respawn every ThrottleInterval,
  * forever; so a supervised copy first backs off in-process (0.5 s doubling to 30 s,
  * LOCK_WAIT_SUPERVISED_SECONDS in all), takes over if the holder leaves, and exits 75 only when
- * the wait runs out. `waitSeconds` overrides the choice (0 = never wait).
+ * the wait runs out. `waitSeconds` overrides the choice (0 = never wait). Where the lock is held as a file (macOS)
+ * the held lock is watched (InstanceLock#watch, FAA-303): a folder swapped under the running copy stops it with 75;
+ * `onLost` replaces that reaction.
  */
 export async function holdSingleInstance(dataDir, {
-  waitSeconds, sleep = sleepSeconds, clock = () => performance.now() / 1000, exit = (code) => process.exit(code), env, argv,
+  waitSeconds, sleep = sleepSeconds, clock = () => performance.now() / 1000, exit = (code) => process.exit(code), env, argv, onLost,
 } = {}) {
   // DEC-0057: markers that disagree exit 75 at once, before the lock, naming them.
   const marker = supervisorMarker({ ...(env === undefined ? {} : { env }), ...(argv === undefined ? {} : { argv }) });
@@ -270,7 +340,7 @@ export async function holdSingleInstance(dataDir, {
   let announced = false;
   for (;;) {
     try {
-      return await new InstanceLock(dataDir).acquire();
+      return (await new InstanceLock(dataDir).acquire()).watch({ onLost });
     } catch (error) {
       if (!(error instanceof AlreadyRunning)) throw error;
       const remaining = deadline - clock();
