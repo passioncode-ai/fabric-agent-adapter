@@ -55,7 +55,8 @@ if mode.startswith("issuer"):
 if mode == "seal-refuses": sys.exit(1)
 h = dict(data["header"])
 org = h["context"] != "personal"
-iat = datetime.datetime(2099, 1, 1) if org else datetime.datetime.utcnow().replace(microsecond=0)
+# a fixed clock: the twins are compared byte for byte, so a second boundary between their runs must not show (0.80.0 seam)
+iat = datetime.datetime(2099, 1, 1) if org else datetime.datetime(2026, 11, 12, 9, 0, 0)
 h.update({"alg": "EdDSA" if org else "ES256", "suite": [16, 1, 1], "signer": "m-a#sig", "sequence": 1,
           "iat": iat.isoformat() + "Z", "exp": (iat + datetime.timedelta(hours=12)).isoformat() + "Z",
           "enc": base64.urlsafe_b64encode(b"\x04" + b"e" * 64).decode().rstrip("=")})

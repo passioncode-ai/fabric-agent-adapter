@@ -74,7 +74,8 @@ twins where they have one.
   `git -C` names the right repository (FAA-184).
 - The retro texts name `agents-db.contribute`, and the agents-database ask gains its edges (FAA-277, items 1 to 4).
 - `test/validate.py` searches the shipped files for a provider token shape, a private key block and a home path, and
-  every shipped script that writes `<https>` carries its legend (FAA-212).
+  every shipped script that writes `<https>` carries its legend but `fabric-delegation.mjs`, which takes it when it next
+  changes (FAA-306) (FAA-212).
 - The nudge notes were re-read against Fabric's tag v0.3.14 (FAA-143).
 - The insight/1 shape follows the estate's spec: `evidence` and `audience` are required, and the kind `market`
   exists (`session-hooks.md`, FAA-217).
@@ -85,15 +86,25 @@ twins where they have one.
 
 ### Fixed
 
+- **A session that moved into a nested checkout keeps its local registration** (the 0.80.0 seam reading of the
+  candidate): FAA-235's one-key rule read a hook's moving `cwd` only, so the Stop and SessionEnd hooks, the deliver
+  worker and `watch-mail` took a session registered with `--scope local` at the repository root for unregistered once
+  it worked in a submodule or a `.claude/worktrees/` worktree. They also read the key of the folder the session started
+  in, `CLAUDE_PROJECT_DIR`, as Claude Code keeps that folder's registration.
 - A refused job answer is named from one read of the job; the responder's shutdown says whether it drains; an epoch
   refusal reads `com.status` before the retry (FAA-186). Provider stems read as the contract reads them, `~` in
   `FABRIC_SERVICES_DIR` is expanded, contract-gated tests are found by `ast` (FAA-189). The channel-agent rule agrees
   with the contract on Python 3.9 and answers NOT_RUN without its schema (FAA-250). ASCII digits only, a header-only
   netstat reads as a restricted table, a hung `launchctl` no longer escapes (FAA-273).
-- The release waits 20 minutes, not 10, for the registry to serve a new version: 0.79.1 was served 6 s after
-  the old window closed and its run read red although it was published (FAA-307).
+- The release waits 20 minutes, not 10, for the registry to serve a new version, and the publish job's own limit is 30
+  minutes: 0.79.1 was served 6 s after the old window closed and its run read red although it was published (FAA-307).
 - The dashboard link gate reads its handoff as UTF-8 bytes, drops a byte-order mark, caps it at 64 KiB and refuses a
   deep document plainly, so a Cyrillic handoff passes under any code page (FAA-210).
+
+### Upgrading
+
+- `fabric_descriptor` (and its Node twin) imports `fabric_peer_owner`, and the facades import `fabric_load`: update with
+  `fabric_kit.py install`, which brings both along, never a hand copy of one file.
 
 ## 0.79.1 (2026-11-12)
 

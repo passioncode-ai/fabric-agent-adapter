@@ -416,6 +416,21 @@ class Registrations(Base):
         self.assertIsNone(fs.claude_registration(nested, self.env))  # a nested repository is its own key
         self.assertIsNone(fs.claude_registration(nested / "deep", self.env))
 
+    def test_a_session_that_moved_into_a_nested_checkout_keeps_its_local_entry(self):
+        """The 0.80.0 seam reading: a hook's `cwd` moves with the session (a submodule, a `.claude/worktrees/` worktree);
+        Claude Code keeps the registration of the folder the session started in, which it gives hooks as
+        CLAUDE_PROJECT_DIR. Keyed by the cwd alone, the Stop hook read such a session as unregistered."""
+        self.register(scope="local")  # keyed at self.repo
+        (self.repo / ".git").mkdir()
+        worktree = self.repo / ".claude" / "worktrees" / "agent-x"
+        worktree.mkdir(parents=True)
+        (worktree / ".git").write_text("gitdir: elsewhere\n")
+        self.assertIsNone(fs.claude_registration(worktree, self.env), "a new session there sees its own key only")
+        moved = dict(self.env, CLAUDE_PROJECT_DIR=str(self.repo))
+        self.assertEqual(fs.claude_registration(worktree, moved)["folder"], str(self.repo.resolve()))
+        elsewhere = dict(self.env, CLAUDE_PROJECT_DIR=str(self.home / "other"))
+        self.assertIsNone(fs.claude_registration(worktree, elsewhere), "another start folder's key is not ours")
+
     def test_an_http_entry_is_not_fabric_mcp(self):
         self.register(kind="http")
         self.assertIsNone(fs.claude_registration(self.repo, self.env))

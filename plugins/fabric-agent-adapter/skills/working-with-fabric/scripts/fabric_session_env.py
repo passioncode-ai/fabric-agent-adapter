@@ -407,13 +407,18 @@ def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Opti
     projects = config.get("projects") if isinstance(config.get("projects"), dict) else {}
     # FAA-235: Claude Code keys a local entry by the git root of the folder it was added in, or that folder outside a
     # checkout, and applies it only there (Claude Code 2.1.299; docs/evidence/runs/2026-11-12-faa-235-local-scope-key.md):
-    # one key, never an ancestor's
-    folder = checkout_root(cwd, env) or _ancestors(cwd)[0]
-    project = projects.get(str(folder))
-    servers = project.get("mcpServers") if isinstance(project, dict) else None
-    found = _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
-    if found:
-        return dict(found, scope="local", folder=str(folder))
+    # one key, never an ancestor's. A hook's cwd moves with the session (a submodule, a worktree under .claude/), while
+    # Claude Code keeps the entry of the folder the session started in, which it hands hooks as CLAUDE_PROJECT_DIR:
+    # that folder's key is read too (the 0.80.0 seam reading)
+    started = (env if env is not None else os.environ).get("CLAUDE_PROJECT_DIR") or ""
+    keys = [cwd] + ([Path(started)] if started else [])
+    for place in keys:
+        folder = checkout_root(place, env) or _ancestors(place)[0]
+        project = projects.get(str(folder))
+        servers = project.get("mcpServers") if isinstance(project, dict) else None
+        found = _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
+        if found:
+            return dict(found, scope="local", folder=str(folder))
     for folder in _ancestors(cwd):
         text = read_small(folder / ".mcp.json")
         if text:

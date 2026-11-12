@@ -155,7 +155,7 @@ jobs:
     needs: release
     if: vars.PUBLISH_NPMJS == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30  # the registry poll alone may take 20 minutes (FAA-307)
     permissions:
       contents: read
       id-token: write
