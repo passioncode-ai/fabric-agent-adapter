@@ -5,7 +5,31 @@
 Wave 3 of the backlog sweep of 2026-11-12. **The contract pin moves to `93e7db16` (`v0.1.0+2026-11-08.1`)**: DEC-0149
 (`fabric-source/1`), CT-254 (HA-2's Linux source, the hybrid the kit already read), DEC-0151, DEC-0152, DEC-0155.
 Bundles pinned at `18f8d487` stay valid (FAA-258; impact map `docs/evidence/specs/2026-11-12-faa-258-repin-93e7db16-impact-map.md`).
-Kit modules change: `fabric_secrets`, `fabric_protocols`, `fabric_peer_owner` (`1.2.0+kit.5`), and their Node twins.
+New kit modules: `fabric_holds` and `fabric-holds.mjs`. Kit modules change: `fabric_secrets`, `fabric_protocols`,
+`fabric_peer_owner` (`1.2.0+kit.5`), `fabric_package`, and their Node twins.
+
+### Added
+
+- **`npx @passioncode-ai/fabric-agent-adapter new <folder> --id <agent-id> [--profile ...] [--service]`** (North Star G21,
+  FAA-270), and `new_agent.py` behind it: one command creates an agent project with the contract built in: the bundle
+  pinned at the contract, `fabric.source.json`, a placement guard reading Observatory's `observatory-placement/1` record
+  with its tests, and with `--service` the service kit's sample (its modules copied by `fabric_kit.py install`).
+  Idempotent, refuses a folder holding other files without `--force`, JSON last. It needs Python 3.9 or later on the
+  machine. Turning a sentence into an agent (`new "<sentence>"`, `test`) stays FAA-26, waiting on Fabric's
+  `fabric.agent.create`.
+- **`fabric.source.json` (DEC-0149, `fabric-source/1`)** (FAA-261): `fabric_source_tree.py` ports the contract's source
+  rules and matches all 140 of its vendored vectors; `fabric_source_check.py check` reads the source a manifest names,
+  by path, line and column, never the value; `adapt_project.py source` lays the manifest down with the kit's slots
+  (`PUBLISHER_URI` behind the `createdBy` sentinel, `PLACEMENT_RECORD`, and for a service `SUPERVISOR_LABEL` and
+  `SERVICE_PORT`; FAA-188's part 2); `pack` writes `secrets[]` and `state[]` from the slots, and FAC-SEM-160 refuses a
+  package that differs.
+- **Work held by a service's own limits** (FAA-298): new kit modules `fabric_holds` and `fabric-holds.mjs` (L3). A held
+  job says why it waits in `statusMessage` with the contract's pause grammar (the job schema is closed); the operator gets
+  one push per hold, and the answer is recorded as a scoped lift that falls back when its window ends; a new probe rule
+  `limits.holds`.
+- **Agent template folders** (FAA-265): five JSON Schemas and `template_check.py` in creating-fabric-agents; the
+  communication agent template moved into `templates/communication-agent/` with its manifest, connections, access, data
+  rooms, checks, assembly and changelog; `validate.py` checks every shipped template folder.
 
 ### Changed
 
