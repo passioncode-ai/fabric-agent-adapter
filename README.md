@@ -260,7 +260,9 @@ claude plugin validate . --strict
 
 `test/validate.py` reads every SKILL.md front matter as strictly as a YAML parser does; an
 unquoted value holding `: ` fails it. `python3 test/validate.py --frontmatter <SKILL.md ...>`
-checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`. Start in
+checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`. Before a push or a release,
+`python3 test/validate.py --private-terms` checks the tracked files against the operator's private-terms list
+(path and line only; exit 2 when the list is absent, which is not a pass; CONTRIBUTING.md step 6). Start in
 [AGENTS.md](AGENTS.md); contributions follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Use

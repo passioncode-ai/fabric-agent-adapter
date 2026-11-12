@@ -1,4 +1,4 @@
-/* fabric-dashboard-kit@1.1.7 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+/* fabric-dashboard-kit@1.1.8 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
    Load it same-origin, after fabric-dashboard.css, with the service it opens Fabric on:
      <script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
              data-project="project-a" data-project-name="Project A"></script>
@@ -11,7 +11,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '1.1.7';
+  var VERSION = '1.1.8';
   var COOKIE = 'fabric_button';
   var GET_FABRIC = 'https://passioncode.ai/fabric';
   var ABSENT_AFTER_MS = 1500;
@@ -178,7 +178,7 @@
   }
 
   // The words a person reads (FAA-119): English, or Russian on a page whose lang is ru; the Russian is written as
-  // escapes so the file reads the same whatever charset it is served with. Checked with Copylot (en-US and ru-RU).
+  // escapes so the file reads the same whatever charset it is served with. Checked with the copy checker (en-US and ru-RU).
   var LABELS = {
     en: { chat: 'Chat with Fabric about {name}', session: 'Open a coding session in {name}', open: 'Open Fabric',
       absent: 'Fabric is not installed. Get it at' },
