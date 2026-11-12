@@ -202,9 +202,10 @@ class Selection(unittest.TestCase):
         self.assertEqual((owner.kind, owner.reason), (P.UNKNOWN, "several-rows"))
 
     def test_no_row_is_unknown(self):
+        # A macOS table that lists sockets but not this connection is a restricted one (DEC-0155 RT-1, FAA-312).
         with self.table():
             owner = P.peer(FakeSocket(SERVER, ("127.0.0.1", 59999)))
-        self.assertEqual((owner.kind, owner.reason), (P.UNKNOWN, "no-row"))
+        self.assertEqual((owner.kind, owner.reason), (P.UNKNOWN, P.NO_ROW_RESTRICTED))
 
     def test_a_proc_read_that_missed_the_row_is_read_once_more(self):
         """0.74.0 seam reading 6: a /proc read under churn can skip a row; one more read before answering unknown.
@@ -216,7 +217,7 @@ class Selection(unittest.TestCase):
             owner = P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER))
         self.assertEqual((owner.kind, read.call_count), (P.THIS_ACCOUNT, 2))
         with mock.patch.object(P, "read_table", return_value=([], "netstat")) as read:
-            self.assertEqual(P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)).reason, "no-row")
+            self.assertEqual(P.server_end(FakeSocket(("127.0.0.1", 50001), SERVER)).reason, P.NO_ROW_RESTRICTED)
         self.assertEqual(read.call_count, 1)
 
     def test_unreadable_table_is_unknown_with_a_reason(self):
@@ -417,7 +418,7 @@ class SelfContained(unittest.TestCase):
         names.discard("__future__")
         # sys.stdlib_module_names is 3.10's; on the kit's 3.9 floor the module's own list stands in.
         stdlib = set(getattr(sys, "stdlib_module_names", ())) or {
-            "ctypes", "http", "ipaddress", "os", "select", "selectors", "socket", "struct", "subprocess", "sys", "threading", "time",
+            "ctypes", "http", "ipaddress", "json", "os", "select", "selectors", "socket", "struct", "subprocess", "sys", "threading", "time",
             "typing"}
         self.assertTrue(names <= stdlib, names - stdlib)
 
@@ -695,16 +696,135 @@ class RestrictedTable(unittest.TestCase):
         for pid in ("4242", True, None, 1, 0, -5):
             self.assertFalse(P.pid_listens(pid, 80), pid)
         calls = []
+        listens = {"text": "p4242\nf4\nn127.0.0.1:80\n"}
 
         def run(argv):
             calls.append(argv)
-            return "%d\n" % os.getuid() if argv[0] == P.PS else "p4242\nf4\nn*:80\n"
+            return "%d\n" % os.getuid() if argv[0] == P.PS else listens["text"]
 
         with mock.patch.object(P, "_run", side_effect=run), mock.patch.object(P.sys, "platform", "darwin"):
             self.assertTrue(P.pid_listens(4242, 80))
             self.assertFalse(P.pid_listens(4242, 81))
+            # FAA-312, DEC-0155 RT-3: only a listen on exactly 127.0.0.1 is vouched for, never the IPv4 wildcard
+            # (`lsof` prints an IPv6-only wildcard as `*:<port>` too, and another account's 127.0.0.1 bind can stand
+            # beside it) nor ::1.
+            for text in ("p4242\nf4\nn*:80\n", "p4242\nf4\nn[::1]:80\n"):
+                listens["text"] = text
+                self.assertFalse(P.pid_listens(4242, 80), text)
         self.assertIn("-i4TCP", calls[-1])
         self.assertNotIn("-iTCP", calls[-1])
+
+    @unittest.skipIf(sys.platform == "win32", "ps and lsof")
+    def test_a_set_uid_reader_vouches_for_nothing(self):
+        """DEC-0155: a reader whose real and effective uid differ uses none of the proofs RT-2 to RT-5."""
+        run = lambda argv: "%d\n" % os.getuid() if argv[0] == P.PS else "p4242\nf4\nn127.0.0.1:80\n"  # noqa: E731
+        with mock.patch.object(P, "_run", side_effect=run), mock.patch.object(P.sys, "platform", "darwin"):
+            self.assertTrue(P.pid_listens(4242, 80))
+            with mock.patch.object(P.os, "geteuid", return_value=os.getuid() + 1, create=True):
+                self.assertFalse(P.pid_listens(4242, 80))
+
+    def test_a_netstat_that_fails_is_a_restricted_table(self):
+        """FAA-312, DEC-0155 RT-1: a netstat that exits non-zero, cannot start or times out is a restricted table, so
+        its reason begins table-restricted and a caller's vouch applies; before, `netstat: exit N` skipped the vouch."""
+        for failure in ("netstat: exit 1", "netstat: TimeoutExpired", "netstat: FileNotFoundError"):
+            with self.subTest(failure=failure), mock.patch.object(P, "method", return_value="netstat"), \
+                    mock.patch.object(P, "_run", side_effect=P.TableUnreadable(failure)):
+                with self.assertRaises(P.TableUnreadable) as caught:
+                    P.read_table()
+                self.assertEqual(str(caught.exception), "%s: %s" % (P.TABLE_RESTRICTED, failure))
+                P._LISTENERS.clear()
+                owner = P.listener(47311)
+                self.assertEqual((owner.kind, owner.reason), (P.UNKNOWN, "%s: %s" % (P.TABLE_RESTRICTED, failure)))
+                self.assertEqual(P.server_end(FakeSocket(F.OWN_CLIENT, SERVER)).reason, owner.reason)
+        P._LISTENERS.clear()
+
+    def test_a_table_of_this_account_alone_is_restricted(self):
+        """FAA-312, DEC-0155 RT-1: a macOS table holding no row of another uid (sysctl) or of another process (netstat)
+        proves nothing by a missing row. Linux and Windows carry the owner on each row and are never read so."""
+        own = [P.Row(SERVER, ("*", 0), True, 501, 4100), P.Row(F.OWN_CLIENT, SERVER, False, 501, 4300)]
+        other_uid = own + [P.Row(("127.0.0.1", 8021), ("*", 0), True, 0, 1)]
+        self.assertTrue(P.restricted(own, "sysctl", own_uid=501))
+        self.assertFalse(P.restricted(other_uid, "sysctl", own_uid=501))
+        self.assertTrue(P.restricted([], "sysctl", own_uid=501))
+        self.assertTrue(P.restricted([P.Row(SERVER, ("*", 0), True, None, 77)], "netstat", own_pid=77))
+        self.assertFalse(P.restricted([P.Row(SERVER, ("*", 0), True, None, 78)], "netstat", own_pid=77))
+        self.assertTrue(P.restricted([P.Row(SERVER, ("*", 0), True, None, None)], "netstat", own_pid=77))
+        self.assertTrue(P.restricted([], "netstat", own_pid=77))
+        for how in ("proc", "iphlpapi", "netstat-windows", "none"):
+            self.assertFalse(P.restricted([], how, own_uid=501, own_pid=77), how)
+
+    def test_under_a_restricted_table_only_an_exact_127_0_0_1_listener_of_this_account_counts(self):
+        """FAA-312, DEC-0155 RT-4: under a restricted table this account's wildcard or ::1 listener, and a port with no
+        row, read as table-restricted; its own bind on exactly 127.0.0.1 is its own."""
+        rows = [P.Row(SERVER, ("*", 0), True, 501, 4100), P.Row(("*", 47555), ("*", 0), True, 501, 4100),
+                P.Row(("::1", 47070), ("*", 0), True, 501, 4100)]
+        with mock.patch.object(P.os, "getuid", return_value=501, create=True), \
+                mock.patch.object(P, "read_table", return_value=(rows, "sysctl")):
+            P._LISTENERS.clear()
+            self.assertEqual((P.listener(F.SERVER_PORT).kind, P.listener(F.SERVER_PORT).pid), (P.THIS_ACCOUNT, 4100))
+            for port in (47555, 47070, 1):
+                owner = P.listener(port)
+                self.assertEqual(owner.kind, P.UNKNOWN, port)
+                self.assertTrue(owner.reason.startswith(P.TABLE_RESTRICTED + ": "), owner.reason)
+            # the same rows beside another uid's: a readable table decides, as before
+            with mock.patch.object(P, "read_table", return_value=(rows + [P.Row(("127.0.0.1", 8021), ("*", 0), True, 0, 1)],
+                                                                    "sysctl")):
+                P._LISTENERS.clear()
+                self.assertEqual(P.listener(47555).kind, P.THIS_ACCOUNT)
+                self.assertEqual(P.listener(1).kind, P.NONE)
+        P._LISTENERS.clear()
+
+    def test_a_missing_row_in_a_macos_table_is_restricted(self):
+        """FAA-312, DEC-0155 RT-1: a macOS table that lists sockets but not the reader's own connection proves nothing;
+        on Linux the reason stays no-row."""
+        rows = [P.Row(SERVER, ("*", 0), True, 502, 4100), P.Row(("127.0.0.1", 8021), ("*", 0), True, 0, 1)]
+        for how in ("sysctl", "netstat"):
+            with mock.patch.object(P, "read_table", return_value=(rows, how)):
+                owner = P.server_end(FakeSocket(F.OWN_CLIENT, SERVER))
+            self.assertEqual((owner.kind, owner.reason), (P.UNKNOWN, P.NO_ROW_RESTRICTED), how)
+            self.assertTrue(P.NO_ROW_RESTRICTED.startswith(P.TABLE_RESTRICTED + ": "))
+        with mock.patch.object(P, "read_table", return_value=(rows, "proc")):
+            self.assertEqual(P.server_end(FakeSocket(F.OWN_CLIENT, SERVER)).reason, "no-row")
+
+    def test_the_cli_prints_the_listeners_kind(self):
+        """FAA-315: `fabric_peer_owner.py listener <port>` prints the kind the dashboard link gate takes as
+        listener_owner, and the owner as JSON with --json; a bad port is a usage error."""
+        import contextlib
+        import io
+        mine = P.Owner(P.THIS_ACCOUNT, 501, 4100, "sysctl")
+        for argv, owner, want, code in ((["listener", "47311"], mine, "this-account\n", 0),
+                                        (["listener", "1"], P.Owner(P.NONE, None, None, "sysctl"), "none\n", 0),
+                                        (["listener", "47311", "--json"], mine, None, 0)):
+            out = io.StringIO()
+            with self.subTest(argv=argv), mock.patch.object(P, "listener", return_value=owner) as asked, \
+                    contextlib.redirect_stdout(out):
+                self.assertEqual(P.main(argv), code)
+                asked.assert_called_once_with(int(argv[1]))
+            if want is not None:
+                self.assertEqual(out.getvalue(), want)
+            else:
+                self.assertEqual(json.loads(out.getvalue()), {"kind": "this-account", "uid": 501, "pid": 4100,
+                                                              "method": "sysctl", "reason": None})
+        for argv in ([], ["listener"], ["listener", "x"], ["listener", "0"], ["listener", "65536"], ["peer", "1"]):
+            err = io.StringIO()
+            with self.subTest(argv=argv), contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(P.main(argv), 2)
+            self.assertIn("usage", err.getvalue())
+
+    def test_the_cli_runs_as_a_script(self):
+        import subprocess
+        sock = socket.socket()
+        sock.bind(("127.0.0.1", 0))
+        sock.listen(1)
+        try:
+            done = subprocess.run([sys.executable, str(SCRIPTS / "fabric_peer_owner.py"), "listener",
+                                   str(sock.getsockname()[1])], capture_output=True, text=True, timeout=60)
+        finally:
+            sock.close()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn(done.stdout.strip(), P.KINDS)
+        if sys.platform.startswith("linux") or sys.platform == "win32":
+            self.assertEqual(done.stdout.strip(), P.THIS_ACCOUNT)
 
     @unittest.skipIf(sys.platform == "win32", "launchd")
     def test_launchd_pid(self):
@@ -771,7 +891,8 @@ class SharedCases(unittest.TestCase):
                 continue
             table = self.CASES["tables"][case["table"]]
             with self.subTest(i=i, table=case["table"], ask=case["ask"]), \
-                    mock.patch.object(P.os, "getuid", return_value=case.get("ownUid", self.CASES["ownUid"]), create=True):
+                    mock.patch.object(P.os, "getuid", return_value=case.get("ownUid", self.CASES["ownUid"]), create=True), \
+                    mock.patch.object(P, "_own_pid", return_value=case.get("ownPid", os.getpid())):
                 P._LISTENERS.clear()
                 try:
                     read = mock.patch.object(P, "read_table", return_value=self.rows(table))

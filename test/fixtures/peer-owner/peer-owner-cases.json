@@ -11,6 +11,10 @@
    "kind": "netstat",
    "text": "Active Internet connections (including servers)\nProto Recv-Q Send-Q  Local Address                                 Foreign Address                               (state)          rxbytes      txbytes  rhiwat  shiwat          process:pid    state  options           gencnt    flags   flags1 usecnt rtncnt fltrs\ntcp4       0      0  127.0.0.1.47311        *.*                    LISTEN                0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.47311        127.0.0.1.50001        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50001        127.0.0.1.47311        ESTABLISHED           0            0  408064  146988      Example App:4300  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp6       0      0  ::1.47070              *.*                    LISTEN                0            0  408064  146988    example-agent:4400  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  192.0.2.10.50100       198.51.100.7.443       ESTABLISHED           0            0  408064  146988             curl:4500  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.47311        127.0.0.1.50002        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50002        127.0.0.1.47311        ESTABLISHED           0            0  408064  146988             curl:5200  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.8021         *.*                    LISTEN                0            0  408064  146988             launchd:1  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  *.47555                *.*                    LISTEN                0            0  408064  146988    example-daemon:300  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50001        127.0.0.1.47311        TIME_WAIT             0            0  408064  146988                    :0  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\n"
   },
+  "netstatOwnOnly": {
+   "kind": "netstat",
+   "text": "Active Internet connections (including servers)\nProto Recv-Q Send-Q  Local Address                                 Foreign Address                               (state)          rxbytes      txbytes  rhiwat  shiwat          process:pid    state  options           gencnt    flags   flags1 usecnt rtncnt fltrs\ntcp4       0      0  127.0.0.1.47311        *.*                    LISTEN                0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.47311        127.0.0.1.50001        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  127.0.0.1.50001        127.0.0.1.47311        ESTABLISHED           0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp4       0      0  *.47555                *.*                    LISTEN                0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\ntcp6       0      0  ::1.47070              *.*                    LISTEN                0            0  408064  146988           Python:4100  00102 00000000 000000000e1cd9e0 00000080 01000800      2      0 000000\n"
+  },
   "netstatNoProcess": {
    "kind": "netstat",
    "text": "Active Internet connections (including servers)\nProto Recv-Q Send-Q  Local Address          Foreign Address        (state)\ntcp4       0      0  127.0.0.1.47311        *.*                    LISTEN\n"
@@ -256,7 +260,91 @@
    ],
    "want": {
     "kind": "unknown",
-    "reason": "no-row"
+    "reason": "table-restricted: no row for this connection"
+   }
+  },
+  {
+   "table": "netstatOwnOnly",
+   "ask": "listener",
+   "port": 47311,
+   "ownPid": 4100,
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
+   }
+  },
+  {
+   "table": "netstatOwnOnly",
+   "ask": "listener",
+   "port": 47555,
+   "ownPid": 4100,
+   "want": {
+    "kind": "unknown",
+    "reason": "table-restricted: no listener of this account on exactly 127.0.0.1:47555"
+   }
+  },
+  {
+   "table": "netstatOwnOnly",
+   "ask": "listener",
+   "port": 47070,
+   "ownPid": 4100,
+   "want": {
+    "kind": "unknown",
+    "reason": "table-restricted: no listener of this account on exactly 127.0.0.1:47070"
+   }
+  },
+  {
+   "table": "netstatOwnOnly",
+   "ask": "listener",
+   "port": 1,
+   "ownPid": 4100,
+   "want": {
+    "kind": "unknown",
+    "reason": "table-restricted: no listener of this account on exactly 127.0.0.1:1"
+   }
+  },
+  {
+   "table": "netstatOwnOnly",
+   "ask": "serverEnd",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50001
+   ],
+   "ownPid": 4100,
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
+   }
+  },
+  {
+   "table": "netstatOwnOnly",
+   "ask": "peerAt",
+   "server": [
+    "127.0.0.1",
+    47311
+   ],
+   "client": [
+    "127.0.0.1",
+    50002
+   ],
+   "ownPid": 4100,
+   "want": {
+    "kind": "unknown",
+    "reason": "table-restricted: no row for this connection"
+   }
+  },
+  {
+   "table": "netstatOwnOnly",
+   "ask": "listener",
+   "port": 47555,
+   "ownPid": 4300,
+   "want": {
+    "kind": "this-account",
+    "pid": 4100
    }
   },
   {
