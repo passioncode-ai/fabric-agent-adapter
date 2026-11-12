@@ -1786,6 +1786,46 @@ class TurnRepositories(Base):
         self.assertLess(time.monotonic() - started, 1.5)
         self.assertEqual(MCP.turn_paths(str(self.transcript), self.repo, until=time.monotonic()), [])
 
+    def test_the_facts_are_spooled_before_the_repositories_are_read(self):
+        # FAA-161: a hook Claude Code kills during the folder walk still leaves the turn's facts in the spool
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "a.txt"))])
+        cli = sys.modules["fabric_session_cli"]
+        seen = []
+        real = cli.turn_repositories
+
+        def walk(transcript, cwd, until):
+            seen.append([json.loads(p.read_text()) for p in fs.session_dir(SID, self.env).glob("*-turn.json")])
+            return real(transcript, cwd, until)
+        with mock.patch.object(cli, "turn_repositories", walk):
+            said, entry = self.spool_turn()
+        (before,) = seen[0]
+        self.assertIn("facts", before)
+        self.assertNotIn("repositories", before)
+        self.assertEqual(entry["repositories"], [{"host": "github.com", "owner": "acme", "name": "one"}])
+        self.assertEqual(entry["facts"], before["facts"])
+        self.assertEqual(len(list(fs.session_dir(SID, self.env).glob("*-turn.json"))), 1, "rewritten, not added")
+
+    def test_a_folder_walk_that_hangs_ends_with_the_budget(self):
+        # FAA-161: a path on a hung network mount blocks os.path.isdir; the walk runs beside the hook, which waits for
+        # it no longer than the facts budget and spools the facts without repositories
+        one = self.git_repo("one", "https://github.com/acme/one.git")
+        self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "a.txt"))])
+        release = __import__("threading").Event()
+        with mock.patch.object(MCP, "_existing_folder", lambda path: release.wait(20) and None):
+            started = time.perf_counter()
+            spawned = []
+            said = fs.hook_spool({"session_id": SID, "cwd": str(self.repo), "transcript_path": str(self.transcript)},
+                                 "turn", self.env, spawn=spawned.append)
+            elapsed = time.perf_counter() - started
+            release.set()
+        self.assertEqual(said, "spooled: worker started")
+        self.assertLess(elapsed, fs.FACTS_BUDGET_S + 1.0)
+        (entry,) = sorted(fs.session_dir(SID, self.env).glob("*-turn.json"))
+        stored = json.loads(entry.read_text())
+        self.assertIn("facts", stored)
+        self.assertNotIn("repositories", stored)
+
     def test_a_spent_budget_names_none(self):
         one = self.git_repo("one", "https://github.com/acme/one.git")
         self.write_transcript([prompt_entry(), tool_entry("Edit", file_path=str(one / "x"))])

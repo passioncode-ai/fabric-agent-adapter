@@ -723,13 +723,19 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
              "facts": git_facts(cwd, until=until)}
     if event == "turn" and not branch_off(env):  # FAA-152: one more git call inside the same budget
         entry["branch"] = git_branch(cwd, until)
-    if event == "turn" and repositories_wanted(env):  # only once Fabric takes them: no transcript read before (FAA-140)
-        repositories = turn_repositories(payload.get("transcript_path"), cwd, until)
-        if repositories:
-            entry["repositories"] = repositories
     if event == "end" and isinstance(payload.get("reason"), str):
         entry["reason"] = payload["reason"][:64]
-    spool(directory, entry)
+    path = spool(directory, entry)
+    # FAA-161: the facts are spooled first, so a hook ended during the folder walk (a path on a hung network mount)
+    # still leaves them; the walk runs beside the hook, which waits for it until the budget ends, then the entry is
+    # written again, whole, with the repositories
+    if event == "turn" and repositories_wanted(env):  # only once Fabric takes them: no transcript read before (FAA-140)
+        repositories = _bounded_repositories(payload.get("transcript_path"), cwd, until)
+        if repositories and path.exists():  # a worker that already sent the facts has removed it: nothing to add to
+            try:
+                _write_private(path, json.dumps(dict(entry, repositories=repositories), sort_keys=True))
+            except OSError:
+                pass
     if event != "end" and lock_held(directory):
         return "spooled: a worker is running"
     if event != "end" and rejoined_recently(directory):
@@ -752,6 +758,18 @@ def _enterable(folder: Path) -> bool:
 
 def _under(folder: Path, command: str) -> bool:
     return _real(folder) in _real(Path(command)).parents
+
+
+def _bounded_repositories(transcript: Any, cwd: Path, until: float) -> List[Dict[str, str]]:
+    """turn_repositories in a daemon thread, waited for until `until` (FAA-161): a folder check that never returns
+    leaves it behind, and the hook goes on without the repositories."""
+    import threading
+
+    found: List[List[Dict[str, str]]] = []
+    walk = threading.Thread(target=lambda: found.append(turn_repositories(transcript, cwd, until)), daemon=True)
+    walk.start()
+    walk.join(max(0.0, until - time.monotonic()) + 0.1)
+    return found[0] if found else []
 
 
 def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.platform) -> Dict[str, Any]:

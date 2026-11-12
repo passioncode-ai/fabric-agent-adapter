@@ -77,7 +77,7 @@ backslash as an escape, so `cd C:\work` goes to `C:work`, which is left out); an
 *touched*: a `cd` or a read-only `git -C <path> log` names one as much as an edit does. A subagent's entries are not
 read, so a repository only a subagent touched is not named. Each
 path is resolved with one `git rev-parse --show-toplevel` and its repository's `origin` with one `git config --get
-remote.origin.url`, every call inside the same 1.5 s as the turn's facts (the facts first); a path outside every
+remote.origin.url`, every call inside the same 1.5 s as the turn's facts (the facts first, and spooled before the walk starts, so a hook ended during it still leaves them; the folder checks run beside the hook, which waits for them no longer than the budget, then writes the entry again with the repositories it found, FAA-161); a path outside every
 checkout costs no git call, and when the budget runs out the hook spools what it found. Each repository is named
 `{host, owner, name}` from its `origin` (https, `ssh://`, `git@host:owner/name`; credentials, a port and `.git`
 dropped; a nested group stays in `owner`, and on a self-hosted ssh remote `owner` is the folder path on that server
