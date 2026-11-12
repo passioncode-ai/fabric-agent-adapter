@@ -499,7 +499,10 @@ def serve(args: argparse.Namespace) -> int:
             # records (FAA-155): joined, so the process does not end before that. Idle, it waits 3 s for the DELETE and the
             # join ends within LC-01's 5 s (FAA-173); with work, it is bounded by the kit's hard exit, 8 + 2 s after the
             # stop was asked: 1.5 s are left for the rest of the stop.
-            bound = 4.5 if svc.board.current is None else 8.5
+            # The bound follows what the responder's shutdown found, not a read of `current` here: a claim between the
+            # stop and the shutdown would make them disagree (FAA-186); a shutdown not begun yet is read as idle.
+            svc.board.shutting_down.wait(0.5)
+            bound = 8.5 if svc.board.draining else 4.5
             board_thread.join(max(0.5, bound - (time.monotonic() - (stop_asked[0] if stop_asked else time.monotonic()))))
         server.server_close()
         svc.lock.release()

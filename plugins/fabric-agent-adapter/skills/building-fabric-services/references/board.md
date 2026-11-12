@@ -214,7 +214,8 @@ capability's enroll or replace is settled on its own: a refusal of that capabili
 `invalid_arguments`, any code that is not about the board session) leaves it `retry`, asked again alone after 15 s,
 30 s, doubling to 15 minutes, with one `board.slot.refused` event (warning; said again if it is refused again after
 the slot was held); its accepted work waits `lapsed` and goes back
-by a transfer once the slot is held. The capabilities after it are recovered as before. A refusal of the board session
+by a transfer once the slot is held; `idempotency_window_expired` also reads `com.status` first, so the retry goes
+under the epoch Fabric names now (FAA-186). The capabilities after it are recovered as before. A refusal of the board session
 (`unreachable`, `session-ended`, `not_available`, `not_authorized` and the other codes in `SESSION_CODES`) leaves the
 rest `retry` too, says no `board.slot.refused`, and goes to the responder's fault, which says it by code:
 `board.access.needed` for `not_authorized`, `authority_changed` and `credential` (the session is left),

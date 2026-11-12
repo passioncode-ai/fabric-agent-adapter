@@ -247,3 +247,5 @@ class SlotKeeper:
             self._retry_later(capability, entries or [], exc)
             if exc.code in SESSION_CODES:
                 raise
+            if exc.code == "idempotency_window_expired":
+                self._status()  # the epoch moved: read it before the retry, which no held slot would do (FAA-186)
