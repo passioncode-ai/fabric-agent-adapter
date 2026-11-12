@@ -366,8 +366,9 @@ def url_refused(value: str) -> bool:
     """Whether `new URL` refuses an absolute URL (trimmed as secret_url trims it) for its host or port (FAA-309), read
     with the same authority url_parts reads: a special scheme's host through the WHATWG host parser and the IDNA reading
     of FAA-98 (`_domain_ok`), never empty; `file`'s host, after `//`, the same, empty allowed; another scheme's host,
-    after `//`, without a forbidden host code point, and empty only with no user information and no port; a port of
-    ASCII digits up to 65535. Where the reading is unsure, the host is taken as valid (the detector's safe side)."""
+    after `//`, without a forbidden host code point, and empty only with no user information and no `:` after it (an
+    empty port is refused too); a port of ASCII digits up to 65535. Where the reading is unsure, the host is taken as
+    valid (the detector's safe side)."""
     value = _LONE_SURROGATE.sub("\ufffd", value)
     scheme, _, rest = value.partition(":")
     rest = rest.partition("#")[0].partition("?")[0]
@@ -401,7 +402,7 @@ def url_refused(value: str) -> bool:
         return host == "" or not _domain_ok(host)
     if host.startswith("["):
         return not _ipv6_ok(host[1:-1])
-    return any(c in _FORBIDDEN_HOST for c in host) or (host == "" and ("@" in authority or port != ""))
+    return any(c in _FORBIDDEN_HOST for c in host) or (host == "" and ("@" in authority or ":" in hostport))
 
 
 def secret_url(value: str) -> bool:

@@ -31,7 +31,7 @@
    "file": "fabric_secrets.py",
    "layer": "L0",
    "imports": [],
-   "sha256": "a6a5830c6796df8e899924e284905bfe40b2333cb080fcbcb9bb85fb0793425a"
+   "sha256": "2ebbd53d4b162fb41586b07ccc31534cbc3a9c6632a4ff84f56d29e90bd4294f"
   },
   {
    "module": "fabric_peer_owner",
@@ -211,7 +211,7 @@
     "fabric_base",
     "fabric_secrets"
    ],
-   "sha256": "1592ff864af43e61ff18231828147ea3d16a861dfb0cb36e0174a0624942fec6"
+   "sha256": "3e59c4aeb8048826283d62a55630b66906b7a77f3567f75dc4b3e4d555366162"
   },
   {
    "module": "fabric_a2a",
@@ -6988,7 +6988,7 @@
    "fabric_jsvalue.py": "052f1b40bab18600b3731dbdca27cbff17588c21d9458fa6241efd1340d0e09a",
    "fabric_time.py": "588f383da4ac6a243ea95b6ffc3a0aa99ca94245732dc4937734f190b7af4ae9",
    "fabric_identifiers.py": "0fd814d521ac3aa39907458265870753046a73f48af3d8581ab864b93b211607",
-   "fabric_secrets.py": "a6a5830c6796df8e899924e284905bfe40b2333cb080fcbcb9bb85fb0793425a",
+   "fabric_secrets.py": "2ebbd53d4b162fb41586b07ccc31534cbc3a9c6632a4ff84f56d29e90bd4294f",
    "fabric_peer_owner.py": "7e007a74ab166e06046610c5961c134e523247e6d1ed010934369b7b27642bfc",
    "fabric_tailnet.py": "c60416539be0199182f7969c24a37b14d0db50c8ea5e3e04cea43babfb483407",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
@@ -7005,7 +7005,7 @@
    "fabric_package.py": "8b835fcf173b8c345ea6d229edf8ebb98b0f94e9af4894c4a6bd1301f175e2b1",
    "fabric_protocols.py": "3cba881f6f3468e8d8a8455a5d54c5567e748c37291211a1c7f22d195ea562c4",
    "fabric_actions.py": "ae21d1199614c4f74d1dcd1e0a87107a9d52434cd9e2d64aa24a7b1e196fb723",
-   "fabric_connections.py": "1592ff864af43e61ff18231828147ea3d16a861dfb0cb36e0174a0624942fec6",
+   "fabric_connections.py": "3e59c4aeb8048826283d62a55630b66906b7a77f3567f75dc4b3e4d555366162",
    "fabric_a2a.py": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919",
    "fabric_page_links.py": "1b57ea573c550e2f90d1ec3edcc655917ceaa0db9dd1635fccf422ec3024d25e",
    "fabric_load.py": "0e97b6307108c5877a728be8f0c416686130ce98b31c4dfd5d788d9dc61a8860",

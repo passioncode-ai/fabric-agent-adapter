@@ -243,7 +243,7 @@ def _whatwg_parts(value: str) -> Optional[Dict[str, str]]:
             return None
     elif any(c in _FORBIDDEN_HOST for c in host):
         return None
-    elif host == "" and ("@" in authority or port):
+    elif host == "" and ("@" in authority or ":" in hostport):
         return None
     return {"password": password, "query": query, "fragment": fragment}
 

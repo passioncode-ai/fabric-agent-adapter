@@ -208,9 +208,9 @@ def read_as_url(read: str) -> bool:
 
 
 def _url_reading(read: str) -> bool:
-    """secretUrl where read_as_url admits the head, secretArgument otherwise. The kit's secret_url also reads a URL the
-    WHATWG parser refuses (the safe direction for its own callers); the contract's `new URL` throws there and finds only
-    what secretArgument finds, so a refused URL is read by secret_argument alone here."""
+    """secretUrl where read_as_url admits the head, secretArgument otherwise. A URL the WHATWG parser refuses makes the
+    contract's `new URL` throw, which finds only what secretArgument finds, so such a URL is read by secret_argument
+    alone: url_parts answers None for it here, as the kit's secret_url reads it as an argument only since FAA-309."""
     if not read_as_url(read):
         return secret_argument(read)
     return secret_argument(read) or (url_parts(read) is not None and secret_url(read))
@@ -397,6 +397,8 @@ def url_parts(text: str) -> Optional[Tuple[str, str]]:
             return None
         if at and hostport == "":
             return None
+        if host == "" and colon > bracket:
+            return None  # an empty host ended by `:`, with an empty port or a port: `new URL` throws
         if host == "" and special and lowered != "file":
             return None
         if host and not _host_ok(host, special):

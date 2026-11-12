@@ -39,7 +39,14 @@ test('a URL whose host or port new URL refuses is read as an argument only, as t
     ['https://u:pw@\uff11\uff12\uff17.\uff10.\uff10.\uff11/', true], ['https://u:pw@1.2.3.999/', false],
     ['foo://u:pw@[zz]/', false], ['foo://u:pw@:80/', false], ['foo://:@/?token=abc', false], ['https://u:pw@h:/', true],
     ['https://u:pw@%zz/', false], ['https://u:pw@h%41/', true], ['https://u:pw@a\u200db/', false],
-    ['https:///?token=abc', false], ['https://u:pw@[::1]:8080/', true]]) assert.equal(s.secretUrl(value), expected, JSON.stringify(value));
+    ['https:///?token=abc', false], ['https://u:pw@[::1]:8080/', true],
+    // An empty host ended by `:` is refused whatever follows: an empty port, a port, a query or a fragment.
+    ['foo://:/?token=abcdef', false], ['git://:/r?access_token=abcdef', false], ['foo://:80/?token=abcdef', false],
+    ['foo://:/#token=abcdef', false]]) assert.equal(s.secretUrl(value), expected, JSON.stringify(value));
+  // The ground truth is Node's own parser: each of these throws in `new URL`.
+  for (const value of ['foo://:/?token=abcdef', 'git://:/r?access_token=abcdef', 'foo://:80/?token=abcdef', 'foo://:/#token=abcdef']) {
+    assert.throws(() => new URL(value), TypeError, value);
+  }
 });
 
 test('every resolution and every rule case answers as the contract does', () => {

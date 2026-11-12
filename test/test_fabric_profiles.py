@@ -32,7 +32,10 @@ URL_HOSTS = tuple(("secret_url", value, expected) for value, expected in (
     ("https://u:pw@\uff11\uff12\uff17.\uff10.\uff10.\uff11/", True), ("https://u:pw@1.2.3.999/", False),
     ("foo://u:pw@[zz]/", False), ("foo://u:pw@:80/", False), ("foo://:@/?token=abc", False), ("https://u:pw@h:/", True),
     ("https://u:pw@%zz/", False), ("https://u:pw@h%41/", True), ("https://u:pw@a\u200db/", False),
-    ("https:///?token=abc", False), ("https://u:pw@[::1]:8080/", True)))
+    ("https:///?token=abc", False), ("https://u:pw@[::1]:8080/", True),
+    # An empty host ended by `:` is refused whatever follows: an empty port, a port, a query or a fragment.
+    ("foo://:/?token=abcdef", False), ("git://:/r?access_token=abcdef", False), ("foo://:80/?token=abcdef", False),
+    ("foo://:/#token=abcdef", False)))
 
 
 def decode(text):

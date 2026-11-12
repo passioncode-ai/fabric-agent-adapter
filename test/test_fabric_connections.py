@@ -82,6 +82,17 @@ class IdnaHosts(unittest.TestCase):
             {"id": "a", "kind": "connector", "target": "https://u:p@\uff11\uff12\uff17.\uff10.\uff10.\uff11/", "state": "ok"}]}}})
         self.assertTrue(view["reported"])
 
+    def test_an_empty_host_ended_by_a_colon_is_refused(self):
+        """`new URL` throws on an empty host ended by `:`, with an empty port or a port: the URL is read as an argument
+        only, so its parameters are not read (shared vectors: test_fabric_profiles.py URL_HOSTS)."""
+        for value in ("foo://:/?token=abcdef", "git://:/r?access_token=abcdef", "foo://:80/?token=abcdef",
+                      "foo://:/#token=abcdef", "foo://u:pw@:/x"):
+            with self.subTest(value=value):
+                self.assertIsNone(fc._whatwg_parts(value))
+                self.assertFalse(fc._secret_url(value))
+        self.assertIsNotNone(fc._whatwg_parts("foo:///?token=abcdef"))
+        self.assertTrue(fc._secret_url("foo://h:/?token=abcdef"))
+
 
 class DateTime(unittest.TestCase):
     """ajv-formats `date-time`, full mode: what the contract's validator accepts for `lastAt`."""
