@@ -131,7 +131,7 @@ export class SlotKeeper {
     delete this.confirmed[capability];
     delete this.claimKeys[capability]; // the move returned that claim to the queue: its receipt is dead
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it; accepted work stays accepted (work begun is the new holder's). The operator brings it back by take-back (once the other session lets it go, or at a restart with accepted work waiting; a restart alone does not) or, where Fabric offers it, a move back here. Else ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it; accepted work stays accepted (work begun is the new holder's). The operator brings it back by take-back (once the other session lets it go, or at a restart or reconnect with accepted work waiting; neither alone does) or, where Fabric can, a move back here. Else ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written
     }
     return true;

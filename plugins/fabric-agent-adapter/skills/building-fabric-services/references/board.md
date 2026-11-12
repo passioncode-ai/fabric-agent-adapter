@@ -332,7 +332,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
   landed is not stranded; until then it counts as at most a lease from that key's first send (a fresh key starts
   its own, and it counts only while more than the 10 s margin of that lease is left, then no more, as a lapsed slot), so a second lost answer keeps
-  the session (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
+  the session (as any call without an answer does while a lease holds: the failure table above; FAA-194 (34)). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
   dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
   it waits for its attempt's lease (60 s) before it is claimed again (a take-back that lands before the move-back check makes its claim key
   leaves that key to the claim loop, which works the request at once). Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits

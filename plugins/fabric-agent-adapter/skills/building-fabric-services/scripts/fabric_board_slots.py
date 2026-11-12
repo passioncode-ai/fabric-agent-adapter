@@ -126,8 +126,8 @@ class SlotKeeper:
         if "moved" not in held:  # once, even across restarts
             self._emit("board.slot.moved", "warning", "The %s slot on this Project moved to another session. This service stopped answering it; accepted "
                        "work stays accepted (work begun is the new holder's). The operator brings it back by take-back (once the "
-                       "other session lets it go, or at a restart with accepted work waiting; a restart alone does not) or, where "
-                       "Fabric offers it, a move back here. Else ask its maintainer." % capability,
+                       "other session lets it go, or at a restart or reconnect with accepted work waiting; neither alone does) or, "
+                       "where Fabric can, a move back here. Else ask its maintainer." % capability,
                        notify=True, episode=capability, capability=capability, generation=now, held=held["generation"])
         return True
 
