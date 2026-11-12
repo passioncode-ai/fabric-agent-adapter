@@ -729,3 +729,57 @@ def service_checkout(descriptor: Any, repo: Optional[str]) -> Tuple[Optional[Pat
         if same_repository(_git_out(Path(top), "remote", "get-url", "origin") or "", source):
             return Path(top), "the checkout of %s that holds %s" % (shown_repository(source), place)
     return None, "no checkout of %s holds the descriptor's commands, manifest or launchd job; pass --repo" % shown_repository(source)
+
+
+# FAA-298: a service with limits of its own holds work visibly (fabric_holds), never silently.
+_HOLD_USE = "HoldBook|waiting_message|waitingMessage|hold_job|holdJob"  # git grep -E is POSIX: no word boundary
+_HOLD_KIT_FILES = ("fabric_holds.py", "fabric-holds.mjs")
+
+
+def declared_limits(wk: Any, usage_report: Any = None) -> List[str]:
+    """The limits a service declares: the load declaration's `limits` (DEC-0104), and the usage report's `budget` and
+    `budgets` (DEC-0021, DEC-0027) when the probe read one. An invalid load declaration reads as not declared."""
+    import fabric_load  # noqa: E402 - beside this file
+    found: List[str] = []
+    view = fabric_load.load_view(wk)
+    limits = (view.get("load") or {}).get("limits") if view.get("valid") else None
+    if isinstance(limits, dict):
+        found += ["load %s %s" % (name, limits[name]) for name in ("concurrency", "perCaller", "queueMax") if name in limits]
+    if isinstance(usage_report, dict):
+        budget = usage_report.get("budget")
+        if isinstance(budget, dict) and "limitUsd" in budget:
+            found.append("usage budget USD %s a %s" % (budget.get("limitUsd"), budget.get("period")))
+        budgets = usage_report.get("budgets")
+        if isinstance(budgets, list) and budgets:
+            found.append("usage budgets (%d)" % len(budgets))
+    return found
+
+
+def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
+                  budget: float = OPENS_IN_HOST_BUDGET) -> Tuple[str, str]:
+    """`limits.holds` over one checkout: PASS when a tracked file outside the kit's own copy and the tests holds work
+    through fabric_holds (HoldBook, waiting_message, hold_job), FAIL when the service declares limits and none does,
+    NOT_RUN when it declares none, or its checkout or git cannot be read in the budget."""
+    if not limits:
+        return "NOT_RUN", "the service declares no limits (a load declaration's limits, a usage report's budget or budgets)"
+    if repo is None:
+        return "NOT_RUN", why
+    if not shutil.which("git"):
+        return "NOT_RUN", "git is not installed"
+    try:
+        listed = subprocess.run(["git", "-C", str(repo), "grep", "-I", "-l", "-z", "-E", _HOLD_USE], capture_output=True,
+                                timeout=max(0.05, budget))
+    except subprocess.TimeoutExpired:
+        return "NOT_RUN", "the %.1f s budget ran out while git read %s" % (budget, repo)
+    except OSError as exc:
+        return "NOT_RUN", "git could not read %s: %s" % (repo, exc)
+    if listed.returncode not in (0, 1):
+        return "NOT_RUN", "git grep could not read %s" % repo
+    users = [p for p in listed.stdout.decode("utf-8", "surrogateescape").split("\0")
+             if p and p.rsplit("/", 1)[-1] not in _HOLD_KIT_FILES and not _TEST_PATH.search(p)]
+    if users:
+        return "PASS", "declares %s; %s hold(s) work through fabric_holds" % ("; ".join(limits), ", ".join(users[:5]))
+    return "FAIL", ("declares %s, and no tracked file outside the kit and the tests holds work through fabric_holds "
+                    "(HoldBook, waiting_message, hold_job): a hold its caller cannot read as one and its operator never "
+                    "hears of goes unseen. Say each hold on the job, push the operator once per hold and take a scoped "
+                    "lift (FAA-298, references/interop.md)" % "; ".join(limits))

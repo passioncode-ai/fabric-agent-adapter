@@ -159,6 +159,33 @@ node keys every per-caller rule with `job_caller_key`, counts every started job 
 and paused ones too) as running, and answers another caller's job id `unknown-job`. The text-only `queue-full` result
 and `fabric.job.list` are still the node's own (FAA-103).
 
+### Work held by the service's own limits
+
+A service that holds work by a limit of its own (a daily quota, a per-caller share, a concurrency cap, a money cap)
+says so, so a hold is never seen only by a caller who waits (FAA-298). `fabric_holds` (Node `fabric-holds.mjs`) does
+the three parts:
+
+- **On the job.** `hold_job(jobs, job_id, reason, since, until, message)` (Node `holdJob`) pauses the job with the
+  statusMessage `waiting_message` writes: `quota-exhausted[ until <until>]: waiting <reason> since <since>[: <message>]`,
+  `reason` one of `daily-quota`, `caller-share`, `concurrency`, `money`. The pinned `interop-job` schema is closed
+  (`additionalProperties: false`), so `waiting {reason, since, until, message}` is carried in `statusMessage`, the
+  contract's pause grammar, never as a field of the job: every caller already reads it as wait (until `until` when
+  given), and `read_waiting(answer)` (Node `readWaiting`) gives the four parts back. A job waiting its normal turn in
+  the call queue keeps `queued <position> of <length>`; a hold is the service's own limit.
+- **One push per hold.** `HoldBook(path, events=log)` (Node `new HoldBook(file, {events})`) opens a hold per reason and
+  caller: `hold(caller=, work=, reason=, until=, job_id=)` returns `{hold, statusMessage, push}`, and only the call that
+  opens the hold pushes: one `limit.held` event, level `notice`, `notify: true`, naming the caller, the work, the reason
+  and when it frees by itself, and asking whether to raise the limit. More work held by the same limit for the same
+  caller joins the hold silently. A hold closes by `release`, when its `until` passes, or by a lift that covers it;
+  the next hold pushes again. Names that read as a credential are refused.
+- **The operator's answer as a scoped lift.** `lift(reason=, decision=, caller=, job_id=, jobs= | usd= | limit=,
+  until=)` records the operator's words (`fabric_actions.operator_decision("limit.lift", words)`) with its scope (this
+  order, one caller, or every caller) and its size: a number of jobs, an amount of money, or a raised limit for a window
+  (100 a day for today: `limit=100, until=<midnight>`), and writes `limit.lifted`. `admit(reason=, caller=, job_id=,
+  cost_usd=)` spends a jobs or money lift (the narrowest scope first) and answers whether the work may pass the limit;
+  pass its answer to `jobs.create(..., limit_holds=not admitted)` for a repeated key. `limit(reason=, base=, caller=)`
+  is the limit in force. A lift falls back by itself when its window ends or its amount is spent.
+
 <a id="actions"></a>
 
 ## Actions
@@ -412,5 +439,6 @@ your own record, keep it (OA-6).
 | `interop.events-trace` | every event with a trace carries both `traceId` and `spanId`, well formed | no events page was read |
 | `interop.action-tools` | every action the well-known `extensions/actions/0.1` declares names a tool `tools/list` serves (DEC-0121 AP-1); one it does not serve is a `FAIL`, and so is a local service that declares actions with no MCP surface (beyond FAC-SEM-142, which reads only a present list) | no declaration, an unreadable one (`well-known.actions` reports it), no listing was read, or a remote service with no MCP surface (its twin may be on A2A or behind a gateway) |
 | `channel-agent.declaration` | a channel agent's declaration (DEC-0150) passes the contract's FAC-SEM-162 to 165 at the pin, read from `provider.extensions` of the manifest the descriptor names, else from `extensions` of the well-known answer (CA-1); a `FAIL` on the obligations of a declaration the reader still reads (FAC-SEM-164) or a string shaped like a credential (FAC-SEM-165, not a declaration too large to read for credentials) in the read declaration or in any copy beside it, the first five findings shown as code and path, never a declared value | nothing declared, the named manifest unreadable (`interop.manifest-link` fails it), or a key read as not declared (a manifest's own `extensions`, a capability's, another version's key, a well-known copy beside a manifest, a form the schema or FAC-SEM-163 refuses), each named in the evidence, never a failure while producers move to this revision unless a copy holds a string shaped like a credential (that fails in any copy the probe reads: a manifest's own `extensions`, a capability's, the well-known copy, CA-5); no line when the well-known answer is not read; credentials are read as the contract reads them, within its reading budget and under the `0.1` key only (a key of another version is named, not read); a well-known answer carrying the declaration at 75 % of the 2 MiB cap or over is named, never a failure (until the contract's CT-223) |
+| `limits.holds` | a service that declares limits (a load declaration's `limits`, the usage report's `budget` or `budgets`) holds work through `fabric_holds` (`HoldBook`, `waiting_message`, `hold_job`) in a tracked file of its checkout outside the kit's copy and the tests; one that declares limits and holds none that way is a `FAIL` (FAA-298) | no limits declared, or no checkout found (`--repo` names it), git missing or out of time |
 
 `python3 scripts/check_service.py <id>` prints them with the rest; `--json` for a machine.

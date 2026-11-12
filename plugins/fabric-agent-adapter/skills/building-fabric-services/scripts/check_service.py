@@ -97,7 +97,7 @@ from check_service_rules import usage_problems  # noqa: E402,F401 - moved (FAA-6
 from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
 from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict  # noqa: E402 - DEC-0121
-from check_service_rules import opens_in_host_verdict, service_checkout  # noqa: E402 - FAA-118
+from check_service_rules import opens_in_host_verdict, service_checkout, declared_limits, holds_verdict  # noqa: E402 - FAA-118, FAA-298
 from check_service_rules import well_known_a2a_verdict, a2a_card_verdict  # noqa: E402 - DEC-0122
 import fabric_a2a as fa2  # noqa: E402 - DEC-0122
 import check_service_channel_agent as cac  # noqa: E402 - DEC-0150, FAA-197
@@ -467,7 +467,7 @@ class Probe:
             self.add("usage.report", "FAIL", "HTTP %d with the token" % status)
             return
         try:
-            report = json.loads(body)
+            report = self.usage_report = json.loads(body)  # FAA-298: limits.holds reads its budgets
         except ValueError:
             self.add("usage.report", "FAIL", "not JSON")
             return
@@ -947,8 +947,8 @@ class Probe:
             self.login_rules()
             self.interop_rules()
             self.channel_agent_rule()
-            verdict, evidence = board_responder_verdict(self.wk, self.board_kit)
-            self.add("board.responder", verdict, evidence)
+            self.add("limits.holds", *holds_verdict(declared_limits(self.wk, getattr(self, "usage_report", None)), *service_checkout(self.d, self.repo)))
+            self.add("board.responder", *board_responder_verdict(self.wk, self.board_kit))
         self.lifecycle_rules()
         return self.results
 
