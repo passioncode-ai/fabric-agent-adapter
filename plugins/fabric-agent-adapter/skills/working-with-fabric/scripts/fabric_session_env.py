@@ -422,7 +422,11 @@ def services_dir(platform: str = sys.platform, env: Optional[Dict[str, str]] = N
     """Where fabric-service/0.1 descriptors live: FABRIC_SERVICES_DIR, else Fabric's folder per OS + /services."""
     env = os.environ if env is None else env
     if env.get("FABRIC_SERVICES_DIR"):
-        return Path(env["FABRIC_SERVICES_DIR"])
+        value = env["FABRIC_SERVICES_DIR"]
+        if value == "~" or value[:2] in ("~/", "~\\"):  # `~` as the kit, Fabric and Fabric Dashboards expand it (FAA-189)
+            home = env.get("HOME") or env.get("USERPROFILE") or str(Path.home())
+            return Path(home) / value[2:] if len(value) > 2 else Path(home)
+        return Path(value)
     return fabric_root(platform, env) / "services"
 
 

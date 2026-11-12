@@ -174,6 +174,18 @@ class DirectoryTests(unittest.TestCase):
             out = subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "validate", str(path)], capture_output=True, text=True)
             self.assertEqual("file name" in out.stdout, misnamed, out.stdout)
 
+    def test_the_stem_reads_dot_as_ecmascript_does(self):
+        """FAA-189 (1): registry-rules.ts strips /^.*[\\/]/ with no s flag, so `.` stops at a line break (\\n, \\r,
+        U+2028, U+2029) and `$` is the string's end; `re.S` let a folder holding a line break give another stem.
+        The answers are Node's (node -e, 2026-11-12)."""
+        for path, stem in (("/a/b/example-agent.json", "example-agent"), ("x\\example-agent.json", "example-agent"),
+                           ("/a\nb/example-agent.json", "a\nb/example-agent"), ("/a\rb/c.json", "a\rb/c"),
+                           ("/a\u2028b/c.json", "a\u2028b/c"), ("/a\u2029b/c.json", "a\u2029b/c"),
+                           ("q/a\nb/c.json", "a\nb/c"), ("example-agent.json\n", "example-agent.json\n"),
+                           ("/a\u0085b/c.json", "c")):
+            with self.subTest(path=path):
+                self.assertEqual(fp.entry_stem(path), stem)
+
     def test_remove(self):
         fp.write_provider_entry(self.e(), self.providers, self.services)
         self.assertTrue(fp.remove_provider_entry("example-agent", self.providers))

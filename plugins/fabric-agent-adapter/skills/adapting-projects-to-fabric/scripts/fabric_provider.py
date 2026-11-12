@@ -292,6 +292,13 @@ def _now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+
+def entry_stem(path: str) -> str:
+    """CT-193 (FAC-SEM-014): the stem registry-rules.ts reads, `file.replace(/^.*[\\/]/, "").replace(/\.json$/, "")`,
+    with ECMAScript's `.` (no line break: \\n, \\r, U+2028, U+2029) and `$` (the string's end) (FAA-189)."""
+    return re.sub(r"\.json\Z", "", re.sub(r"\A[^\n\r\u2028\u2029]*[\\/]", "", path, count=1))
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -327,7 +334,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             entry = json.loads(args.path.read_text(encoding="utf-8"))
             problems = validate_provider_entry(entry)
             # CT-193 (FAC-SEM-014): the stem is what follows the last / or \ and loses .json, on every platform.
-            stem = re.sub(r"\.json\Z", "", re.sub(r"^.*[\\/]", "", str(args.path), flags=re.S))
+            stem = entry_stem(str(args.path))
             if isinstance(entry, dict) and entry.get("id") != stem:
                 problems.append("the file name %s is not <id>.json for %s (FAC-SEM-014)" % (args.path.name, entry.get("id")))
             if not problems:

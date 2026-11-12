@@ -1831,6 +1831,11 @@ class NoServicesLine(Base):
         self.assertEqual(fs.services_dir("win32", {"HOME": "C:/U", "LOCALAPPDATA": "C:/L"}),
                          Path("C:/L") / "passioncode-fabric" / "services")
         self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "/s"}), Path("/s"))
+        # FAA-189 (3): `~` is expanded as the kit, Fabric and Fabric Dashboards expand it, from the given HOME
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "~/s"}), Path("/h/s"))
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "~"}), Path("/h"))
+        self.assertEqual(fs.services_dir("darwin", {"HOME": "/h", "FABRIC_SERVICES_DIR": "/x/~s"}), Path("/x/~s"))
+        self.assertEqual(fs.services_dir("win32", {"USERPROFILE": "C:/U", "FABRIC_SERVICES_DIR": "~\\s"}), Path("C:/U") / "s")
 
 
 
