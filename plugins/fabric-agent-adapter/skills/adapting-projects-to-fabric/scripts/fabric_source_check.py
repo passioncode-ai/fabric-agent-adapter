@@ -127,13 +127,16 @@ PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----
 JWK_PRIVATE = re.compile(r"\\?[\"']d\\?[\"'][ \t]*:[ \t]*\\?[\"']([A-Za-z0-9_-]{43,})")  # JSON, escaped, Python
 #: Words a documented or synthetic credential carries (AWS's `...EXAMPLE`, `sk-test-not-a-key`); a random key does not.
 SYNTHETIC = ("example", "not-a-key", "notakey", "fake", "dummy", "placeholder", "redacted")
-# The detector's provider-key shapes without its first alternative, `^bearer\s.+`, which reads a whole header value: in
-# a file it would take prose that starts with the word and hide a key later on the same line. A bearer token is looked
-# for as `_BEARER_INSIDE` does: the word, then a run of 12 or more with a digit.
-_BEARER_FIRST = "(^bearer["
-if not _secrets.SECRET_VALUE.pattern.startswith(_BEARER_FIRST):  # not an assert: `python -O` would drop it
-    raise ImportError("fabric_secrets.SECRET_VALUE changed its first branch; update fabric_source_check.py with it")
-PROVIDER_KEY = re.compile("(" + _secrets.SECRET_VALUE.pattern.split("|", 1)[1], _secrets.SECRET_VALUE.flags)
+# This check's own key shapes, the detector's before DEC-0151 (unbounded, ASCII case-insensitive), apart from the shared
+# SECRET_VALUE for parity with the contract's tree check (KEY_SHAPE_SOURCES, `src/source-rules.ts` at the pin; CT-207,
+# FAA-258). Not the detector's `^bearer\s.+`, which reads a whole header value and would take prose that starts with the
+# word: a bearer token is looked for as `_BEARER_INSIDE` does, the word, then a run of 12 or more with a digit.
+KEY_SHAPE_SOURCES = ("sk-[A-Za-z0-9_-]{16,}", "gh[pousr]_[A-Za-z0-9]{20,}", "xox[abposr]-[A-Za-z0-9-]{10,}", "AKIA[0-9A-Z]{16}", "glpat-[A-Za-z0-9_-]{20,}")
+PROVIDER_KEY = re.compile("(" + "|".join(KEY_SHAPE_SOURCES) + ")", re.IGNORECASE | re.ASCII)
+#: A URL parameter's value read as the contract's tree check reads it (`URL_SECRET_VALUE` in `src/source-rules.ts`): the
+#: detector's whole-value `^bearer` branch and this check's own unbounded shapes, never the shared DEC-0151 detector.
+URL_SECRET_VALUE = re.compile("(^bearer[" + _secrets.JS_SPACE + "]" + _secrets._NOT_LINE_END + "+|" + "|".join(KEY_SHAPE_SOURCES) + ")",
+                              re.IGNORECASE | re.ASCII)
 #: Files that are credentials by their name: pack's own rule (fabric_package.SECRET_FILE and SECRET_FILE_OK, held
 #: equal by test_source_check), and the kit's token files (`service.token`, fabric_auth; `board.credential`, fabric_hub).
 _JS_DOT = "[^\n\r\u2028\u2029]"
@@ -216,7 +219,7 @@ def _url_secret(url: str, depth: int = 0) -> bool:
                 if not _real(value):
                     continue
                 if (_secrets.credential_name(name) and _secrets._long_secret(value)) or \
-                        _secrets.JWT_SHAPE.search(value) or _secrets.SECRET_VALUE.search(value):
+                        _secrets.JWT_SHAPE.search(value) or URL_SECRET_VALUE.search(value):
                     return True
     return False
 
@@ -399,13 +402,13 @@ def _instance_finding(text: str, entries: List[str]) -> Optional[str]:
 
 
 def _alternatives(pattern: "re.Pattern[str]") -> List[Tuple["re.Pattern[str]", ...]]:
-    """Each provider-key alternative of the contract's pattern as (its starts, its prefix, a run of its class, least
+    """Each provider-key alternative of this check's pattern as (its starts, its prefix, a run of its class, least
     length, open-ended, the whole alternative), so a key is read where its own class ends, not where another's does."""
     found = []
     for alt in pattern.pattern[1:-1].split("|"):
         part = re.fullmatch(r"(.+?)(\[[^\]]+\])\{(\d+)(,?)\}", alt)
         if part is None:  # not an assert: `python -O` would drop it
-            raise ImportError("fabric_secrets.SECRET_VALUE has a key shape this check cannot read: %s" % alt[:12])
+            raise ImportError("KEY_SHAPE_SOURCES has a key shape this check cannot read: %s" % alt[:12])
         prefix, cls, least, open_ended = part.groups()
         found.append((re.compile("(?=%s)" % prefix, pattern.flags), re.compile(prefix, pattern.flags),
                       re.compile(cls + "+", pattern.flags), int(least), bool(open_ended), re.compile(alt, pattern.flags)))

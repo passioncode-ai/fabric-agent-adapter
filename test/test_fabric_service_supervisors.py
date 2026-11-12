@@ -71,7 +71,7 @@ class SystemdUnitTests(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):  # no supervisor file carries a secret (service.md)
             fs.systemd_unit("x.service", ["/bin/x"], working_directory=Path("/tmp"), environment={"API_KEY": "abc"})
         with self.assertRaises(fs.ServiceError):
-            fs.systemd_unit("x.service", ["/bin/x", "--key=" + "s" + "k-" + "q" * 24], working_directory=Path("/tmp"))
+            fs.systemd_unit("x.service", ["/bin/x", "--key=" + "s" + "k-" + "Q1" + "q" * 22], working_directory=Path("/tmp"))
         with self.assertRaises(fs.ServiceError):
             self.unit(stop_timeout=5)
         with self.assertRaises(fs.ServiceError):  # a tab or a line break would end the line early
@@ -205,7 +205,7 @@ class TaskSchedulerTests(unittest.TestCase):
         self.assertEqual(doc.find("t:Actions/t:Exec/t:Arguments", NS).text, "a<b&c --fabric-supervisor task-scheduler")
 
     def test_refusals(self):
-        for bad in (dict(task="no-leading-backslash"), dict(argv=["relative.exe"]), dict(argv=[r"C:\x.exe", "--token=" + "s" + "k-" + "w" * 24]),
+        for bad in (dict(task="no-leading-backslash"), dict(argv=["relative.exe"]), dict(argv=[r"C:\x.exe", "--token=" + "s" + "k-" + "W1" + "w" * 22]),
                     dict(argv=[r"C:\x.exe", "a\x01b"]), dict(cwd="C:\\w\n"), dict(user="")):
             with self.subTest(bad=bad), self.assertRaises(fs.ServiceError), \
                     mock.patch.dict(os.environ, {"USERNAME": ""}):

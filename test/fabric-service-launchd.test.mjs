@@ -16,7 +16,7 @@ import { tempDir } from './temp-dir.mjs';
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const temp = () => tempDir('fabric-launchd-');
 const label = () => `ai.passioncode.test.lifecycle-${crypto.randomBytes(4).toString('hex')}`;
-const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'q'.repeat(24)}`;
+const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'Q1'}${'q'.repeat(22)}`;
 const UID = 501;
 const noSleep = async () => {};
 
