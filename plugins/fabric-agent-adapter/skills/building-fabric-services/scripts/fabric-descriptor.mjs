@@ -1,10 +1,12 @@
 // How a service is found (fabric-service/0.1): its descriptor, peers and app descriptors (DEC-0061, DEC-0069), build identity and the well-known document.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_descriptor.py. Node 20+, no dependency.
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialName, repositoryCredential, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 import { ID, INSTANCE, LOCAL_PATH, PRIMARY_CAPABILITY, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
+import { ANOTHER_ACCOUNT } from './fabric-peer-owner.mjs'; // L0: who listens on a port (DEC-0154 HA-2, FAA-225)
 import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
 import { ACTIONS_EXTENSION_KEY, actionsExtension, actionsExtensionRules } from './fabric-actions.mjs';
@@ -313,9 +315,43 @@ export function sourceRefusal(d, dir = servicesDir()) {
   return `Descriptor ${d?.id}.${instance} ${NO_SOURCE_REPOSITORY}. ${PASS_SOURCE}`;
 }
 
-// FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns
-// (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY), so an installed agent's update keeps working.
-export function writeDescriptor(d, dir = servicesDir()) {
+// The child that answers portOwner: a plain listen on 127.0.0.1:<port> that succeeds means nothing holds it (the table
+// is not read); one that fails asks fabric-peer-owner's listener. A child, because writeDescriptor is synchronous.
+const PORT_OWNER_CHILD = `
+import net from 'node:net';
+const [port, url] = process.argv.slice(1);
+const say = (value) => process.stdout.write(JSON.stringify(value));
+const server = net.createServer();
+server.once('error', async () => {
+  try { const { listener } = await import(url); const who = await listener(Number(port)); say([who.kind, Number.isInteger(who.uid) ? who.uid : null]); }
+  catch { say(['unknown', null]); }
+});
+server.listen({ port: Number(port), host: '127.0.0.1', exclusive: true }, () => server.close(() => say(null)));
+`;
+
+/** Who listens on 127.0.0.1:<port> now, as [kind, uid] from the kit's fabric-peer-owner, or null when nothing holds it
+ * (FAA-225, DEC-0154 HA-2). */
+export function portOwner(port) {
+  const done = spawnSync(process.execPath, ['--input-type=module', '-e', PORT_OWNER_CHILD, String(port),
+    new URL('./fabric-peer-owner.mjs', import.meta.url).href], { encoding: 'utf8', timeout: 10000 });
+  try { return JSON.parse(done.stdout); } catch { return ['unknown', null]; }
+}
+
+/** Why an install may not take `port`: another OS account listens on it (FAA-225). This account, the system (launchd
+ * holds a socket-activated job's socket), nobody and an unreadable table pass. The recorded port per account and its
+ * claim file wait on contract DEC-0160. */
+export function portListenerRefusal(port, reader = portOwner) {
+  const found = reader(port);
+  if (!Array.isArray(found) || found[0] !== ANOTHER_ACCOUNT) return null;
+  const uid = Number.isInteger(found[1]) ? ` (uid ${found[1]})` : '';
+  return `Port ${port} is listened on by another OS account${uid}: choose a port no other account holds (DEC-0154, FAA-225).`;
+}
+
+/** Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim), and a port another OS
+ * account listens on (FAA-225; `portOwner(port) -> [kind, uid] | null` reads it, the kit's own by default).
+ * FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns
+ * (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY), so an installed agent's update keeps working. */
+export function writeDescriptor(d, dir = servicesDir(), { portOwner: reader = portOwner } = {}) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
@@ -334,6 +370,8 @@ export function writeDescriptor(d, dir = servicesDir()) {
     try { otherPort = portOf(String(other.origin ?? '')); } catch { continue; }
     if (otherPort === port) throw new ServiceError(`Port ${port} is already claimed by ${key} (${file}).`);
   }
+  const held = port === null ? null : portListenerRefusal(port, reader);
+  if (held) throw new ServiceError(held);
   ensurePrivateDir(dir);
   const target = descriptorPath(d.id, d.instance, dir);
   atomicWrite(target, `${JSON.stringify(d, null, 2)}\n`, 0o600);
