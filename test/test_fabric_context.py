@@ -218,6 +218,49 @@ class Hold(TempHome):
                 self.assertNotIn("machine-a", err, "never a record value")
         self.assertEqual(self.created(), ["home"], "nothing created before a refusal")
 
+    def test_a_supervised_refusal_backs_off_before_exiting_78(self):
+        """FAA-279: under KeepAlive an exit 78 at once is a respawn every ThrottleInterval (10 s), forever; a supervised
+        copy waits the lock's back-off (0.5 s doubling to 30 s, 300 s in all) before it exits; one by hand does not."""
+        slept, now = [], [0.0]
+        def sleep(seconds):
+            slept.append(seconds)
+            now[0] += seconds
+        for supervised in ({"env": {"FABRIC_SERVICE_SUPERVISOR": "launchd"}, "argv": []},
+                           {"env": {}, "argv": ["service.py", "--fabric-supervisor=systemd"]}):
+            slept.clear()
+            now[0] = 0.0
+            with self.subTest(supervised):
+                held, err, code = self.hold("org:acme-rehearsal", wait_seconds=None, sleep=sleep, clock=lambda: now[0],
+                                            **supervised)
+                self.assertIsNone(held)
+                self.assertEqual(code, 78)
+                self.assertEqual(slept[:7], [0.5, 1, 2, 4, 8, 16, 30])
+                self.assertAlmostEqual(sum(slept), fabric_lock.LOCK_WAIT_SUPERVISED_SECONDS)
+                self.assertIn("record-required", err)
+                self.assertIn("300 s", err)
+                self.assertEqual(len(err.strip().splitlines()), 1, "one sentence")
+        slept.clear()
+        held, err, code = self.hold("org:acme-rehearsal", wait_seconds=None, sleep=sleep, clock=lambda: now[0])
+        self.assertEqual((code, slept), (78, []), "by hand: at once")
+        self.assertNotIn("Waiting", err)
+        self.assertEqual(self.created(), ["home"], "nothing created while it waits")
+
+    def test_a_supervised_context_mismatch_backs_off_with_the_lock_released(self):
+        data = fabric_paths.service_dirs(SERVICE)["data"]
+        data.mkdir(parents=True)
+        (data / "fabric-context.json").write_text(json.dumps({"service": SERVICE, "instance": "default",
+                                                               "context": "org:other"}), encoding="utf-8")
+        released = []
+        def sleep(seconds):
+            if not released:  # the lock is free while it waits
+                fabric_lock.InstanceLock(data).acquire().release()
+                released.append(seconds)
+        held, err, code = self.hold("personal", wait_seconds=2, sleep=sleep, clock=iter(range(100)).__next__,
+                                    env={"FABRIC_SERVICE_SUPERVISOR": "launchd"})
+        self.assertEqual(code, 78)
+        self.assertEqual(released, [0.5])
+        self.assertIn("context-mismatch", err)
+
     def test_a_folder_never_changes_context(self):
         data = fabric_paths.service_dirs(SERVICE)["data"]
         data.mkdir(parents=True)

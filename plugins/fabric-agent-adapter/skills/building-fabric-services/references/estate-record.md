@@ -218,7 +218,9 @@ const { dirs, instance, lock } = await holdContextInstance('example-agent', 'org
   kept; another context or instance, or unreadable, releases the lock and refuses. The folder never changes context.
 
 A refusal is one sentence on stderr naming the code and the context, never a record or grant value, and exit 78
-(`EXIT_CONTEXT_REFUSED`, EX_CONFIG; 75 stays "already running"). `ContextRefused` carries the code:
+(`EXIT_CONTEXT_REFUSED`, EX_CONFIG; 75 stays "already running"); a copy its supervisor started waits the lock's
+back-off (300 s in all) before that exit, so `KeepAlive` does not restart it every 10 s (FAA-279). `ContextRefused`
+carries the code:
 
 | Code | When |
 |---|---|

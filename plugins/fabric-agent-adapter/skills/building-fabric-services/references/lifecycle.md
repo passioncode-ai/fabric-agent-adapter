@@ -205,6 +205,10 @@ if the holder leaves, and exits 75 only when the wait runs out: a few starts an 
 360. It touches nothing while it waits. Two installs sharing one data directory are still the
 defect to remove; the back-off only stops the loop from costing the machine.
 
+A context refusal (`fabric_context`, exit 78: no record, a revoked grant, a folder of another context) is the same
+loop under `KeepAlive`, so a supervised copy waits the same back-off, holding nothing and with the lock released,
+before it exits 78 (FAA-279); started by hand it exits 78 at once.
+
 The marker (contract DEC-0057, CT-01) is the variable `FABRIC_SERVICE_SUPERVISOR=<manager>` or
 the argument `--fabric-supervisor <manager>` (also `--fabric-supervisor=<manager>`), after the
 executable and before any `--`; `<manager>` is `launchd`, `systemd`, `task-scheduler` or `node`

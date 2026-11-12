@@ -33,7 +33,8 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 from fabric_base import ServiceError, _INSTANCE  # noqa: E402
 from fabric_descriptor import descriptor_path  # noqa: E402
 from fabric_estate import parse_context  # noqa: E402
-from fabric_lock import InstanceLock, hold_single_instance  # noqa: E402
+from fabric_lock import (InstanceLock, LOCK_BACKOFF_FIRST_SECONDS, LOCK_BACKOFF_MAX_SECONDS, hold_single_instance,  # noqa: E402
+                         lock_wait_budget_seconds, supervisor_marker)
 from fabric_paths import atomic_write, instance_dirs  # noqa: E402
 from fabric_share import instance_share_grant  # noqa: E402
 from fabric_time import clock_ms  # noqa: E402
@@ -125,9 +126,28 @@ def context_instance(service_id: str, context: Any, *, record: Optional[Dict[str
     return answer
 
 
-def _refuse(service_id: Any, context: Any, code: str) -> None:
-    print("%s will not run for %s (%s): %s." % (service_id, _shown(context), code, _REASONS[code]), file=sys.stderr, flush=True)
-    raise SystemExit(EXIT_CONTEXT_REFUSED)
+def _refuse(service_id: Any, context: Any, code: str, wait_seconds: Optional[float] = 0.0, *,
+            sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
+            env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None) -> None:
+    """One sentence naming the code, then exit 78. Under a supervisor that restarts on exit (launchd's KeepAlive with
+    ThrottleInterval 10, systemd's Restart=always) an exit at once is a respawn every few seconds, forever (FAA-279);
+    so a supervised copy first waits the lock's back-off (0.5 s doubling to 30 s, 300 s in all), holding nothing, and
+    exits 78 when it runs out: a few restarts an hour. ``wait_seconds`` overrides the choice as the lock's does."""
+    if wait_seconds is None:
+        wait_seconds = lock_wait_budget_seconds(supervisor_marker(env, argv))
+    wait_seconds = max(0.0, wait_seconds)
+    tail = " Waiting %.0f s before exiting, so its supervisor does not restart it every few seconds." % wait_seconds \
+        if wait_seconds > 0 else ""
+    print("%s will not run for %s (%s): %s.%s" % (service_id, _shown(context), code, _REASONS[code], tail),
+          file=sys.stderr, flush=True)
+    deadline = clock() + wait_seconds
+    delay = LOCK_BACKOFF_FIRST_SECONDS
+    while True:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise SystemExit(EXIT_CONTEXT_REFUSED)
+        sleep(min(delay, remaining))
+        delay = min(delay * 2, LOCK_BACKOFF_MAX_SECONDS)
 
 
 def _marker_matches(path: Path, expected: Dict[str, str]) -> Optional[bool]:
@@ -152,7 +172,7 @@ def hold_context_instance(service_id: str, context: Any, *, record: Optional[Dic
                           env: Optional[Dict[str, str]] = None, argv: Optional[Sequence[str]] = None,
                           services_directory: Optional[Path] = None) -> Tuple[Dict[str, Any], InstanceLock]:
     """Run as ``context``'s one instance, before any side effect (brief D17): ``context_instance`` (a refusal prints one
-    sentence naming the code and exits 78, nothing created); then ``hold_single_instance`` on the instance's data
+    sentence naming the code and exits 78, nothing created; a supervised copy backs off first, FAA-279); then ``hold_single_instance`` on the instance's data
     folder (its markers, its supervised wait, its exit 75); then the marker ``<data>/fabric-context.json``: absent, it
     is written (0600, atomic); equal, it is kept; another context or instance, or unreadable, releases the lock and
     exits 78 (``context-mismatch``). Returns the instance and the held lock."""
@@ -160,7 +180,7 @@ def hold_context_instance(service_id: str, context: Any, *, record: Optional[Dic
         info = context_instance(service_id, context, record=record, machine_id=machine_id, agent_ref=agent_ref, at=at,
                                 personal_instance=personal_instance, services_directory=services_directory)
     except ContextRefused as refused:
-        _refuse(service_id, context, refused.code)
+        _refuse(service_id, context, refused.code, wait_seconds, sleep=sleep, clock=clock, env=env, argv=argv)
     lock = hold_single_instance(info["dirs"]["data"], wait_seconds, sleep=sleep, clock=clock, env=env, argv=argv)
     expected = {"service": service_id, "instance": info["instance"], "context": context}
     marker = Path(info["dirs"]["data"]) / CONTEXT_MARKER
@@ -173,5 +193,5 @@ def hold_context_instance(service_id: str, context: Any, *, record: Optional[Dic
         raise
     if matches is False:
         lock.release()
-        _refuse(service_id, context, "context-mismatch")
+        _refuse(service_id, context, "context-mismatch", wait_seconds, sleep=sleep, clock=clock, env=env, argv=argv)
     return info, lock

@@ -10,7 +10,7 @@ import { INSTANCE, ServiceError } from '../plugins/fabric-agent-adapter/skills/b
 import * as fc from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-context.mjs';
 import { descriptorPath } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
 import { placementGrantFindings } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-estate.mjs';
-import { abstractNames, EXIT_ALREADY_RUNNING, InstanceLock } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
+import { abstractNames, EXIT_ALREADY_RUNNING, InstanceLock, LOCK_WAIT_SUPERVISED_SECONDS } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs';
 import { instanceDirs, serviceDirs } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-paths.mjs';
 import { instanceShareGrant } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-share.mjs';
 import { parseRfc3339Ms } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-time.mjs';
@@ -178,6 +178,30 @@ test('a refusal exits 78 with one sentence and creates nothing', async (t) => {
     assert.ok(!err.includes('urn:fabric:share') && !err.includes('machine-a'), 'never a record or grant value');
   }
   assert.deepEqual(created(), ['home'], 'nothing created before a refusal');
+});
+
+test('a supervised refusal backs off before it exits 78 (FAA-279)', async (t) => {
+  const { created } = tempHome(t);
+  const slept = [];
+  let now = 0;
+  const sleep = async (seconds) => { slept.push(seconds); now += seconds; };
+  for (const marker of [{ env: { FABRIC_SERVICE_SUPERVISOR: 'launchd' }, argv: [] }, { env: {}, argv: ['service.mjs', '--fabric-supervisor=systemd'] }]) {
+    slept.length = 0;
+    now = 0;
+    const { code, err } = await hold('org:acme-rehearsal', { waitSeconds: undefined, sleep, clock: () => now, ...marker });
+    assert.equal(code, 78);
+    assert.deepEqual(slept.slice(0, 7), [0.5, 1, 2, 4, 8, 16, 30]);
+    assert.ok(Math.abs(slept.reduce((a, b) => a + b, 0) - LOCK_WAIT_SUPERVISED_SECONDS) < 1e-9);
+    assert.match(err, /record-required/);
+    assert.match(err, /300 s/);
+    assert.equal(err.trim().split('\n').length, 1, 'one sentence');
+  }
+  slept.length = 0;
+  const byHand = await hold('org:acme-rehearsal', { waitSeconds: undefined, sleep, clock: () => now });
+  assert.equal(byHand.code, 78);
+  assert.deepEqual(slept, [], 'by hand: at once');
+  assert.doesNotMatch(byHand.err, /Waiting/);
+  assert.deepEqual(created(), ['home'], 'nothing created while it waits');
 });
 
 test('a folder never changes context; the lock is released before the exit', { skip: noLinuxLock }, async (t) => {
