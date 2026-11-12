@@ -17,6 +17,7 @@ itself takes an option of the same name. --env is for a stdio server only and is
 
 Normative source: fabric-agent-contract docs/specification/provider.md (DEC-0016, rulings DEC-0017).
 """
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 # #region provider-writer — docs: plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/references/provider-entry.md#the-writer
 

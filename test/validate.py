@@ -807,8 +807,8 @@ def _scheme_of(found: str) -> str:
     return "no scheme"
 
 
-def credential_url_problems(root: Path = ROOT) -> List[str]:
-    problems: List[str] = credential_url_scope_problems(root)
+def shipped_text_files(root: Path = ROOT):
+    """(relative path, text) of every UTF-8 file in the shipped scope, `__pycache__` left out."""
     for name in credential_url_scope(root):
         top = root / name
         if not top.exists():
@@ -816,15 +816,77 @@ def credential_url_problems(root: Path = ROOT) -> List[str]:
         files = [top] if top.is_file() else sorted(p for p in top.rglob("*") if p.is_file() and "__pycache__" not in p.parts)
         for path in files:
             try:
-                text = path.read_text(encoding="utf-8")
+                yield path.relative_to(root).as_posix(), path.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
-            for lineno, line in enumerate(text.splitlines(), 1):
-                found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
-                if found:  # the scheme alone: a real credential is never repeated into a log
-                    problems.append("%s:%d writes a URL with credentials (%s): name the scheme in angle brackets, "
-                                    "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
-                                    % (path.relative_to(root).as_posix(), lineno, _scheme_of(found.group(0))))
+
+
+def credential_url_problems(root: Path = ROOT) -> List[str]:
+    problems: List[str] = credential_url_scope_problems(root)
+    for rel, text in shipped_text_files(root):
+        for lineno, line in enumerate(text.splitlines(), 1):
+            found = next((hit for hit in (rx.search(line) for rx in CREDENTIAL_URLS) if hit), None)
+            if found:  # the scheme alone: a real credential is never repeated into a log
+                problems.append("%s:%d writes a URL with credentials (%s): name the scheme in angle brackets, "
+                                "`<https>://u:pw@h`, so a product that vendors the kit can ship it (FAA-211)"
+                                % (rel, lineno, _scheme_of(found.group(0))))
+    return problems
+
+
+# FAA-212: the vendoring product's release check (project-observatory-open-source `tools/check_public_release.py`)
+# refuses three more patterns; they are composed from parts as it composes them, so this source is no fixture hit.
+SHIPPED_PATTERNS = {
+    "provider-token-shape": re.compile(r"\b(?:" + "gh[pousr]_" + r"[A-Za-z0-9]{30,}|" + "github_pat_" + r"[A-Za-z0-9_]{40,}|"
+                                       + "sk-" + r"(?:proj-|or-v1-|ant-api03-)?[A-Za-z0-9_-]{30,}|" + "AKIA"
+                                       + r"[A-Z0-9]{16}|" + "AIza" + r"[A-Za-z0-9_-]{30,})"),
+    "private-key-block": re.compile("-----BEGIN " + r"(?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    "personal-machine-path": re.compile(r"(?<![A-Za-z0-9_.:/-])(?:file://)?/(?:" + "Users" + r"|home)/[A-Za-z0-9_.-]+/"),
+}
+
+
+def shipped_pattern_problems(root: Path = ROOT) -> List[str]:
+    """FAA-212: no shipped file carries a provider token shape, a private key block or a path in a person's home."""
+    problems: List[str] = []
+    for rel, text in shipped_text_files(root):
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for name, rx in SHIPPED_PATTERNS.items():
+                if rx.search(line):  # the pattern's name alone: a value is never repeated into a log
+                    problems.append("%s:%d writes a %s, which the products that vendor the kit refuse to ship: use a "
+                                    "neutral example (`<name>`, `example`) (FAA-212)" % (rel, lineno, name))
+    return problems
+
+
+# FAA-212: a module vendored on its own leaves references/kit-modules.md behind, so a shipped script that writes an
+# example scheme in angle brackets carries the legend itself.
+HTTPS_EXAMPLE = "<https>"
+HTTPS_LEGEND = re.compile(r"^\s*(?:#|//) Example URLs write their scheme in angle brackets: read `<https>` as `https`",
+                          re.MULTILINE)
+SCRIPT_PLACES = re.compile(r"^(?:plugins/[^/]+/skills/[^/]+/scripts|bin)/")
+# A script that writes the example and is owned by another change this wave; each entry names why, and an entry that
+# is no longer needed fails.
+HTTPS_LEGEND_PENDING = {
+    "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-delegation.mjs":
+        "the delegation modules belong to another builder in wave 2; its legend lands with that change",
+}
+
+
+def https_legend_problems(root: Path = ROOT, pending: Optional[Dict[str, str]] = None) -> List[str]:
+    pending = HTTPS_LEGEND_PENDING if pending is None else pending
+    problems: List[str] = []
+    for rel, text in shipped_text_files(root):
+        if not SCRIPT_PLACES.match(rel) or HTTPS_EXAMPLE not in text:
+            continue
+        has = bool(HTTPS_LEGEND.search(text))
+        if not has and rel not in pending:
+            problems.append("%s writes `<https>` in an example and carries no legend: add the line `# Example URLs "
+                            "write their scheme in angle brackets: read `<https>` as `https` (FAA-212).` (// in "
+                            "JavaScript)" % rel)
+        elif has and rel in pending:
+            problems.append("HTTPS_LEGEND_PENDING names %s, which carries the legend now: remove it (FAA-212)" % rel)
+    for rel in sorted(pending):
+        path = root / rel
+        if not path.is_file() or HTTPS_EXAMPLE not in path.read_text(encoding="utf-8", errors="replace"):
+            problems.append("HTTPS_LEGEND_PENDING names %s, which writes no `<https>`: remove it (FAA-212)" % rel)
     return problems
 
 
@@ -1041,6 +1103,8 @@ def validate_repo() -> List[str]:
     errors.extend(workflow_problems())
     errors.extend(dollar_anchor_problems())
     errors.extend(credential_url_problems())
+    errors.extend(shipped_pattern_problems())
+    errors.extend(https_legend_problems())
     return errors
 
 

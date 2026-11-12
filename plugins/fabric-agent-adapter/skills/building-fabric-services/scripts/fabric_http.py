@@ -28,6 +28,7 @@ The transport is injected in tests: `transport(method, url, headers, body, timeo
 `(status, headers, body_bytes)` or raises `OSError` (a connection error, `TimeoutError` included) or `HttpError`.
 Standard library only. Part of the service kit (FAA-65, layer L4).
 """
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 from __future__ import annotations
 
 import datetime as _dt

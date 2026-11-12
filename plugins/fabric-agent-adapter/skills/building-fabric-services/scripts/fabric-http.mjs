@@ -16,6 +16,8 @@
 // The transport is injected in tests: async ({ method, url, headers, body, timeoutS, maxBytes }) =>
 // { status, headers, body: Uint8Array }, throwing on a connection error (a `TimeoutError` name is a timeout) or an
 // HttpError. Node 20 or newer, no dependencies. Part of the service kit (FAA-65, layer L4).
+//
+// Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 import http from 'node:http';
 import { CheckedAgent, ListenerRefused } from './fabric-peer-owner.mjs';

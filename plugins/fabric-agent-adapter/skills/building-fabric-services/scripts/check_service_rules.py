@@ -3,6 +3,7 @@ network guard's verdict, the board responder's fixture conversation, a session c
 whether two repository URLs name one repository, a service's actions declaration (DEC-0121) and whether its checkout
 opens its pages in a browser (FAA-118), and its A2A member and public Agent Card (DEC-0122). ``check_service.py`` runs them against a live service.
 Standard library only, Python 3.9+."""
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 from __future__ import annotations
 
 import email.utils

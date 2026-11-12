@@ -45,6 +45,7 @@ is refused: it would travel with the source. The summary says whether Git chose 
 Under a locale whose file-system encoding is not UTF-8 the check restarts itself in Python's UTF-8 mode, so a name,
 an argument and a file are read in one encoding. Standard library only.
 """
+# Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 # #region source-check — docs: plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/source-and-instance.md#the-check
 
