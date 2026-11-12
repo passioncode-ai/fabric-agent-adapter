@@ -166,7 +166,8 @@ class Live(unittest.TestCase):
 
     def test_the_default_reader_is_the_socket_table(self):
         # A real connection of this process: the owner the table gives is this account's, or unknown where the table is
-        # restricted (an ad-hoc-signed interpreter on macOS); never another account's, so it is served either way.
+        # restricted (an ad-hoc-signed interpreter on macOS); never another account's, so it is served either way. On
+        # Windows this is the iphlpapi reader and the token's SID (validate.yml's Windows job runs this file).
         with Serving(D.LoopbackHTTPServer.peer_reader) as server:
             self.assertEqual(get(server), 200)
         self.assertIn(Seen.calls[0].kind, (P.THIS_ACCOUNT, P.UNKNOWN))

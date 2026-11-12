@@ -193,6 +193,9 @@ jobs:
       - name: The probe's listener rule on Windows (FAA-226)
         if: ${{ !cancelled() }}
         run: python -m unittest discover -s test -p "test_check_service_listener.py" -v
+      - name: The loopback server's peer check on Windows (FAA-227, DEC-0154 HA-2; its default reader is iphlpapi there)
+        if: ${{ !cancelled() }}
+        run: python -m unittest discover -s test -p "test_loopback_peer_check.py" -v
       - name: The whole Node suite on Windows (FAA-72)
         if: ${{ !cancelled() }}
         run: node --test "test/*.test.mjs"
