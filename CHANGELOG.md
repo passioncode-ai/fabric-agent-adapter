@@ -31,6 +31,12 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
   or grant, a template takes precedence over the communication prompt (FAA-277), adapting step 4c scoped to an
   existing agent; building `SKILL.md` names the board responder's mandate opt-in, the LaunchDaemon refusing `purge`, and
   Apple's Python on macOS 27.2.
+- **`admit.py`** (FAA-271): `creating-fabric-agents/scripts/admit.py` chains the source check, the probe, the strict
+  template check and the private-terms list into one admission check.
+- **`test/validate.py --private-terms`** (FAA-243): tracked files are checked against the operator's local list of
+  private terms (`$PASSIONCODE_PRIVATE_TERMS`, else `~/.config/passioncode/private-terms.txt`), printing paths and lines
+  only; it exits 2 when the list is absent, and the release checklist runs it before a push.
+
 ### Changed
 
 - `pid_listens` takes an `owner` (this account by default, a uid, or None), and the LaunchDaemon check reads that one
@@ -45,6 +51,25 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
   `.gitignore` (FAA-190).
 - `AGENTS.md` carries item 1a, the course check before every change (fabric-workspace `knowledge/rules.md` §0).
 - Private terms in `CHANGELOG.md` and `docs/backlog.md` are replaced by neutral words; ids and findings stay (FAA-243).
+- `fabric_secrets.repository_name` reads a JWT at a word's start in one pass, both twins (FAA-321). Neutral words replace
+  private terms in the docs and the dashboard kit, which moves to 1.1.8 (FAA-243).
+- The source check reads `fabric_secrets` by public names, refuses a detector of another version with exit 2, and has
+  its command line in `fabric_source_check_cli.py` (FAA-190). `register_remote` warns before it writes its token;
+  validators refuse a non-string id or instance; the services folder keeps only JSON objects; refusals name relative
+  paths and the remedy (FAA-200). The package folder check reads manifests as the contract does, and pack's refusal
+  offers a clean copy (FAA-194, FAA-190).
+- `providers_dir()` follows Fabric's `registryDirs` rule; the Windows CI job runs the provider tests and measures the
+  owner check without failing on it (FAA-189, FAA-256). The probe is tested over real HTTP with a channel-agent
+  declaration (FAA-250).
+
+### Upgrading
+
+- A set `FABRIC_SERVICES_DIR` no longer moves the providers folder, as in Fabric's own `registryDirs`; set
+  `FABRIC_PROVIDERS_DIR` to keep a custom location (FAA-189).
+- The Node OpenRouter client refuses a base URL holding a tab or line break, a non-ASCII path, a backslash or a dot
+  segment (kind `config`), which it used to rewrite and send (FAA-187).
+- `check_service_a2a.py` is a command of its own: run it beside `check_service.py` for a service that serves A2A, with
+  `--key-env` naming the interface's own key (FAA-10).
 
 ## 0.82.0 (2026-11-12)
 
