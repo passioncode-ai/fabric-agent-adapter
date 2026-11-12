@@ -1,6 +1,8 @@
 // Which OS account owns each end of a loopback TCP connection (DEC-0154 HA-2, FAA-226, layer L0); the twin of
-// fabric_peer_owner.py, which is Project Observatory's peer_owner 1.1.0 vendored by commit. Node 18+, no dependency;
-// nothing here imports another kit module.
+// fabric_peer_owner.py, which is Project Observatory's peer_owner vendored by commit (its 1.3.1 line). Node 18+, no
+// dependency; the one kit module it may load is fabric-socket-proof.mjs beside it (DEC-0155 RT-2, FAA-292): on a
+// restricted macOS table a server end or listener one of this account's own processes holds is this account's, and
+// without that file this one answers as before.
 //
 // WHY. Loopback is one per computer, not one per OS account: every account's processes reach every listener on
 // 127.0.0.1, so a loopback socket proves nothing about who is on the other end. A client about to send a credential
@@ -47,7 +49,7 @@ import net from 'node:net';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-export const PEER_OWNER_VERSION = '1.2.0+kit.6'; // the Python twin's, Observatory's 1.2.0 with the kit's differences
+export const PEER_OWNER_VERSION = '1.3.1+kit.7'; // the Python twin's, Observatory's 1.3.1 line with the kit's differences
 export const THIS_ACCOUNT = 'this-account';
 export const ANOTHER_ACCOUNT = 'another-account';
 export const SYSTEM = 'system';
@@ -478,10 +480,36 @@ async function oneOwner(found, how, opts, noneReason = null) {
   return owner(UNKNOWN, { method: how, reason: 'several-rows' });
 }
 
+// fabric-socket-proof.mjs beside this file, loaded once (DEC-0155 RT-2, FAA-292); null when it is not there.
+let socketProof;
+
+// `fallback`, unless it is a restricted macOS table's unknown and fabric-socket-proof finds the socket (`accepted`) or
+// the 127.0.0.1 listener (`ownListener`, FAA-272) in this account's own processes; else it stands. A test that injects
+// a table (`read`, `run`) reaches this host's processes only through the `socketProof` it names.
+async function proved(ask, args, fallback, opts = {}) {
+  if (fallback.kind !== UNKNOWN || !String(fallback.reason ?? '').startsWith(TABLE_RESTRICTED)) return fallback;
+  if ((opts.platform ?? process.platform) !== 'darwin') return fallback;
+  let module = opts.socketProof;
+  if (module === undefined) {
+    if (opts.read || opts.run) return fallback;
+    if (socketProof === undefined) socketProof = await import('./fabric-socket-proof.mjs').catch(() => null);
+    module = socketProof;
+  }
+  let p = null;
+  try {
+    p = module ? await module[ask](...args) : null;
+  } catch {
+    p = null; // a proof that fails proves nothing; the table's answer stands (fail closed)
+  }
+  return p?.proved ? owner(THIS_ACCOUNT, { uid: opts.ownUid ?? ownUid(), pid: p.pid, method: p.method, reason: p.reason }) : fallback;
+}
+
 // The owner of the CLIENT socket of the connection between `server` and `client` ([host, port] each), as a server sees
 // them: the row whose local address is the client's and whose remote address is the server's.
-export function peerAt(server, client, opts) {
-  return ownerOf(address(client[0], client[1]), address(server[0], server[1]), opts);
+export async function peerAt(server, client, opts) {
+  const c = address(client[0], client[1]);
+  const s = address(server[0], server[1]);
+  return proved('accepted', [c, s, { wait: false }], await ownerOf(c, s, opts), opts);
 }
 
 // For a server's accepted socket: who connected. Reads nothing from the socket.
@@ -494,9 +522,11 @@ export function peer(socket, opts) {
 // address is this socket's own, the server process's accepted socket, so a listener swapped after listen cannot pass
 // for the one that answers. On Linux a connection not yet accept()ed has no owner of its own (inode 0): its listener
 // answers (the contract's CT-254, HA-2's Linux source).
-export function serverEnd(socket, opts) {
-  if (!socket.remoteAddress || !socket.localAddress) return Promise.resolve(owner(UNKNOWN, { reason: 'socket: not connected' }));
-  return ownerOf(address(socket.remoteAddress, socket.remotePort), address(socket.localAddress, socket.localPort), opts, true);
+export async function serverEnd(socket, opts) {
+  if (!socket.remoteAddress || !socket.localAddress) return owner(UNKNOWN, { reason: 'socket: not connected' });
+  const s = address(socket.remoteAddress, socket.remotePort);
+  const own = address(socket.localAddress, socket.localPort);
+  return proved('accepted', [s, own, { wait: true }], await ownerOf(s, own, opts, true), opts);
 }
 
 const LISTEN_ORDER = ['127.0.0.1', '*', '::1'];
@@ -524,12 +554,12 @@ export async function listener(port, opts = {}) {
   try {
     table = await (read ?? readTable)(opts);
   } catch (err) {
-    const who = owner(UNKNOWN, { method: method(), reason: err instanceof TableUnreadable ? err.message : `table: ${err.name}` });
+    const who = await proved('ownListener', [port], owner(UNKNOWN, { method: method(), reason: err instanceof TableUnreadable ? err.message : `table: ${err.name}` }), opts);
     if (!injected) listeners.set(port, [at, who]);
     return who;
   }
-  const who = restricted(table.rows, table.how, opts) ? await restrictedListener(table.rows, port, table.how, opts)
-    : await oneOwner(pickListener(table.rows, port), table.how, opts);
+  const who = await proved('ownListener', [port], restricted(table.rows, table.how, opts)
+    ? await restrictedListener(table.rows, port, table.how, opts) : await oneOwner(pickListener(table.rows, port), table.how, opts), opts);
   if (!injected) listeners.set(port, [at, who]);
   return who;
 }
@@ -552,18 +582,23 @@ export function refusal(who, port, expectPid = null) {
   return null;
 }
 
-// macOS, when the socket table is restricted (FAA-267, DEC-0155 RT-3): whether process `pid`, this account's, listens on
-// exactly 127.0.0.1:<port> (never the IPv4 wildcard, which lsof prints as it prints an IPv6-only one, nor ::1; FAA-312).
+// macOS, when the socket table is restricted (FAA-267, DEC-0155 RT-3): whether process `pid` listens on exactly
+// 127.0.0.1:<port> (never the IPv4 wildcard, which lsof prints as it prints an IPv6-only one, nor ::1; FAA-312).
 // `lsof -p` asks the process itself, which the restriction does not hide. Only a caller that started `pid` itself (a
-// launchd job it installed) may vouch with it, and never a set-uid one (its real and effective uid differ, DEC-0155).
-export async function pidListens(pid, port, { run = runProgram, platform = process.platform, ownUid: mine, ownEuid } = {}) {
+// launchd job it installed) may vouch with it, and never a set-uid one for this account (its real and effective uid
+// differ, DEC-0155). `owner`: the uid `pid` must run as, this account's by default, or null when the caller checks it
+// itself (a LaunchDaemon's UserName, FAA-286); anything else is a RangeError.
+export async function pidListens(pid, port, { run = runProgram, platform = process.platform, ownUid: mine, ownEuid, owner: want = THIS_ACCOUNT } = {}) {
+  if (want !== null && want !== THIS_ACCOUNT && !(Number.isInteger(want) && want >= 0)) throw new RangeError('owner is this-account, a uid or null');
   if (platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
   const real = mine ?? ownUid();
   const effective = ownEuid ?? (typeof process.geteuid === 'function' ? process.geteuid() : real);
-  if (effective !== real) return false;
+  if (want === THIS_ACCOUNT && effective !== real) return false;
   try {
-    const uid = parsePsUid(await run(PS, ['-o', 'uid=', '-p', String(pid)]));
-    if (uid === null || uid !== real) return false;
+    if (want !== null) {
+      const uid = parsePsUid(await run(PS, ['-o', 'uid=', '-p', String(pid)]));
+      if (uid === null || uid !== (want === THIS_ACCOUNT ? real : want)) return false;
+    }
     const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
     return parseLsofListeners(out).some(([host, p]) => host === '127.0.0.1' && p === port);
   } catch {

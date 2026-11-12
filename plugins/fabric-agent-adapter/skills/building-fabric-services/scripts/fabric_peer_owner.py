@@ -1,25 +1,22 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.2.0+kit.6: Observatory's peer_owner 1.2.0 (passioncode-ai/project-observatory-dashboard,
-    `observatory/engine/peer_owner.py`, first vendored at f86f0622, read against 2180235c; the same licence), the kit's
-    `fabric_peer_owner` (layer L0; DEC-0154 HA-2, FAA-226, FAA-258). Observatory's 1.3.x (this account's own sockets
-    through libproc, DEC-0155 RT-2) is not in it (FAA-292). The kit's differences: `Owner` and `Row` are NamedTuples
-    (a dataclass with postponed annotations needs its module in sys.modules, and a service may load a kit file by
-    path); `Optional[X]` for `X | None` (the kit's floor is Python 3.9); `classify` / `classify_sid` ask for this
-    process's own uid or SID first (a client running as root or SYSTEM owns root's listener); on Linux `server_end`
-    reads an accepted connection's own row and, for one not accept()ed yet (uid 0, inode 0), the listener on its local
-    address (CT-254; reasons `not-accepted`, `several-rows`, `closed`), `peer` reads a client row with inode 0 as
-    unknown, several rows of one owner are that owner, a row printed twice counts once, and a `/proc` question that
-    finds no row or several reads once more; ctypes is imported where used. On macOS (kit.2 to kit.4, FAA-267,
-    FAA-273): the sysctl calibration also requires a child process's listener, an empty or header-only netstat is
-    `TABLE_RESTRICTED`, a caller may vouch for a listener with a pid it started (`pid_listens`,
-    `CheckedHTTPConnection(vouch_pid=...)`), the child's port is read under one deadline with `selectors`, a number is
-    ASCII digits only. DEC-0155 (kit.6, FAA-312): a netstat that fails, a table with no row of another uid (sysctl) or process
-    (netstat) and a missing connection row read as `table-restricted` (RT-1); a restricted table's listener is this
-    account's only on exactly 127.0.0.1 (RT-4); the vouch takes exactly 127.0.0.1 (RT-3), never from a set-uid
-    reader. `main` is the CLI, `listener <port>` (FAA-315). /proc carries a socket's creator, so a listener root created
-    and handed to another account (systemd socket activation, User=) reads as root's. Standard library only, no other
-    kit module. Tests: `test/test_fabric_peer_owner.py`; the Node twin is `fabric-peer-owner.mjs` (no ctypes).
+    peer_owner 1.3.1+kit.7: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
+    `observatory/engine/peer_owner.py`, vendored at f86f0622, read against 2180235c for 1.2.0 and a69c6fee for 1.3.1),
+    the kit's `fabric_peer_owner` (layer L0; DEC-0154 HA-2, FAA-226, FAA-258). 1.3.1's proof from this account's own
+    sockets (DEC-0155 RT-2) is the kit's `fabric_socket_proof`, asked when it sits beside this file (FAA-292); without
+    it this file stands alone, as before. The kit's differences: NamedTuples (a service may load a kit file by path);
+    the Python 3.9 floor; `classify` / `classify_sid` ask for this process's uid or SID first (a client running as root
+    owns root's listener); on Linux `server_end` reads an accepted connection's own row and, for one not accept()ed yet
+    (uid 0, inode 0), the listener on its local address (CT-254), several rows of one owner are that owner, a row
+    printed twice counts once, and a `/proc` question that finds no row or several reads once more. On macOS (FAA-267,
+    FAA-273): the sysctl calibration also requires a child's listener, read under one deadline with `selectors`; a
+    number is ASCII digits only; a caller may vouch for a listener with a pid it started (`pid_listens`,
+    `CheckedHTTPConnection(vouch_pid=...)`, RT-3, the fallback after RT-2). DEC-0155 (FAA-312): a netstat that fails or
+    is empty, a table with no row of another uid (sysctl) or process (netstat) and a missing connection row read as
+    `table-restricted` (RT-1); a restricted table's listener is this account's only on exactly 127.0.0.1 (RT-4); no
+    proof is taken from a set-uid reader. `main` is the CLI, `listener <port>` (FAA-315). /proc carries a socket's
+    creator, so a listener root created and handed to another account (socket activation) reads as root's. Tests:
+    `test/test_fabric_peer_owner.py`; the Node twin is `fabric-peer-owner.mjs`.
 
 WHY. Loopback is one per machine, not one per OS account. On a host with several accounts, every account's processes
 reach every service any account listens with on 127.0.0.1, and a loopback socket proves nothing about who is on the
@@ -29,17 +26,14 @@ other end. This module answers that question from the host's socket table, read 
     server_end(sock) -> Owner     for a client's connected socket: who accepted it
     peer(sock) -> Owner           for a server's accepted socket: who connected
     peer_at(server, client)       the same as `peer`, from two (host, port) addresses
-    own_connection(port, ...)     a CheckedHTTPConnection, connected: every connect, the first and
-                                  any reconnect http.client makes after `Connection: close`, checks
-                                  that the server end is this account's, or raises ListenerRefused
-                                  before a byte of the request is sent
+    own_connection(port, ...)     a CheckedHTTPConnection, connected: every connect (the first, and any reconnect
+                                  http.client makes) checks the server end is this account's before a byte is sent
 
 `Owner.kind` is one of:
 
     this-account      the socket belongs to the account running this process
     another-account   another OS account's
-    system            uid 0, pid 1 (launchd holds the sockets of socket-activated jobs) or, on
-                      Windows, the system's own accounts and processes
+    system            uid 0, pid 1 (launchd's socket-activated jobs) or, on Windows, the system's accounts and processes
     unknown           the owner could not be told; `reason` says why
     none              `listener` only: nothing listens on that port
 
@@ -52,36 +46,28 @@ answer; two live rows with the same addresses are `unknown` (`several-rows`), ne
 
 - macOS, primary (`sysctl`): `sysctl net.inet.tcp.pcblist_n` through ctypes, the record list `netstat` itself reads.
   Each connection is an `xinpcb_n` (addresses and ports) followed by an `xsocket_n` that carries `so_uid` and
-  `so_last_pid` (XNU `bsd/netinet/in_pcb.h` and `bsd/sys/socketvar.h`, both under `#pragma pack(4)`); the two are
-  paired by the pcb handle (`xi_inpp` equals `so_pcb`). Measured on macOS 26: about 4 ms for 770 sockets, every pid
-  equal to the one `netstat` printed. The `xtcpcb_n` record that follows gives the TCP state (`t_state`), so listeners
-  and TIME_WAIT rows are told apart. The layout is not an API, so the first read in a process calibrates it: it opens
-  a connected pair of its own (listen, connect, accept) and the listener and both ends of the pair must read back with
-  their exact addresses, this process's uid and its pid. A layout that fails calibration is not used again in that
-  process.
-- macOS 27.2 shows an ad-hoc-signed interpreter (a Homebrew Python) only its own sockets: the calibration also
-  requires a child's listener, and a restricted table (DEC-0155 RT-1) is `unknown` with a reason beginning
-  `table-restricted`, never another account's. A caller that started the server (an installer, its launchd job) may
-  vouch with that pid: `lsof -p PID` asks the process, which the restriction leaves readable (RT-3).
+  `so_last_pid` (XNU `bsd/netinet/in_pcb.h` and `bsd/sys/socketvar.h`, both under `#pragma pack(4)`), paired by the pcb
+  handle (`xi_inpp` equals `so_pcb`); the `xtcpcb_n` that follows gives the TCP state. Measured on macOS 26: about 4 ms
+  for 770 sockets. The layout is not an API, so the first read in a process calibrates it on a connected pair of its
+  own (the listener and both ends must read back with their exact addresses, this uid and this pid); a layout that
+  fails is not used again in that process.
+- macOS 27.2 shows an ad-hoc-signed interpreter (a Homebrew Python) only its own sockets: the calibration also requires
+  a child's listener, and a restricted table (DEC-0155 RT-1) is `unknown` with a reason beginning `table-restricted`,
+  never another account's, unless `fabric_socket_proof` finds the socket in this account's own processes (RT-2) or a
+  caller that started the server vouches with its pid, which `lsof -p PID` asks the process itself about (RT-3).
 - macOS, fallback (`netstat`): `/usr/sbin/netstat -anv -p tcp`, its `process:pid` column, then `ps -o uid= -p PID` for
-  the owner of the one row a question needs. Measured: about 20 ms over 846 sockets, and it names the pids of root's
-  listeners, which `lsof` run by an ordinary account cannot see. Another local service implemented the same check this
-  way; it is kept as the documented fallback for a macOS whose record layout the calibration refuses.
+  the one row a question needs; about 20 ms over 846 sockets, and it names the pids of root's listeners, which `lsof`
+  run by an ordinary account cannot see. Kept for a macOS whose record layout the calibration refuses.
 - Linux (`proc`): `/proc/net/tcp` and `/proc/net/tcp6`, whose `uid` column every account may read (also under
-  `hidepid=2`, which hides `/proc/<pid>` and not this file). No pid: that is only readable for this account's own
-  processes, and the decision needs the uid alone.
-- Windows (`iphlpapi`): `GetExtendedTcpTable(TCP_TABLE_OWNER_PID_ALL)` gives each row's owning pid;
-  `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)`, `OpenProcessToken(TOKEN_QUERY)` and
-  `GetTokenInformation(TokenUser)` give its account SID, compared with this process's. A process that cannot be opened
-  (another account's, usually) is `unknown`, never `another-account`: the caller refuses either way, and the reason
-  says which it was. `Owner.uid` is None there.
+  `hidepid=2`). No pid: that is only readable for this account's own processes, and the decision needs the uid alone.
+- Windows (`iphlpapi`): `GetExtendedTcpTable(TCP_TABLE_OWNER_PID_ALL)` gives each row's owning pid; `OpenProcess`,
+  `OpenProcessToken` and `GetTokenInformation(TokenUser)` its account SID, compared with this process's. A process that
+  cannot be opened (another account's, usually) is `unknown`, never `another-account`. `Owner.uid` is None there.
 - Anything else: `unknown`, reason `unsupported-platform`.
 
-`LOCAL_PEERCRED`, `getpeereid` and Linux `SO_PEERCRED` answer this question for Unix-domain sockets only, not for TCP,
-which is why a socket table is read here at all.
-
-WHAT IT NEVER DOES. It never reads a byte from the socket it is asked about, never resolves a name, never sends
-anything, and never needs a privilege. It reports the process names `netstat` prints only as far as the pid behind them.
+`LOCAL_PEERCRED`, `getpeereid` and `SO_PEERCRED` answer this for Unix-domain sockets only, hence a socket table. It
+never reads a byte from the socket it is asked about, never resolves a name, never sends anything, never needs a
+privilege, and reports the process names `netstat` prints only as far as the pid behind them.
 """
 from __future__ import annotations
 
@@ -98,7 +84,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.2.0+kit.6"  # Observatory's 1.2.0 with the kit's differences above
+PEER_OWNER_VERSION = "1.3.1+kit.7"  # Observatory's 1.3.1 line with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
@@ -199,11 +185,6 @@ def _posix_uid() -> Optional[int]:
     """This process's uid, or None where the OS has none (Windows compares SIDs). The one place this module reads it:
     vendored without its project's OS layer, it reads it here, on POSIX only (an engine boundary test names it)."""
     return os.getuid() if hasattr(os, "getuid") else None
-
-
-def _own_pid() -> int:
-    """This process's pid: a netstat that shows no other process's row is a restricted table (DEC-0155 RT-1)."""
-    return os.getpid()
 
 
 def _set_uid() -> bool:
@@ -529,10 +510,9 @@ def _child_line(child: "subprocess.Popen[bytes]", deadline: float) -> Optional[b
 
 
 def _child_listener_seen(rows_of) -> Optional[bool]:
-    """Whether the table shows a listener of a child process of this one: False when it does not (the table shows
-    this process alone, FAA-267), None when no child could be started (a frozen or embedded host has no interpreter to
-    start), or it gave no port line within TIMEOUT_SECONDS (silence, a partial or non-numeric line, an early exit, a
-    pipe that cannot be read). The calibration trusts only True."""
+    """Whether the table shows a listener of a child process of this one: False when not (it shows this process alone,
+    FAA-267), None when no child could be started (a frozen or embedded host) or it gave no port line within
+    TIMEOUT_SECONDS (silence, a partial line, an early exit, an unreadable pipe). The calibration trusts only True."""
     if not sys.executable or getattr(sys, "frozen", False):
         return None
     try:
@@ -780,7 +760,7 @@ def restricted(rows: list[Row], how: str, *, own_uid: Optional[int] = None, own_
         own = _posix_uid() if own_uid is None else own_uid
         return not any(row.uid is not None and row.uid != own for row in rows)
     if how == "netstat":
-        own = _own_pid() if own_pid is None else own_pid
+        own = os.getpid() if own_pid is None else own_pid
         return not any(row.pid is not None and row.pid != own for row in rows)
     return False
 
@@ -810,10 +790,9 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = Fa
     if len(found) > 1:
         return Owner(UNKNOWN, None, None, how, "several-rows")
     if how == "proc" and server and found[0].uid is None:
-        # Linux: a connection not accept()ed yet (uid 0, inode 0) belongs to the listener on its local address (exact,
-        # else the wildcard) and dies with it (inet_csk_listen_stop); an accepted one's own row carries the accepting
-        # process's uid (sock_graft), so a listener swapped after another account accepted cannot pass (Observatory's
-        # 1.2.0, board thread ced00f6e; CT-254). An orphaned server row reads so too: nothing sent to it reaches anyone.
+        # Linux: a connection not accept()ed yet (uid 0, inode 0) belongs to the listener on its local address (exact, else
+        # the wildcard) and dies with it; an accepted one's own row carries the accepting process's uid (sock_graft), so a
+        # listener swapped after another account accepted cannot pass (CT-254). An orphaned server row reads so too.
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
     if how == "proc" and found[0].uid is None:
         # A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.
@@ -842,10 +821,32 @@ def _one_owner(found: list[Row], how: str, none_reason: Optional[str] = None) ->
     return Owner(UNKNOWN, None, None, how, "several-rows")
 
 
+_PROOF: list = [None]  # fabric_socket_proof once looked for: None not yet, False not beside this file (FAA-292)
+
+
+def _proved(ask: str, *args, fallback: Owner, **kwargs) -> Owner:
+    """`fallback`, unless it is a restricted macOS table's `unknown` and `fabric_socket_proof` beside this file finds the
+    socket (`accepted`) or the 127.0.0.1 listener (`own_listener`, FAA-272) in this account's processes: else it stands."""
+    if fallback.kind != UNKNOWN or not (fallback.reason or "").startswith(TABLE_RESTRICTED) or sys.platform != "darwin":
+        return fallback
+    try:
+        if _PROOF[0] is None:
+            sys.path.append(os.path.dirname(os.path.abspath(__file__)))  # beside this file, as the kit's modules load
+            import fabric_socket_proof
+            _PROOF[0] = fabric_socket_proof
+        proof = getattr(_PROOF[0], ask)(*args, **kwargs) if _PROOF[0] else None
+    except ImportError:
+        _PROOF[0], proof = False, None
+    except Exception:  # noqa: BLE001 - a proof that fails proves nothing; the table's answer stands (fail closed)
+        proof = None
+    return Owner(THIS_ACCOUNT, _posix_uid(), proof.pid, proof.method, proof.reason) if proof and proof.proved else fallback
+
+
 def peer_at(server: tuple, client: tuple) -> Owner:
     """The owner of the CLIENT socket of the connection between `server` and `client`, as a server sees them (its own
     address, the peer's): the row whose local address is the client's and whose remote address is the server's."""
-    return _owner_of(_address(client), _address(server))
+    client, server = _address(client), _address(server)
+    return _proved("accepted", client, server, wait=False, fallback=_owner_of(client, server))
 
 
 def peer(sock: socket.socket) -> Owner:
@@ -859,14 +860,14 @@ def peer(sock: socket.socket) -> Owner:
 
 def server_end(sock: socket.socket) -> Owner:
     """For a client's connected socket: who accepted it. The row whose local address is the server's and whose remote
-    address is this socket's own, which is the server process's accepted socket, so a listener swapped after `listen`
-    cannot pass for the one that answers. On Linux a connection not yet accept()ed has no owner of its own (inode 0):
-    its listener answers (the contract's CT-254, HA-2's Linux source)."""
+    address is this socket's own, the server process's accepted socket, so a listener swapped after `listen` cannot
+    pass; on Linux a connection not accept()ed yet answers through its listener (CT-254); RT-2 under a restricted table."""
     try:
         own, server = sock.getsockname(), sock.getpeername()
     except OSError as exc:
         return Owner(UNKNOWN, None, None, "none", f"socket: {type(exc).__name__}")
-    return _owner_of(_address(server), _address(own), server=True)
+    server, own = _address(server), _address(own)
+    return _proved("accepted", server, own, wait=True, fallback=_owner_of(server, own, server=True))
 
 
 #: port -> (time.monotonic() of the read, the Owner)
@@ -899,6 +900,7 @@ def listener(port: int) -> Owner:
         owner = Owner(UNKNOWN, None, None, method(), str(exc))
     else:
         owner = _restricted_listener(rows, port, how) if restricted(rows, how) else _one_owner(pick_listener(rows, port), how)
+    owner = _proved("own_listener", port, fallback=owner)
     _LISTENERS[port] = (now, owner)
     return owner
 
@@ -922,17 +924,21 @@ def refusal(owner: Owner, port: int, expect_pid: Optional[int] = None) -> Option
     return None
 
 
-def pid_listens(pid: int, port: int) -> bool:
-    """macOS, when the socket table is restricted (FAA-267, DEC-0155 RT-3): whether process `pid`, this account's,
-    listens on exactly 127.0.0.1:<port> (never the IPv4 wildcard, which `lsof` prints as it prints an IPv6-only one, nor
-    ::1; FAA-312). `lsof -p` asks the process itself (libproc), which the restriction does not hide. Only a caller that
-    started `pid` itself (a launchd job it installed) may vouch with it, and never a set-uid one."""
-    if sys.platform != "darwin" or not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1 or _set_uid():
+def pid_listens(pid: int, port: int, owner: object = THIS_ACCOUNT) -> bool:
+    """macOS, a restricted table (FAA-267, DEC-0155 RT-3): whether process `pid` listens on exactly 127.0.0.1:<port>
+    (never the IPv4 wildcard, which `lsof` prints as an IPv6-only one, nor ::1), asked of the process (`lsof -p`). Only
+    a caller that started `pid` (a launchd job it installed) vouches with it, never a set-uid one for this account. `owner`:
+    the uid `pid` runs as, this account's by default, or None when the caller checks it (a LaunchDaemon's UserName)."""
+    if owner is not None and owner != THIS_ACCOUNT and (not isinstance(owner, int) or isinstance(owner, bool) or owner < 0):
+        raise ValueError("owner is this-account, a uid or None")
+    if sys.platform != "darwin" or not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1 or (
+            owner == THIS_ACCOUNT and _set_uid()):
         return False
     try:
-        uid = parse_ps_uid(_run([PS, "-o", "uid=", "-p", str(pid)]))
-        if uid is None or uid != _posix_uid():
-            return False
+        if owner is not None:
+            uid = parse_ps_uid(_run([PS, "-o", "uid=", "-p", str(pid)]))
+            if uid is None or uid != (_posix_uid() if owner == THIS_ACCOUNT else owner):
+                return False
         out = _run([LSOF, "-nP", "-a", "-p", str(pid), "-i4TCP", "-sTCP:LISTEN", "-Fn"])
     except TableUnreadable:
         return False
@@ -940,9 +946,8 @@ def pid_listens(pid: int, port: int) -> bool:
 
 
 class CheckedHTTPConnection(http.client.HTTPConnection):
-    """An `http.client.HTTPConnection` whose every `connect()` checks the server end before returning: `http.client`
-    connects again by itself (`auto_open`) after `Connection: close` or a close, and that connection may reach another
-    listener. A refused connect closes the socket and raises ListenerRefused before any byte of a request is sent."""
+    """An `http.client.HTTPConnection` whose every `connect()` (the reconnect `auto_open` makes too, which may reach
+    another listener) checks the server end: refused, it closes the socket and raises ListenerRefused before a byte."""
 
     def __init__(self, host: str, port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0,
                  vouch_pid: Optional[int] = None) -> None:
@@ -969,14 +974,9 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
 def own_connection(port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0,
                    host: str = "127.0.0.1", vouch_pid: Optional[int] = None) -> CheckedHTTPConnection:
     """A `CheckedHTTPConnection` to `host:port`, connected, whose server end is this account's (and, with `expect_pid`,
-    that process's). The check runs on the very connection the caller then sends on, so no listener can change between
-    the check and the request, and again on every reconnect `http.client` makes. No proxy is consulted. Raises
-    ListenerRefused after closing the connection:
-
-        server-not-own             another account's or the system's process accepted it
-        server-unverified          its owner could not be told (nothing is sent: fail closed)
-        server-not-this-workspace  this account's process, but not the pid expected
-
+    that process's), checked on the very connection the caller sends on and on every reconnect; no proxy is consulted.
+    ListenerRefused, the connection closed: `server-not-own` (another account's or the system's process accepted it),
+    `server-unverified` (its owner could not be told: fail closed), `server-not-this-workspace` (not the pid expected).
     `vouch_pid`, as on `CheckedHTTPConnection` and the Node twin's `checkedSocket`: a pid the caller started (FAA-267)."""
     conn = CheckedHTTPConnection(host, port, expect_pid=expect_pid, timeout=timeout, vouch_pid=vouch_pid)
     conn.connect()

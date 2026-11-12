@@ -360,3 +360,73 @@ test('the CLI prints the listener\'s kind (FAA-315)', async () => {
   assert.equal(await po.main(['listener', '47311'], { listener: async () => po.owner(po.NONE), write: (t) => out.push(t) }), 0);
   assert.deepEqual(out, ['none\n']);
 });
+
+// FAA-292 (DEC-0155 RT-2) and FAA-272: on a restricted macOS table, the server end or listener this account's own
+// processes hold is this account's (fabric-socket-proof.mjs, beside this file); anything else keeps the table's answer.
+const RESTRICTED = `${po.TABLE_RESTRICTED}: netstat printed nothing to this process`;
+const restrictedRead = { read: async () => { throw new po.TableUnreadable(RESTRICTED); } };
+function fakeProof(proved = true, pid = 4100, reason = null) {
+  const asked = [];
+  const answer = async () => ({ proved, pid, method: 'lsof', reason: proved ? reason : po.TABLE_RESTRICTED });
+  return { asked, accepted: (...args) => { asked.push(['accepted', ...args]); return answer(); }, ownListener: (...args) => { asked.push(['ownListener', ...args]); return answer(); } };
+}
+
+test('a server end, a peer and a listener this account\'s process holds are this account\'s (FAA-292)', async () => {
+  const proof = fakeProof();
+  const ask = { ...restrictedRead, platform: 'darwin', ownUid: 501, socketProof: proof };
+  const who = await po.serverEnd(fakeSocket(['127.0.0.1', 50001], ['127.0.0.1', 47311]), ask);
+  assert.deepEqual([who.kind, who.pid, who.method, who.reason], [po.THIS_ACCOUNT, 4100, 'lsof', null]);
+  assert.equal((await po.peerAt(['127.0.0.1', 47311], ['127.0.0.1', 50001], ask)).kind, po.THIS_ACCOUNT);
+  assert.equal((await po.listener(47311, ask)).kind, po.THIS_ACCOUNT);
+  assert.deepEqual(proof.asked, [
+    ['accepted', ['127.0.0.1', 47311], ['127.0.0.1', 50001], { wait: true }],
+    ['accepted', ['127.0.0.1', 50001], ['127.0.0.1', 47311], { wait: false }],
+    ['ownListener', 47311],
+  ]);
+});
+
+test('nothing proved, no module, or another platform keeps the restricted answer (FAA-292)', async () => {
+  const socket = fakeSocket(['127.0.0.1', 50001], ['127.0.0.1', 47311]);
+  for (const socketProof of [fakeProof(false, null), null, { accepted: async () => { throw new Error('boom'); } }]) {
+    const who = await po.serverEnd(socket, { ...restrictedRead, platform: 'darwin', socketProof });
+    assert.deepEqual([who.kind, who.reason], [po.UNKNOWN, RESTRICTED]);
+  }
+  const proof = fakeProof();
+  assert.equal((await po.serverEnd(socket, { ...restrictedRead, platform: 'linux', socketProof: proof })).kind, po.UNKNOWN);
+  const unreadable = { read: async () => { throw new po.TableUnreadable('proc: EACCES'); } };
+  assert.equal((await po.serverEnd(socket, { ...unreadable, platform: 'darwin', socketProof: proof })).kind, po.UNKNOWN);
+  // An injected table never reaches this host's own processes unless the test names a proof.
+  assert.equal((await po.serverEnd(socket, { ...restrictedRead, platform: 'darwin' })).kind, po.UNKNOWN);
+  assert.deepEqual(proof.asked, []);
+});
+
+test('the accepted-socket proof comes before the vouch (FAA-292)', async (t) => {
+  const { server, port } = await recorder();
+  t.after(() => server.close());
+  let vouched = 0;
+  const run = async () => { vouched += 1; return ''; };
+  const socket = await po.checkedSocket(port, { ...restrictedRead, platform: 'darwin', ownUid: 501, ownEuid: 501, run, vouchPid: 4242,
+    socketProof: fakeProof(true, null, 'several-processes') });
+  socket.destroy();
+  assert.equal(vouched, 0);
+});
+
+test('a live restricted table still proves this process\'s own server (FAA-273 item 14)', { skip: process.platform !== 'darwin' }, async (t) => {
+  const { server, port } = await recorder();
+  t.after(() => server.close());
+  const socket = await po.checkedSocket(port, { ...restrictedRead, socketProof: await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-socket-proof.mjs') });
+  socket.destroy();
+});
+
+test('pidListens takes an owner: this account by default, a uid, or none (FAA-286 item 1)', async () => {
+  const uids = { 4242: '501\n', 4343: '0\n' };
+  const run = async (file, args) => (file === po.PS ? uids[args[args.length - 1]] : `p${args[3]}\nf4\nn127.0.0.1:80\n`);
+  const base = { run, platform: 'darwin', ownUid: 501, ownEuid: 501 };
+  assert.equal(await po.pidListens(4242, 80, base), true);
+  assert.equal(await po.pidListens(4343, 80, base), false);
+  assert.equal(await po.pidListens(4343, 80, { ...base, owner: 0 }), true);
+  assert.equal(await po.pidListens(4242, 80, { ...base, owner: 0 }), false);
+  assert.equal(await po.pidListens(4343, 80, { ...base, owner: null }), true);
+  assert.equal(await po.pidListens(4343, 81, { ...base, owner: null }), false);
+  for (const bad of ['0', true, -1, 1.5]) await assert.rejects(po.pidListens(4242, 80, { ...base, owner: bad }), RangeError);
+});

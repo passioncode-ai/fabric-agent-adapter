@@ -522,14 +522,9 @@ def _read_well_known(origin: str, timeout: float = 2.0,
 def _job_listens(pid: int, port: int) -> bool:
     """Whether launchd's job `pid` listens on 127.0.0.1:<port> exactly (never the wildcard), asked of the process itself
     (`lsof -p`), which a restricted socket table does not hide. Used only for a LaunchDaemon root just bootstrapped,
-    whose pid launchd itself named (FAA-278)."""
-    if sys.platform != "darwin" or not isinstance(pid, int) or isinstance(pid, bool) or pid <= 1:
-        return False
-    try:
-        out = _po._run([_po.LSOF, "-nP", "-a", "-p", str(pid), "-i4TCP", "-sTCP:LISTEN", "-Fn"])
-    except _po.TableUnreadable:
-        return False
-    return any(host == "127.0.0.1" and p == port for host, p in _po.parse_lsof_listeners(out))  # exact bind, as RT-3
+    whose pid launchd itself named (FAA-278). The peer owner's one lsof reader, the uid left to the caller, which checks
+    the job's UserName itself (FAA-286 item 1)."""
+    return _po.pid_listens(pid, port, owner=None)
 
 
 def _account_uid(user_name: str) -> Optional[int]:
