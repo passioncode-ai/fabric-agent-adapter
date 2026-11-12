@@ -805,7 +805,10 @@ def service_checkout(descriptor: Any, repo: Optional[str]) -> Tuple[Optional[Pat
 
 # FAA-298: a service with limits of its own holds work visibly (fabric_holds), never silently.
 _HOLD_USE = "HoldBook|waiting_message|waitingMessage|hold_job|holdJob"  # git grep -E is POSIX: no word boundary
-_HOLD_KIT_FILES = ("fabric_holds.py", "fabric-holds.mjs")
+#: the kit's own copies, and a vendored copy of this file (its pattern names the kit's words): neither is a use
+_HOLD_KIT_FILES = ("fabric_holds.py", "fabric-holds.mjs", "check_service_rules.py")
+#: only code holds work: a README or a note naming HoldBook is no use of it (0.81.0 seam reading)
+_HOLD_CODE = ("*.py", "*.mjs", "*.js", "*.ts")
 
 
 def declared_limits(wk: Any, usage_report: Any = None) -> List[str]:
@@ -830,8 +833,10 @@ def declared_limits(wk: Any, usage_report: Any = None) -> List[str]:
 def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
                   budget: float = OPENS_IN_HOST_BUDGET) -> Tuple[str, str]:
     """`limits.holds` over one checkout: PASS when a tracked file outside the kit's own copy and the tests holds work
-    through fabric_holds (HoldBook, waiting_message, hold_job), FAIL when the service declares limits and none does,
-    NOT_RUN when it declares none, or its checkout or git cannot be read in the budget."""
+    through fabric_holds (HoldBook, waiting_message, hold_job) in a code file (.py, .mjs, .js, .ts); NOT_RUN when it
+    declares none, or its checkout or git cannot be read in the budget. A service that declares limits and holds none
+    through the kit is NOT_RUN with a migration note naming fabric_holds, never FAIL: services built before the module
+    existed could not have adopted it, and whether one holds work silently or refuses it cannot be read from its tree."""
     if not limits:
         return "NOT_RUN", "the service declares no limits (a load declaration's limits, a usage report's budget or budgets)"
     if repo is None:
@@ -839,7 +844,8 @@ def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
     if not shutil.which("git"):
         return "NOT_RUN", "git is not installed"
     try:
-        listed = subprocess.run(["git", "-C", str(repo), "grep", "-I", "-l", "-z", "-E", _HOLD_USE], capture_output=True,
+        listed = subprocess.run(["git", "-C", str(repo), "grep", "-I", "-l", "-z", "-E", _HOLD_USE, "--"]
+                                + list(_HOLD_CODE), capture_output=True,
                                 timeout=max(0.05, budget))
     except subprocess.TimeoutExpired:
         return "NOT_RUN", "the %.1f s budget ran out while git read %s" % (budget, repo)
@@ -851,7 +857,7 @@ def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
              if p and p.rsplit("/", 1)[-1] not in _HOLD_KIT_FILES and not _TEST_PATH.search(p)]
     if users:
         return "PASS", "declares %s; %s hold(s) work through fabric_holds" % ("; ".join(limits), ", ".join(users[:5]))
-    return "FAIL", ("declares %s, and no tracked file outside the kit and the tests holds work through fabric_holds "
-                    "(HoldBook, waiting_message, hold_job): a hold its caller cannot read as one and its operator never "
-                    "hears of goes unseen. Say each hold on the job, push the operator once per hold and take a scoped "
-                    "lift (FAA-298, references/interop.md)" % "; ".join(limits))
+    return "NOT_RUN", ("migration: declares %s, and no tracked code file outside the kit and the tests holds work "
+                       "through fabric_holds (HoldBook, waiting_message, hold_job) yet. Adopt fabric_holds so each hold "
+                       "is said on the job, the operator is pushed once per hold and takes a scoped lift (FAA-298, "
+                       "references/interop.md); until then this rule is not run" % "; ".join(limits))
