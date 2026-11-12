@@ -74,7 +74,10 @@ PREAMBLE = (
     "Call `fabric_whoami` first. Then read the project board: `com.status` (is it ready, how many unread), "
     "`com.list` for the messages, and `com.read_ack` only for what you actually read. A request, announcement or "
     "question waiting on your Project gets an answer in the same turn: its state now (done, where, when, what "
-    "blocks), the result later in a second message; a request a responder should take stays queued. "
+    "blocks), the result later in a second message; a request your Project's service should take stays queued for "
+    "it. Before Fabric 0.3.17 a run Fabric starts on a request no session can take declines it and the asker resends; "
+    "from 0.3.17 (CO-506) the session's own Project is granted `board.respond` at `com.enroll`, so you or that run "
+    "can take it (`com.enroll`, `com.claim`). "
     "Before you start work, call `fabric_work_list` (who is working on what here) and "
     "claim your task with `fabric_work_claim`; release it with `fabric_work_release` when you stop. When a piece of "
     "work ends (released as done, or the session about to end), write its retro in the same turn: `observatory_lesson` "
@@ -137,12 +140,12 @@ DISPATCH_IF = (
     " Other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3996 in 0.68.0 and in 0.69.0, 3999 in 0.71.0, 3996 in 0.72.0: a new rule takes its characters back from the text around it).
+#: (3996 in 0.68.0 and in 0.69.0, 3999 in 0.71.0, 3996 in 0.72.0, 3994 in 0.79.0: a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
     "request and end; never wait for a person. 1. `fabric_whoami`, then the packet "
     "(`observatory_checkpoint_latest` {{workflowId: {workflow}}}): obey its constraints first; its goal describes "
-    "the request; artifacts: capability, deadline, run-ends-at. Read the request (`com.get` "
+    "the request; artifacts: capability, deadline, run-ends-at (ids: the line's first). Read the request (`com.get` "
     "{{message: <request>}}) and its thread (`com.list` {{thread: <the `thread` com.get answered>}}). 2. "
     "`observatory_handoff_accept` with {handoff}, the `owner`, `idempotencyKey` and `executor` the launcher's prompt names "
     "(when it names none: your `owner` `agent:<name>`, the key `accept-<handoff>`, no executor) and this session's own "
@@ -150,7 +153,7 @@ DISPATCH_CONTRACT = (
     "no lease: end the run without touching the request. 3. `com.status` once ("
     "epoch, generation); `com.enroll` (the capability), `com.claim` (the request), "
     "`com.accept` and `com.effect_begin` before an effect; a not_authorized enroll: no slot, no work and, if queued and its `com.status` slot `absent` at generation 0, one `com.reply` (replyTo it) "
-    "declining until CO-506 (resend then), either way `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
+    "declining with the reason (resend then), either way `fabric_question_ask` {{kind: access, about: board.gate.<capability>, commandId: {gate}, text: the request, its gate, what opens it}}, then step 6 (done) once `com.get` reads answered, and 7; left accepted or in_progress by an earlier run: `com.responder_replace` (`expectedGeneration`) and its transfer; resolve `outcome_unknown` only with "
     "`com.reconcile` and an observed result. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
@@ -165,7 +168,7 @@ DISPATCH_CONTRACT = (
     "`com.complete` (observed: true): completed, or failed_known with the reason. 6. Once the board took it, "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, a `stepId`, "
     "the `leaseId`, `close: true`, a status, the packet's body plus `done` and `notes`: done for completed; for "
-    "failed_known blocked with the reason in notes (failed once Observatory takes it, OBS-323). 7. Write the retro "
+    "failed_known blocked with the reason in notes. 7. Write the retro "
     "(`observatory_lesson` and insight/1 lines in `insights/`, or one line that there is nothing; no "
     "values), then end: no board sweep, work claim or watch-mail. On an error you cannot get past: complete the request failed_known if you hold its fence; close the workflow "
     "only once the request is settled (`com.get`: answered, terminal or outcome_unknown), else leave it open; then the retro. Details: working-with-fabric references/on-demand-session.md."
@@ -839,6 +842,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p_status = sub.add_parser("status", help="where Fabric is and what to do next")
     p_status.add_argument("--json", action="store_true")
     p_status.add_argument("--cwd", default=".")
+    # FAA-236: named in --help; the command itself is answered above, before argparse
+    p_gate = sub.add_parser("gate-id", help="the commandId of a request's gate question, the one a dispatched run uses")
+    p_gate.add_argument("request", help="the board request id, a UUID")
     args = parser.parse_args(argv)
     if args.command != "status":
         parser.print_help()

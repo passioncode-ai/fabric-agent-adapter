@@ -24,7 +24,9 @@ The skills are `adapting-projects-to-fabric`, `creating-fabric-agents`,
 a terminal that works in a project through Fabric. It finds Fabric (`hub.json`, its `pid`), has the machine's
 lifecycle broker start it when it is down, registers `fabric-mcp` once with no secret, calls `fabric_whoami`
 first, reads the project board (`com.status`, `com.list`, `com.read_ack` only what was read), answers what waits on its
-Project in the same turn with its state (the result later; a request a responder should take stays queued), and asks other
+Project in the same turn with its state (the result later; a request its Project's service should take stays queued; before Fabric 0.3.17 a run Fabric starts
+declines a request no session can take and the asker resends, and from 0.3.17 the session's own Project is granted
+`board.respond` at `com.enroll`, CO-506), and asks other
 Projects only through `com.submit`, asks who is working on what and claims its task before it starts
 (`fabric_work_list`, `fabric_work_claim`, Fabric v0.3.5 and later), links tasks to backlog rows instead of copying them, and
 releases at the end (`fabric_work_release`). `scripts/fabric_session.py status` prints where Fabric stands and one
@@ -49,7 +51,8 @@ line naming the retro (FAA-206; Fabric's `retro-after-work`, since Fabric 0.3.16
 advertises `session-hooks/1`; Stop and SessionEnd always prune their own stale spool folders. All are silent in a session Fabric launched (except the retro line after a release of finished work and, in one started on a board request, the exit contract and the prompt hook's verdict on its dispatch line, but no unread line or reminder), never block the session, read no Fabric token (an `origin` URL's embedded credential is dropped in memory, never
 kept or sent) and always
 exit 0 once `python3` starts (on Windows, Claude Code runs hooks in Git Bash, or PowerShell without it, where `python3`
-must name Python 3.9 or later; FAA-183). `fabric_session.py watch-mail` waits for board mail under a background watcher, and `install-host-hooks
+must name Python 3.9 or later; FAA-183). `fabric_session.py watch-mail` waits for board mail under a background watcher, `gate-id <request>` prints the
+`commandId` of a request's gate question (the one a dispatched run uses), and `install-host-hooks
 --host codex|kimi|hermes|opencode|openclaw|pi` installs each host's native context bridge (dry run unless `--apply`).
 Codex receives structured SessionStart JSON; Hermes, OpenCode, OpenClaw and Pi use native plugin APIs.
 See the [native host matrix](plugins/fabric-agent-adapter/skills/working-with-fabric/references/native-host-hooks.md)
