@@ -400,7 +400,12 @@ def dispatch_holder(dispatch: Dict[str, str], session_id: Any, env: Optional[Dic
     except OSError:
         return True
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        try:
+            handle = os.fdopen(fd, "w", encoding="utf-8")
+        except BaseException:  # the descriptor is still open: Windows refuses to unlink an open file (0.79.0 seam)
+            os.close(fd)
+            raise
+        with handle:
             handle.write(json.dumps(record))
     except OSError:  # a full disk: no half record that would make this session a stranger later
         try:

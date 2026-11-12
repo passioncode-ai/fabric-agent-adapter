@@ -497,8 +497,9 @@ function loopbackOrigin(origin) {
   try { url = new URL(String(origin)); } catch { return null; }
   const host = url.hostname.replace(/^\[|\]$/g, '');
   const loop = host === 'localhost' || host === '::1' || (net.isIPv4(host) && host.startsWith('127.'));
-  if (url.protocol !== 'http:' || !loop || !url.port) return null;
-  return { host, port: Number(url.port) };
+  if (url.protocol !== 'http:' || !loop) return null;
+  // new URL drops a default port: http://127.0.0.1:80 has port '', read as 80 as Python's urlsplit reads it (0.79.0 seam)
+  return { host, port: Number(url.port || 80) };
 }
 
 export async function wellKnownOf(origin, { vouchPid = null, ask = undefined } = {}) {

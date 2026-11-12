@@ -534,7 +534,9 @@ export async function pidListens(pid, port, { run = runProgram, platform = proce
 // Rejects with ListenerRefused (the socket destroyed, nothing written) or with the connection's own error.
 export function checkedSocket(port, { host = '127.0.0.1', timeoutMs = 10000, expectPid = null, vouchPid = null, ...ask } = {}) {
   return new Promise((resolveSocket, reject) => {
-    const socket = net.connect({ host, port, noDelay: true }); // as a plain http.Agent's socket
+    // autoSelectFamily: Node 18 connects to the first address only, and localhost resolves to ::1 first on Linux, so a
+    // listener on 127.0.0.1 was never reached; Python tries every address, as Node 20 and later do by default.
+    const socket = net.connect({ host, port, noDelay: true, autoSelectFamily: true }); // as a plain http.Agent's socket
     const timer = setTimeout(() => socket.destroy(Object.assign(new Error('connect timeout'), { code: 'ETIMEDOUT' })), timeoutMs);
     socket.once('error', (err) => { clearTimeout(timer); reject(err); });
     socket.once('connect', async () => {

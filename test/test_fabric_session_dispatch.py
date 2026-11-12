@@ -26,6 +26,12 @@ LINE = "fabric-dispatch/1 workflow=%s handoff=%s request=%s" % (WF, HANDOFF, REQ
 FULL = {"workflow": WF, "handoff": HANDOFF, "request": REQUEST}
 
 
+# On Windows a /clear holds nothing by design: the hook's parent is a new Git Bash each time, so dispatch_holder cannot
+# tell the holder from a helper and returns False there (fabric_session_cli.py, 0.63.0 product reading 20). Tests of
+# the POSIX take-over skip there (FAA-302, the 0.79.0 seam reading).
+POSIX_TAKE_OVER = "a /clear takes nothing over on Windows by design (dispatch_holder)"
+
+
 class Parsing(unittest.TestCase):
     def test_the_environment_names_a_dispatch(self):
         self.assertEqual(cli.dispatch_from_env(ENV), FULL)
@@ -279,7 +285,7 @@ class Hooks(Base):
         record.write_text("not json")
         other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
         self.assertFalse(cli.dispatch_holder(FULL, other, env, take_over=True))
-        self.assertEqual(record.read_text(), "not json", "a record that is not one is left alone")
+        self.assertEqual(record.read_text(encoding="utf-8"), "not json", "a record that is not one is left alone")
 
     def test_on_windows_a_clear_holds_nothing(self):
         # 0.63.0 product reading 20: a new Git Bash every hook, so a Windows /clear cannot tell the holder from a helper
@@ -288,15 +294,16 @@ class Hooks(Base):
         with mock.patch.object(cli.os, "getppid", return_value=111):
             cli.dispatch_holder(FULL, SID, env)
         record = next((cli.state_root(env=env) / "dispatch").glob("*.json"))
-        before = record.read_text()
+        before = record.read_text(encoding="utf-8")
         other = "4c1d2e3f-0a1b-4c5d-8e9f-0123456789ab"
         for ppid in (111, 222):
             with mock.patch.object(cli.os, "getppid", return_value=ppid), mock.patch.object(cli, "_WINDOWS", True):
                 self.assertFalse(cli.dispatch_holder(FULL, other, env, take_over=True))
-        self.assertEqual(record.read_text(), before, "the record stays the holder's")
+        self.assertEqual(record.read_text(encoding="utf-8"), before, "the record stays the holder's")
         with mock.patch.object(cli.os, "getppid", return_value=333):
             self.assertTrue(cli.dispatch_holder(FULL, SID, env), "the holder keeps it at its next prompt")
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_a_clear_moves_the_record_only_in_the_holders_process(self):
         from unittest import mock
         env = dict(self.env, **ENV)
@@ -322,6 +329,7 @@ class Hooks(Base):
                 self.assertTrue(cli.dispatch_holder(FULL, other, dict(env, SWITCHBOARD_LAUNCH_ID="l2-%d" % len(bad))),
                                 "another launch id is another holder")
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_a_cut_short_write_leaves_no_temporary_file_past_the_prune(self):
         from unittest import mock
         import time
@@ -538,6 +546,7 @@ class Hooks(Base):
         importlib.import_module("fabric_session_env").prune_dispatch_records(env=env, now=now)
         self.assertTrue(record.exists())
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_a_cleared_holder_is_told_not_to_accept_again(self):
         # 0.63.0 seam reading 9: the accept was made under the id the /clear replaced
         uuid = "1a2b3c4d-0a1b-4c5d-8e9f-0123456789ab"
@@ -601,6 +610,7 @@ class Hooks(Base):
         self.assertIn("observatory_lesson", cli.dispatch_contract(FULL), "step 7's retro")
         self.assertIn("insight/1", cli.dispatch_contract(FULL), "step 7's retro (0.63.0 unit reading 12)")
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_a_second_clear_names_the_first_holder(self):
         from unittest import mock
         env = dict(self.env, **ENV)
@@ -612,6 +622,7 @@ class Hooks(Base):
             cli.dispatch_holder(FULL, c, env, take_over=True)
         self.assertEqual(cli.dispatch_cleared_from(FULL, env), a)
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_after_an_unknown_id_the_next_clear_names_the_session_told_to_accept(self):
         # 0.63.0 seam reading 13: a clear that could not name the replaced id told the session it started to accept
         # a pending handoff under its own id; the next clear names that session
@@ -626,6 +637,7 @@ class Hooks(Base):
         self.assertIn("sessionId %s" % b, cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env), HANDOFF, c))
         self.assertNotIn(c, cli.dispatch_cleared(cli.dispatch_cleared_from(FULL, env), HANDOFF, c))
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_a_pending_handoff_is_accepted_under_the_id_every_later_clear_names(self):
         # 0.63.0 seam and unit readings 13: the cleared holder is never told to accept under its own new id when the
         # replaced one is known, and the id it accepts under is the one the next clear names
@@ -643,6 +655,7 @@ class Hooks(Base):
         self.assertNotIn("as step 2 says", told)
         self.assertEqual(cli.dispatch_cleared_from(FULL, env), a, "the id the pending accept was made under")
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_both_hooks_give_a_cleared_session_its_new_id_when_the_replaced_one_is_unknown(self):
         # 0.63.0 seam reading 13: a holder whose id the notice cannot name; the clear names the new id for a pending
         # handoff, at session start and when the line comes again
@@ -656,6 +669,7 @@ class Hooks(Base):
                                 extra_env=ENV)
         self.assertIn("this session's own sessionId (%s)" % new, self.context(done))
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_an_id_the_notice_cannot_name_is_not_carried_on(self):
         # 0.63.0 unit reading 14: a first holder outside the UUID form, then two clears: the next names the second
         from unittest import mock
@@ -709,6 +723,7 @@ class Hooks(Base):
         # 0.63.0 seam reading 7: Observatory asks a retry of the acceptance to send the same sessionId
         self.assertIn("this session's own `sessionId` (the same on a retry)", cli.dispatch_contract(FULL))
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_a_clear_in_the_holder_keeps_the_contract(self):
         # 0.63.0 seam r3: /clear gives the same run a new session id; a session with no record of the run gets the
         # conditional contract, and its prompt decides
@@ -725,7 +740,7 @@ class Hooks(Base):
     def test_the_reference_says_a_codex_run_needs_the_hook_trusted(self):
         # 0.63.0 seam reading 4: Codex runs a hooks.json hook only when the home's config.toml trusts it, and
         # Switchboard links hooks.json, not config.toml, into its isolated homes
-        text = (Path(cli.__file__).resolve().parents[1] / "references" / "on-demand-session.md").read_text()
+        text = (Path(cli.__file__).resolve().parents[1] / "references" / "on-demand-session.md").read_text(encoding="utf-8")
         flat = " ".join(text.split())
         self.assertIn("that run's `CODEX_HOME` trusts it", flat)
         self.assertIn("since 0.7.8 carries the person's trust", flat, "Switchboard 0.7.8 of 2026-11-04 carries it")
@@ -734,7 +749,7 @@ class Hooks(Base):
     def test_one_workflow_pattern_for_every_reader(self):
         dashboard_kit = (Path(cli.__file__).resolve().parents[2] / "building-fabric-services/scripts/dashboard_kit.py")
         env_module = importlib.import_module("fabric_session_env")
-        self.assertIn('re.fullmatch(r"%s"' % env_module.DISPATCH_WORKFLOW, dashboard_kit.read_text())
+        self.assertIn('re.fullmatch(r"%s"' % env_module.DISPATCH_WORKFLOW, dashboard_kit.read_text(encoding="utf-8"))
         mail = importlib.import_module("fabric_session_mail")
         self.assertIs(mail.DISPATCH_WORKFLOW, env_module.DISPATCH_WORKFLOW)
 
@@ -791,6 +806,7 @@ class Hooks(Base):
             self.assertEqual(text, cli.DISPATCH_NESTED.format(**FULL))
             self.assertFalse(cli.dispatch_holder(FULL, cleared, env), "its prompt is answered nested too")
 
+    @unittest.skipIf(sys.platform == "win32", POSIX_TAKE_OVER)
     def test_a_clear_another_process_holds_is_told_it_is_nested_by_the_hook(self):
         # 0.63.0 unit reading 23: the hook runs as a process (env from os.environ), as in production; a record written
         # under another parent, or one that cannot be read, is another session's
@@ -803,7 +819,7 @@ class Hooks(Base):
             done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},
                                     extra_env=ENV)
             self.assertEqual(self.context(done), cli.DISPATCH_NESTED.format(**FULL), body)
-            self.assertEqual((folder / (key + ".json")).read_text(), body, "the record stays")
+            self.assertEqual((folder / (key + ".json")).read_text(encoding="utf-8"), body, "the record stays")
             self.assertFalse(cli.dispatch_holder(FULL, cleared, env), "its prompt is answered nested too")
         self.assertFalse(cli.dispatch_held_elsewhere(FULL, "a b", env), "a bad id is the holder at its prompt")
         (folder / (key + ".json")).write_text("not json")
@@ -811,7 +827,7 @@ class Hooks(Base):
                         {"session_id": "a b", "cwd": str(self.repo), "source": "clear"}):
             done, _ = self.run_hook("session-start", payload, extra_env=ENV)
             self.assertEqual(self.context(done), cli.dispatch_contract(FULL, conditional=True), "a bad id")
-            self.assertEqual((folder / (key + ".json")).read_text(), "not json")
+            self.assertEqual((folder / (key + ".json")).read_text(encoding="utf-8"), "not json")
         (folder / (key + ".json")).unlink()
         (folder / (key + ".json")).symlink_to(folder / "gone.json")
         done, _ = self.run_hook("session-start", {"session_id": cleared, "cwd": str(self.repo), "source": "clear"},

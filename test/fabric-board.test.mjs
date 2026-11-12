@@ -1862,3 +1862,26 @@ test('a board notice names its subject: its request, else its capability, else t
   fb.Responder.prototype.emit.call({ said: {}, emitTo: (k, l, t, x) => rows2.push(x), project: 'p-1' }, 'board.request.held', 'warning', 'x', { request: astral });
   assert.equal(rows2[0].subject.type, 'request');
 });
+
+test('foreign-user keeps a lost call\'s record, never read as the board\'s refusal (0.79.0 seam reading)', async (t) => {
+  // FAA-252 made a hub port another account holds a BoardError foreign-user (nothing was sent). That says nothing about
+  // an earlier call whose answer was lost: the reply probe and the asking record stay, as they do for unreachable.
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  r.call = () => Promise.reject(new fb.BoardError('foreign-user', 'the hub port is another account\'s'));
+  r.replyExtra = () => ({});
+  r.fence = () => ({});
+  const put = [];
+  r.checkpoint.put = (e) => put.push(e);
+  const entry = { request: 'r1', probe: { key: 'k.reply.1', generation: 1, attempt: 'a1', digest: 'd', revision: 2 } };
+  await assert.rejects(r.repliedBefore(entry), (e) => e.code === 'foreign-user');
+  assert.ok('probe' in entry, 'the probe stays for the next try');
+  assert.equal(entry.replied, undefined);
+  assert.deepEqual(put, []);
+  const noted = [];
+  r.note = (...args) => noted.push(args);
+  const held = { project: 'p', generation: 1, asking: { op: 'com.enroll', args: { capability: 'video.render' } } };
+  await assert.rejects(r.replay('video.render', held, 1), (e) => e.code === 'foreign-user');
+  assert.deepEqual(noted, [], 'the asking record is not dropped');
+});

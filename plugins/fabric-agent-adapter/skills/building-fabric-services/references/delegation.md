@@ -130,7 +130,7 @@ a minute (DL-15), and waits 10 s after a failed read before trying again; after 
 `issuer-unavailable`. It reads https, http on loopback only, or a file; a URL with credentials is refused. On loopback
 http it tells the listener's owner from the socket table before a byte is sent and reads no key set another OS
 account's process serves (DEC-0154 HA-2, `fabric_peer_owner`; the read fails `foreign-user`, so the set stays unread,
-FAA-255); no proxy from the environment is used there. The
+FAA-255); no proxy from the environment is used there. Where the socket table hides other processes (macOS 27.2 with an ad-hoc-signed Homebrew Python, FAA-267), the owner cannot be told, so a loopback key set fails `foreign-user` and every delegated call is refused `issuer-unavailable`: run the service on Apple's `/usr/bin/python3`, or give the verifier the key set as a file. The
 Python kit also refuses, https included, a URL holding a space or ASCII control character before its first `#` (it
 reads the URL up to there, as Node does), or a character outside ASCII in its path or query (urllib would send it
 and every read fail; a trailing ASCII space or line break is trimmed as urllib reads it; a Unicode space ending the

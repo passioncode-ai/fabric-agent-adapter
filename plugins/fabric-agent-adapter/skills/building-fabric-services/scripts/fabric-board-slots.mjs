@@ -83,7 +83,7 @@ export class SlotKeeper {
         const moved = isInt(before, 1) && isInt(rest.generation, 1) && before > rest.generation;
         if (isInt(generation, 1) && (answer.repeated === true || !moved)) record = { project: this.project, generation };
       } catch (e) {
-        if (LOST.includes(e.code)) throw e;
+        if (LOST.includes(e.code) || e.code === 'foreign-user') throw e; // foreign-user: the earlier ask is unknown
         if (e.code === 'idempotency_window_expired') record = {}; // a retired epoch: unknown, so a first start, no move
       }
     }

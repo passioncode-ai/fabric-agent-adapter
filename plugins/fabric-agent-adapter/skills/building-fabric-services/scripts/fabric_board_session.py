@@ -433,7 +433,8 @@ class Responder(SlotKeeper):
         try:
             self._receipt("com.reply", self._call("com.reply", dict(self._reply_extra(entry), fence=self._fence(old, probe["key"]))))
         except BoardError as exc:
-            if exc.code in ("unreachable", "session-ended", "authority_changed", "not_authorized", "not_available", "capacity_exceeded"):
+            if exc.code in ("unreachable", "foreign-user", "session-ended", "authority_changed", "not_authorized", "not_available",
+                            "capacity_exceeded"):  # foreign-user: nothing was sent now, so nothing is known (0.79.0 seam)
                 raise
         else:
             entry["replied"] = True
