@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.79.0 (2026-11-12)
+
+The first release of the backlog sweep of 2026-11-12 (plan and inventory of the 134 open rows:
+`docs/evidence/specs/2026-11-12-backlog-waves-plan.md`). The contract pin stays `18f8d487`. Kit modules change:
+`fabric_lock` and `fabric-lock.mjs` (FAA-293).
+
+### Added
+
+- **creating and adapting: an organization's catalogue first** (the project board's request `2718ece8`). One neutral
+  line at step 0 of creating-fabric-agents and before scaffolding in adapting-projects-to-fabric: a private catalogue
+  of agent templates with an architect is asked first for the template, version, variant and known traps; the skill
+  runs after it. Scenario `ask-the-organization-catalogue-first` in both skills.
+
+### Changed
+
+- **working-with-fabric reads against Fabric v0.3.19.** The session-start preamble, the README and SKILL.md say both
+  cases: before Fabric 0.3.17 a dispatched run declines a request no session can take and the asker resends; from
+  0.3.17 the session's own Project is granted `board.respond` at `com.enroll` (CO-506) (FAA-221). The exit contract's
+  decline names the refusal's reason, takes over an `in_progress` request an earlier run left, and reads board ids
+  from the dispatch line first; the Observatory packet's board refs are the fallback (FAA-215, FAA-295).
+  `references/on-demand-session.md` and `board.md` name the Fabric releases as they are (FAA-246, FAA-216), and a
+  helper a run starts itself uses the runner's bypass flag with the task's limits set at launch (FAA-274).
+- **"When nobody answers"** runs only on a machine whose trust is `mine` (ADR-0176), and the asker cancels its own
+  request after adapting (FAA-220). One phrase for a never-held slot, and a gate question is moot once its request is
+  answered or taken (FAA-222, FAA-248).
+- **creating-fabric-agents: completion lines for an agent that answers people**, one per checklist item (a file and a
+  test, or `NOT_RUN`), the first reply measured from the person's message (FAA-180).
+- **One rule for a secret in a child's environment**: the agent's own process may hold its key from its supervisor or
+  a vault runner; a child it starts never gets it (FAA-281).
+- **Operator channel through the estate's gateway**: where the estate runs a messaging gateway the operator chose, the
+  channel sends through it; a polling token has one poller across machines (`poller-elsewhere`); the contract's
+  own-bot form (DEC-0034) is unchanged (FAA-282).
+- **README quick start picks a free port**; `where-agents-run.md` adds one computer with a personal and an
+  organization account and a member's virtual machine (DEC-0154) (FAA-283).
+- **The dashboard link gate is agent-side**, and a generated project pins a negative fixture in its own test (FAA-129).
+- **The shipped-file check follows npm** (`test/validate.py`): a `files` entry with a glob, one naming nothing, or no
+  `files` at all is a finding; README and LICENSE are read because npm ships them regardless; a line with no scheme
+  says so. Tests pin `__pycache__`, the wiring into `validate_repo`, and the kit's `older` and `modified` verdicts
+  without release tags (FAA-212).
+
+### Fixed
+
+- **The instance lock never holds a file that is no longer at its path** (FAA-293, a board finding of 2026-11-10).
+  After `flock` (Python) or the `O_EXLOCK` open (Node on macOS), and again after the pid is written, `acquire`
+  compares the locked inode with the file at the path; on a mismatch it re-opens up to
+  `InstanceLock.INODE_RETRIES` (3) times, then fails with an error naming the path. A data import that swapped the
+  data folder no longer lets two copies start.
+- Step 6's `fabric_task_create` example carries the required `origin` (FAA-154).
+- A dispatched Claude Code run that sees only `fabric_whoami` is named as Fabric's CO-563 (fixed in the Fabric release
+  after v0.3.19) and says so in its exit report instead of claiming the board was read (FAA-296).
+- `fabric_session.py --help` and the README list `gate-id`, and the Windows job runs the dispatch tests (FAA-236).
+- `provider-entry.md` and the provider writer's message name Fabric v0.3.16 for CO-479 (FAA-216).
+
+### Upgrading
+
+- A service that vendors `fabric_lock` (or `fabric-lock.mjs`) takes 0.79.0's copy with `fabric_kit.py install`; nothing
+  else changes for it.
+
 ## 0.78.0 (2026-11-12)
 
 The contract pin stays `18f8d487`. Kit modules change: a new `fabric_tailnet` and `fabric-tailnet.mjs` (layer L0); `fabric_supervisors` and `fabric-supervisors.mjs`, and the facades
