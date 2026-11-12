@@ -123,7 +123,15 @@ if_absent policy, the same device and `"listener_owner": "this-account"`: the ki
 the host read for the listener on http_url's port (`fabric_peer_owner`'s
 `this-account`, `another-account`, `system`, `unknown`, `none`, or
 `check_service.py`'s `foreign-user`); any other, or none given, refuses the
-browser (DEC-0154 PL-3, FAA-251). The native link does not take it: Fabric
+browser (DEC-0154 PL-3, FAA-251). The host reads that kind right before it opens
+the page with the adapter's
+`python3 building-fabric-services/scripts/fabric_peer_owner.py listener <port>`
+(or `node building-fabric-services/scripts/fabric-peer-owner.mjs listener <port>`),
+which prints it on one line (`--json` prints the whole owner) and sends nothing
+to the port (FAA-315). Where the socket table is restricted (macOS 27.2 for an
+ad-hoc-signed Python or Node, DEC-0155 RT-4) only this account's listener on
+exactly `127.0.0.1` reads `this-account`; a wildcard or `::1` bind reads
+`unknown` (`table-restricted`), and the browser is refused. The native link does not take it: Fabric
 Dashboards checks its own listener. Contract DEC-0123 PL-3 also allows a browser
 on `unsupported` (a system the host does not ship for); the gate treats
 `unsupported` as no fallback, by the operator's rule that a browser opens only on a

@@ -68,5 +68,45 @@ class RawValues(unittest.TestCase):
         self.assertLess(best[40000] / max(best[10000], 1e-9), 9)
 
 
+class OnePassJwt(unittest.TestCase):
+    """FAA-313: has_jwt and jwt_spans, the contract's one-pass JWT read (src/secret-shape.ts `jwtSpans`, `hasJwt`):
+    the answers JWT_SHAPE gives, in linear time, in both copies and the Node twin (test/fabric-secrets.test.mjs)."""
+
+    # "@" stands for a JWT's start, put in at run time so no line of this file is shaped like a token
+    CASES = tuple(case.replace("@", "ey" + "J") for case in (
+        "", "@", "@ab.cd.", "@ab.cd.ef", "x @ab.c.d", "@a.bc.d", "@@ab.cd.e", "@ab.c.@cd.ef.g", "@ab..cd", "@ab.cd",
+        "a.@ab.cd.ef.@gh.ij.kl", "@ab.cd.ef.gh", "@_-.-_.", "@ab.cd.e\\nf", "@\\u00e9b.cd.ef", "--@ab.cd.ef--"))
+
+    def test_the_answers_of_the_regular_expression(self):
+        import random
+        texts = list(self.CASES)
+        rand = random.Random(313)
+        for _ in range(3000):
+            texts.append("".join(rand.choice(["eyJ", "e", "y", "J", "a", "_", "-", ".", " ", "b"])
+                                 for _ in range(rand.randint(0, 14))))
+        for path in COPIES:
+            secrets = load(path)
+            for text in texts:
+                with self.subTest(copy=path.parent.parent.name, text=text):
+                    self.assertEqual(secrets.has_jwt(text), bool(secrets.JWT_SHAPE.search(text)))
+                    self.assertEqual(secrets.jwt_spans(text), [m.span() for m in secrets.JWT_SHAPE.finditer(text)])
+                    self.assertEqual(secrets.jwt_spans(text, first=True),
+                                     [m.span() for m in secrets.JWT_SHAPE.finditer(text)][:1])
+
+    def test_a_long_run_of_jwt_starts_is_read_in_linear_time(self):
+        import time
+        secrets = load(COPIES[0])
+        texts = {n: "eyJ" * n for n in (4000, 16000)}
+        for read in (secrets.has_jwt, secrets.secret_value, secrets.secret_argument):
+            best = {}
+            for _ in range(3):  # each size's fastest of three, measured in turn (FAA-209's rule)
+                for n in (4000, 16000):
+                    started = time.perf_counter()
+                    self.assertFalse(read(texts[n]))
+                    best[n] = min(best.get(n, float("inf")), time.perf_counter() - started)
+            # four times the text costs about four times as much; the regular expression cost sixteen
+            self.assertLess(best[16000] / max(best[4000], 1e-9), 9, read.__name__)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -310,7 +310,8 @@ reference's *A2A for remote agents* section), `channel-agent.declaration` (DEC-0
 `board.responder` for a service that declares the project board) and exits 1 on any `FAIL`. A `NOT_RUN` is not a pass;
 name it in the report. A service with a dashboard also runs the layout probe,
 `node <skill-dir>/scripts/check_dashboard_layout.mjs --service <id>` (WebKit at 360, 480, 768
-and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured).
+and 1280 px; needs Playwright, else `NOT_RUN` and exit 3: nothing was measured; also `NOT_RUN`
+and exit 3 where the socket table is restricted, `table-restricted`, since 0.81.0: FAA-318).
 
 Then prove the lock: start a second copy by hand against the same data directory; it
 must exit 75 while the first keeps serving. Prove recovery: `kill -9` the launchd pid;

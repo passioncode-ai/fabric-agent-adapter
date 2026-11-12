@@ -33,6 +33,34 @@ CREDENTIAL_PAIRS: Dict[str, tuple] = {
 JS_SPACE = "\t\n\x0b\x0c\r \xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 _NOT_LINE_END = "[^\n\r\u2028\u2029]"  # ECMAScript's `.` without the s flag
 JWT_SHAPE = re.compile(r"eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*")
+_URL_BASE64_RUN = re.compile(r"[A-Za-z0-9_-]*")
+
+
+def jwt_spans(text: str, first: bool = False) -> List[Tuple[int, int]]:
+    """The spans JWT_SHAPE matches in a text, leftmost and not overlapping, read in one pass (the contract's `jwtSpans`,
+    FAA-313): the regular expression backtracks from every `eyJ` of a long run, quadratic in it, while every `eyJ` of
+    one run shares that run's end, so only its first is tried, and a match ends where its third segment's run ends.
+    `first` stops at the first match."""
+    spans: List[Tuple[int, int]] = []
+    at = text.find("eyJ")
+    while at >= 0:
+        one = _URL_BASE64_RUN.match(text, at + 3).end()
+        resume = one
+        if one - at - 3 >= 2 and text[one:one + 1] == ".":
+            two = _URL_BASE64_RUN.match(text, one + 1).end()
+            if two - one - 1 >= 2 and text[two:two + 1] == ".":
+                three = _URL_BASE64_RUN.match(text, two + 1).end()
+                spans.append((at, three))
+                if first:
+                    break
+                resume = three
+        at = text.find("eyJ", resume)
+    return spans
+
+
+def has_jwt(text: str) -> bool:
+    """Whether JWT_SHAPE matches anywhere in a text, read in one pass (the contract's `hasJwt`, FAA-313)."""
+    return bool(jwt_spans(text, True))
 #: Where a provider key's prefix may start (DEC-0151): the start of a value, a character that is no ASCII letter or
 #: digit, or an escape (a percent-escape, single or double, a backslash escape, an octal, `\\x` with two hex digits,
 #: `\\u` with four, an ESC colour sequence, raw or escaped). A consuming group, as the contract writes it.
@@ -86,7 +114,7 @@ def _long_secret(value: str) -> bool:
 
 def secret_value(value: str) -> bool:
     """A JWT anywhere, a provider key or `Bearer …`, or a long base64 run mixing upper case, lower case and digits."""
-    return bool(JWT_SHAPE.search(value) or SECRET_VALUE.search(value) or _long_secret(value))
+    return bool(has_jwt(value) or SECRET_VALUE.search(value) or _long_secret(value))
 
 
 def _path_like(piece: str) -> bool:
@@ -98,7 +126,7 @@ def _path_like(piece: str) -> bool:
 def secret_argument(value: str) -> bool:
     """The same for a launch argument or a server's command and URL: a long run is looked for between path separators,
     so a folder path holding a session id is not taken for a key."""
-    if JWT_SHAPE.search(value) or SECRET_VALUE.search(value) or _BEARER_INSIDE.search(value):
+    if has_jwt(value) or SECRET_VALUE.search(value) or _BEARER_INSIDE.search(value):
         return True
     for piece in _ARGUMENT_SPLIT.split(value):
         if _path_like(piece):

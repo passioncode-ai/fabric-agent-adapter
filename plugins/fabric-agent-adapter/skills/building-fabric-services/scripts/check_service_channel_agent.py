@@ -18,7 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fabric_jsvalue import indexed_objects, js_keys  # noqa: E402
-from fabric_secrets import JS_SPACE, JWT_SHAPE, SECRET_VALUE, raw_values, secret_argument, secret_url, secret_value  # noqa: E402
+from fabric_secrets import JS_SPACE, SECRET_VALUE, has_jwt, raw_values, secret_argument, secret_url, secret_value  # noqa: E402
 from fabric_secrets import url_parts as _whatwg_url_parts  # noqa: E402 - public since FAA-250
 import check_service_channel_agent_schema as cas  # noqa: E402
 
@@ -222,7 +222,7 @@ def shaped_read(read: str) -> bool:
 
 def _key_shaped(text: str) -> bool:
     read = head(text)
-    return bool(JWT_SHAPE.search(read) or SECRET_VALUE.search(read))
+    return bool(has_jwt(read) or SECRET_VALUE.search(read))
 
 
 def plain_name(name: str) -> bool:

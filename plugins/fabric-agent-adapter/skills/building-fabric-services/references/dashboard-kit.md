@@ -149,6 +149,16 @@ vertically by the viewport or a clipping ancestor; ED-4 is `NOT_RUN` on a page p
 the scroll position: say so in the report. A `NOT_RUN` is not a pass. Exit codes: 0 when no rule fails and at least
 one passed, 1 on a `FAIL`, 2 on a usage error, 3 when no rule was measured (every rule `NOT_RUN`, since 0.44.0).
 
+Since 0.81.0 the probe opens a loopback page (and asks a local service for its login code) only after it reads the
+page's listener from the socket table as this OS account's (DEC-0154 PL-3, HA-2; FAA-260). On a Mac whose socket
+table is restricted for the runtime that runs the probe (macOS 27.2 shows an ad-hoc-signed Node, such as Homebrew's,
+nothing through `netstat`; DEC-0155 RT-1) the listener reads `unknown` (`table-restricted`), so every rule is
+`NOT_RUN` and the probe exits 3, whatever the page. That is not a pass and not the page's fault: say so in the report,
+with the reason the probe printed. The probe does not vouch for the listener by the service's pid, since only a
+caller that started the process may (DEC-0155 RT-3, the installers' route), and the well-known `process.pid` proves
+nothing. To measure the page, run the probe with a Node whose table reads (an Apple-signed or Developer ID one), or
+on a host without the restriction (FAA-318).
+
 ## Upgrading an existing dashboard
 
 A session that starts (or is cleared) in a repository that owns a service, whose dashboard has no
@@ -167,7 +177,9 @@ In the middle of an unrelated task, finish that first or record the upgrade as a
 3. A page with an older kit: `dashboard_kit.py install <dir>`. A `changed` copy is refused; move the
    edits into the page's own files, then install (or `--force` when the operator says the edits go).
 4. Raise `kit` in the declaration (`dashboard_extension()` does it), restart the service, and run
-   both probes above. Report the layout table with every `NOT_RUN`.
+   both probes above. Report the layout table with every `NOT_RUN`. On a Mac with a restricted socket
+   table the layout probe measures nothing since 0.81.0 (every rule `NOT_RUN`, exit 3, the reason
+   `table-restricted`; *Proving it* above): report that as not measured, never as a pass.
 
 ## When something is missing
 

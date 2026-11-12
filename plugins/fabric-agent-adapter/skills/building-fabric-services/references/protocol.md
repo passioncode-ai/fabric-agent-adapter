@@ -232,15 +232,21 @@ on macOS, the same `/proc` files on Linux, and `netstat -ano` with the owner SID
 
 macOS 27.2 shows an ad-hoc-signed interpreter (a Homebrew Python, measured; a Homebrew Node is ad-hoc-signed too and was not measured) only its own sockets: sysctl lists this
 process alone and netstat prints nothing. The Python calibration therefore also asks for a child process's listener,
-and an empty netstat is `unknown` with reason `table-restricted` (never another account's). A caller that started the
+and a restricted table is `unknown` with a reason beginning `table-restricted` (never another account's): DEC-0155 RT-1
+reads so a netstat that prints nothing or only its header, one that fails or exits non-zero, a table holding no row of
+another uid (sysctl) or of another process (netstat), and a macOS table without the reader's own connection (FAA-312;
+Linux and Windows keep `no-row`). Under it `listener(port)` reads this account's listener as its own only on exactly
+`127.0.0.1` (RT-4). `fabric_peer_owner.py listener <port>` and `fabric-peer-owner.mjs listener <port>` print the kind
+(`--json` the whole owner; FAA-315). A caller that started the
 server itself may vouch with that pid: `lsof -p <pid>` asks the process, which the restriction leaves readable, and a
 listener of this account's pid on the port counts as this account's (`CheckedHTTPConnection(vouch_pid=...)`, Node
 `checkedSocket({vouchPid})`). The launchd installers vouch with their own job's pid; elsewhere a restricted table
 refuses (the probe, the hub client and `fabric_http` included, FAA-272), and Apple's `/usr/bin/python3` sees the
-whole table (FAA-267). A vouch is a weaker proof than the table's: it shows the job's pid listens on the port (`127.0.0.1` or the
-IPv4 wildcard for a LaunchAgent's installer, exactly `127.0.0.1` for a LaunchDaemon's), not that it accepted this connection, so a more specific bind by root over a wildcard job would pass;
-the pin's ruling on vouching is DEC-0155 RT-3 (the contract's CT-261), which vouches only for a listen on exactly
-`127.0.0.1`: the kit's IPv4 wildcard vouch for a LaunchAgent departs from it until a later release (filed by FAA-258).
+whole table (FAA-267). A vouch is a weaker proof than the table's: it shows the job's pid listens on exactly `127.0.0.1`
+on the port, not that it accepted this connection. Since FAA-312 every vouch follows DEC-0155 RT-3: a wildcard or `::1`
+listener is never vouched for (`lsof` prints an IPv6-only wildcard as `*:<port>` too), and a reader whose real and
+effective uid differ vouches for nothing. The accepted socket itself (RT-2, libproc or `lsof` of established sockets)
+is not read yet (FAA-292; the repository's `docs/evidence/specs/2026-11-12-faa-292-libproc-decision.md`).
 
 Every kit client that sends a credential to loopback checks first: `check_service.py` (rule `listener.owner`, the first that reads the port for
 a local placement; `FAIL` `foreign-user` and no rule reads the port), the hub client (`HubError` `foreign-user`, its

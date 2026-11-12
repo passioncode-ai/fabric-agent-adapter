@@ -69,6 +69,24 @@ NO_LISTENER = _HEAD + F._proc(0, "0100007F:B8CF", "0100007F:C351", "01", 0, 0)
 
 def _two_listeners(uids):
     return _HEAD + "".join(F._proc(i, "0100007F:B8CF", "00000000:0000", "0A", uid, 4001 + i) for i, uid in enumerate(uids))
+#: The reasons of a restricted table (DEC-0155 RT-1, RT-4; FAA-312), stated here, never read from the code.
+NO_ROW_RESTRICTED = "table-restricted: no row for this connection"
+
+
+def restricted_listener(port):
+    return "table-restricted: no listener of this account on exactly 127.0.0.1:%d" % port
+
+
+# A netstat whose every row is one process's (pid 4100): its listener on 127.0.0.1:47311 and a connection to it from
+# itself, its wildcard on 47555 and its ::1 on 47070.
+NETSTAT_OWN_ONLY = F.NETSTAT_HEADER + "".join((
+    F._ns("tcp4", "127.0.0.1.47311", "*.*", "LISTEN", "Python:%d" % F.SERVER_PID),
+    F._ns("tcp4", "127.0.0.1.47311", "127.0.0.1.50001", "ESTABLISHED", "Python:%d" % F.SERVER_PID),
+    F._ns("tcp4", "127.0.0.1.50001", "127.0.0.1.47311", "ESTABLISHED", "Python:%d" % F.SERVER_PID),
+    F._ns("tcp4", "*.47555", "*.*", "LISTEN", "Python:%d" % F.SERVER_PID),
+    F._ns("tcp6", "::1.47070", "*.*", "LISTEN", "Python:%d" % F.SERVER_PID),
+))
+
 OWN = list(F.OWN_CLIENT)
 FOREIGN = list(F.FOREIGN_CLIENT)
 
@@ -108,6 +126,7 @@ cases = {
     "tables": {
         "netstatMulti": {"kind": "netstat", "text": F.NETSTAT_MULTI_ACCOUNT},
         "netstatTimeWait": {"kind": "netstat", "text": F.NETSTAT_TIME_WAIT},
+        "netstatOwnOnly": {"kind": "netstat", "text": NETSTAT_OWN_ONLY},
         "netstatNoProcess": {"kind": "netstat", "text": F.NETSTAT_NO_PROCESS},
         "procMulti": {"kind": "proc4", "text": F.PROC_NET_TCP_MULTI},
         "procUnacceptedOwn": {"kind": "proc4", "text": _unaccepted(F.OWN_UID)},
@@ -145,8 +164,27 @@ cases = {
          "want": {"kind": "this-account", "pid": F.SERVER_PID}},
         {"table": "netstatMulti", "ask": "peerAt", "server": ["::ffff:127.0.0.1", F.SERVER_PORT],
          "client": ["::ffff:127.0.0.1", 50002], "want": {"kind": "another-account"}},
+        # A macOS table that lists sockets but not this connection is restricted (DEC-0155 RT-1, FAA-312).
         {"table": "netstatMulti", "ask": "peerAt", "server": SERVER, "client": ["127.0.0.1", 59999],
-         "want": {"kind": "unknown", "reason": "no-row"}},
+         "want": {"kind": "unknown", "reason": NO_ROW_RESTRICTED}},
+        # DEC-0155 RT-1 and RT-4 (FAA-312): a netstat holding no row of another process than the reader's (pid 4100)
+        # is restricted: only its own exact 127.0.0.1 listener counts; its wildcard, its ::1 and a port with no row are
+        # an owner that cannot be told; its own connection's rows still answer, a missing one is restricted too.
+        {"table": "netstatOwnOnly", "ask": "listener", "port": F.SERVER_PORT, "ownPid": F.SERVER_PID,
+         "want": {"kind": "this-account", "pid": F.SERVER_PID}},
+        {"table": "netstatOwnOnly", "ask": "listener", "port": 47555, "ownPid": F.SERVER_PID,
+         "want": {"kind": "unknown", "reason": restricted_listener(47555)}},
+        {"table": "netstatOwnOnly", "ask": "listener", "port": 47070, "ownPid": F.SERVER_PID,
+         "want": {"kind": "unknown", "reason": restricted_listener(47070)}},
+        {"table": "netstatOwnOnly", "ask": "listener", "port": 1, "ownPid": F.SERVER_PID,
+         "want": {"kind": "unknown", "reason": restricted_listener(1)}},
+        {"table": "netstatOwnOnly", "ask": "serverEnd", "server": SERVER, "client": OWN, "ownPid": F.SERVER_PID,
+         "want": {"kind": "this-account", "pid": F.SERVER_PID}},
+        {"table": "netstatOwnOnly", "ask": "peerAt", "server": SERVER, "client": FOREIGN, "ownPid": F.SERVER_PID,
+         "want": {"kind": "unknown", "reason": NO_ROW_RESTRICTED}},
+        # The same table read by another process: rows of a process not its own, so the table reads as before.
+        {"table": "netstatOwnOnly", "ask": "listener", "port": 47555, "ownPid": 4300,
+         "want": {"kind": "this-account", "pid": F.SERVER_PID}},
         {"table": "netstatTimeWait", "ask": "peerAt", "server": SERVER, "client": OWN,
          "want": {"kind": "this-account", "pid": F.OWN_CLIENT_PID}},
         {"table": "netstatNoProcess", "ask": "listener", "port": F.SERVER_PORT,
