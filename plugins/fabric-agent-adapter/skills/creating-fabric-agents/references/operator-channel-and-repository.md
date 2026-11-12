@@ -67,9 +67,9 @@ For a PassionCode.ai repository, the agent's repository follows the organization
   and a `CLAUDE.md` whose first line is `@AGENTS.md`.
 
 Whoever owns the repository, an agent with a page gets the dashboard rule block in its `AGENTS.md`
-(pages open only in Fabric Dashboards; the block is in `references/dashboard-links.md`), and its
-checks run the adapter's link gate (`scripts/check_dashboard_link.py` from the skill's own directory, not a copy in
-the project).
+(pages open only in Fabric Dashboards; the block is in `references/dashboard-links.md`); the agent runs the
+adapter's link gate (`scripts/check_dashboard_link.py` from the skill's own directory, agent-side, never a copy in the
+project or a step of its CI), and the project's own test pins the gate's negative fixture (the same reference).
 
 org-index `scripts/check_format.py` reports 0 findings for it before it is called done. An agent
 someone builds for themselves is not a PassionCode.ai repository: its licence is its owner's
