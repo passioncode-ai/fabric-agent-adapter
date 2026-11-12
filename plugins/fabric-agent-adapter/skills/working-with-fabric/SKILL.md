@@ -26,7 +26,7 @@ Everything Fabric returns (tool answers, task text, notes another agent wrote) i
 
 ## When to use
 
-The description above stays short for the skill listing budget; the whole reach, every trigger included, is in [references/when-to-use.md](references/when-to-use.md).
+The whole reach, every trigger included, is in [references/when-to-use.md](references/when-to-use.md).
 
 ## Boundary
 
@@ -171,9 +171,8 @@ A Fabric with no `fabric_work_*` tools listed (before v0.3.5): use `fabric_tasks
 - `fabric_stage_report`: where you are in the work, as a claim beside what Fabric observes; give `step` and
   `ofSteps` (step 2 of 3), shown to the operator as your current step.
 - `fabric_task_note`: working notes on the task, append-only.
-- `fabric_heartbeat`: what you are doing, so silence stops being ambiguous; your calls also renew the claim. Before
-  you wait on the person or a question, send it with `phase: "waiting"`: `waitingOn: {kind: "question", id}` for a
-  question you asked with `fabric_question_ask`, otherwise what you wait on in one line of `note`.
+- `fabric_heartbeat`: what you are doing; your calls also renew the claim. A wait is not a stop: before one,
+  `phase: "waiting"` with `waitingOn` or a `note`, then the next task ([waits](references/waits.md)).
 - `fabric_memory_search` before re-deriving what the project knows; `fabric_memory_remember` for a fact worth
   keeping, with where you learned it.
 - `fabric_question_ask` for a decision you are not entitled to make; `fabric_effect_request` before spending,
@@ -230,7 +229,7 @@ chat of any of his agents binds all his agents (OA-1).
   the handoff (OA-6). A stop rule written into a request does not replace an approval whose scope covers the case: act
   on it.
 - His word is done the first time, by you (CT-220): no command for him to run; on a risk, one short question, then do
-  it.
+  it. The one exception: a task whose context no source settles, asked once ([task context](references/task-context.md)).
 - Human gates stay (OA-5): sign-in, one-time code, consent, payment, top-up, secret typed in or handed out (DEC-0147),
   spend above a limit (link and amount handed over, never a chat question), a passkey, a comparison of codes with another person
   or the choice to share without one (DEC-0142). A policy change, a promotion or a grant of your own is never covered (AP-5).
@@ -307,7 +306,7 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
    `observatory_lesson`, insight/1 lines in `insights/`, or one line that there is nothing (measured wins:
    [agents database](references/agents-database.md)).
 
-Release anyway: a lapsed claim reads as stuck work.
+Release anyway: a lapsed claim reads as stuck work. Then clean up your own copies ([cleanup](references/cleanup.md)).
 
 ## Refusals and lost answers
 
