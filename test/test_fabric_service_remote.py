@@ -106,6 +106,36 @@ class RemotePlacement(unittest.TestCase):
         with self.assertRaises(fs.ServiceError):
             fs.register_remote(service_id="other", name="O", origin="https://o.example.com", token="short", directory=root)
 
+    def test_a_rotation_under_warnings_as_errors_keeps_the_old_token(self):
+        # FAA-200 (1): the rewrite warning comes before the token is written, so an installer that runs with warnings as
+        # errors keeps its token and its descriptor together, never a new token beside the old descriptor.
+        import shutil
+        import warnings
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        root = temp / "services"
+        fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                           token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
+        path = fs.descriptor_path("example-agent", "default", root)
+        hand = json.loads(path.read_text())
+        hand["source"] = {"repository": "git@github.com:example/agent.git"}  # a source the kit refuses: dropped, with the warning
+        path.write_text(json.dumps(hand))
+        token_file = fs.remote_token_file("example-agent", "default", root)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", fs.NoSourceRepositoryWarning)
+            with self.assertRaises(fs.NoSourceRepositoryWarning):
+                fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                   token="n" * 40, directory=root)
+        self.assertEqual(token_file.read_text(), "t" * 40, "the token is not replaced")
+        self.assertEqual(json.loads(path.read_text())["source"], hand["source"], "nor the descriptor")
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always")
+            fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                               token="n" * 40, directory=root)
+        self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning], "warned once, not twice")
+        self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the installer's call")
+        self.assertEqual(token_file.read_text(), "n" * 40)
+
     def test_register_remote_source(self):
         # FAA-120: the repository of the service's code goes into source.repository, checked as the schema's URI.
         temp = Path(tempfile.mkdtemp())

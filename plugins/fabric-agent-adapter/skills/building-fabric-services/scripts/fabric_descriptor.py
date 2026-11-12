@@ -589,8 +589,15 @@ def port_listener_refusal(port: int, reader: Optional[Any] = None) -> Optional[s
             "FAA-225)." % (port, uid))
 
 
+def warn_no_source(descriptor: Dict[str, Any], stacklevel: int = 2) -> None:
+    """The rewrite warning of a descriptor that names no source.repository (FAA-198)."""
+    me = "%s.%s" % (descriptor["id"], descriptor["instance"])
+    warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY),
+                  NoSourceRepositoryWarning, stacklevel=stacklevel + 1)
+
+
 def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None, *, _stacklevel: int = 2,
-                     port_owner: Optional[Any] = None) -> Path:
+                     port_owner: Optional[Any] = None, _warned: bool = False) -> Path:
     """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim), and a port another
     OS account listens on (FAA-225; ``port_owner(port) -> (kind, uid) | None`` reads it, the kit's own by default).
 
@@ -604,9 +611,8 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
     refusal = source_refusal(descriptor, root)
     if refusal:
         raise ServiceError(refusal)
-    if not names_repository(descriptor):
-        warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY),
-                      NoSourceRepositoryWarning, stacklevel=_stacklevel)
+    if not names_repository(descriptor) and not _warned:  # register_remote warns itself, before its token (FAA-200 (1))
+        warn_no_source(descriptor, _stacklevel)
     # DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
     port = None if placement_of(descriptor) == "remote" or "origin" not in descriptor else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):

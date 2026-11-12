@@ -428,15 +428,18 @@ export function portListenerRefusal(port, reader = portOwner) {
  * account listens on (FAA-225; `portOwner(port) -> [kind, uid] | null` reads it, the kit's own by default).
  * FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns
  * (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY), so an installed agent's update keeps working. */
-export function writeDescriptor(d, dir = servicesDir(), { portOwner: reader = portOwner } = {}) {
+/** The rewrite warning of a descriptor that names no source.repository (FAA-198). */
+export function warnNoSource(d) {
+  process.emitWarning(`Descriptor ${d.id}.${d.instance} ${NO_SOURCE_REPOSITORY}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
+}
+
+export function writeDescriptor(d, dir = servicesDir(), { portOwner: reader = portOwner, warned = false } = {}) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
   const refusal = sourceRefusal(d, dir);
   if (refusal) throw new ServiceError(refusal);
-  if (!namesRepository(d)) {
-    process.emitWarning(`Descriptor ${me} ${NO_SOURCE_REPOSITORY}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
-  }
+  if (!namesRepository(d) && !warned) warnNoSource(d); // registerRemote warns itself, before its token (FAA-200 (1))
   // DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
   const port = placementOf(d) === 'remote' || d.origin === undefined ? null : portOf(d.origin);
   for (const [file, other] of readDescriptors(dir)) {

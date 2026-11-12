@@ -89,6 +89,31 @@ test('the remote session cookie is __Host-, Secure, HttpOnly, Strict, Path=/ and
   assert.ok(!/Domain=/i.test(h));
 });
 
+test('a rotation whose warning throws keeps the old token (FAA-200 (1))', () => {
+  const dir = path.join(temp(), 'services');
+  k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 't'.repeat(40), dir,
+    source: { repository: 'https://github.com/example/agent' } });
+  const file = k.descriptorPath('example-agent', 'default', dir);
+  const hand = { ...JSON.parse(fs.readFileSync(file, 'utf8')), source: { repository: 'git@github.com:example/agent.git' } };
+  fs.writeFileSync(file, JSON.stringify(hand)); // a source the kit refuses: dropped, with the warning
+  const tokenFile = k.remoteTokenFile('example-agent', 'default', dir);
+  const emit = process.emitWarning;
+  const seen = [];
+  try {
+    process.emitWarning = () => { throw new Error('warnings are errors here'); };
+    assert.throws(() => k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 'n'.repeat(40), dir }),
+      /warnings are errors here/);
+    assert.equal(fs.readFileSync(tokenFile, 'utf8'), 't'.repeat(40), 'the token is not replaced');
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).source, hand.source, 'nor the descriptor');
+    process.emitWarning = (message, options) => seen.push(options?.code);
+    k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 'n'.repeat(40), dir });
+  } finally {
+    process.emitWarning = emit;
+  }
+  assert.deepEqual(seen, ['FABRIC_NO_SOURCE_REPOSITORY'], 'warned once, not twice');
+  assert.equal(fs.readFileSync(tokenFile, 'utf8'), 'n'.repeat(40));
+});
+
 test('registerRemote writes source.repository, checked as the schema URI (FAA-120)', () => {
   const dir = path.join(temp(), 'services');
   const file = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 't'.repeat(40), dir,
