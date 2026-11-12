@@ -31,7 +31,7 @@
    "file": "fabric_secrets.py",
    "layer": "L0",
    "imports": [],
-   "sha256": "53c5df8d6f2c87433c288853bfaad9a43f544789bdf1e39bda8d3ff14485c89d"
+   "sha256": "d2e74e3a98691d67ad892c3e04e4d9546b9ad6cda6cd2932b3a8b95a9c006b75"
   },
   {
    "module": "fabric_peer_owner",
@@ -6548,7 +6548,7 @@
    "fabric_jsvalue.py": "052f1b40bab18600b3731dbdca27cbff17588c21d9458fa6241efd1340d0e09a",
    "fabric_time.py": "588f383da4ac6a243ea95b6ffc3a0aa99ca94245732dc4937734f190b7af4ae9",
    "fabric_identifiers.py": "0fd814d521ac3aa39907458265870753046a73f48af3d8581ab864b93b211607",
-   "fabric_secrets.py": "53c5df8d6f2c87433c288853bfaad9a43f544789bdf1e39bda8d3ff14485c89d",
+   "fabric_secrets.py": "d2e74e3a98691d67ad892c3e04e4d9546b9ad6cda6cd2932b3a8b95a9c006b75",
    "fabric_peer_owner.py": "a6b6b9bebf8c6fe567a898cf20a6d2d8e8f76a755e7f872609587ca0bfe2678e",
    "fabric_tailnet.py": "c60416539be0199182f7969c24a37b14d0db50c8ea5e3e04cea43babfb483407",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",

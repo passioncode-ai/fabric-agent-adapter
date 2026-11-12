@@ -677,8 +677,13 @@ class Probe:
         well-known answer (CA-1); one read as not declared is NOT_RUN with its evidence, never a FAIL (D3), except a string
         shaped like a credential in it or in a copy the probe reads beside it (CA-5)."""
         manifest, _, where = self.load_manifest()
-        self.add("channel-agent.declaration", *cac.declaration_verdict(
-            manifest, bool(self.d.get("fabricManifest")), where, self.wk, getattr(self, "wk_bytes", None)))
+        try:
+            verdict = cac.declaration_verdict(manifest, bool(self.d.get("fabricManifest")), where, self.wk,
+                                              getattr(self, "wk_bytes", None))
+        except (OSError, ValueError) as exc:  # a copy of the probe without its schema file (FAA-250): the later rules run
+            verdict = ("NOT_RUN", "the probe cannot read %s beside it (%s); copy it with the probe"
+                       % (cac.cas.SCHEMA_FILE.name, exc.__class__.__name__))
+        self.add("channel-agent.declaration", *verdict)
 
     def configuration_rule(self) -> None:
         """DEC-0046: a well-known `configuration` is {slots, resolved} as the schema types it; absent is NOT_RUN."""

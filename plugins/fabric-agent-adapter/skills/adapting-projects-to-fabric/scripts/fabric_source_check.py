@@ -200,7 +200,7 @@ def _url_secret(url: str, depth: int = 0) -> bool:
     url = url.rstrip(".,;)]}")
     if not _secrets._SCHEME.match(url):
         return False
-    password, query, fragment = _secrets._url_parts(url)
+    password, query, fragment = _secrets.url_parts(url)
     # what says it is synthetic is the value, never the host or the path (`examples.blob.core.windows.net`)
     if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password) and _real(unquote(password)):
         return True
