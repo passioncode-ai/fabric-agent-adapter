@@ -1,6 +1,6 @@
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.2.0+kit.5: Observatory's peer_owner 1.2.0 (passioncode-ai/project-observatory-dashboard,
+    peer_owner 1.2.0+kit.6: Observatory's peer_owner 1.2.0 (passioncode-ai/project-observatory-dashboard,
     `observatory/engine/peer_owner.py`, first vendored at f86f0622, read against 2180235c; the same licence), the kit's
     `fabric_peer_owner` (layer L0; DEC-0154 HA-2, FAA-226, FAA-258). Observatory's 1.3.x (this account's own sockets
     through libproc, DEC-0155 RT-2) is not in it (FAA-292). The kit's differences: `Owner` and `Row` are NamedTuples
@@ -14,7 +14,7 @@
     FAA-273): the sysctl calibration also requires a child process's listener, an empty or header-only netstat is
     `TABLE_RESTRICTED`, a caller may vouch for a listener with a pid it started (`pid_listens`,
     `CheckedHTTPConnection(vouch_pid=...)`), the child's port is read under one deadline with `selectors`, a number is
-    ASCII digits only. DEC-0155 (FAA-312): a netstat that fails, a table with no row of another uid (sysctl) or process
+    ASCII digits only. DEC-0155 (kit.6, FAA-312): a netstat that fails, a table with no row of another uid (sysctl) or process
     (netstat) and a missing connection row read as `table-restricted` (RT-1); a restricted table's listener is this
     account's only on exactly 127.0.0.1 (RT-4); the vouch takes exactly 127.0.0.1 (RT-3), never from a set-uid
     reader. `main` is the CLI, `listener <port>` (FAA-315). /proc carries a socket's creator, so a listener root created
@@ -98,7 +98,7 @@ import time
 from typing import NamedTuple, Optional, Tuple
 
 # This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.2.0+kit.5"  # Observatory's 1.2.0 with the kit's differences above
+PEER_OWNER_VERSION = "1.2.0+kit.6"  # Observatory's 1.2.0 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"

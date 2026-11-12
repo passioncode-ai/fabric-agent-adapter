@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.82.0 (2026-11-12)
+
+Wave 4 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`). Kit modules
+change: `fabric_secrets`, `fabric_connections`, `fabric_peer_owner` (`1.2.0+kit.6`), `fabric_descriptor`,
+`fabric_holds`, `fabric_hub`, `fabric-delegation.mjs`, and their Node twins; dashboard kit 1.1.7.
+
+### Changed
+
+- **working-with-fabric answers a board request as contract DEC-0152 SA-6 says** (FAA-311): a session reads the
+  capability's slot in `com.status` first; at an `active` slot, or an enroll refused `fenced`, it leaves the request to
+  that holder, sends nothing and asks no one; it declines only at a slot `absent` at generation 0, and asks the operator
+  with `fabric_question_ask` after any refusal that is not retryable. A session without the slot does no work on a
+  request and gives it no state. The exit contract, the preamble, `SKILL.md` and the references say so, the exit
+  contract within Hermes' 4000 characters (3996).
+- **The peer owner reads DEC-0155's restricted table** (FAA-312): a `netstat` that fails or exits non-zero, a macOS
+  table with no row of another uid (sysctl) or process (netstat), and one without the reader's own connection read
+  `table-restricted` (RT-1); Linux and Windows keep `no-row`. Under a restricted table a listener is this account's only
+  on exactly `127.0.0.1` (RT-4). The launchd vouch takes only a listen on exactly `127.0.0.1` (RT-3), never the IPv4
+  wildcard or `::1`, and nothing from a set-uid reader: the kit's wildcard departure ends. `PEER_OWNER_VERSION` is
+  `1.2.0+kit.6`.
+- **The kit's hub locator answers a pid another OS account holds as the session hooks do** (FAA-304, after FAA-254):
+  `pid_alive` / `pidAlive` give None / null and `locate_hub` / `locateHub` refuse with `not-a-hub`, retryable, "not
+  verified", never `not-running`.
+- **`fabric_secrets.secret_url` refuses a URL whose host or port `new URL` refuses** (FAA-309), as `secretUrl` does:
+  the WHATWG host reading and the IDNA tables of FAA-98 move into `fabric_secrets` (`fabric_connections` imports them;
+  new `url_refused`). `repository_credential` still reads a repository's parameters whatever its host.
+- **One-pass JWT reading** (FAA-313): `has_jwt` / `jwt_spans` (Node `hasJwt` / `jwtSpans`), the same answers in linear
+  time; `secret_value`, `secret_argument`, the channel-agent check and `fabric_source_tree` use it.
+- **The holds twins agree on whitespace** (FAA-316): both squash a `statusMessage` with one ECMAScript class, so
+  U+001C, U+0085 and U+FEFF read the same; four vectors in `test/fixtures/holds/waiting-vectors.json`.
+- **The probe's `lifecycle.one-copy` finds a LaunchDaemon's leftover LaunchAgent** (FAA-317) in its `UserName`'s
+  `gui/<uid>` first, then in the probe's own; `in_launch_daemons` is `fabric_supervisors._in_daemons`, imported.
+- **Dashboard kit 1.1.7** (FAA-314): `fabric-button.js` reads credentials with DEC-0151's `SECRET_VALUE`, held to the
+  contract's `secretValue` and `credentialName` vectors.
+
+### Added
+
+- **`fabric_peer_owner.py listener <port> [--json]`** and **`fabric-peer-owner.mjs listener <port>`** print the
+  listener's kind (FAA-315): the route for the dashboard link gate's `listener_owner`, named in the three
+  `dashboard-links.md`.
+
+### Documented
+
+- On a host with a restricted socket table the dashboard layout probe measures nothing: every rule `NOT_RUN`, exit 3
+  (FAA-318). It does not vouch by the service's pid, which DEC-0155 RT-3 reserves for the caller that started it.
+- FAA-292's decision: RT-2 through libproc waits for an L0 module of its own, as `fabric_peer_owner.py` is at the
+  1000-line cap (`docs/evidence/specs/2026-11-12-faa-292-libproc-decision.md`); the row stays open.
+- `fabric-delegation.mjs` carries the `<https>` legend; `HTTPS_LEGEND_PENDING` in `test/validate.py` is empty (FAA-306).
+
 ## 0.81.0 (2026-11-12)
 
 Wave 3 of the backlog sweep of 2026-11-12. **The contract pin moves to `93e7db16` (`v0.1.0+2026-11-08.1`)**: DEC-0149
