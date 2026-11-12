@@ -54,8 +54,8 @@ By hand, when Python is absent: Fabric publishes `hub.json` in its folder while 
 | Linux | `$XDG_DATA_HOME/passioncode-fabric/` (default `~/.local/share/`) | the install folder's `resources/bin`; the `.deb` puts it in `/opt/Fabric` |
 
 Fabric is up only when `hub.json` exists, says `"protocol": "fabric-hub/0.1"`, names the loopback origin
-`http://127.0.0.1:<port>` and a live `pid`. No file, or a dead pid, means no Fabric, whatever answers on
-the port. Never send anything to the port yourself, and never read the door token `hub.json` names: `fabric-mcp`
+`http://127.0.0.1:<port>` and a live `pid` of your own OS account. No file, or a dead pid, means no Fabric, whatever answers on
+the port; a pid another account's process holds (a reused id) is not verified, never running (FAA-254). Never send anything to the port yourself, and never read the door token `hub.json` names: `fabric-mcp`
 does that. On Linux an AppImage mounts at a new path each start, so a registration pointing into it breaks; use the
 `.deb`.
 
@@ -107,7 +107,7 @@ and its answer is an error that names what Fabric waits for (never a fake succes
 | Answer says | Meaning | Do |
 |---|---|---|
 | Fabric is not running, or its hub is closed | no live hub | Step 1; Settings → Agent access in Fabric says why a hub is closed |
-| Fabric's hub could not be verified | foreign protocol, dead pid, token outside Fabric's folder | send nothing; ask the person to open Fabric |
+| Fabric's hub could not be verified | foreign protocol, a pid another OS account's process holds, token outside Fabric's folder | send nothing; ask the person to open Fabric |
 | the folder is not a project | no project holds this folder yet | Fabric with automatic project admission creates or attaches the Project during enrollment; an older Fabric needs the person to open it (+ Project → Open a project) |
 | waiting for the operator to allow this coding agent | the consent prompt is on their screen | tell the person; call again in a moment; never loop fast |
 | denied | the operator said no | stop; the denial stands until they clear it in Agent access |
