@@ -39,8 +39,9 @@ refuses it with `invalid_arguments` (FAA-244).
 3. Each connection joins with `fabric.board.join {projectId}` (`join_board` / `joinBoard`). It re-reads `hub.json`,
    checks the pid it names is alive, tells the owner of the door's listener from the socket table (DEC-0154 HA-2:
    another OS account's process, or one whose owner cannot be told, is `HubError` code `foreign-user`, retryable, with
-   nothing sent; a retry never clears a restricted macOS table, `table-restricted` in protocol.md, FAA-272), and only then sends the credential (a session already running maps that refusal, as any transport
-   failure, to `board.down` with reason `unreachable` until FAA-252). A missing grant is `HubError` code
+   nothing sent; a retry never clears a restricted macOS table, `table-restricted` in protocol.md, FAA-272), and only then sends the credential (a session already running carries that refusal as `BoardError` code
+   `foreign-user`, one of `SESSION_CODES`, to `board.down` with reason `foreign-user` and a sentence that says nothing
+   was sent, never `unreachable`'s "a write may have been stored", FAA-252). A missing grant is `HubError` code
    `not_authorized` whose `data.ask` holds the arguments to ask with.
 
 ## Wiring it into the service

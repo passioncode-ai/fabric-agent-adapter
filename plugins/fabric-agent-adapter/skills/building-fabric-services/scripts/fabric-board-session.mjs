@@ -510,8 +510,11 @@ export class Responder extends SlotKeeper {
     } else {
       this.state = 'down';
       // A refusal in recovery that left no slot held reconnects (seam 6); one that left some held serves them (seam 7).
-      if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol'].includes(code)) && !keep) await this.dropSession();
-      this.emit('board.down', 'warning', 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
+      if ((connecting || ['session-ended', 'unreachable', 'not-running', 'not-a-hub', 'hub-unavailable', 'protocol', 'foreign-user'].includes(code)) && !keep) await this.dropSession();
+      // FAA-252: a port another OS account holds is said as such; nothing was sent there
+      this.emit('board.down', 'warning', code === 'foreign-user'
+        ? 'Fabric\'s board port is held by another OS account\'s process; nothing was sent, and the responder tries again with a growing pause.'
+        : 'Fabric\'s board cannot be reached; the responder tries again with a growing pause.', { episode: 'down', reason: code });
     }
     return wait;
   }

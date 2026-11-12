@@ -567,9 +567,13 @@ class Responder(SlotKeeper):
         else:
             self.state = "down"
             # In recovery with no slot held a refusal reconnects (seam 6); with some held they are served (seam 7).
-            if (connecting or code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol")) and not keep:
+            if (connecting or code in ("session-ended", "unreachable", "not-running", "not-a-hub", "hub-unavailable", "protocol",
+                                       "foreign-user")) and not keep:
                 self._drop_session()
-            self._emit("board.down", "warning", "Fabric's board cannot be reached; the responder tries again with a growing pause.",
+            # FAA-252: a port another OS account holds is said as such; nothing was sent there
+            self._emit("board.down", "warning", "Fabric's board port is held by another OS account's process; nothing was sent, "
+                       "and the responder tries again with a growing pause." if code == "foreign-user" else
+                       "Fabric's board cannot be reached; the responder tries again with a growing pause.",
                        episode="down", reason=code)
         return wait
 
