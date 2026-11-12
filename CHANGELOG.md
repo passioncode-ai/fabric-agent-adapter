@@ -12,6 +12,26 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
   Node reads `lsof -F pun`). `fabric_peer_owner` asks it on a restricted macOS table before the RT-3 vouch, and stands
   alone without it. `PEER_OWNER_VERSION` is `1.3.1+kit.7`.
 
+- **Operations digests** (FAA-206 part 2): `fabric_ops_digest` and `fabric-ops-digest.mjs` fold a service's own counts
+  into `ops.digest.hourly@1` and `ops.digest.daily@1` (DEC-0153), held to the contract's reference folds and its
+  fixtures (FAC-SEM-166, FAC-SEM-167); they keep the hour the service stops in for the next run, never fill hours
+  across a sleep, and catch up missed days. `ops_digest_extension` writes the descriptor's OD-9 declaration. New
+  `references/ops-digest.md`.
+- **A2A serving and calling** (FAA-10): `fabric_a2a_server` and `fabric-a2a-server.mjs` build the Agent Card from the
+  service's capabilities, check it before serving it, and map the A2A 1.0 JSON-RPC binding (`SendMessage`,
+  `SendStreamingMessage` as server-sent events, `GetTask`, `CancelTask`) onto the interop job store. `A2AClient` reaches
+  only origins on the operator's list, with its key from the environment. `check_service_a2a.py` holds the probe rows.
+  New `references/a2a.md`. The interop test against Hermes waits on a reachable endpoint.
+- **A data-agent recipe** (FAA-66): `recipes/data-agent/`, numbers computed by code from a read-only source and answered
+  with a truth envelope where missing is never zero (built from the agents database's `data-room` template).
+- **The support recipe** (FAA-116, FAA-182, FAA-264): a person's categories are routed first, a same-vendor fallback is
+  refused at load, the outbox is redacted, knowledge ids must be citable, and `support-agent.mjs` is `check_reply`'s
+  Node twin (31 shared cases).
+- **`FABRIC_DATA_HOME`** puts a service's data folder on a durable volume, both `fabric_paths` twins (FAA-192).
+- Guidance: the data-home base and a second context's home, the uptime A and B rows, model classes on the spend policy
+  or grant, a template takes precedence over the communication prompt (FAA-277), adapting step 4c scoped to an
+  existing agent; building `SKILL.md` names the board responder's mandate opt-in, the LaunchDaemon refusing `purge`, and
+  Apple's Python on macOS 27.2.
 ### Changed
 
 - `pid_listens` takes an `owner` (this account by default, a uid, or None), and the LaunchDaemon check reads that one
