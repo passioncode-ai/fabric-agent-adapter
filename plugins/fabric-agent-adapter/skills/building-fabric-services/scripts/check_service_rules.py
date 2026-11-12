@@ -135,20 +135,31 @@ import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 
 
-def other_domain_copy(label: object, domain: str) -> Optional[str]:
-    """The other launchd domain when it also has job `label` loaded, a second copy (FAA-286 item 6), else None."""
-    other = ("gui/%d" % getattr(os, "getuid", lambda: 0)()) if domain == "system" else "system"
-    try:
-        out = subprocess.run(["launchctl", "print", "%s/%s" % (other, label)], capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return other if out.returncode == 0 else None
+def other_domain_copy(label: object, domain: str, user_name: object = None) -> Optional[str]:
+    """The other launchd domain when it also has job `label` loaded, a second copy (FAA-286 item 6), else None. For a
+    LaunchDaemon (`system`) that is a gui/<uid> domain: first the one of its plist's UserName (`user_name`), where a
+    leftover LaunchAgent of a dedicated account runs (FAA-317), then the probe's own."""
+    if domain == "system":
+        uids = [_sup._account_uid(user_name)] if isinstance(user_name, str) and user_name else []
+        uids.append(getattr(os, "getuid", lambda: 0)())
+        others = ["gui/%d" % uid for i, uid in enumerate(uids) if uid is not None and uid not in uids[:i]]
+    else:
+        others = ["system"]
+    for other in others:
+        try:
+            out = subprocess.run(["launchctl", "print", "%s/%s" % (other, label)], capture_output=True, text=True,
+                                 timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if out.returncode == 0:
+            return other
+    return None
 
 
 def in_launch_daemons(plist_path: Path) -> bool:
-    """Whether a plist sits in /Library/LaunchDaemons, where launchd loads it at boot as a LaunchDaemon (FAA-278)."""
-    folder = re.sub(r"^/{2,}", "/", str(Path(os.path.abspath(str(plist_path))).parent))
-    return folder.lower() == str(_sup.SYSTEM_DAEMONS).lower()  # the supervisors' own, which a test may point elsewhere
+    """Whether a plist sits in /Library/LaunchDaemons, where launchd loads it at boot as a LaunchDaemon (FAA-278): the
+    supervisors' own rule, imported (FAA-317), which a test may point elsewhere through their SYSTEM_DAEMONS."""
+    return _sup._in_daemons(plist_path)
 
 
 def plist_problems(plist: dict, label: object, token: object = None, *, system: bool = False,

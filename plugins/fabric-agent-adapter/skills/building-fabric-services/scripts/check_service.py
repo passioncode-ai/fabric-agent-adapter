@@ -825,13 +825,15 @@ class Probe:
         out = subprocess.run(["launchctl", "print", "%s/%s" % (domain, life.get("label"))], capture_output=True, text=True)
         match = re.search(r"^\s*pid = (\d+)", out.stdout, re.MULTILINE)
         served = ((self.wk or {}).get("process") or {}).get("pid")
+        # a LaunchDaemon's leftover LaunchAgent runs in its UserName's gui/<uid> (FAA-317)
+        second = other_domain_copy(life.get("label"), domain, plist.get("UserName")) if out.returncode == 0 and match else None
         if out.returncode != 0:
             self.add("lifecycle.one-copy", "FAIL", "launchd job %s is not loaded in %s" % (life.get("label"), domain))
         elif not match:
             self.add("lifecycle.one-copy", "FAIL", "launchd job loaded but not running")
-        elif other_domain_copy(life.get("label"), domain):  # loaded in both domains: two copies (FAA-286 item 6)
+        elif second:  # loaded in both domains: two copies (FAA-286 item 6)
             self.add("lifecycle.one-copy", "FAIL", "launchd job %s is loaded in %s and in %s: two copies; uninstall one"
-                     % (life.get("label"), domain, other_domain_copy(life.get("label"), domain)))
+                     % (life.get("label"), domain, second))
         else:
             same = int(match.group(1)) == served
             self.add("lifecycle.one-copy", "PASS" if same else "FAIL",
