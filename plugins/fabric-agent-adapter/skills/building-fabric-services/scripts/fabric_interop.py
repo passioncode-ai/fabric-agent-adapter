@@ -406,6 +406,8 @@ class JobStore:
         A step is kept as the gate reads it (kept_step), so a job's start and its answer agree."""
         if not isinstance(input_requests, dict) or not input_requests:  # a JSON object of requests, first (readings 38, 39)
             raise InteropError("input_required needs a JSON object of at least one input request.")
+        if steps is not None and not isinstance(steps, dict):  # a JSON object or none, in both kits (FAA-196 (26))
+            raise InteropError("steps maps an input request's key to its approval step: a JSON object, or none.")
         kept: Dict[str, Dict[str, Any]] = {}
         for key, step in (steps or {}).items():  # the value checked is the value kept (seam reading 34)
             kept[key] = kept_step(step) if key in input_requests and isinstance(step, dict) else {}

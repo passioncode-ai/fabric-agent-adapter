@@ -115,6 +115,18 @@ test('a URL-mode request on a raw local address is refused at requestInput; the 
   assert.equal(store.requestInput(id, { approve: link }).status, 'input_required');
 });
 
+// FAA-196 (26): a `steps` that is not a plain object is refused with InteropError in both kits; null is no steps.
+test('requestInput refuses steps that are no object; the job stays working', () => {
+  const store = new i.JobStore(temp());
+  const id = store.create('example.draft', {}).job.id;
+  const request = i.choiceRequest('Publish?', 'choice', [['yes', 'Yes']]);
+  for (const steps of [['approve'], 'approve', 7, true, 0, false, '']) {
+    assert.throws(() => store.requestInput(id, { approve: request }, null, { steps }), i.InteropError, JSON.stringify(steps));
+  }
+  assert.equal(store.get(id).status, 'working');
+  assert.equal(store.requestInput(id, { approve: request }, null, { steps: null }).status, 'input_required');
+});
+
 // MCP 2026-07-28 standard headers: the Node twin agrees with fabric_interop.py.
 test('mcpHeaderProblem refuses a declared request without Mcp-Method/Mcp-Name and any mismatch; matching headers pass', () => {
   const call = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'sample.echo', arguments: {} } };

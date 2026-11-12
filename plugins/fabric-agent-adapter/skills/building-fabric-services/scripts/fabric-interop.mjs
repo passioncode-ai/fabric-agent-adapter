@@ -273,6 +273,9 @@ export class JobStore {
   requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
     const entries = Object.entries(inputRequests ?? {});
     if (!entries.length || Array.isArray(inputRequests) || typeof inputRequests !== 'object') throw new InteropError('input_required needs a JSON object of at least one input request.'); // a JSON object of requests, first (unit 38, 40)
+    if (steps !== null && steps !== undefined && (typeof steps !== 'object' || Array.isArray(steps))) { // FAA-196 (26)
+      throw new InteropError('steps maps an input request\'s key to its approval step: a JSON object, or none.');
+    }
     const kept = Object.create(null); // the value checked is the value kept (seam 34); a key __proto__ stays a key (35)
     for (const [key, step] of Object.entries(steps ?? {})) {
       kept[key] = Object.hasOwn(inputRequests, key) && step !== null && step !== undefined ? keptStep(step) : {};

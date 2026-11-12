@@ -195,6 +195,18 @@ class JobStoreTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         self.assertEqual(fi.parse_traceparent(again.traceparent(handle["job"]["id"]))["trace_id"], "4bf92f3577b34da6a3ce929d0e0e4736")
 
+    def test_steps_that_are_no_object_are_refused(self):
+        """FAA-196 (26): a `steps` that is not a JSON object split the kits (an AttributeError or no step); both refuse it
+        with InteropError and the job stays working. None is no steps."""
+        store = fi.JobStore(self.dir)
+        job_id = store.create("example.draft", {})["job"]["id"]
+        request = fi.choice_request("Publish?", "choice", [("yes", "Yes")])
+        for steps in (["approve"], "approve", 7, True, 0, False, ""):
+            with self.subTest(steps=steps), self.assertRaises(fi.InteropError):
+                store.request_input(job_id, {"approve": request}, steps=steps)
+        self.assertEqual(store.get(job_id)["status"], "working")
+        self.assertEqual(store.request_input(job_id, {"approve": request}, steps=None)["status"], "input_required")
+
     def test_unknown_job_is_an_error_never_a_fresh_job(self):
         store = fi.JobStore(self.dir)
         with self.assertRaises(fi.UnknownJob):
