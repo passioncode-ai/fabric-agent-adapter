@@ -70,8 +70,9 @@ class HubError(Exception):
 def listener_refusal(exc: Any) -> HubError:
     """The HubError for a hub port the peer-owner check refused (DEC-0154 HA-2): code `foreign-user`, the pinned
     contract's state name, with the owner's reason in the sentence and in `data.reason` (FAA-272): `table-restricted`
-    when this process's socket table hides other processes' sockets, which never clears, so it is not retryable;
-    otherwise the owner's kind or the check's reason (`another-account`, `no-row`), retryable as before."""
+    when this process's socket table hides other processes' sockets, or, on macOS, holds no row for this connection
+    (DEC-0155 RT-1, FAA-312), which never clears, so it is not retryable; otherwise the owner's kind or the check's
+    reason (`another-account`, or `no-row`, which only Linux and Windows give), retryable."""
     owner = getattr(exc, "owner", None)
     why = (getattr(owner, "reason", None) or getattr(owner, "kind", None) or getattr(exc, "code", None) or "unknown")
     reason = _po.TABLE_RESTRICTED if str(why).startswith(_po.TABLE_RESTRICTED) else str(why).split(":", 1)[0]

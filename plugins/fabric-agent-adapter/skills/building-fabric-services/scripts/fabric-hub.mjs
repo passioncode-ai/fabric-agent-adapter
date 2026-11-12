@@ -56,8 +56,9 @@ export class HubError extends Error {
 /**
  * The HubError for a hub port the peer-owner check refused (DEC-0154 HA-2): code `foreign-user`, the pinned contract's
  * state name, with the owner's reason in the sentence and in `data.reason` (FAA-272): `table-restricted` when this
- * runtime's socket table hides other processes' sockets, which never clears, so it is not retryable; otherwise the
- * owner's kind or the check's reason (`another-account`, `no-row`), retryable as before.
+ * runtime's socket table hides other processes' sockets, or, on macOS, holds no row for this connection (DEC-0155
+ * RT-1, FAA-312), which never clears, so it is not retryable; otherwise the owner's kind or the check's reason
+ * (`another-account`, or `no-row`, which only Linux and Windows give), retryable.
  */
 export function listenerRefusal(e) {
   const kind = e?.owner?.kind ?? null;
