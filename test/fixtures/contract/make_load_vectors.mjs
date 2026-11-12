@@ -25,6 +25,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => (a.startsWith('--') ? [...acc, [a.slice(2), all[i + 1]]] : acc), []));
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = args.out ?? path.join(here, 'load-vectors.json');
+// The commit written is the lock's, so a repin moves it with the lock (FAA-258).
+const pin = JSON.parse(fs.readFileSync(path.join(here, '../../../fabric-contract.lock.json'), 'utf8')).commit;
 const src = (file) => import(pathToFileURL(path.join(args['contract-src'], file)).href);
 const read = (file) => JSON.parse(fs.readFileSync(path.join(args.contract, file), 'utf8'));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -201,7 +203,7 @@ const reports = [...fromCatalogue('service-load.schema.json'), ...reportExtra].m
 const document = {
   about: 'The call queue and the load report of DEC-0104 at the pin: nextQueuedJob, admitJob, jobCallerKey, readQueuePosition and queueStatusMessage, FAC-SEM-131 and FAC-SEM-132 (code, instancePath, message), FAC-SEM-133 (code and instancePath), and the validity of service-load/1 and the load extension, each answered by the contract\'s functions and validator. Written by make_load_vectors.mjs, never by hand. expected is exactly what the reference returns, with null for undefined; a case without `accepted` passes none.',
   source: 'fixtures/vectors/agent-network.json, fixtures/semantic/{job-queue,service-load,service-well-known-load}-*.json, fixtures/catalogue.json, src/agent-network.ts',
-  commit: '18f8d48762edc5bfb1433657cbfe1c16196df1a6',
+  commit: pin,
   extensionKey: KEY,
   queue: [...vectors.queue, ...queueExtra],
   admit: [...vectors.admit, ...admitExtra],
