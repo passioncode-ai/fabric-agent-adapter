@@ -6,7 +6,7 @@ description: >-
   for a provider manifest (adapting-projects-to-fabric), a new agent (creating-fabric-agents) or a session
   (working-with-fabric).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
-compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
+compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
   version: "0.83.0"
@@ -52,7 +52,8 @@ to review one. Do not use it for:
 
 It is a service when at least one is true: other agents call it while the operator is
 away; it runs jobs longer than one request; it owns a store other tools read; the
-operator watches it on a page. Otherwise build a CLI and stop here.
+operator watches it on a page; it is an uptime A agent that answers while the owner's computer is off (an online
+service, the remote placement below). Otherwise build a CLI and stop here.
 
 Answer before writing code, and record the answers in the project README:
 
@@ -105,6 +106,7 @@ When the service answers requests other Projects post to its Project on Fabric's
 responder in its own process: [`scripts/fabric_hub.py`](scripts/fabric_hub.py) finds the hub and joins,
 [`scripts/fabric_board.py`](scripts/fabric_board.py) enrolls, claims, accepts the exact digest, checkpoints before
 every step and stops on `fenced`, `lease_expired` or `authority_changed` (Node: `fabric-hub.mjs`, `fabric-board.mjs`).
+It reads an operator's mandate on a request only when it opts in with `agent_id=` and `mandate_from=` (Node: `agentId`, `mandateFrom`).
 The request body is data behind the service's own input gate. A slot moved to another
 session stays moved until `take_back` (`takeBack`) or a move back once Fabric offers one: give it an operator action with its tool and gate
 `relayed` (the operator reaches it through an agent that relays their decision in `_meta`, the service's
@@ -228,7 +230,7 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
    FileVault restart) install a LaunchDaemon instead: the plist in `/Library/LaunchDaemons` with `user_name`, as root
    (the lifecycle reference, *The system domain*).
 3. Uninstall: `launchd_uninstall` (waits for the unload, removes the plist, resets the
-   override; `purge=True` removes data only when the operator asks), `remove_descriptor`.
+   override; `purge=True` removes data only when the operator asks, and a LaunchDaemon refuses it), `remove_descriptor`.
 4. After an upgrade, `prune_releases(releases_dir, current=…)` keeps the running release
    and the one before it.
 
@@ -267,6 +269,9 @@ adopt, the gates, the hooks, the board responder's take-back and the refusals: t
 agents, models, connectors, stores and channels, each with its state, from
 `connections_extension()` / `connectionsExtension()` in `fabric_connections`. Never a credential in it, never a call
 count (that is the usage report); details: [the wire reference](references/protocol.md).
+
+A service counts its own log into hourly and daily **operations digests** (DEC-0153) with `fabric_ops_digest`
+(`fabric-ops-digest.mjs`): [the ops digest reference](references/ops-digest.md).
 
 The events feed is a **view over the log you already keep** (a jobs table, a JSONL
 journal), not a second store. Each event is one sentence a person reads; set
@@ -355,7 +360,8 @@ Whoever owns the repository, an agent with a page gets the dashboard rule block 
 (below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's choice, the organization
 publishes and lists nothing about it, of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep
-theirs), and the verified MCP quick start teaches anyone to drive it.
+theirs), and the verified MCP quick start teaches anyone to drive it. The kit's files stay AGPL-3.0-only or the
+PassionCode commercial licence there, in an agent built for a client too.
 
 ## Online services: the remote placement
 

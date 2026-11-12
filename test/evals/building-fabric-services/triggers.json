@@ -196,6 +196,10 @@
       "query": "I told my coding agent to approve the reply; the service refused operator-decision-required. What should the agent send?",
       "shouldTrigger": false,
       "note": "sibling: working-with-fabric"
+    },
+    {
+      "query": "Add hourly and daily operations digests to example-agent's service so a collector can read its counts.",
+      "shouldTrigger": true
     }
   ]
 }

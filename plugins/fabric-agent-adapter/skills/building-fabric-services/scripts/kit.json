@@ -349,6 +349,19 @@
    "sha256": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9"
   },
   {
+   "module": "fabric_ops_digest",
+   "file": "fabric_ops_digest.py",
+   "layer": "L3",
+   "imports": [
+    "fabric_base",
+    "fabric_jsvalue",
+    "fabric_paths",
+    "fabric_secrets",
+    "fabric_time"
+   ],
+   "sha256": "57421e684dd427b485ad2087a73abd005bde8f274a4360174489c647bb10b5e3"
+  },
+  {
    "module": "fabric_supervisors",
    "file": "fabric_supervisors.py",
    "layer": "L3",
@@ -884,6 +897,19 @@
     "fabric-paths"
    ],
    "sha256": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946"
+  },
+  {
+   "module": "fabric-ops-digest",
+   "file": "fabric-ops-digest.mjs",
+   "layer": "L3",
+   "imports": [
+    "fabric-base",
+    "fabric-jsvalue",
+    "fabric-paths",
+    "fabric-secrets",
+    "fabric-time"
+   ],
+   "sha256": "3102044148c27e8cab4a6d34f8f46b30a06819e9b360307751a9d2d693ac0294"
   },
   {
    "module": "fabric-supervisors",
@@ -7115,6 +7141,7 @@
    "fabric_auth.py": "74ccc10239b65a3567cec5213a7b344cbd88d6eee1fd1c5f7be1d6daf985993c",
    "fabric_events.py": "da3fe3e3e19d4c9754b90c719e9c069a3ac85e080b9fffd07adbaf63b5bfcf0d",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
+   "fabric_ops_digest.py": "57421e684dd427b485ad2087a73abd005bde8f274a4360174489c647bb10b5e3",
    "fabric_supervisors.py": "e5e77c7ddac742fd1882d42be33eb694906e7eb869abbee0e825d4f687936698",
    "fabric_service.py": "fb6bccc9f330df26a53287023da2ce4947f85e6b4fb2437db01c429ec809454d",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
@@ -7162,6 +7189,7 @@
    "fabric-auth.mjs": "10ff37a39f9e3adb4d0f05db66c45f49b10eef582e9220c213907964109d7e52",
    "fabric-events.mjs": "c95c07e2745e52fddbb7237b89824123f240d4f8d6b14f5cb269a09e1845c3ba",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
+   "fabric-ops-digest.mjs": "3102044148c27e8cab4a6d34f8f46b30a06819e9b360307751a9d2d693ac0294",
    "fabric-supervisors.mjs": "6d9fecb0f19e82548c991be2e7e76e1bde5405fa34c6606f90025cc14128395e",
    "fabric-service.mjs": "0d21b3f6f4a51b3ede576e748d481ab831fec570f629883b95f138c8823ab320",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",

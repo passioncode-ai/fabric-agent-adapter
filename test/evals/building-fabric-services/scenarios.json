@@ -702,6 +702,28 @@
         "reads status and pid without root with launchd_loaded(label, \"system\") and launchd_pid(label, \"system\")",
         "starts the server with exec (no wrapper child) so the job's own pid proves the listener"
       ]
+    },
+    {
+      "id": "a-service-writes-its-operations-digests",
+      "trap": "the agent sends log lines or paths to a collector, fills hours across a sleep, counts a missing-slot refusal as failed, or writes a daily line for a day with no hourly lines",
+      "request": "Make example-agent keep the hourly and daily operations digests Fabric asks for, so Observatory can read them.",
+      "expected": [
+        "uses fabric_ops_digest (Node fabric-ops-digest.mjs): OpsDigest(<data>/digests).start(), record(op, outcome) for every record before sampling, tick() while running, flush() now and then, stop() at the drain",
+        "names operations by OD-2 (board.tick, mcp.tools/list), never a value, and knows a refused name raises at record",
+        "maps the log's own outcome words with outcome_of and publishes the map and the overflow name; a missing slot or refusal is unknown, never failed",
+        "never fills hours the service did not observe; the stop hour is written at the next run, and a missed day is folded then",
+        "declares the folder with ops_digest_extension([{dir: digests, source: app}]) in a local descriptor that names paths.data, never in a remote one",
+        "keeps the digests on the machine: counts only, no log line, path or identifier"
+      ]
+    },
+    {
+      "id": "an-uptime-a-agent-is-a-service-online",
+      "trap": "Step 0 sends an agent that must answer while the owner's computer is off to a CLI because no other agent calls it yet",
+      "request": "example-agent answers our customers' messages day and night, even when my laptop is closed. Nothing else calls it. Is it a service?",
+      "expected": [
+        "answers yes: an uptime A agent is a service by Step 0, built as an online service (the remote placement)",
+        "does not build a CLI or a laptop-only local service for it"
+      ]
     }
   ]
 }

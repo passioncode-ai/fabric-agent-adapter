@@ -1,0 +1,813 @@
+{
+ "about": "Vendored from fabric-agent-contract at the pin 93e7db164c7829e2783b4b7705c4113bb5201131 (fixtures/positive/ops-digest-* and fixtures/semantic/ops-digest-hourly-*, ops-digest-daily-*), unchanged except that the credential-shaped operation name is written @SK@ (each test builds it, so no file holds one): each the kind, the rule codes the contract expects (none for a positive fixture) and the digest. FAC-SEM-166 and FAC-SEM-167 are read by fabric_ops_digest.ops_digest_rules and opsDigestRules.",
+ "fixtures": [
+  {
+   "name": "ops-digest-daily",
+   "kind": "ops-digest-daily",
+   "expect": [],
+   "input": {
+    "schema": "ops.digest.daily@1",
+    "day": "2026-11-04",
+    "hours": 2,
+    "ops": [
+     {
+      "op": "retro-after-work",
+      "ok": 3,
+      "failed": 0,
+      "unknown": 1
+     },
+     {
+      "op": "x",
+      "ok": 0,
+      "failed": 42,
+      "unknown": 0
+     },
+     {
+      "op": "y",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     }
+    ],
+    "total": {
+     "ok": 4,
+     "failed": 42,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "x",
+      "hours": 2,
+      "failed": 42
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-empty",
+   "kind": "ops-digest-hourly",
+   "expect": [],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T03:00:00Z",
+    "to": "2026-11-04T04:00:00Z",
+    "ops": [],
+    "total": {
+     "ok": 0,
+     "failed": 0,
+     "unknown": 0
+    },
+    "risen": []
+   }
+  },
+  {
+   "name": "ops-digest-hourly",
+   "kind": "ops-digest-hourly",
+   "expect": [],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 48,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-daily-no-such-day",
+   "kind": "ops-digest-daily",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.daily@1",
+    "day": "2026-13-01",
+    "hours": 2,
+    "ops": [
+     {
+      "op": "retro-after-work",
+      "ok": 3,
+      "failed": 0,
+      "unknown": 1
+     },
+     {
+      "op": "x",
+      "ok": 0,
+      "failed": 42,
+      "unknown": 0
+     },
+     {
+      "op": "y",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     }
+    ],
+    "total": {
+     "ok": 4,
+     "failed": 42,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "x",
+      "hours": 2,
+      "failed": 42
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-daily-ok",
+   "kind": "ops-digest-daily",
+   "expect": [],
+   "input": {
+    "schema": "ops.digest.daily@1",
+    "day": "2026-11-04",
+    "hours": 2,
+    "ops": [
+     {
+      "op": "retro-after-work",
+      "ok": 3,
+      "failed": 0,
+      "unknown": 1
+     },
+     {
+      "op": "x",
+      "ok": 0,
+      "failed": 42,
+      "unknown": 0
+     },
+     {
+      "op": "y",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     }
+    ],
+    "total": {
+     "ok": 4,
+     "failed": 42,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "x",
+      "hours": 2,
+      "failed": 42
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-daily-rise-too-few",
+   "kind": "ops-digest-daily",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.daily@1",
+    "day": "2026-11-04",
+    "hours": 2,
+    "ops": [
+     {
+      "op": "retro-after-work",
+      "ok": 3,
+      "failed": 0,
+      "unknown": 1
+     },
+     {
+      "op": "x",
+      "ok": 0,
+      "failed": 42,
+      "unknown": 0
+     },
+     {
+      "op": "y",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     }
+    ],
+    "total": {
+     "ok": 4,
+     "failed": 42,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "x",
+      "hours": 2,
+      "failed": 15
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-daily-rose-more-hours",
+   "kind": "ops-digest-daily",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.daily@1",
+    "day": "2026-11-04",
+    "hours": 2,
+    "ops": [
+     {
+      "op": "retro-after-work",
+      "ok": 3,
+      "failed": 0,
+      "unknown": 1
+     },
+     {
+      "op": "x",
+      "ok": 0,
+      "failed": 42,
+      "unknown": 0
+     },
+     {
+      "op": "y",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     }
+    ],
+    "total": {
+     "ok": 4,
+     "failed": 42,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "x",
+      "hours": 3,
+      "failed": 42
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-no-such-day",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-02-30T17:00:00.000Z",
+    "to": "2026-02-30T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 48,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-not-a-rise",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 48,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 7
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-ok",
+   "kind": "ops-digest-hourly",
+   "expect": [],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 48,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-op-credential",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-167"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "@SK@",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 49,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-op-home",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-167"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     },
+     {
+      "op": "users/jdoe/fabric",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     }
+    ],
+    "total": {
+     "ok": 49,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-op-twice",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     },
+     {
+      "op": "board.tick",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     }
+    ],
+    "total": {
+     "ok": 49,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-op-users",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-167"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "api.users/list",
+      "ok": 1,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 49,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-rise-not-counted",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 48,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     },
+     {
+      "op": "queue.drop",
+      "failed": 10,
+      "previous": 0
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-total-not-sum",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T18:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 47,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  },
+  {
+   "name": "ops-digest-hourly-two-hours",
+   "kind": "ops-digest-hourly",
+   "expect": [
+    "FAC-SEM-166"
+   ],
+   "input": {
+    "schema": "ops.digest.hourly@1",
+    "from": "2026-11-04T17:00:00.000Z",
+    "to": "2026-11-04T19:00:00.000Z",
+    "ops": [
+     {
+      "op": "board.tick",
+      "ok": 3,
+      "failed": 2,
+      "unknown": 0
+     },
+     {
+      "op": "cycle.receipt",
+      "ok": 40,
+      "failed": 12,
+      "unknown": 0
+     },
+     {
+      "op": "ipc.work:home",
+      "ok": 5,
+      "failed": 0,
+      "unknown": 0
+     },
+     {
+      "op": "mcp.unparsed",
+      "ok": 0,
+      "failed": 0,
+      "unknown": 1
+     }
+    ],
+    "total": {
+     "ok": 48,
+     "failed": 14,
+     "unknown": 1
+    },
+    "risen": [
+     {
+      "op": "cycle.receipt",
+      "failed": 12,
+      "previous": 5
+     }
+    ]
+   }
+  }
+ ]
+}
