@@ -189,7 +189,7 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
 | `authority_changed`, `not_authorized` | stop claiming; one `board.access.needed` event (notify) saying what to ask for (except `not_authorized` on the move-back claim of a moved slot, read as another session's slot, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)) |
 | `fenced` on enroll or claim | another live holder: wait for it to lapse; never replace it on its own initiative. When this responder recorded holding the slot, it first reads `com.status`: a newer generation means the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155), and it is not taken again even after that holder lapses |
 | lost after an effect began | keep the entry as `unknown`; `observe(entry)` is asked to settle it with `com.reconcile` |
-| Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning |
+| Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning; a board that flaps is said down once until it stays up `DOWN_QUIET_SECONDS` (300 s, FAA-187 (22)) |
 | one call without an answer while the lease holds | `board.down`, but the session and the running work stay; the call goes again, with the same key, before the lease lapses |
 | `revision_conflict` on `com.renew` or `com.progress` | they store nothing: the revision is read again (`com.get`) and the call sent once more; a second one loses the attempt |
 | `idempotency_conflict` | a key sent with other content is a defect, not an outage: `board.blocked` (notify) naming it, and the session is left |

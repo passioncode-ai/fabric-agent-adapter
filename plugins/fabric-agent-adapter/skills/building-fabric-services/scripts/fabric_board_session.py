@@ -52,6 +52,9 @@ IDLE_LEAVE_SECONDS = 3.0
 
 EVENT_SCHEMA = "urn:fabric:schema:board-responder-event:1"
 
+#: `board.down` is said once per outage window: said again only after the board stayed up this long (FAA-187 (22)).
+DOWN_QUIET_SECONDS = 300.0
+
 #: On these the attempt is no longer ours: stop acting at once (C4).
 STOP_CODES = frozenset(["fenced", "lease_expired", "authority_changed"])
 
@@ -148,6 +151,7 @@ class Responder(SlotKeeper):
         self.claim_keys: Dict[str, str] = {}
         self._probing: set = set()  # moved slots whose move-back claim lost its answer: asked again under the same key
         self._said: Dict[str, str] = {}
+        self._up_since: Optional[float] = None  # when the board was last seen up after a fault (FAA-187 (22))
         self._rr = 0
         #: The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS.
         self.hold_delay = POLL_SECONDS
@@ -243,8 +247,8 @@ class Responder(SlotKeeper):
         self.slots = {}
         self._recover(status, [c for c in self.capabilities if c in grant.capabilities])
         self.state = "ready"
-        for kind in ("board.down", "board.blocked") + (() if missing else ("board.access.needed",)):
-            self._said.pop(kind, None)
+        for kind in ("board.blocked",) + (() if missing else ("board.access.needed",)):
+            self._said.pop(kind, None)  # board.down waits for its quiet window (step)
 
     def _enroll(self, capability: str) -> None:
         args = {"idempotency": self._idem(self._key("enroll")), "capability": capability}
@@ -501,6 +505,8 @@ class Responder(SlotKeeper):
             self.backoff.reset()
             if self.state == "down":  # a lost call was sent again and answered: the session held throughout
                 self.state = "ready"
+            self._up_since = now if self._up_since is None else self._up_since
+            if now - self._up_since >= DOWN_QUIET_SECONDS:  # up a whole window: a later outage is said again
                 self._said.pop("board.down", None)
             return self.interval()
         except (BoardError, _hub.HubError) as exc:
@@ -518,7 +524,7 @@ class Responder(SlotKeeper):
         return min(renewed) + LEASE_SECONDS - self.now() if renewed and self.session is not None else 0.0
 
     def _fault(self, exc: Exception) -> float:
-        code, slots = getattr(exc, "code", "unreachable"), self.slots.values()
+        code, slots, self._up_since = getattr(exc, "code", "unreachable"), self.slots.values(), None
         connecting = self.state == "connecting" and not any(s.get("state") == "held" for s in slots)
         wait = self.backoff.next()
         left = self._lease_left() - LEASE_MARGIN_SECONDS

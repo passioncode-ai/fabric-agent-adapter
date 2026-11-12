@@ -319,6 +319,29 @@ test('authority_changed stops claiming; no epoch fails closed; another protocol 
   assert.equal(h3.events.at(-1)[3].data.value.reason, 'schema-unsupported');
 });
 
+test('FAA-187 (22): a flapping board is said down once per outage window', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  for (let i = 0; i < 4; i += 1) { // down, up, down, up within the window: one row
+    await hub.control({ op: 'set', values: { down: true } });
+    await h.advance(await r.step());
+    await hub.control({ op: 'set', values: { down: false } });
+    await h.advance(await r.step());
+  }
+  assert.equal(h.kinds().filter((k) => k === 'board.down').length, 1);
+  assert.equal(r.state, 'ready');
+  const { DOWN_QUIET_SECONDS } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board-session.mjs');
+  for (let i = 0; i < Math.floor(DOWN_QUIET_SECONDS / 20) + 2; i += 1) { // up long enough: the outage window closes
+    await h.advance(20);
+    await r.step();
+  }
+  await hub.control({ op: 'set', values: { down: true } });
+  await h.advance(await r.step());
+  assert.equal(h.kinds().filter((k) => k === 'board.down').length, 2, 'a later outage is said again');
+});
+
 test('Fabric down: bounded backoff, one event, then recovery', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

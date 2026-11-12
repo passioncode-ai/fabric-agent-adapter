@@ -20,6 +20,8 @@ export const POLL_JITTER_SECONDS = 5;
 export const DRAIN_SECONDS = 10;
 /** An idle responder's leave waits this long for the DELETE, so an idle stop ends within LC-01's 5 s (FAA-173). */
 export const IDLE_LEAVE_SECONDS = 3;
+/** `board.down` is said once per outage window: said again only after the board stayed up this long (FAA-187 (22)). */
+export const DOWN_QUIET_SECONDS = 300;
 
 export const EVENT_SCHEMA = 'urn:fabric:schema:board-responder-event:1';
 
@@ -115,6 +117,7 @@ export class Responder extends SlotKeeper {
     this.claimKeys = Object.create(null);
     this.probing = new Set(); // moved slots whose move-back claim lost its answer: asked again under the same key
     this.said = Object.create(null);
+    this.upSince = null; // when the board was last seen up after a fault (FAA-187 (22))
     this.rr = 0;
     this.reconcileAt = 0;
     /** The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS. */
@@ -211,7 +214,7 @@ export class Responder extends SlotKeeper {
     this.slots = Object.create(null);
     await this.recover(status, this.capabilities.filter((c) => grant.capabilities.includes(c)));
     this.state = 'ready';
-    for (const kind of ['board.down', 'board.blocked', ...(missing.length ? [] : ['board.access.needed'])]) delete this.said[kind];
+    for (const kind of ['board.blocked', ...(missing.length ? [] : ['board.access.needed'])]) delete this.said[kind]; // board.down waits for its quiet window (step)
   }
 
   async enroll(capability) {
@@ -476,10 +479,9 @@ export class Responder extends SlotKeeper {
       if (!this.session) await this.connect();
       await this.tick();
       this.backoff.reset();
-      if (this.state === 'down') { // a lost call was sent again and answered: the session held throughout
-        this.state = 'ready';
-        delete this.said['board.down'];
-      }
+      if (this.state === 'down') this.state = 'ready'; // a lost call was sent again and answered: the session held throughout
+      this.upSince ??= now;
+      if (now - this.upSince >= DOWN_QUIET_SECONDS) delete this.said['board.down']; // up a whole window: a later outage is said again
       return this.interval();
     } catch (e) {
       if (!(e instanceof BoardError) && !(e instanceof HubError)) throw e;
@@ -498,6 +500,7 @@ export class Responder extends SlotKeeper {
 
   async fault(e) {
     const code = e.code ?? 'unreachable';
+    this.upSince = null;
     const connecting = this.state === 'connecting' && !Object.values(this.slots).some((s) => s?.state === 'held');
     let wait = this.backoff.next();
     const left = this.leaseLeft() - LEASE_MARGIN_SECONDS;

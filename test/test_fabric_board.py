@@ -435,6 +435,25 @@ class FailureTests(Conversation):
         self.assertEqual([e[0] for e in self.events].count("board.access.needed"), 1)  # once per episode
         self.assertTrue(waits[0] < waits[-1] <= 300)
 
+    def test_a_flapping_board_is_said_down_once_per_outage_window(self):
+        """FAA-187 (22): `board.down` was said again after every good tick that ended an outage, so a hub that flaps wrote
+        a row a tick; it is said once until the board has stayed up for DOWN_QUIET_SECONDS."""
+        r = self.responder()
+        r.step()
+        for _ in range(4):  # down, up, down, up within the window: one row
+            self.hub.down = True
+            self.board.advance(r.step())
+            self.hub.down = False
+            self.board.advance(r.step())
+        self.assertEqual(self.kinds().count("board.down"), 1)
+        self.assertEqual(r.state, "ready")
+        for _ in range(int(importlib.import_module("fabric_board_session").DOWN_QUIET_SECONDS // 20) + 2):  # up long enough: the outage window closes
+            self.board.advance(20)
+            r.step()
+        self.hub.down = True
+        self.board.advance(r.step())
+        self.assertEqual(self.kinds().count("board.down"), 2, "a later outage is said again")
+
     def test_fabric_down_backs_off_without_spinning_then_recovers(self):
         self.hub.withdraw()
         r = self.responder()
