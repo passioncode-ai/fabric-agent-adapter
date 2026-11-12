@@ -374,7 +374,8 @@ export function launchdDomain(plistPath = null, { domain = null, platform = proc
 function pairProblem(plistPath, domain, platform) {
   const paths = platform === 'darwin' ? path.posix : path;
   const folder = paths.dirname(paths.resolve(String(plistPath)));
-  if (domain === 'system' && paths.basename(folder).toLowerCase() === 'launchagents') {
+  const parts = String(plistPath).split(/[\\/]+/); // the folder's own name, whatever separator a test's host path uses
+  if (domain === 'system' && String(parts[parts.length - 2] ?? '').toLowerCase() === 'launchagents') {
     return `A LaunchDaemon's plist lives in ${SYSTEM_DAEMONS}: ${plistPath} is in a LaunchAgents folder, which launchd also loads into gui/<uid> at login, so the job would run twice.`;
   }
   if (domain === 'gui' && folder.toLowerCase() === SYSTEM_DAEMONS.toLowerCase()) {

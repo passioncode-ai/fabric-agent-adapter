@@ -137,7 +137,7 @@ import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 
 def other_domain_copy(label: object, domain: str) -> Optional[str]:
     """The other launchd domain when it also has job `label` loaded, a second copy (FAA-286 item 6), else None."""
-    other = ("gui/%d" % os.getuid()) if domain == "system" else "system"
+    other = ("gui/%d" % getattr(os, "getuid", lambda: 0)()) if domain == "system" else "system"
     try:
         out = subprocess.run(["launchctl", "print", "%s/%s" % (other, label)], capture_output=True, text=True, timeout=10)
     except (OSError, subprocess.SubprocessError):

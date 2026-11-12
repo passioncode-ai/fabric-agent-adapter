@@ -884,7 +884,7 @@
     "fabric-peer-owner",
     "fabric-secrets"
    ],
-   "sha256": "62f30015327b7917805e4ce1be9049b34e770d7a8eedef675578653c72cef0ad"
+   "sha256": "6d9fecb0f19e82548c991be2e7e76e1bde5405fa34c6606f90025cc14128395e"
   },
   {
    "module": "fabric-service",
@@ -6939,7 +6939,7 @@
    "fabric-auth.mjs": "10ff37a39f9e3adb4d0f05db66c45f49b10eef582e9220c213907964109d7e52",
    "fabric-events.mjs": "c95c07e2745e52fddbb7237b89824123f240d4f8d6b14f5cb269a09e1845c3ba",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
-   "fabric-supervisors.mjs": "62f30015327b7917805e4ce1be9049b34e770d7a8eedef675578653c72cef0ad",
+   "fabric-supervisors.mjs": "6d9fecb0f19e82548c991be2e7e76e1bde5405fa34c6606f90025cc14128395e",
    "fabric-service.mjs": "3beca77cacc4becdbc440ccc1449d1a7fc6451fb7e1f664ffbfaa5b1895938d1",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458",

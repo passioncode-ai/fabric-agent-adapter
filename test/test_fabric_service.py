@@ -694,7 +694,7 @@ class DocumentTests(unittest.TestCase):
                 if argv[2].split("/")[0] not in loaded:
                     return subprocess.CompletedProcess(argv, 113, "", "Could not find service")
                 return subprocess.CompletedProcess(argv, 0, "%s = {\n\tpid = 4242\n}\n" % argv[2], "")
-            gui = "gui/%d/a.b.c" % os.getuid()
+            gui = "gui/%d/a.b.c" % getattr(os, "getuid", lambda: 0)()
             # FAA-286 items 6 and 17: the plist's domain first, then the other one, which must not hold a second copy;
             # the gui branch reads a LaunchAgents plist the same way
             agent = Path(tmp) / "LaunchAgents" / "a.b.c.plist"
@@ -705,6 +705,8 @@ class DocumentTests(unittest.TestCase):
                                                (agent, {"gui"}, gui, "PASS"),
                                                (agent, {"gui", "system"}, gui, "FAIL"),
                                                (agent, {"system"}, gui, "FAIL")):
+                if where == agent and not hasattr(os, "getuid"):
+                    continue  # a gui/<uid> domain needs a uid: Windows has none, and launchd is macOS's
                 with self.subTest(plist=where.parent.name, loaded=sorted(loaded)):
                     d["lifecycle"]["plist"] = str(where)
                     p = checker.Probe(Path("/dev/null"), d, Path("/tmp"), True)
