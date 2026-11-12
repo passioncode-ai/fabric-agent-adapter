@@ -244,7 +244,7 @@
     "fabric_paths",
     "fabric_platform"
    ],
-   "sha256": "dfaf92a7086cbb097d832a305869b7964e2d2a9da0e3365c8ec1685a7bb4fef9"
+   "sha256": "10d6a2321ac8da47fc6f5bb01b32e2f8c8c966ef6d7145cf3b12bd35156bd650"
   },
   {
    "module": "fabric_usage",
@@ -752,7 +752,7 @@
     "fabric-base",
     "fabric-paths"
    ],
-   "sha256": "02cf833c97a07a8b3c788f9c93f70c4b9c9066efa25318dccf0038e0fc79717f"
+   "sha256": "cf79c3aed04dfd36833929f7edd76404976699ac7a8fe38820f0fa02fc2243be"
   },
   {
    "module": "fabric-usage",
@@ -6378,7 +6378,7 @@
    "fabric_connections.py": "7de55cb7d808f756d650effabfaa12027d40a5bd5d2f6d448c32969d47529ecb",
    "fabric_a2a.py": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919",
    "fabric_page_links.py": "1b57ea573c550e2f90d1ec3edcc655917ceaa0db9dd1635fccf422ec3024d25e",
-   "fabric_lock.py": "dfaf92a7086cbb097d832a305869b7964e2d2a9da0e3365c8ec1685a7bb4fef9",
+   "fabric_lock.py": "10d6a2321ac8da47fc6f5bb01b32e2f8c8c966ef6d7145cf3b12bd35156bd650",
    "fabric_usage.py": "5cc2e03ccc5b06e81987ed7bc3eead7a7e6cbf1a7cb8e05c6c64315eed9d91b6",
    "fabric_backups.py": "1f3f0d7ecf361b29e9101e07f1c53e5dc304d598bf26fd59ec89f16b9fed2420",
    "fabric_descriptor.py": "c08c91ca0960c694ed7677e7e9247d6307c7b63f37a7e614db022c080cd92ccc",
@@ -6423,7 +6423,7 @@
    "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",
    "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
    "fabric-page-links.mjs": "a8834926e9d4bbf7c4857f551451d2ebf6ac8873bbccaaf89c5e30cf45b17ee6",
-   "fabric-lock.mjs": "02cf833c97a07a8b3c788f9c93f70c4b9c9066efa25318dccf0038e0fc79717f",
+   "fabric-lock.mjs": "cf79c3aed04dfd36833929f7edd76404976699ac7a8fe38820f0fa02fc2243be",
    "fabric-usage.mjs": "1c4d18004639409624ac3516a02f2b60bbf55abdb612e9a96c37e83666eb87a7",
    "fabric-backups.mjs": "cfd8c9085e3d597a783099c2bd2ffe2f3faa0daaadab46dedd30523894cfeb06",
    "fabric-descriptor.mjs": "7c0ef7d245c037eb9e859ab481f6e66fb3e5ef2cf6d1e0a8d32b6d303097ca43",

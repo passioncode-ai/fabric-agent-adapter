@@ -73,8 +73,42 @@ class InstanceLock:
     #: a file is allowed there).
     WINDOWS_LOCK_OFFSET = 1 << 30
 
+    #: How many times acquire re-opens service.lock when the file it locked is no longer the file at its path (a
+    #: folder swapped under it by a data import), before it gives up with an error naming the path (FAA-293).
+    INODE_RETRIES = 3
+
     def acquire(self) -> "InstanceLock":
         ensure_private_dir(self.path.parent)
+        for _ in range(self.INODE_RETRIES):
+            if self._acquire_once():
+                return self
+        raise ServiceError("%s kept moving while it was locked (a folder swapped under the data folder?): no copy "
+                           "holds a file that is no longer at its path; start again once the folder is settled." % self.path)
+
+    def _locked_file_is_at_path(self, fd: int) -> bool:
+        """The inode this copy locked is the file at the path now (FAA-293). Windows does not rename a folder holding
+        an open file, and its lock is a byte range on this handle, so the check is POSIX only."""
+        if WINDOWS:
+            return True
+        try:
+            here, held = os.stat(str(self.path)), os.fstat(fd)
+        except FileNotFoundError:
+            return False
+        return (here.st_dev, here.st_ino) == (held.st_dev, held.st_ino)
+
+    def _let_go(self, fd: int) -> None:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        name, self._name = self._name, None
+        if name is not None:
+            try:
+                _drop_lock_name(name)
+            except OSError:
+                pass
+
+    def _acquire_once(self) -> bool:
         fd = os.open(str(self.path), os.O_RDWR | os.O_CREAT | _O_BINARY, 0o600)
         try:
             if WINDOWS:
@@ -92,6 +126,9 @@ class InstanceLock:
             if exc.errno in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES, getattr(errno, "EDEADLOCK", -1)):
                 raise AlreadyRunning(_read_pid(self.path), self.path) from None
             raise
+        if not self._locked_file_is_at_path(fd):  # another copy may hold the file at the path: re-open that one
+            os.close(fd)
+            return False
         try:
             self._name = _hold_lock_name(self.path)
         except BaseException:
@@ -114,8 +151,11 @@ class InstanceLock:
                     except OSError:  # as with the close: nothing to add to the first error
                         pass
             raise
+        if not self._locked_file_is_at_path(fd):  # swapped while the pid was written: this copy holds nothing real
+            self._let_go(fd)
+            return False
         self._fd = fd
-        return self
+        return True
 
     def release(self) -> None:
         if self._fd is not None:

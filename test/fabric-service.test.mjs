@@ -56,6 +56,53 @@ test('a failed pid write lets the instance lock go (a board finding of 2026-11-0
   }
 });
 
+test('a lock file swapped under the path is never held (FAA-293)', { skip: process.platform !== 'darwin' }, async () => {
+  // macOS: open(2) with O_EXLOCK locks the inode it opened; a data import that swaps the folder leaves that inode off
+  // the path while another copy holds the file that is there. The swap is made while this copy writes its pid.
+  const root = temp();
+  const data = path.join(root, 'data');
+  fs.mkdirSync(data);
+  const original = fs.ftruncateSync;
+  const other = new k.InstanceLock(data);
+  let held = null;
+  fs.ftruncateSync = (...args) => {
+    fs.ftruncateSync = original; // once: the swap, and the other copy taking the new file
+    fs.renameSync(data, path.join(root, 'data.old'));
+    fs.mkdirSync(data);
+    held = other.acquireDarwinOnce();
+    return original(...args);
+  };
+  try {
+    // this copy locked the old file; it re-opens the one at the path, which the other copy holds, and is refused
+    await assert.rejects(new k.InstanceLock(data).acquire(), (e) => e instanceof k.AlreadyRunning);
+  } finally {
+    fs.ftruncateSync = original;
+  }
+  assert.equal(held, true);
+  other.release();
+  (await new k.InstanceLock(data).acquire()).release();
+});
+
+test('a lock file that keeps moving is a clear error, not a stale lock (FAA-293)', { skip: process.platform !== 'darwin' }, async () => {
+  const root = temp();
+  const data = path.join(root, 'data');
+  fs.mkdirSync(data);
+  const original = fs.ftruncateSync;
+  let moves = 0;
+  fs.ftruncateSync = (...args) => {
+    moves += 1;
+    fs.renameSync(data, path.join(root, `old${moves}`));
+    fs.mkdirSync(data);
+    return original(...args);
+  };
+  try {
+    await assert.rejects(new k.InstanceLock(data).acquire(), (e) => !(e instanceof k.AlreadyRunning) && /service\.lock/.test(e.message));
+  } finally {
+    fs.ftruncateSync = original;
+  }
+  assert.equal(moves, k.InstanceLock.INODE_RETRIES);
+});
+
 test('a close that fails too still lets the lock go, the first error standing (0.61.0 seam reading 7)', { skip: process.platform !== 'darwin' }, async () => {
   const dir = temp();
   const { fsyncSync, closeSync } = fs;
