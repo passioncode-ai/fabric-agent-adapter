@@ -20,7 +20,7 @@ class OperatorChannelGateway(unittest.TestCase):
                       "Check placement before polling", "`poller-elsewhere`",
                       "a test starts a second instance placed elsewhere and sees it stay off the token"):
             self.assertIn(words, text, words)
-        self.assertNotIn("—", text)
+        self.assertNotIn("\u2014", text)
 
 
 if __name__ == "__main__":

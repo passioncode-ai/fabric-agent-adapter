@@ -26,7 +26,7 @@ class SecretsInAChild(unittest.TestCase):
         lifecycle = flat(SKILLS / "building-fabric-services" / "references" / "lifecycle.md")
         self.assertIn("Keys reach the process through its environment, a 0600 file or a vault, never argv", lifecycle)
         for text in (resilience, models):
-            self.assertNotIn("—", text)
+            self.assertNotIn("\u2014", text)
 
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ class QuickStartPort(unittest.TestCase):
                       "| **A member's virtual machine** |", "DEC-0154 HA-4", "its callers T2, never token-free",
                       "a port recorded per account, the listener's owner checked before a token is sent"):
             self.assertIn(words, text, words)
-        self.assertNotIn("—", text)
+        self.assertNotIn("\u2014", text)
 
 
 if __name__ == "__main__":
