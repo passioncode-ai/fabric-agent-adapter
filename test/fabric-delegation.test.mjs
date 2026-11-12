@@ -316,3 +316,21 @@ test('a human step carries its step and link; what is not an answer is an unknow
   assert.equal(d.refusalError(step).error.data.detail, 'mandate-capability-missing');
   assert.equal(d.refusalFromAction({ fault: 'effect-missing' }).code, 'unknown-state');
 });
+
+test('FAA-255: a loopback key set another OS account serves is never read, and that listener gets nothing', async (t) => {
+  const http = await import('node:http');
+  const po = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-peer-owner.mjs');
+  const seen = [];
+  const server = http.createServer((req, res) => { seen.push(req.url); res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(V.jwks)); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const url = `http://127.0.0.1:${server.address().port}/jwks`;
+  for (const ask of [{ ownUid: 424242, ownSid: 'S-1-5-21-9-9-9-424242' }, { read: async () => { throw new po.TableUnreadable('netstat: exit 1'); } }]) {
+    const agent = new po.CheckedAgent({ ask });
+    await assert.rejects(d.fetchKeySet(url, { agent }), /foreign-user/);
+    assert.equal(await new d.JwksCache(url, { fetch: (s) => d.fetchKeySet(s, { agent }) }).get(), null);
+  }
+  assert.deepEqual(seen, []);
+  assert.deepEqual(await new d.JwksCache(url).get(), V.jwks); // this account's listener
+  assert.deepEqual(seen, ['/jwks']);
+});
