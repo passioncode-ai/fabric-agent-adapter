@@ -180,7 +180,7 @@
     "fabric_package_schema",
     "fabric_secrets"
    ],
-   "sha256": "1ac262f916bbc8066c2fa1782de601fc117df8ff246803cc9593dfa6f62dd815"
+   "sha256": "8b835fcf173b8c345ea6d229edf8ebb98b0f94e9af4894c4a6bd1301f175e2b1"
   },
   {
    "module": "fabric_protocols",
@@ -717,7 +717,7 @@
     "fabric-package-schema",
     "fabric-secrets"
    ],
-   "sha256": "5636172ba6d6309e91f4a74724a5f8de7a00cdf8bbf4bfff125e26f4236f5037"
+   "sha256": "aa75c4f6ff3dade68a47c6187666332a3845b3f5da98b50e3da7824d918e941f"
   },
   {
    "module": "fabric-protocols",
@@ -6904,7 +6904,7 @@
    "fabric_share.py": "da36a466426fc29dd7dd40013167f3959a18375f8fedd228bf64f298cec1040c",
    "fabric_ceremonies.py": "a59e83cf4adb2669a9b98008e3d3a0cba991a35cbff97bc604fc82fe81cfd49f",
    "fabric_package_schema.py": "e623f0408d38e3343ed66222fb812907c6c52e1a286eb1c1176ab2e64640c9ad",
-   "fabric_package.py": "1ac262f916bbc8066c2fa1782de601fc117df8ff246803cc9593dfa6f62dd815",
+   "fabric_package.py": "8b835fcf173b8c345ea6d229edf8ebb98b0f94e9af4894c4a6bd1301f175e2b1",
    "fabric_protocols.py": "3cba881f6f3468e8d8a8455a5d54c5567e748c37291211a1c7f22d195ea562c4",
    "fabric_actions.py": "ae21d1199614c4f74d1dcd1e0a87107a9d52434cd9e2d64aa24a7b1e196fb723",
    "fabric_connections.py": "5499d421c658f8bf00241e5e2291bd02d9ea473a229a812de3d3de9a62562ae6",
@@ -6951,7 +6951,7 @@
    "fabric-share.mjs": "bfb26581c21ad984c2a337da02429f9f3a165cc582f8ba48de4d3dfb7d163a59",
    "fabric-ceremonies.mjs": "117d4374c9e95c930a38de7adbd4323774798f4fe6ec6f24afcd6f2c7298ca44",
    "fabric-package-schema.mjs": "cd28092375db0fc21ffab1f0bb7794f7f8979ee08c64d3b9faf4b3845357caa6",
-   "fabric-package.mjs": "5636172ba6d6309e91f4a74724a5f8de7a00cdf8bbf4bfff125e26f4236f5037",
+   "fabric-package.mjs": "aa75c4f6ff3dade68a47c6187666332a3845b3f5da98b50e3da7824d918e941f",
    "fabric-protocols.mjs": "26eeb8c63e9881d8fa56389455626f2bb80725bbc25b9d6ed756af88c05a848e",
    "fabric-actions.mjs": "06e42f5e24c96311d5417d0d1effa93479ef7128a7ab139903b2bcf59253f6be",
    "fabric-connections.mjs": "303432e547ce563e90ca9ffcd827f5612f51d3582929834e1add0fdaf6485dcc",

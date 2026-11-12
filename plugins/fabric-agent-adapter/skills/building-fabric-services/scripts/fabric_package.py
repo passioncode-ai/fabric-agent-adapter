@@ -784,6 +784,24 @@ FOLDER_MESSAGES = {
 }
 
 
+def _secrets_lacking(draft: Dict[str, Any], secrets: List[Dict[str, Any]]) -> List[str]:
+    """The names a hand-written secrets[] declares that the source manifest has no secret slot for, in their order."""
+    have = {s["name"] for s in secrets}
+    declared = draft.get("secrets") if isinstance(draft.get("secrets"), list) else []
+    lacking: List[str] = []
+    for entry in declared:
+        name = entry.get("name") if isinstance(entry, dict) else None
+        if isinstance(name, str) and name not in have and name not in lacking:
+            lacking.append(name)
+    return lacking
+
+
+def _lacking_message(lacking: List[str]) -> str:
+    return ("%s declares no secret slot for %s, which %s's secrets[] names: pack writes secrets[] from the manifest's "
+            "slots and never drops a declared secret. Add each as a slot of kind secret to %s (or take it out of "
+            "secrets[]), then pack again" % (SOURCE_FILE, ", ".join(lacking), PACKAGE_FILE, SOURCE_FILE))
+
+
 def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
     """Pack ``folder`` (see the module's doc). The answer names the digest, ``agentRef`` and every problem; with
     ``apply`` and no problem, ``fabric.package.json`` is rewritten."""
@@ -795,9 +813,13 @@ def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
     draft = _load_json(files[PACKAGE_FILE], PACKAGE_FILE)
     source = _source_manifest(files)
     written: List[str] = []
+    refused: List[Dict[str, str]] = []
     if source is not None:  # DEC-0149: secrets[] and state[] come from the source manifest's slots
         secrets, state = source_members(source)
-        if secrets or "secrets" in draft:
+        lacking = _secrets_lacking(draft, secrets)
+        if lacking:  # a declared secret is never dropped: the manifest gains its slot first
+            refused.append({"rule": "source", "instancePath": "/secrets", "message": _lacking_message(lacking)})
+        elif secrets or "secrets" in draft:
             draft["secrets"] = secrets
             written.append("secrets[]")
         if state and draft.get("state") != []:  # an empty state[] is a copy packed without state, kept
@@ -806,7 +828,7 @@ def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
     pkg, notes = compose(draft, files)
     if written:
         notes.append("%s written from %s" % (" and ".join(written), SOURCE_FILE))
-    problems = _all_problems(pkg, files)
+    problems = refused + _all_problems(pkg, files)
     suite = pkg.get("evals", {}).get("suite") if isinstance(pkg.get("evals"), dict) else None
     if isinstance(suite, str) and suite in files and any(p.get("instancePath") == "/evals/receipt/suite" for p in problems):
         notes.append("the suite packed is %s: run it again and write that receipt" % sha256_of(files[suite]))

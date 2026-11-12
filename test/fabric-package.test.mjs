@@ -398,7 +398,7 @@ test('FAA-261: pack writes secrets[] and state[] from fabric.source.json, as the
   const make = (name) => {
     const root = path.join(dir, name);
     fs.mkdirSync(root);
-    writeAgent(root, { secrets: [{ name: 'OTHER_KEY', purpose: 'a slot the source does not declare' }] });
+    writeAgent(root, { secrets: [{ name: 'MAIL_OAUTH', purpose: 'an older purpose, rewritten from the source' }] });
     fs.writeFileSync(path.join(root, k.SOURCE_FILE), JSON.stringify(source));
     return root;
   };
@@ -417,6 +417,25 @@ test('FAA-261: pack writes secrets[] and state[] from fabric.source.json, as the
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.equal(fs.readFileSync(path.join(py, k.PACKAGE_FILE), 'utf8'), fs.readFileSync(path.join(node, k.PACKAGE_FILE), 'utf8'));
   }
+  // 0.81.0 seam reading: a hand-written secrets[] the manifest lacks a slot for is never dropped; pack refuses
+  writeAgent(node, { secrets: [{ name: 'MAIL_OAUTH', purpose: 'p' }, { name: 'OTHER_KEY', purpose: 'q' }, { name: 'THIRD_KEY', purpose: 'r' }] });
+  const refused = k.pack(node, { apply: true });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.applied, false);
+  assert.deepEqual([refused.problems[0].rule, refused.problems[0].instancePath], ['source', '/secrets']);
+  assert.ok(refused.problems[0].message.includes('OTHER_KEY, THIRD_KEY'));
+  assert.ok(!refused.problems[0].message.includes('MAIL_OAUTH'));
+  assert.deepEqual(refused.package.secrets.map((s) => s.name), ['MAIL_OAUTH', 'OTHER_KEY', 'THIRD_KEY']);
+  assert.equal(readPkg(node).secrets[1].name, 'OTHER_KEY');
+  if (hasPython) {
+    const r = spawnSync('python3', [path.join(scripts, 'fabric_package.py'), 'pack', node], { encoding: 'utf8' });
+    const { package: _p, ...pyAnswer } = JSON.parse(r.stdout);
+    const { package: _q, ...nodeAnswer } = refused;
+    assert.deepEqual(pyAnswer, nodeAnswer, 'the same refusal from both twins');
+  }
+  fs.writeFileSync(path.join(node, k.SOURCE_FILE), JSON.stringify({ ...source, slots: source.slots.filter((s) => s.kind !== 'secret') }));
+  assert.ok(k.pack(node).problems[0].message.includes('MAIL_OAUTH, OTHER_KEY, THIRD_KEY'));
+  fs.writeFileSync(path.join(node, k.SOURCE_FILE), JSON.stringify(source));
   writeAgent(node, { state: [] });
   assert.deepEqual(k.pack(node).package.state, []);
   fs.writeFileSync(path.join(node, k.SOURCE_FILE), JSON.stringify({ format: 'fabric-source/2', include: ['lib/'] }));

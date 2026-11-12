@@ -587,6 +587,21 @@ function writeAtomic(file, text) {
   fs.renameSync(temp, file);
 }
 
+/** The names a hand-written secrets[] declares that the source manifest has no secret slot for, in their order. */
+function secretsLacking(draft, secrets) {
+  const have = new Set(secrets.map((s) => s.name));
+  const lacking = [];
+  for (const entry of Array.isArray(draft.secrets) ? draft.secrets : []) {
+    const name = isObject(entry) ? entry.name : undefined;
+    if (isString(name) && !have.has(name) && !lacking.includes(name)) lacking.push(name);
+  }
+  return lacking;
+}
+
+function lackingMessage(lacking) {
+  return `${SOURCE_FILE} declares no secret slot for ${lacking.join(', ')}, which ${PACKAGE_FILE}'s secrets[] names: pack writes secrets[] from the manifest's slots and never drops a declared secret. Add each as a slot of kind secret to ${SOURCE_FILE} (or take it out of secrets[]), then pack again`;
+}
+
 /** Pack `folder`; with `apply` and no problem, fabric.package.json is rewritten. */
 export function pack(folder, { apply = false } = {}) {
   const files = readFolder(folder);
@@ -596,10 +611,15 @@ export function pack(folder, { apply = false } = {}) {
   const draft = parseStrict(files.get(PACKAGE_FILE), PACKAGE_FILE);
   const source = sourceManifest(files);
   const written = [];
+  const refused = [];
   if (source !== undefined) {
     // DEC-0149: secrets[] and state[] come from the source manifest's slots; an empty state[] is a copy without state.
     const members = sourceMembers(source);
-    if (members.secrets.length > 0 || Object.hasOwn(draft, 'secrets')) {
+    const lacking = secretsLacking(draft, members.secrets);
+    if (lacking.length > 0) {
+      // a declared secret is never dropped: the manifest gains its slot first
+      refused.push({ rule: 'source', instancePath: '/secrets', message: lackingMessage(lacking) });
+    } else if (members.secrets.length > 0 || Object.hasOwn(draft, 'secrets')) {
       Object.defineProperty(draft, 'secrets', { value: members.secrets, enumerable: true, writable: true, configurable: true });
       written.push('secrets[]');
     }
@@ -610,7 +630,7 @@ export function pack(folder, { apply = false } = {}) {
   }
   const { pkg, notes } = compose(draft, files);
   if (written.length > 0) notes.push(`${written.join(' and ')} written from ${SOURCE_FILE}`);
-  const problems = allProblems(pkg, files);
+  const problems = [...refused, ...allProblems(pkg, files)];
   const suite = isObject(pkg.evals) ? pkg.evals.suite : undefined;
   if (isString(suite) && files.has(suite) && problems.some((p) => p.instancePath === '/evals/receipt/suite')) notes.push(`the suite packed is ${sha256Of(files.get(suite))}: run it again and write that receipt`);
   const answer = { ok: problems.length === 0, applied: false, digest: pkg.digest, files: pkg.files.length, problems, notes };

@@ -45,7 +45,9 @@ python3 scripts/fabric_package.py pack <folder> --apply   # writes fabric.packag
 When the folder carries the agent's source manifest, `fabric.source.json` (contract DEC-0149, `fabric-source/1`), `pack`
 writes `secrets[]` from its `secret` slots (name, purpose and `optional`) and `state[]` from its `store` slots' paths,
 says so in its notes, and lists the manifest in `files[]` like any other file; `pack`, `sign` and `verify` refuse a
-package whose `secrets[]` or `state[]` differ from the slots (FAC-SEM-160). An author's `state: []` is a copy packed
+package whose `secrets[]` or `state[]` differ from the slots (FAC-SEM-160). A hand-written `secrets[]` naming a secret
+the manifest has no slot for is never dropped: `pack` refuses (rule `source`, `/secrets`) and names each one, so add
+it as a `secret` slot (or take it out) and pack again. An author's `state: []` is a copy packed
 without state and is kept. A manifest that is no `fabric-source/1` object is refused. The manifest's own rules and the
 tree check under it are the source check's (`references/source-and-instance.md` of adapting-projects-to-fabric, *The
 source manifest*).

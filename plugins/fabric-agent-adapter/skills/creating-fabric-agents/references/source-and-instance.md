@@ -101,7 +101,8 @@ source under it.
   `.fabric-source-ignore` and `--exclude` are not read there: `exclude` and `unchecked` say it. A declared home
   (`home: <name>`) is still found in every source file.
 - **Packing it.** `pack` (building-fabric-services' `references/package.md`) writes the package's `secrets[]` from the secret slots and `state[]` from the store slots' paths, and refuses a
-  package whose members differ (FAC-SEM-160); an empty `state[]` is a copy packed without state, and stays so.
+  package whose members differ (FAC-SEM-160); an empty `state[]` is a copy packed without state, and stays so. A
+  hand-written `secrets[]` naming a secret the manifest has no slot for is refused by name, never dropped.
 - **Handing it over** stays the owner's act, each time, on their word for that act (the contract's `source.md`,
   Handing over).
 
