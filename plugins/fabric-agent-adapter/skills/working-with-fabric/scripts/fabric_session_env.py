@@ -741,6 +741,15 @@ def _write_private(path: Path, text: str) -> None:
     os.replace(str(tmp), str(path))
 
 
+#: FAA-152: the turn's git branch goes to Fabric (contract DEC-0140 PR-3: shown on this machine's screens, never stored
+#: or shared) unless the person turns it off with FABRIC_SESSION_NO_BRANCH set to anything but "" or "0".
+NO_BRANCH_ENV = "FABRIC_SESSION_NO_BRANCH"
+
+
+def branch_off(env: Optional[Dict[str, str]] = None) -> bool:
+    return (os.environ if env is None else env).get(NO_BRANCH_ENV, "") not in ("", "0")
+
+
 def repositories_off(env: Optional[Dict[str, str]] = None) -> bool:
     """Whether the person turned the transcript read off (FAA-160): FABRIC_SESSION_NO_REPOSITORIES set to anything but
     "" or "0", or the file NO_REPOSITORIES_MARK in the hooks' own folder."""

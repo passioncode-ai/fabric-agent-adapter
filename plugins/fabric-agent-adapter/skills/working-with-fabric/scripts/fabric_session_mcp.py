@@ -104,6 +104,26 @@ def git_facts(cwd: Path, budget_s: Optional[float] = None, until: Optional[float
     return facts
 
 
+#: The branch Fabric's fabric_session_observe takes (0.3.16, CO-459, its own pattern): a name outside it is not sent.
+BRANCH = re.compile(r"[A-Za-z0-9._@+/-]{1,200}")
+
+
+def git_branch(cwd: Path, until: Optional[float] = None) -> Optional[str]:
+    """The branch HEAD names (FAA-152), or None: a detached head, no checkout, or no answer before `until`."""
+    name = (_git(cwd, ("symbolic-ref", "--short", "-q", "HEAD"), until) or "").strip()
+    return name or None
+
+
+def stored_branch(entry: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    """Whether a spool entry carries a branch to send, and which: a name BRANCH takes, or None for a detached head."""
+    if "branch" not in entry:
+        return False, None
+    value = entry["branch"]
+    if value is None:
+        return True, None
+    return (True, value) if isinstance(value, str) and BRANCH.fullmatch(value) else (False, None)
+
+
 def _count_status(z: str) -> int:
     records, count, skip = z.split("\0"), 0, False
     for record in records:
@@ -738,6 +758,11 @@ def deliver(directory: Path, env: Optional[Dict[str, str]] = None, deadline_s: f
                                      observedAt=entry.get("observedAt"), idempotencyKey=key)
                     if event == "end":
                         arguments["reason"] = reason
+                    rule = _input_rule(client, OBSERVE_TOOL, "branch") if event == "turn" else None
+                    carried, branch = stored_branch(entry)
+                    # FAA-152: only where the tool declares it, never on the end, null only where its schema allows it
+                    if rule is not None and carried and _allows(rule, branch):
+                        arguments["branch"] = branch
                     repositories = stored_repositories(entry) if event == "turn" else []
                     fitted = [r for r in repositories if _fits(r, _repository_rules(client))][:takes] if takes else []
                     if fitted:
@@ -851,6 +876,39 @@ def _input_fields(client: McpStdio, tool: str) -> List[str]:
             props = schema.get("properties") if isinstance(schema, dict) else None
             return [k for k in props if isinstance(k, str)] if isinstance(props, dict) else []
     return []
+
+
+def _input_rule(client: McpStdio, tool: str, field: str) -> Optional[Dict[str, Any]]:
+    """The schema a listed tool's input declares for one property, or None when it declares none."""
+    for listed in client.tools:
+        if listed.get("name") == tool:
+            schema = listed.get("inputSchema")
+            props = schema.get("properties") if isinstance(schema, dict) else None
+            rule = props.get(field) if isinstance(props, dict) else None
+            return rule if isinstance(rule, dict) else None
+    return None
+
+
+def _allows(rule: Dict[str, Any], value: Optional[str], depth: int = 0) -> bool:
+    """Whether a string or null meets a property's schema as far as it is read here: `type` (a name or a list),
+    `pattern`, `maxLength`, `minLength`, `enum`, and `anyOf`/`oneOf` of such. Anything else unread: allowed."""
+    if depth > 4 or not isinstance(rule, dict):
+        return False
+    for key in ("anyOf", "oneOf"):
+        if isinstance(rule.get(key), list):
+            return any(_allows(option, value, depth + 1) for option in rule[key])
+    kinds = rule.get("type")
+    kinds = [kinds] if isinstance(kinds, str) else kinds if isinstance(kinds, list) else None
+    if value is None:
+        return kinds is not None and "null" in kinds
+    if kinds is not None and "string" not in kinds:
+        return False
+    try:
+        return not (len(value) > rule.get("maxLength", len(value)) or len(value) < rule.get("minLength", 0)
+                    or ("enum" in rule and value not in rule["enum"])
+                    or ("pattern" in rule and not re.search(rule["pattern"], value)))
+    except (TypeError, re.error):
+        return False
 
 
 def _fits(item: Dict[str, str], props: Dict[str, Any]) -> bool:

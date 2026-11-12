@@ -200,7 +200,13 @@ close. The prompt hook prints no unread line and no nudges there, nor in a sessi
   `git config` with it; the Stop hook drops the credential in memory before anything is spooled, logged or sent.
 - **Send content, or use more than it reads for.** A turn is the HEAD commit, the number of files that differ from it
   (untracked included) and the lines added and removed against it, and, once Fabric takes them, the other repositories
-  it touched by their `origin` name (`{host, owner, name}`); no path, branch name, commit message or diff text. The
+  it touched by their `origin` name (`{host, owner, name}`), and its branch (below); no path, commit message or diff
+  text. The branch (FAA-152, contract DEC-0140 PR-3; Fabric 0.3.16, CO-459) is `git symbolic-ref --short -q HEAD`,
+  one more git call inside the same 1.5 s, null on a detached head, and goes with a turn (never the end) only where
+  `fabric_session_observe` declares `branch`, null only where its schema allows it and a name outside its pattern
+  not at all; Fabric shows it on this machine's screens and never stores or shares it. Turn it off with
+  `FABRIC_SESSION_NO_BRANCH=1` (any value but empty or `0`): no branch is read or sent. The role PR-3 also defines
+  is not sent: Fabric's enrollment takes no role yet. The
   transcript's tail is read, message text and tool output with it, and only tool names and path arguments are used; a sent turn's log
   line counts its repositories, never names them. The board is read
   as a count (`com.status`), never a message. Git runs with `--no-optional-locks`.
@@ -250,6 +256,6 @@ launched-session check exact.
 | D1 | `fabric-mcp` enrolls with the runtime session id | for `--runner claude-code`, `runtimeSessionId` = env `CLAUDE_CODE_SESSION_ID` in `fabric.session.enroll {cwd, runtimeSessionId}` (Claude Code 2.1.296 gives MCP stdio servers and Bash commands that variable, equal to the hooks' `session_id`) |
 | D2 | rejoin only | `fabric-mcp --runner claude-code --rejoin-only --runtime-session-id <id>` attaches to that runtime session's live enrolled session; never asks, never mints; otherwise only `fabric_whoami`, as not enrolled; Fabric 0.3.9 exits 3 at once when no session holds the id |
 | D3 | the flag | `hub.json` `"features": ["session-hooks/1"]` once D1, D2, D4 and D5 ship |
-| D4 | `fabric_session_observe` | `{event: "turn" or "end", runtime: "claude-code", runtimeSessionId, observedAt, head, filesChanged, linesAdded, linesRemoved, reason (end only), repositories (turn only, optional), idempotencyKey}` → `session.turn.observed@1`, `session.ended@1`; `repositories` (FAA-140, proposed to Fabric on `a8bdda7a`, accepted on `d3f9e6fb`) is at most 10 `{host, owner, name}` and is sent only where the tool's input schema lists it with items carrying host, owner and name, so a Fabric without it gets the call it gets today; from Fabric 0.3.14 a turn's answer is `{recorded, seq, nudges?}`, each nudge `{kind, says, task_id?, request_id?}` shown on a turn once, at most five, the same on a repeated turn, and kept for `fabric_work_list` and `fabric_heartbeat` (FAA-142) |
+| D4 | `fabric_session_observe` | `{event: "turn" or "end", runtime: "claude-code", runtimeSessionId, observedAt, head, filesChanged, linesAdded, linesRemoved, reason (end only), repositories (turn only, optional), branch (turn only, optional; Fabric 0.3.16), idempotencyKey}` → `session.turn.observed@1`, `session.ended@1`; `repositories` (FAA-140, proposed to Fabric on `a8bdda7a`, accepted on `d3f9e6fb`) is at most 10 `{host, owner, name}` and is sent only where the tool's input schema lists it with items carrying host, owner and name, so a Fabric without it gets the call it gets today; from Fabric 0.3.14 a turn's answer is `{recorded, seq, nudges?}`, each nudge `{kind, says, task_id?, request_id?}` shown on a turn once, at most five, the same on a repeated turn, and kept for `fabric_work_list` and `fabric_heartbeat` (FAA-142) |
 | D5 | release a whole session | `fabric_work_release {claims: "session", outcome: "let-go", reason, idempotencyKey}`; `observedAt` too where its input schema names it (Fabric 0.3.9: `stale-end` for an end observed before the session enrolled) |
 | D6 | a launched-session marker | `FABRIC_LAUNCHED_SESSION=1` in the environment of every session Fabric launches, whatever its adapter; until then, the inference above |

@@ -33,6 +33,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     registered_command,
     a_file,
     administrators_copy,
+    branch_off,
     another_users_copy,
     fabric_bin_candidates,
     fabric_launched,
@@ -63,6 +64,7 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
 from fabric_session_mcp import (  # noqa: E402 - the kit (FAA-65)
     FACTS_BUDGET_S,
     deliver,
+    git_branch,
     git_facts,
     turn_repositories,
 )
@@ -719,6 +721,8 @@ def hook_spool(payload: Dict[str, Any], event: str, env: Optional[Dict[str, str]
     entry = {"event": event, "runtimeSessionId": session_id, "cwd": str(cwd),
              "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "facts": git_facts(cwd, until=until)}
+    if event == "turn" and not branch_off(env):  # FAA-152: one more git call inside the same budget
+        entry["branch"] = git_branch(cwd, until)
     if event == "turn" and repositories_wanted(env):  # only once Fabric takes them: no transcript read before (FAA-140)
         repositories = turn_repositories(payload.get("transcript_path"), cwd, until)
         if repositories:

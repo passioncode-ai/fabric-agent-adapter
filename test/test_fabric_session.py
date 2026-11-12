@@ -85,6 +85,11 @@ FAKE_MCP = textwrap.dedent('''\
                     if shape == "untyped":
                         field.pop("type")
                     return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "repositories": field}}}}
+                branch = os.environ.get("FAKE_MCP_OBSERVE_BRANCH")
+                if n == "fabric_session_observe" and branch:  # Fabric 0.3.16 (CO-459): an optional branch on a turn
+                    rule = {{"type": "string", "pattern": "^[A-Za-z0-9._@+\\/-]{{1,200}}$"}}
+                    return {{"type": "object", "properties": {{"event": {{"type": "string"}}, "branch": rule if branch == "no-null"
+                            else {{"anyOf": [rule, {{"type": "null"}}]}}}}}}
                 return {{"type": "object"}}
             send({{"jsonrpc": "2.0", "id": m["id"], "result": {{"tools": [{{"name": n, "inputSchema": schema(n)}} for n in names]}}}})
         elif method == "tools/call":
@@ -622,11 +627,51 @@ class StopAndEndActive(Base):
         said = fs.hook_spool(dict({"session_id": SID, "cwd": str(self.repo)}, **extra), event, self.env, spawn=spawned.append)
         return said, spawned
 
+    def test_the_branch_goes_with_a_turn_only_where_fabric_takes_it(self):
+        # FAA-152 (contract DEC-0140 PR-3; Fabric 0.3.16 CO-459): `branch` on a turn, never on the end, and only where
+        # fabric_session_observe declares it; a detached head is null where the schema allows it
+        branch = subprocess.run(["git", "-C", str(self.repo), "symbolic-ref", "--short", "HEAD"],
+                                capture_output=True, text=True).stdout.strip()
+        said, spawned = self.spool("turn")
+        (entry,) = sorted(spawned[0].glob("*-turn.json"))
+        self.assertEqual(json.loads(entry.read_text())["branch"], branch)
+        self.spool("end", reason="other")
+        self.assertNotIn("branch", json.loads(sorted(spawned[0].glob("*-end.json"))[0].read_text()))
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        self.assertEqual(["branch" in c["arguments"] for c in self.records("call")], [False, False, False],
+                         "a Fabric that does not declare it gets none")
+        self.record.unlink()
+        self.env["FAKE_MCP_OBSERVE_BRANCH"] = "1"
+        subprocess.run(["git", "-C", str(self.repo), "checkout", "-qb", "agent/faa-152"], check=True)
+        said, spawned = self.spool("turn")
+        subprocess.run(["git", "-C", str(self.repo), "checkout", "-q", "--detach"], check=True)
+        self.spool("turn")
+        self.spool("end", reason="other")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        calls = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
+        self.assertEqual([(c["event"], c.get("branch", "absent")) for c in calls],
+                         [("turn", "agent/faa-152"), ("turn", None), ("end", "absent")])
+        # a schema with no null takes no null; a name outside its pattern is left out, never sent to be refused
+        self.record.unlink()
+        self.env["FAKE_MCP_OBSERVE_BRANCH"] = "no-null"
+        self.spool("turn")
+        subprocess.run(["git", "-C", str(self.repo), "checkout", "-qb", "f\u00e4hig"], check=True)
+        said, spawned = self.spool("turn")
+        fs.deliver(spawned[0], self.env, deadline_s=8)
+        calls = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
+        self.assertEqual([c.get("branch", "absent") for c in calls], ["absent", "absent"])
+        # turned off: none read, none sent
+        said, spawned = fs.hook_spool({"session_id": SID, "cwd": str(self.repo)}, "turn",
+                                      dict(self.env, FABRIC_SESSION_NO_BRANCH="1"), spawn=lambda d: None), None
+        (entry,) = sorted((fs.state_root(env=self.env) / "sessions" / SID).glob("*-turn.json"))
+        self.assertNotIn("branch", json.loads(entry.read_text()))
+
     def test_a_turn_and_the_end_reach_fabric_with_facts_only(self):
         said, spawned = self.spool("turn")
         self.assertEqual(said, "spooled: worker started")
         (entry,) = sorted(spawned[0].glob("*-turn.json"))
-        self.assertEqual(sorted(json.loads(entry.read_text())), ["cwd", "event", "facts", "observedAt", "runtimeSessionId"])
+        self.assertEqual(sorted(json.loads(entry.read_text())), ["branch", "cwd", "event", "facts", "observedAt",
+                                                                 "runtimeSessionId"])
         self.spool("end", reason="prompt_input_exit")
         lines = fs.deliver(spawned[0], self.env, deadline_s=8)
         (argv,) = self.records("argv")
