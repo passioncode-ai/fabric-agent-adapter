@@ -141,6 +141,45 @@ class DashboardLinksTest(unittest.TestCase):
                 test.run(result)
                 self.assertEqual(result.wasSuccessful(), ok, result.failures or result.errors)
 
+    def run_bytes(self, payload, encoding):
+        import os
+        env = dict(os.environ, PYTHONIOENCODING=encoding)
+        env.pop('PYTHONUTF8', None)
+        return subprocess.run([sys.executable, str(SCRIPT)], input=payload, capture_output=True, env=env)
+
+    def test_the_handoff_is_read_as_utf8_bytes_whatever_the_code_page(self):  # FAA-210
+        # Windows before Python 3.15 decodes a text stdin with its code page; the gate reads bytes as UTF-8 (a BOM
+        # dropped), so a Cyrillic or BOM-led handoff is read the same under every code page.
+        from urllib.parse import quote
+        item = json.loads((ROOT / 'test/evals/dashboard-links/cases.json').read_text())['cases'][0]['input']
+        page = '/dashboard?tab=задачи'
+        link = 'fabric-dashboards://service/example-agent.default?path=' + quote(page, safe='')
+        item['resolved'].update(open_link=link, http_url='http://127.0.0.1:47195' + page)
+        item['action']['url'] = link
+        item['target_device'] = item['viewer_device'] = 'рабочая станция'
+        body = json.dumps(item, ensure_ascii=False).encode('utf-8')
+        for encoding in ('cp1251', 'cp1252', 'utf-8'):
+            for name, payload in (('plain', body), ('bom', b'\xef\xbb\xbf' + body)):
+                with self.subTest(encoding=encoding, payload=name):
+                    result = self.run_bytes(payload, encoding)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertEqual(json.loads(result.stdout), {'ok': True, 'kind': 'native_link'})
+
+    def test_bytes_that_are_no_utf8_and_a_deep_document_are_refused_plainly(self):  # FAA-210
+        body = json.dumps(json.loads((ROOT / 'test/evals/dashboard-links/cases.json').read_text())['cases'][0]['input'])
+        refused = {'ok': False, 'reason': 'dashboard_handoff_refused'}
+        for name, payload in (('stray byte', body.replace('workstation', 'work\xff', 1).encode('latin-1')),
+                              ('deep', b'[' * 32000 + b']' * 32000), ('over the cap', b' ' * 65537 + body.encode())):
+            with self.subTest(payload=name):
+                result = self.run_bytes(payload, 'cp1252')
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(json.loads(result.stdout), refused)
+                self.assertEqual(result.stderr, b'', 'no traceback')
+        # the cap counts bytes: 65,536 of them pass, 65,537 do not
+        padded = body.encode() + b' ' * (65536 - len(body.encode()))
+        self.assertEqual(self.run_bytes(padded, 'utf-8').returncode, 0)
+        self.assertEqual(self.run_bytes(padded + b' ', 'utf-8').returncode, 1)
+
     def test_shared_payload_is_self_contained_and_identical(self):
         for relative in ['scripts/check_dashboard_link.py', 'references/dashboard-links.md']:
             contents = [(SKILLS / name / relative).read_bytes() for name in ['building-fabric-services', 'creating-fabric-agents', 'adapting-projects-to-fabric']]

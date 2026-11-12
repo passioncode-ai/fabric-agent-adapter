@@ -151,6 +151,22 @@ class Registration(unittest.TestCase):
         self.assertTrue(command["command"].endswith("fabric_session.py\" hook post-tool-use"), command["command"])
 
 
+class DepthBound(unittest.TestCase):
+    def test_the_answer_is_read_six_levels_deep_and_no_deeper(self):
+        # FAA-210: _release_answer unwraps at most six levels; a refusal at the sixth is read, one at the seventh is
+        # an answer the hook cannot read, which keeps the reminder
+        for depth, said in ((5, False), (6, False), (7, True)):
+            with self.subTest(depth=depth):
+                self.assertEqual(cli.released_done(release(how="done", response=_nested({"released": False}, depth))),
+                                 said)
+        # the content list and its text block are a level each: four wrappers inside them put the refusal at the
+        # sixth level (read), five at the seventh (not read)
+        text = [{"type": "text", "text": json.dumps(_nested({"released": False}, 4))}]
+        self.assertFalse(cli.released_done(release(how="done", response=text)))
+        deeper = [{"type": "text", "text": json.dumps(_nested({"released": False}, 5))}]
+        self.assertTrue(cli.released_done(release(how="done", response=deeper)))
+
+
 class Hook(Base):
     def test_the_hook_says_the_line_after_a_done_release_and_nothing_else(self):
         started = time.perf_counter()
