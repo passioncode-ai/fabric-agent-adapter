@@ -650,5 +650,25 @@ class BoardMandateTests(Conversation):
                     self.responder(**kw)
 
 
+
+class InstanceLockReleaseTests(unittest.TestCase):
+    """FAA-196 (11): `InstanceLock.release()` called from a `finally` must not replace the caller's own outcome: a close
+    that raises forgets the descriptor number (a retry never closes a number reused since) and the name still goes."""
+
+    def test_a_close_that_raises_forgets_the_number_and_still_drops_the_name(self):
+        lock_module = importlib.import_module("fabric_lock")
+        lock = lock_module.InstanceLock(__import__("pathlib").Path("/nonexistent-example"))
+        lock._fd, lock._name = 987654, "example-name"
+        dropped = []
+        with mock.patch.object(lock_module.os, "close", side_effect=OSError(5, "Input/output error")), \
+                mock.patch.object(lock_module, "_drop_lock_name", side_effect=dropped.append):
+            lock.release()  # never raises: the caller's own outcome stands
+        self.assertEqual((lock._fd, lock._name, dropped), (None, None, ["example-name"]))
+        with mock.patch.object(lock_module, "_drop_lock_name", side_effect=OSError(2, "gone")):
+            lock._name = "example-name"
+            lock.release()
+        self.assertIsNone(lock._name)
+
+
 if __name__ == "__main__":
     unittest.main()

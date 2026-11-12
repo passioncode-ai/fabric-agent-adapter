@@ -172,13 +172,26 @@ export class InstanceLock {
     return this;
   }
 
+  /**
+   * Let the lock go. Never throws, so a release in a `finally` never replaces the caller's own outcome (FAA-196 (11)):
+   * the descriptor and the name's server are forgotten before they are closed, so a retry never closes a descriptor
+   * reused since, and a close that fails still closes the server.
+   */
   release() {
     if (this.timer !== null) clearInterval(this.timer);
-    if (this.fd !== null) fs.closeSync(this.fd);
-    if (this.server) this.server.close();
+    const { fd, server } = this;
     this.timer = null;
     this.fd = null;
     this.server = null;
+    try {
+      if (fd !== null) fs.closeSync(fd);
+    } catch { // the descriptor is gone either way; the kernel frees the lock with it
+    } finally {
+      try {
+        server?.close();
+      } catch { // nothing to add to the caller's own outcome
+      }
+    }
   }
 }
 

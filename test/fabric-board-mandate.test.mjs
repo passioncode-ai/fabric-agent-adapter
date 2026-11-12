@@ -385,3 +385,19 @@ test('FAA-135: the operator\'s words reach no checkpoint during the work', async
   assert.ok(h.seen.checkpoint, 'the request\'s entry is in the checkpoint while it is worked');
   assert.ok(!h.seen.checkpoint.includes(WORDS));
 });
+
+// FAA-196 (11): release() from a finally must not replace the caller's own outcome: a close that throws forgets the
+// descriptor and still closes the name's server.
+test('FAA-196 (11): InstanceLock.release never throws and forgets what it held', async (t) => {
+  const { InstanceLock } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs');
+  const lock = new InstanceLock(path.join(tempDir('faa196-lock-'), 'data'));
+  let closed = false;
+  lock.fd = 987654;
+  lock.server = { close: () => { closed = true; } };
+  t.mock.method(fs, 'closeSync', () => { throw Object.assign(new Error('EIO'), { code: 'EIO' }); });
+  lock.release();
+  assert.deepEqual([lock.fd, lock.server, closed], [null, null, true]);
+  lock.server = { close: () => { throw new Error('ERR_SERVER_NOT_RUNNING'); } };
+  lock.release();
+  assert.equal(lock.server, null);
+});

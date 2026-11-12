@@ -206,15 +206,24 @@ class InstanceLock:
         return self
 
     def release(self) -> None:
+        """Let the lock go. Never raises, so a release in a `finally` never replaces the caller's own outcome (FAA-196
+        (11)): the descriptor number and the name are forgotten before they are closed, so a retry never closes a
+        number reused since; a close that fails (a deferred write error) still drops the name, as acquire does."""
         if self._watch is not None:
             self._watch.set()
             self._watch = None
-        if self._fd is not None:
-            os.close(self._fd)
-            self._fd = None
-        if self._name is not None:
-            _drop_lock_name(self._name)
-            self._name = None
+        fd, name, self._fd, self._name = self._fd, self._name, None, None
+        try:
+            if fd is not None:
+                os.close(fd)
+        except OSError:  # the descriptor is gone either way; the kernel frees the lock with it
+            pass
+        finally:
+            if name is not None:
+                try:
+                    _drop_lock_name(name)
+                except OSError:  # nothing to add to the caller's own outcome
+                    pass
 
 
 def lost_lock_message(lock_path: Path) -> str:
