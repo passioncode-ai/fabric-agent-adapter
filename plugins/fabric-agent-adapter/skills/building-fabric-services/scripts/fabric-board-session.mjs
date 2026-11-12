@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { Backoff, HubError, normalProject } from './fabric-hub.mjs';
 import { PRIMARY_CAPABILITY, acceptedRevisions, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
 import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems } from './fabric-board-shapes.mjs';
-import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, readBackProblem, readMandate, senderAgent } from './fabric-board-link.mjs';
+import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, noticeLinks, readBackProblem, readMandate, senderAgent } from './fabric-board-link.mjs';
 import { HOLD_RETRY_MAX_SECONDS, LEASE_MARGIN_SECONDS, SESSION_CODES, SlotKeeper } from './fabric-board-slots.mjs';
 
 export { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD }; // re-exported: callers import them from here since 0.40.0
@@ -86,7 +86,7 @@ function noticeSubject(value, project, episode) {
  */
 export class Responder extends SlotKeeper {
   constructor({ hub, projectId, capabilities, credentialFile, checkpointFile, handler, admit, observe, emit, service = 'service',
-    now = () => performance.now() / 1000, rand = Math.random, sessionFactory, agentId = null, mandateFrom = null, wall = Date.now, identifyAgent = null } = {}) {
+    now = () => performance.now() / 1000, rand = Math.random, sessionFactory, agentId = null, mandateFrom = null, wall = Date.now, identifyAgent = null, links = null } = {}) {
     super();
     if (typeof admit !== 'function' || typeof handler !== 'function' || !(identifyAgent == null || typeof identifyAgent === 'function')) {
       throw new BoardError('invalid_arguments', 'A responder needs the service\'s own input gate (admit) and a handler; identifyAgent, when given, is a function of the sender (FAA-135).');
@@ -100,6 +100,7 @@ export class Responder extends SlotKeeper {
     // FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; null reads none), and bind
     // its chain with the agent id identifyAgent names for the sender (asked only when a mandate travelled)
     Object.assign(this, { mandateFrom: mandateOptions(agentId, mandateFrom), agentId: agentId ?? null, wall, identifyAgent: identifyAgent ?? null });
+    this.links = noticeLinks(links); // FAA-187 (21): the page that resolves each notify kind
     this.service = String(service).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 40) || 'service';
     this.checkpoint = new Checkpoint(checkpointFile);
     this.sessionFactory = sessionFactory ?? ((grant) => new BoardSession(grant));
@@ -157,7 +158,8 @@ export class Responder extends SlotKeeper {
     // (events-and-notifications.md, "Say who wants what"; 0.56.0 seam r30).
     const subject = noticeSubject(value, this.project, episode);
     try {
-      this.emitTo(kind, level, text, { notify, subject, ...(data ? { data } : {}) });
+      const link = notify && this.links && Object.hasOwn(this.links, kind) ? { link: this.links[kind] } : {}; // the page that resolves it (FAA-187 (21))
+      this.emitTo(kind, level, text, { notify, subject, ...link, ...(data ? { data } : {}) });
     } catch {
       // an event that cannot be written never stops the responder
     }

@@ -1569,6 +1569,21 @@ class MovedSlotTests(Conversation):
         path = self.data / "board-checkpoint.json"
         return json.loads(path.read_text()).get("slots", {}) if path.exists() else {}
 
+    def test_a_notify_notice_carries_the_link_the_service_gives_for_its_kind(self):
+        """FAA-187 (21): a notify event names the page that resolves it (events-and-notifications.md); the responder
+        takes a link per kind from the service (`links=`), passed only to a notice that notifies, and only when given."""
+        r = self.responder(links={"board.slot.moved": "/#board"})
+        r.step()
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()
+        (moved,) = self.moved()
+        self.assertEqual((moved[3]["notify"], moved[3]["link"]), (True, "/#board"))
+        self.assertTrue(all("link" not in e[3] for e in self.events if e[0] != "board.slot.moved"))
+        for bad in ({"board.slot.moved": "https://elsewhere.example/x"}, {"board.slot.moved": 7}, ["board.slot.moved"]):
+            with self.subTest(links=bad), self.assertRaises(fb.BoardError):
+                self.responder(links=bad)
+
     def test_the_generation_held_is_recorded_beside_the_checkpoint(self):
         r = self.responder()
         r.step()
@@ -2725,6 +2740,8 @@ class SampleWiringTests(unittest.TestCase):
             hub.board.advance(15)
             svc.board.step()  # the claim is fenced: com.status shows the move
             self.assertEqual(svc.board_moved(), ["sample.echo"])
+            moved = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.moved"]
+            self.assertEqual(moved[-1].get("link"), "/", "the notice links the page with Take back (FAA-187 (21))")
 
             def request(method, path, headers=None, body=None):
                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)

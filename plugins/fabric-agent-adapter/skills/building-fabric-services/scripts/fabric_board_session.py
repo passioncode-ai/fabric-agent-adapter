@@ -118,7 +118,7 @@ class Responder(SlotKeeper):
                  now: Callable[[], float] = time.monotonic, rand: Callable[[], float] = random.random,
                  spawn: Optional[Callable[[Callable[[], None]], Any]] = None, session_factory: Optional[Callable[..., BoardSession]] = None,
                  agent_id: Optional[str] = None, mandate_from: Any = None, wall: Callable[[], float] = time.time,
-                 identify_agent: Optional[Callable[[Dict[str, Any]], Optional[str]]] = None):
+                 identify_agent: Optional[Callable[[Dict[str, Any]], Optional[str]]] = None, links: Any = None):
         if admit is None or handler is None or not (identify_agent is None or callable(identify_agent)):
             raise BoardError("invalid_arguments", "A responder needs the service's own input gate (admit) and a handler; "
                              "identify_agent, when given, is a function of the sender (FAA-135).")
@@ -132,7 +132,7 @@ class Responder(SlotKeeper):
         #: FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; None reads none), and
         #: bind its chain with the agent id identify_agent names for the sender (asked only when a mandate travelled).
         self.mandate_from, self.agent_id, self.wall = _link.mandate_options(agent_id, mandate_from), agent_id, wall
-        self.identify_agent = identify_agent
+        self.identify_agent, self.links = identify_agent, _link.notice_links(links)  # FAA-187 (21): a link per notify kind
         self.capabilities = caps
         self.credential_file, self.handler, self.admit, self.observe = Path(credential_file), handler, admit, observe
         self.checkpoint = Checkpoint(Path(checkpoint_file))
@@ -183,6 +183,8 @@ class Responder(SlotKeeper):
         # goes once, without a subject there (unit r31, seam r31).
         if _takes_subject(self._emit_to):
             extra["subject"] = _notice_subject(value, self.project, episode)
+        if notify and kind in getattr(self, "links", {}):  # the page that resolves it, which the service named (FAA-187 (21))
+            extra["link"] = self.links[kind]
         try:
             self._emit_to(kind, level, text, notify=notify, **extra)
         except Exception:  # noqa: BLE001 - an event that cannot be written never stops the responder

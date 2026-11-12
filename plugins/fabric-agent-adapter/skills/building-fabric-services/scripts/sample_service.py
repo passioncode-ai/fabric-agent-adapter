@@ -154,7 +154,8 @@ class Service:
             # After the lock, like every other piece of state: the responder's checkpoint lives in the data directory.
             self.board = fbd.Responder(hub=fhb.HubClient(), project_id=self.board_project, capabilities=[self.board_capability],
                                        credential_file=self.board_credential, checkpoint_file=self.data / "board-checkpoint.json",
-                                       handler=self.board_answer, admit=self.board_admit, emit=self.log.append, service=self.id)
+                                       handler=self.board_answer, admit=self.board_admit, emit=self.log.append, service=self.id,
+                                       links={"board.slot.moved": "/"})  # the page with Take back (FAA-187 (21))
             # Every button has a tool (DEC-0121): the page's Take back is this relayed action, the operator's decision.
             cap = TAKE_BACK_CAPABILITY
             self.mcp.add_tool(fi.tool_for_capability(cap, cap["input"], cap["output"]), self.board_take_back_tool,

@@ -255,3 +255,21 @@ test('FAA-194 (5): moved slots share one com.status read a tick', async (t) => {
     assert.equal(calls.filter((c) => c === 'com.status').length, 1, calls.join(', '));
   }
 });
+
+// FAA-187 (21): a notify event names the page that resolves it; the responder takes a link per kind from the service.
+test('FAA-187 (21): a notify notice carries the link the service gives for its kind', async (t) => {
+  const h = await fakeHub(t, ['video.render']);
+  const seen = [];
+  const r = new fb.Responder({ ...h.options(), links: { 'board.slot.moved': '/#board' }, emit: (kind, level, text, extra) => seen.push([kind, extra]) });
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  const moved = seen.filter(([kind]) => kind === 'board.slot.moved');
+  assert.equal(moved.length, 1);
+  assert.deepEqual([moved[0][1].notify, moved[0][1].link], [true, '/#board']);
+  assert.ok(seen.every(([kind, extra]) => kind === 'board.slot.moved' || !('link' in extra)));
+  for (const bad of [{ 'board.slot.moved': 'https://elsewhere.example/x' }, { 'board.slot.moved': 7 }, ['board.slot.moved'], 'x']) {
+    assert.throws(() => new fb.Responder({ ...h.options(), links: bad }), (e) => e.code === 'invalid_arguments', JSON.stringify(bad));
+  }
+});

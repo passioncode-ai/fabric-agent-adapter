@@ -292,6 +292,19 @@ export function covers(mandate, call, agentId, wall, caller = null, callerAgent 
 }
 
 /**
+ * A responder's `links` (FAA-187 (21)): the page on the service that resolves each notify kind, such as
+ * `{'board.slot.moved': '/#board'}`, passed to a notice that notifies as its `link`. A path on the service, as makeEvent
+ * takes one; null is none. A service that gives links has an emit that takes `link`.
+ */
+export function noticeLinks(links) {
+  if (links === null || links === undefined) return Object.create(null);
+  if (!isObj(links) || !Object.entries(links).every(([, v]) => typeof v === 'string' && v.startsWith('/') && !v.startsWith('//'))) {
+    throw new BoardError('invalid_arguments', 'links maps an event kind to a path on this service, such as /#board.');
+  }
+  return Object.assign(Object.create(null), links);
+}
+
+/**
  * Why a message read back with com.get is not the request a claim took (the first path refuses it, a resume reads no
  * mandate from it, FAA-196 (1)): `digest-mismatch` (another digest than the claim's), `not-addressed` (not this
  * request, capability and Project), else null.

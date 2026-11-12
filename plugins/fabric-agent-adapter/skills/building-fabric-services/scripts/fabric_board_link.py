@@ -345,6 +345,19 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
     return answer
 
 
+def notice_links(links: Any) -> Dict[str, str]:
+    """A responder's `links` (FAA-187 (21)): the page on the service that resolves each notify kind, such as
+    `{"board.slot.moved": "/#board"}`, passed to a notice that notifies as its `link` (events-and-notifications.md).
+    A path on the service, as make_event takes one; None is none. A service that gives links has an emit that takes
+    `link` (JsonlEventLog.append does)."""
+    if links is None:
+        return {}
+    if not isinstance(links, Mapping) or not all(isinstance(k, str) and isinstance(v, str) and v.startswith("/")
+                                                 and not v.startswith("//") for k, v in links.items()):
+        raise BoardError("invalid_arguments", "links maps an event kind to a path on this service, such as /#board.")
+    return dict(links)
+
+
 def read_back_problem(message: Any, entry: Dict[str, Any], project: str) -> Optional[str]:
     """Why a message read back with com.get is not the request a claim took (the first path refuses it, a resume reads
     no mandate from it, FAA-196 (1)): `digest-mismatch` (another digest than the claim's), `not-addressed` (not this

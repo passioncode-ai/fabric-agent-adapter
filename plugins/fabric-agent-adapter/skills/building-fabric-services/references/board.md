@@ -420,7 +420,7 @@ account's does, where limited query access alone would have read it as running (
 message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,
-admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time, identify_agent=None)`
+admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time, identify_agent=None, links=None)`
 with `step()`, `run(stop, drain)`, `shutdown(drain)`, `take_back(capability)`; `WorkContext.progress(note)`,
 `.begin_effect(summary)`, `.stopped`, `.mandate`, `.mandate_covers(call)`; `PERSONAL_BOARD`; `BoardSession(grant)`;
 `Checkpoint(path)`; `comms_canonical(value)`, `comms_digest(operation, value)`, `receipt_problems(value, op)`,
@@ -431,4 +431,4 @@ effect_began)`, `self_check()`; `BoardError`, `Stopped`.
 Node: the same names in camelCase (`locateHub(root, {alive, estate, now})`, `new HubClient(root, {alive, timeout,
 estate, post})`, `new Responder({...})` with async `step()`, `run({signal, drain})`, `shutdown(drain)`,
 `takeBack(capability)`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`, `ctx.mandate`, `ctx.mandateCovers(call)`;
-the options `agentId`, `mandateFrom`, `wall` (milliseconds) and `identifyAgent`; `selfCheck()`). Both kits read and write the same checkpoint file.
+the options `agentId`, `mandateFrom`, `wall` (milliseconds), `identifyAgent` and `links`; `selfCheck()`). Both kits read and write the same checkpoint file. `links` maps a notify kind to the page on the service that resolves it (`{"board.slot.moved": "/#board"}`, a path, as `make_event` takes one): a notice that notifies carries it as `link`, so the banner opens that page; give it only with an emit that takes `link` (`JsonlEventLog.append` does; FAA-187 (21)). A Node emit receives `{notify, subject, link?, data?}` as one object: spread it before its own `subject` or `link` if it sets its own, or the responder's wins (FAA-187 (27)).
