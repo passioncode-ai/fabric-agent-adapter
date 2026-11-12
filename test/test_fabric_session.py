@@ -337,7 +337,9 @@ class Registrations(Base):
         reg = fs.claude_registration(self.repo, self.env)
         self.assertEqual((reg["scope"], reg["fabricMcp"], reg["args"]), ("user", True, ["--runner", "claude-code"]))
         self.register(scope="local")
+        (self.repo / ".git").mkdir()  # FAA-235: a local entry is keyed by the git root, found from any folder inside it
         self.assertEqual(fs.claude_registration(self.repo / "sub", self.env)["scope"], "local")
+        (self.repo / ".git").rmdir()
         (self.home / ".claude.json").unlink()
         (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {
             "command": "C:\\Fabric\\resources\\bin\\fabric-mcp.cmd", "args": [], "env": {"X": "secret"}}}}))
@@ -390,6 +392,21 @@ class Registrations(Base):
         done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
                                 extra_env={"CLAUDE_CONFIG_DIR": str(config)})
         self.assertIn("fabric_whoami", done.stdout)
+
+    def test_a_local_entry_is_keyed_by_the_git_root_or_the_exact_folder(self):
+        # FAA-235, measured with Claude Code 2.1.299 (docs/evidence/runs/2026-11-12-faa-235-local-scope-key.md):
+        # `claude mcp add --scope local` keys projects[<git root>] inside a checkout and projects[<cwd>] outside one;
+        # Claude Code applies it from inside that checkout only, never from a child folder outside git or from a nested
+        # repository, so no ancestor walk.
+        self.register(scope="local")  # keyed at self.repo
+        self.assertEqual(fs.claude_registration(self.repo, self.env)["scope"], "local")
+        self.assertIsNone(fs.claude_registration(self.repo / "child", self.env))  # outside git: the exact folder only
+        (self.repo / ".git").mkdir()
+        self.assertEqual(fs.claude_registration(self.repo / "a" / "b", self.env)["folder"], str(self.repo.resolve()))
+        nested = self.repo / "nested"
+        (nested / ".git").mkdir(parents=True)
+        self.assertIsNone(fs.claude_registration(nested, self.env))  # a nested repository is its own key
+        self.assertIsNone(fs.claude_registration(nested / "deep", self.env))
 
     def test_an_http_entry_is_not_fabric_mcp(self):
         self.register(kind="http")
@@ -2325,10 +2342,13 @@ class Status(Base):
             report = fs.status(self.repo, self.env, "darwin")
             self.assertIn("in %s, claude mcp remove --scope local fabric, then claude mcp add --scope local fabric"
                           % self.repo.resolve(), report["next"])
-            # 0.69.0 seam reading 4: the entry may be an ancestor's; the line names the folder it was found in
+            # 0.69.0 seam reading 4: the entry may be the git root's (FAA-235: never another ancestor's); the line
+            # names the folder it was found in
             (self.repo / "sub").mkdir(exist_ok=True)
+            (self.repo / ".git").mkdir()
             self.assertIn("in %s, claude mcp remove" % self.repo.resolve(),
                           fs.status(self.repo / "sub", self.env, "darwin")["next"])
+            (self.repo / ".git").rmdir()
             self.assertIn("put your own Fabric.app in ~/Applications, then", report["next"])
             (self.home / ".claude.json").unlink()
             (self.repo / ".mcp.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": str(shared)}}}))

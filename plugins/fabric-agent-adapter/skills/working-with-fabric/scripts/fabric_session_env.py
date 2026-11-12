@@ -405,11 +405,15 @@ def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Opti
         except ValueError:
             config = {}
     projects = config.get("projects") if isinstance(config.get("projects"), dict) else {}
-    for folder in _ancestors(cwd):
-        servers = (projects.get(str(folder)) or {}).get("mcpServers") if isinstance(projects.get(str(folder)), dict) else None
-        found = _stdio_entry((servers or {}).get("fabric")) if isinstance(servers, dict) else None
-        if found:
-            return dict(found, scope="local", folder=str(folder))
+    # FAA-235: Claude Code keys a local entry by the git root of the folder it was added in, or that folder outside a
+    # checkout, and applies it only there (Claude Code 2.1.299; docs/evidence/runs/2026-11-12-faa-235-local-scope-key.md):
+    # one key, never an ancestor's
+    folder = checkout_root(cwd, env) or _ancestors(cwd)[0]
+    project = projects.get(str(folder))
+    servers = project.get("mcpServers") if isinstance(project, dict) else None
+    found = _stdio_entry(servers.get("fabric")) if isinstance(servers, dict) else None
+    if found:
+        return dict(found, scope="local", folder=str(folder))
     for folder in _ancestors(cwd):
         text = read_small(folder / ".mcp.json")
         if text:
