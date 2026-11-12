@@ -459,6 +459,24 @@ test('selfCheck: the fixture conversation check_service.py runs passes on the No
   assert.deepEqual(await fb.selfCheck(), []);
 });
 
+// FAA-187 (23): the fixture's Responder records its notices: a kit that sends none, one at a level the event log
+// refuses, or one without its subject fails the self check.
+test('selfCheck: a kit whose notices are lost fails', async (t) => {
+  const original = fb.Responder.prototype.emit;
+  const cases = [[function silent() {}, 'fenced: no warning notice'],
+    [function warn(kind, level, text, options) { return original.call(this, kind, level === 'warning' ? 'warn' : level, text, options); }, "at level 'warn'"],
+    [function noSubject(kind, level, text, { notify = false } = {}) { this.emitTo(kind, level, text, { notify }); }, 'without its subject']];
+  for (const [planted, said] of cases) {
+    fb.Responder.prototype.emit = planted;
+    try {
+      const problems = await fb.selfCheck();
+      assert.ok(problems.some((p) => p.includes(said)), `${planted.name}: ${problems.join('; ')}`);
+    } finally {
+      fb.Responder.prototype.emit = original;
+    }
+  }
+});
+
 // --- DEC-0079 and DEC-0081 (FAA-42) ------------------------------------------------------------------------------------
 const HOLD = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/comms-hold-vectors.json'), 'utf8'));
 

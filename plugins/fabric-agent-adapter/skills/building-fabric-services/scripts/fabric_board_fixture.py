@@ -13,6 +13,7 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_hub as _hub
+from fabric_events import LEVELS as _LEVELS  # noqa: E402 - the levels the event log takes (FAA-187 (23))
 from fabric_board_shapes import (  # noqa: E402 - the kit (FAA-65)
     COMMS_PROTOCOL,
     RESPOND_TOOLS,
@@ -55,7 +56,9 @@ def _fixture_answers(variant: str) -> Dict[str, Any]:
 def self_check() -> List[str]:
     """One scripted conversation per path through this kit, with no Fabric: the whole conversation, a `fenced` accept
     and a board session without an epoch. Answers the problems found; an empty list means this kit answers the fixture
-    conversation as the contract asks. Writes only in a temporary folder it removes."""
+    conversation as the contract asks. Writes only in a temporary folder it removes. The responder's notices are recorded
+    by an emit that takes a subject, as JsonlEventLog.append does: a notice at a level the log refuses, one without its
+    subject, or a fenced attempt that says no warning fails it (FAA-187 (23))."""
     import os
     import tempfile
     problems: List[str] = []
@@ -71,7 +74,10 @@ def self_check() -> List[str]:
             cred = Path(tmp) / "credential"
             cred.write_text("c" * 43)
             os.chmod(cred, 0o600)
-            answers, calls, handled = _fixture_answers(variant), [], []
+            answers, calls, handled, notices = _fixture_answers(variant), [], [], []
+
+            def emit(kind, level, text, subject=None, **extra):
+                notices.append((kind, level, subject))
 
             def post(origin, body, bearer, session=None, timeout=15.0, method="POST", protocol_version=None):
                 if method == "DELETE":
@@ -93,9 +99,16 @@ def self_check() -> List[str]:
                                   credential_file=cred, checkpoint_file=Path(tmp) / "checkpoint.json",
                                   handler=lambda request, ctx: handled.append(request.body) or {"state": "completed", "summary": "Rendered."},
                                   admit=lambda request: None, now=lambda: 0.0, rand=lambda: 0.5, spawn=lambda fn: fn(),
-                                  session_factory=lambda grant: BoardSession(grant, post=post))
+                                  session_factory=lambda grant: BoardSession(grant, post=post), emit=emit)
             responder.step()
             tools = [t for t, _ in calls]
+            for kind, level, subject in notices:
+                if level not in _LEVELS:
+                    problems.append("%s: notice %s at level %r, which the event log refuses" % (variant, kind, level))
+                if not (isinstance(subject, dict) and subject.get("type") and subject.get("id")):
+                    problems.append("%s: notice %s without its subject" % (variant, kind))
+            if variant == "fenced" and not any(level == "warning" for _, level, _ in notices):
+                problems.append("fenced: no warning notice reached the service's emit")
             if any(t not in RESPOND_TOOLS and t != "fabric.board.join" for t in tools):
                 problems.append("%s: a tool outside the respond scope was sent" % variant)
             if variant == "whole":

@@ -2350,6 +2350,24 @@ class SelfCheckAndProbeTests(unittest.TestCase):
     def test_self_check_passes(self):
         self.assertEqual(fb.self_check(), [])
 
+    def test_self_check_catches_a_kit_whose_notices_are_lost(self):
+        """FAA-187 (23): the fixture's Responder records its notices: a kit that sends none (a fenced attempt says a
+        warning), sends one at a level the event log refuses, or sends one without its subject fails the self check."""
+        original = fb.Responder._emit
+        cases = {"silent": (lambda self, *a, **k: None, "fenced: no warning notice"),
+                 "warn": (lambda self, kind, level, text, **k: original(self, kind, "warn" if level == "warning" else level, text, **k),
+                          "at level 'warn'"),
+                 "no subject": (lambda self, kind, level, text, **k: self._emit_to(kind, level, text, notify=k.get("notify", False)),
+                                "without its subject")}
+        for name, (planted, said) in cases.items():
+            with self.subTest(name):
+                fb.Responder._emit = planted
+                try:
+                    problems = fb.self_check()
+                finally:
+                    fb.Responder._emit = original
+                self.assertTrue(any(said in p for p in problems), problems)
+
     def test_self_check_catches_a_kit_that_keeps_acting_after_fenced(self):
         original = fb.Responder._accept
         fb.Responder._accept = lambda self, entry: True  # planted defect: ignores the board's answer
