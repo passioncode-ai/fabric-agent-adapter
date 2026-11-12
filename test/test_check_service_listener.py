@@ -129,7 +129,11 @@ class Served(unittest.TestCase):
         """A timeout or a full backlog is not `down`: NOT_RUN naming the error; the well-known rules then read the port,
         each on a checked connection."""
         rules = importlib.import_module("check_service_rules")
-        with mock.patch.object(rules.socket, "create_connection", side_effect=TimeoutError()):
+        # the listener table is asked too (FAA-260 item 12); faked here, since reading it under a patched
+        # create_connection would calibrate the process's table reader on a socket that cannot connect
+        mine = po.Owner(po.THIS_ACCOUNT, 501, 9, "x")
+        with mock.patch.object(rules.socket, "create_connection", side_effect=TimeoutError()), \
+                mock.patch.object(po, "listener", return_value=mine):
             self.assertTrue(self.probe.listener_rule())
         got = self.verdict()
         self.assertEqual(got["verdict"], "NOT_RUN")
