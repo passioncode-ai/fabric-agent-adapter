@@ -220,7 +220,9 @@ The installer, not the service, owns the plist and the descriptor. Sequence:
 2. `launchd_plist(...)` then `launchd_install(...)`: writes and lints the plist,
    `bootout` and waits for the unload, `bootstrap` with retries on the transient I/O
    error, then polls the well-known document until **this** identity answers on this OS account's listener (HA-2).
-   A label the operator disabled stays disabled: only a first install enables.
+   A label the operator disabled stays disabled: only a first install enables. On a headless Mac (no GUI login after a
+   FileVault restart) install a LaunchDaemon instead: the plist in `/Library/LaunchDaemons` with `user_name`, as root
+   (the lifecycle reference, *The system domain*).
 3. Uninstall: `launchd_uninstall` (waits for the unload, removes the plist, resets the
    override; `purge=True` removes data only when the operator asks), `remove_descriptor`.
 4. After an upgrade, `prune_releases(releases_dir, current=…)` keeps the running release
@@ -243,28 +245,19 @@ while the operator types or a dialog is open, one panel's failure never blanks t
 others, and every error is a sentence with the next action. Read
 [the dashboard reference](references/dashboard.md) before building the page.
 
-The host shows the page in a pane beside the agent console that the operator can drag wide, so
-the page must hold from **360 CSS px** up: no sideways document scroll, navigation that wraps or
-folds into a More menu (never a tab strip that only scrolls sideways), wide tables and logs in
-their own focusable scroll box, sticky chrome at most 120 px, and the host's colour scheme and
-theme followed (`fabric-dashboard/0.1`, contract DEC-0036). **Build it from the dashboard kit**
-(`assets/dashboard-kit/`: `dashboard_kit.py install <static dir>`, seven AA themes, light and dark)
-and declare it with `extensions=fs.dashboard_extension()`. Read
-[the dashboard kit reference](references/dashboard-kit.md) for the markup, the themes, the
-declaration and how to upgrade a dashboard built before the kit: an upgrade you may make yourself,
-which the plugin's session-start notice offers in a repository that owns the service.
+The host shows the page in a pane the operator can drag wide, so it holds from **360 CSS px** up and follows the
+host's colour scheme and theme (`fabric-dashboard/0.1`, contract DEC-0036). **Build it from the dashboard kit**
+(`assets/dashboard-kit/`: `dashboard_kit.py install <static dir>`, seven AA themes, light and dark) and declare it with
+`extensions=fs.dashboard_extension()`. [The dashboard kit reference](references/dashboard-kit.md) has the layout rules,
+the markup, the themes, the declaration and how to upgrade a dashboard built before the kit, which the plugin's
+session-start notice offers in a repository that owns the service.
 
-**Every button has a tool** (`fabric-actions/0.1`, contract DEC-0121 AP-1). Each action the page lets a
-person take is a tool on the MCP surface with the same effect, checks, audit record and an idempotency key,
-registered with `server.add_tool(tool, handler, action={id, title, tool, gate})` (`gate` is `none`, `relayed`
-or `human` with its `humanStep`) and declared with `build_well_known(actions=server.action_table())` under
-`extensions/actions/0.1`. A `relayed` action called by the operator's own agent with their decision in
-`_meta.decision` is the operator's act: never answer it "operator session required" or send them to the page.
-A service adopts the relayed gate once Fabric's hub forwards decisions (CT-125), as the contract says; until then its tools
-answer as today, except the board responder's take-back action, declared `relayed` now: an agent whose client sets
-`_meta` calls it with the operator's decision; Claude Code and Codex reach it through the page until CT-125
-([board.md](references/board.md); the reference service's `board.take-back`). Read the interop reference's *Actions* section for when to adopt, the gate, its hooks and its
-refusals.
+**Every button has a tool** (`fabric-actions/0.1`, contract DEC-0121 AP-1): each action the page offers is an MCP tool
+with the same effect, checks, audit record and idempotency key, registered with
+`server.add_tool(tool, handler, action={id, title, tool, gate})` and declared with
+`build_well_known(actions=server.action_table())` under `extensions/actions/0.1`. A `relayed` action called with the
+operator's decision in `_meta.decision` is the operator's act, never answered "operator session required". When to
+adopt, the gates, the hooks, the board responder's take-back and the refusals: the interop reference's *Actions* section.
 
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
 agents, models, connectors, stores and channels, each with its state, from
@@ -376,12 +369,8 @@ things change and the kits implement each:
    example is [`scripts/sample-remote-service.mjs`](scripts/sample-remote-service.mjs): it runs
    with its own TLS or behind a platform router.
 2. **Secrets live on the platform:** the service token and the session key (32 bytes) are
-   platform secrets, never in the repository, a URL or an argument vector. A provider key the
-   remote service needs is issued and kept in Project Observatory, pushed to the platform, and
-   the movement recorded with
-   `python3 "$(project-observatory full-path)/tools/vault.py" moved <project> <env> <NAME> --how "<what moved, where, evidence>" --at <provider>`,
-   so the platform's copy is known rather than invisible. Without Project Observatory, record
-   where the key lives in the person's own secret manager.
+   platform secrets, never in the repository, a URL or an argument vector; a provider key stays in Project
+   Observatory or the person's secret manager, its move recorded ([remote placement](references/remote-placement.md), *On the platform*).
 3. **Register it on the operator's computer**, the installer side, run there:
    `registerRemote({ id, name, origin, token, source })` / `register_remote(...)` writes the token file
    (0600) and the descriptor, with `source.repository` naming the code's repository; pass the token from a file or

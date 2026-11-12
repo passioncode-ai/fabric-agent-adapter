@@ -1,8 +1,35 @@
 # Changelog
 
-## 0.78.0
+## 0.78.0 (2026-11-12)
+
+The contract pin stays `18f8d487`. Kit modules change: a new `fabric_tailnet` and `fabric-tailnet.mjs` (layer L0); `fabric_supervisors` and `fabric-supervisors.mjs`, and the facades
+`fabric_service` and `fabric-service.mjs` (new exports `launchd_domain` / `launchdDomain`, `SYSTEM_DAEMONS`,
+`jobWellKnownOf`, `ForeignUserAnswer`); the probe `check_service.py` (`lifecycle.one-copy`); guidance in building-fabric-services and
+working-with-fabric.
 
 ### Added
+
+- **A LaunchDaemon for a headless Mac** (FAA-278, with FAA-228): the launchd helpers in both kits work in launchd's system
+  domain, for a Mac that a FileVault restart (`fdesetup authrestart`) leaves with no GUI login, where a `gui/<uid>` job
+  never starts. A plist in `/Library/LaunchDaemons` (the folder's case ignored) or `domain="system"` /
+  `domain: 'system'` is a LaunchDaemon, macOS only; `launchd_plist(..., user_name=)` / `launchdPlist({userName})` writes
+  its `UserName`, which a system install requires; `launchd_domain` / `launchdDomain` names the domain.
+  `launchd_loaded`, `launchd_pid` and `launchd_override` read the system domain without root. `launchd_install` and
+  `launchd_uninstall` there need root, refuse before writing anything otherwise and name the command to run as root,
+  refuse `purge` (the data is the `UserName`'s), and accept the installed service's token-free answer only on a
+  connection launchd's own job accepted (its pid from `launchctl print system/<label>`, running as the `UserName`'s uid)
+  or, under a restricted socket
+  table, on a port that pid listens on (`lsof -p`, a weaker vouch, CT-261). A `gui/<uid>` bootstrap that fails for lack
+  of a GUI session (error 125, an SSH install) now says to remove that LaunchAgent and use the system domain. The probe's
+  `lifecycle.one-copy` asks launchd in the domain the descriptor's plist names. A LaunchDaemon's label is the machine's:
+  an install refuses, before writing anything, a label another plist holds, a plist at its path of another label or
+  another `UserName`, a `UserName` that is not a short name, is root or is no account of the Mac, and an origin other
+  than `http://127.0.0.1:<port>`; one refused after its bootstrap leaves the job loaded and names the `bootout`. An
+  uninstall refuses a label another plist holds before its `bootout`. The root installer's read of its own job's token-free answer, proved by the job's pid, its uid and a bind on
+  exactly `127.0.0.1`, departs from the pinned HA-2 (and the contract's later RT-3); the contract owner accepted it in
+  principle as DEC-0161, proposed (FAA-288). `references/lifecycle.md`
+  *The system domain* says which steps run as the `UserName` and which as root, and what a host must not do (FAA-287);
+  one scenario eval.
 
 - **A kit module for an agent behind `tailscale serve`: `fabric_tailnet`** (FAA-297, a board request of 2026-11-11).
   `fabric_tailnet.py` and `fabric-tailnet.mjs` (layer L0, no imports) decide who is calling and what that person may
@@ -43,6 +70,20 @@
   previous description, every trigger included, moved word for word to its `references/when-to-use.md`, linked
   from a short `## When to use` section. `test/validate.py` now fails a description over 360 characters
   (`DESCRIPTION_LISTING_BUDGET`) and its self-test plants one.
+
+### Fixed
+
+- SKILL.md headroom (FAA-263): building-fabric-services and working-with-fabric each keep at least 150 words under the
+  4750-word cap; the detail stays in their references, which already held most of it (the dashboard kit, the interop
+  *Actions* section, the session hooks, the board's *When nobody answers*), and the remote placement's *On the
+  platform* and the native host hooks gained what they lacked; no rule changes.
+
+### Upgrading
+
+- A service that installs a LaunchDaemon vendors `fabric_supervisors` (or `fabric-supervisors.mjs`) with its facade and
+  `fabric_peer_owner` (or `fabric-peer-owner.mjs`) of 0.76.0 or later, which it imports. A LaunchAgent install behaves
+  as before, but in Node `fabric-supervisors.mjs` 0.78.0 imports `fabric-peer-owner.mjs` 0.76.0 or later in either
+  domain; `fabric_kit.py install` copies both.
 
 ## 0.77.0 (2026-11-08)
 

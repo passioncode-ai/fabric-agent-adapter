@@ -39,6 +39,8 @@ Hermes activation remains its own explicit CLI step. Remove its activation with 
 
 OpenClaw uses strict JSON. For a JSON5 configuration, use OpenClaw's own config commands; this installer refuses it without guessing. An existing master/entry disable, deny list or denied hook permission is preserved and reported. This adapter needs both `allowConversationAccess` and `allowPromptInjection`; it does not read messages. Removing it drops its recognized load path and owned entry; customized entries are disabled. An existing allow-list entry is retained to avoid changing broader discovery policy. Removal is ownership-limited, not an exact rollback of the whole config.
 
+Codex's `hooks.json` and Kimi Code's `config.toml` are refused, nothing changed, when they have another shape than the one the installer writes into.
+
 OpenCode and Pi loader files carry a managed marker. A foreign file at the same destination is refused, not overwritten. Existing unrelated extensions/settings remain. Config replacement uses a backup and a stale-plan hash check; Hermes's multi-file loader is preflighted before writes, but the operation is not a filesystem-wide transaction.
 
 ## Runtime and failure boundaries
