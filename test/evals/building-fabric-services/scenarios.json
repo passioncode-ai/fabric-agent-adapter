@@ -724,6 +724,19 @@
         "answers yes: an uptime A agent is a service by Step 0, built as an online service (the remote placement)",
         "does not build a CLI or a laptop-only local service for it"
       ]
+    },
+    {
+      "id": "an-agent-serves-and-calls-a2a",
+      "trap": "the agent serves the card behind the service token or names the token as the card's scheme, maps tasks onto a store of its own, or calls any peer origin with a key read from a file",
+      "request": "Make example-agent reachable by other agents over A2A, and let it ask a peer agent at https://peer.example for drafts.",
+      "expected": [
+        "builds the card with fabric_a2a_server.agent_card from the capabilities, one skill each, and serves it at /.well-known/agent-card.json without the token, declaring surfaces.a2a with a2a_surface",
+        "gives the interface its own scheme and an authorize function; never the descriptor's token (DEC-0122 item 3)",
+        "answers POST on the interface with A2ABinding.handle over the interop JobStore: a task is a job, input-required answered by inputResponses or text, the envelope an artifact",
+        "calls the peer with A2AClient listing only https://peer.example, its key from an environment variable use_secret.py run fills",
+        "runs check_service_a2a.py and reports a2a.task-states NOT_RUN unless the service names a safe probe message",
+        "says the live Hermes interop test is not run"
+      ]
     }
   ]
 }

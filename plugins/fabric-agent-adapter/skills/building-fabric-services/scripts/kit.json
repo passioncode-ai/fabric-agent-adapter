@@ -222,7 +222,7 @@
     "fabric_jsvalue",
     "fabric_secrets"
    ],
-   "sha256": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919"
+   "sha256": "ea8c93b075dc25ae3b0de8147d3bf87c23e5378daf4b2b03f8ea86bd5dec3320"
   },
   {
    "module": "fabric_page_links",
@@ -554,6 +554,19 @@
     "fabric_usage"
    ],
    "sha256": "a415db7475c3359fa15c85979a63a3a223a0ad7f85f878bcc2d638acccb44090"
+  },
+  {
+   "module": "fabric_a2a_server",
+   "file": "fabric_a2a_server.py",
+   "layer": "L4",
+   "imports": [
+    "fabric_a2a",
+    "fabric_base",
+    "fabric_http",
+    "fabric_interop",
+    "fabric_interop_rules"
+   ],
+   "sha256": "a592fb3483d2385361178bf5a2eed020c4bab9cf108185fb5b03c1d37b603ae5"
   }
  ],
  "node": [
@@ -773,7 +786,7 @@
     "fabric-jsvalue",
     "fabric-secrets"
    ],
-   "sha256": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346"
+   "sha256": "bad5f2835f29bc3fabf33ace513f5df1f057b9c33672861dafd3a4e77ab480af"
   },
   {
    "module": "fabric-page-links",
@@ -1097,6 +1110,18 @@
     "fabric-usage"
    ],
    "sha256": "4e3e73a1b8882bdde4cbb311f6f4a5e2f048fa81fa245409a16df1e6cab03e19"
+  },
+  {
+   "module": "fabric-a2a-server",
+   "file": "fabric-a2a-server.mjs",
+   "layer": "L4",
+   "imports": [
+    "fabric-a2a",
+    "fabric-base",
+    "fabric-http",
+    "fabric-interop-rules"
+   ],
+   "sha256": "1f50953ecee924c66bdc61977cc66a791f2126aa7f833aa3f9a1df204cd71d46"
   }
  ],
  "history": {
@@ -7130,7 +7155,7 @@
    "fabric_protocols.py": "3cba881f6f3468e8d8a8455a5d54c5567e748c37291211a1c7f22d195ea562c4",
    "fabric_actions.py": "ae21d1199614c4f74d1dcd1e0a87107a9d52434cd9e2d64aa24a7b1e196fb723",
    "fabric_connections.py": "ca6a4735b21d285a3ef2c60724f3ead08f5aa707fdfaa3cb5757e02a226132a0",
-   "fabric_a2a.py": "8b01502131215bb4de1c01866187c56e99b791543923ed8577535573db33b919",
+   "fabric_a2a.py": "ea8c93b075dc25ae3b0de8147d3bf87c23e5378daf4b2b03f8ea86bd5dec3320",
    "fabric_page_links.py": "1b57ea573c550e2f90d1ec3edcc655917ceaa0db9dd1635fccf422ec3024d25e",
    "fabric_load.py": "0e97b6307108c5877a728be8f0c416686130ce98b31c4dfd5d788d9dc61a8860",
    "fabric_lock.py": "6dac051969f2c331f7cc6a90b6bb1a506a5a23a4082425d07e708ce6682aedfb",
@@ -7157,6 +7182,7 @@
    "fabric_board.py": "f86c40b8291f8c818f6924910f4022b013d5fd107abaf8825dd0aa6c5e418638",
    "fabric_http.py": "5a6d5ccfb76239777ef4d95fe60f96dcb156e2b8fad329a7f83a85c5c9ac4a61",
    "fabric_openrouter.py": "a415db7475c3359fa15c85979a63a3a223a0ad7f85f878bcc2d638acccb44090",
+   "fabric_a2a_server.py": "a592fb3483d2385361178bf5a2eed020c4bab9cf108185fb5b03c1d37b603ae5",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
    "fabric-identifiers.mjs": "a18c2a501a4aa170bfd3d99e571ad6b7662649b4d3b9d2a540c002ea42811bbf",
@@ -7178,7 +7204,7 @@
    "fabric-protocols.mjs": "26eeb8c63e9881d8fa56389455626f2bb80725bbc25b9d6ed756af88c05a848e",
    "fabric-actions.mjs": "06e42f5e24c96311d5417d0d1effa93479ef7128a7ab139903b2bcf59253f6be",
    "fabric-connections.mjs": "dd82998d7b854bfb4a11fa0fc442357e1037e379f849a91ec21f0f81d73a82fb",
-   "fabric-a2a.mjs": "51b72fe1d80649d659fcad3a8f96370db3476c4a7b30cbabd8522c138be69346",
+   "fabric-a2a.mjs": "bad5f2835f29bc3fabf33ace513f5df1f057b9c33672861dafd3a4e77ab480af",
    "fabric-page-links.mjs": "a8834926e9d4bbf7c4857f551451d2ebf6ac8873bbccaaf89c5e30cf45b17ee6",
    "fabric-load.mjs": "88d9fc5576ac605a038b7ca8a8498aa0dc5848dee94f66c4c7900bd9de48e935",
    "fabric-lock.mjs": "ffd569de66d214c18f2b739e1e5fd169d84fe8f034fee8ed3d1fcb1cd87325c7",
@@ -7205,6 +7231,7 @@
    "fabric-board.mjs": "15fbb4441fcf7d2f285375b75de64ad6cffea129c515084c110245376b07775f",
    "fabric-http.mjs": "7bb5e41d2fbd3ba2717946777be7fd91e41ec4514a92aae2351ae8c4f2439476",
    "fabric-openrouter.mjs": "4e3e73a1b8882bdde4cbb311f6f4a5e2f048fa81fa245409a16df1e6cab03e19",
+   "fabric-a2a-server.mjs": "1f50953ecee924c66bdc61977cc66a791f2126aa7f833aa3f9a1df204cd71d46",
    "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
    "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0"
   }

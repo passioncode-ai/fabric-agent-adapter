@@ -103,6 +103,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L4 | `fabric_board` | the facade of the board connector ([board](board.md)) |
 | L4 | `fabric_http` | outbound HTTP: deadline, bounded retries, `Retry-After`, size cap ([connectors](connectors.md)) |
 | L4 | `fabric_openrouter` | OpenRouter chat: own key, spend ceiling, receipts, fallback ([connectors](connectors.md)) |
+| L4 | `fabric_a2a_server` | A2A 1.0 serving and calling: the Agent Card from capabilities, the JSON-RPC binding over the interop job store, a bounded client with the operator's origin allowlist (FAA-10); its reference is [a2a.md](a2a.md) |
 
 Beside the kit, not in `kit.json`: the probe (`check_service.py`, `check_service_rules.py`,
 `check_service_channel_agent.py`, `check_service_channel_agent_schema.py` and the
