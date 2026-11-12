@@ -34,6 +34,10 @@ facade `fabric_service`, and their Node twins.
 
 ### Changed
 
+- The probe's `limits.holds` reads a service that declares limits but does not use `fabric_holds` as NOT_RUN with a
+  migration note, not FAIL, and counts only code files (a vendored `check_service_rules.py` and docs naming `HoldBook`
+  no longer pass it). `LoopbackHTTPServer` and `loopbackServer` read the socket table only for a loopback peer: a peer
+  at another address (a `0.0.0.0` bind) is served with no owner under `refuse` and `strict` (the 0.81.0 seam reading).
 - **A kit service refuses a loopback peer of another OS account before it reads the request** (DEC-0154 HA-2 and HA-3,
   FAA-227): `LoopbackHTTPServer` takes `peer_check` and Node's new `loopbackServer(httpServer, {peerCheck})` holds each
   connection paused until the check passes; `refuse` (the default) closes another account's peer and serves the rest,
@@ -58,8 +62,17 @@ facade `fabric_service`, and their Node twins.
   `make_load_vectors.mjs` reads the pin from the lock file. SECURITY.md, lifecycle.md and protocol.md name DEC-0155 RT-3
   for the vouch; SA-6 (DEC-0152) is the accepted board rule (FAA-258).
 
+### Fixed
+
+- `fabric_source_check.py` refuses a copy without `fabric_source_tree.py` with exit 2 and the file's name, not a
+  traceback and exit 1; `pack` (both kits) refuses by name a hand-written `secrets[]` naming a secret `fabric.source.json`
+  has no slot for, instead of dropping it (the 0.81.0 seam reading). The Windows job runs the loopback peer check.
+
 ### Upgrading
 
+- A door that gave T0 because `strict` served the peer must also check that the peer's owner is named
+  (`peer_owner()` / `connectionOwner`): a peer off loopback has none and is T2. A folder whose `fabric.package.json`
+  names secrets its `fabric.source.json` lacks fails `pack` until they are added as `secret` slots.
 - A service that serves loopback HTTP keeps serving its own account's callers; pass `peer_check="strict"` to refuse an
   owner the table cannot tell. A caller of the dashboard link gate passes `listener_owner`. An outside test that runs
   this checkout's probe needs a readable socket table.
