@@ -1,0 +1,6917 @@
+{
+  "about": "The call queue and the load report of DEC-0104 at the pin: nextQueuedJob, admitJob, jobCallerKey, readQueuePosition and queueStatusMessage, FAC-SEM-131 and FAC-SEM-132 (code, instancePath, message), FAC-SEM-133 (code and instancePath), and the validity of service-load/1 and the load extension, each answered by the contract's functions and validator. Written by make_load_vectors.mjs, never by hand. expected is exactly what the reference returns, with null for undefined; a case without `accepted` passes none.",
+  "source": "fixtures/vectors/agent-network.json, fixtures/semantic/{job-queue,service-load,service-well-known-load}-*.json, fixtures/catalogue.json, src/agent-network.ts",
+  "commit": "18f8d48762edc5bfb1433657cbfe1c16196df1a6",
+  "extensionKey": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
+  "queue": [
+    {
+      "name": "the oldest job starts when nothing runs",
+      "queue": [
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        },
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j1"
+    },
+    {
+      "name": "nothing starts at the concurrency limit",
+      "queue": [
+        {
+          "id": "j3",
+          "caller": "c",
+          "at": "2026-10-22T09:00:03Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "j1",
+          "caller": "a"
+        },
+        {
+          "id": "j2",
+          "caller": "b"
+        }
+      ],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "a caller at its own limit waits; another caller's job starts",
+      "queue": [
+        {
+          "id": "j2",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "j3",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "j1",
+          "caller": "a"
+        }
+      ],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j3"
+    },
+    {
+      "name": "every waiting caller at its limit: nothing starts",
+      "queue": [
+        {
+          "id": "j2",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "j1",
+          "caller": "a"
+        }
+      ],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "fairness: the caller running fewer wins over an older job",
+      "queue": [
+        {
+          "id": "j3",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "j4",
+          "caller": "b",
+          "at": "2026-10-22T09:00:05Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "j1",
+          "caller": "a"
+        }
+      ],
+      "limits": {
+        "concurrency": 4,
+        "perCaller": 3,
+        "queueMax": 9
+      },
+      "expected": "j4"
+    },
+    {
+      "name": "between callers running as many, the oldest arrival",
+      "queue": [
+        {
+          "id": "j5",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        },
+        {
+          "id": "j4",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j4"
+    },
+    {
+      "name": "an arrival tie breaks by id",
+      "queue": [
+        {
+          "id": "jb",
+          "caller": "b",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "ja",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "ja"
+    },
+    {
+      "name": "a caller's own jobs go in arrival order",
+      "queue": [
+        {
+          "id": "j9",
+          "caller": "a",
+          "at": "2026-10-22T09:00:09Z"
+        },
+        {
+          "id": "j8",
+          "caller": "a",
+          "at": "2026-10-22T09:00:08Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 2,
+        "queueMax": 3
+      },
+      "expected": "j8"
+    },
+    {
+      "name": "an arrival that is not a time is skipped",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "yesterday"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j2"
+    },
+    {
+      "name": "an arrival in lower case or at an offset is not a UTC instant: skipped",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22t09:00:01z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T11:00:00+02:00"
+        },
+        {
+          "id": "j3",
+          "caller": "c",
+          "at": "2026-10-22T09:00:05Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j3"
+    },
+    {
+      "name": "unreadable limits start nothing",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 0,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "a running job without a caller still holds a slot",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "j0"
+        }
+      ],
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 9
+      },
+      "expected": null
+    },
+    {
+      "name": "an empty queue starts nothing",
+      "queue": [],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "running that is not an array holds no slot",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": {
+        "id": "r"
+      },
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j1"
+    },
+    {
+      "name": "a running item that is not an object still holds a slot",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        7,
+        "x"
+      ],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "an id that is not a string is skipped",
+      "queue": [
+        {
+          "id": 7,
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j2"
+    },
+    {
+      "name": "a caller that is not a string is skipped",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": null,
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j2"
+    },
+    {
+      "name": "four fraction digits are not a UTC instant",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01.0001Z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j2"
+    },
+    {
+      "name": "three fraction digits order below the second",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01.500Z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:01.499Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j2"
+    },
+    {
+      "name": "a day that does not exist is skipped",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-02-30T09:00:01Z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j2"
+    },
+    {
+      "name": "a leap second is skipped",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T23:59:60Z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j2"
+    },
+    {
+      "name": "an id tie breaks by UTF-16 code units, not code points",
+      "queue": [
+        {
+          "id": "￿",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "😀",
+          "caller": "b",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "😀"
+    },
+    {
+      "name": "fewest running wins over arrival",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "j2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:03Z"
+        },
+        {
+          "id": "j3",
+          "caller": "c",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        },
+        {
+          "id": "r2",
+          "caller": "b"
+        }
+      ],
+      "limits": {
+        "concurrency": 5,
+        "perCaller": 3,
+        "queueMax": 9
+      },
+      "expected": "j3"
+    },
+    {
+      "name": "concurrency that is not an integer starts nothing",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 1.5,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "perCaller true starts nothing",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 1,
+        "perCaller": true,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "queueMax below zero starts nothing",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": -1
+      },
+      "expected": null
+    },
+    {
+      "name": "limits that are not an object start nothing",
+      "queue": [
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": [
+        2,
+        1,
+        3
+      ],
+      "expected": null
+    },
+    {
+      "name": "a queue that is not an array starts nothing",
+      "queue": {
+        "id": "j1",
+        "caller": "a",
+        "at": "2026-10-22T09:00:01Z"
+      },
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": null
+    },
+    {
+      "name": "non-object queue items are skipped",
+      "queue": [
+        null,
+        3,
+        {
+          "id": "j1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "expected": "j1"
+    }
+  ],
+  "admit": [
+    {
+      "name": "room in the queue",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 2
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": true
+      }
+    },
+    {
+      "name": "the queue is full",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "w2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 2
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 30
+          }
+        }
+      }
+    },
+    {
+      "name": "an idle agent admits a start that runs at once, even with queueMax 0",
+      "queue": [],
+      "running": [],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 0
+      },
+      "retryAfterSeconds": 5,
+      "expected": {
+        "admit": true
+      }
+    },
+    {
+      "name": "queueMax 0 refuses a start that would wait",
+      "queue": [],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 0
+      },
+      "retryAfterSeconds": 5,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "a free slot behind a caller at its own limit: the start runs at once",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 4,
+        "perCaller": 1,
+        "queueMax": 1
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": true
+      }
+    },
+    {
+      "name": "an unreadable retry-after becomes 60",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "w2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 2
+      },
+      "retryAfterSeconds": 0,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 60
+          }
+        }
+      }
+    },
+    {
+      "name": "a retry-after above an hour becomes 60",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        },
+        {
+          "id": "w2",
+          "caller": "b",
+          "at": "2026-10-22T09:00:02Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 2
+      },
+      "retryAfterSeconds": 3601,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 60
+          }
+        }
+      }
+    },
+    {
+      "name": "unreadable limits refuse",
+      "queue": [],
+      "running": [],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1
+      },
+      "retryAfterSeconds": 10,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 10
+          }
+        }
+      }
+    },
+    {
+      "name": "a job whose arrival is not a UTC instant is refused",
+      "queue": [],
+      "running": [],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T11:00:09+02:00"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 2
+      },
+      "retryAfterSeconds": 10,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 10
+          }
+        }
+      }
+    },
+    {
+      "name": "a job that is not an object is refused",
+      "queue": [],
+      "running": [],
+      "job": "jn",
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 30
+          }
+        }
+      }
+    },
+    {
+      "name": "a job without a caller is refused",
+      "queue": [],
+      "running": [],
+      "job": {
+        "id": "jn",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 2,
+        "perCaller": 1,
+        "queueMax": 3
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 30
+          }
+        }
+      }
+    },
+    {
+      "name": "a retry-after of one second stays",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 1
+      },
+      "retryAfterSeconds": 1,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 1
+          }
+        }
+      }
+    },
+    {
+      "name": "a retry-after of an hour stays",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 1
+      },
+      "retryAfterSeconds": 3600,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 3600
+          }
+        }
+      }
+    },
+    {
+      "name": "a fractional retry-after becomes 60",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 1
+      },
+      "retryAfterSeconds": 1.5,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 60
+          }
+        }
+      }
+    },
+    {
+      "name": "a retry-after string becomes 60",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 1
+      },
+      "retryAfterSeconds": "30",
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 60
+          }
+        }
+      }
+    },
+    {
+      "name": "a retry-after null becomes 60",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [
+        {
+          "id": "r1",
+          "caller": "a"
+        }
+      ],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 1
+      },
+      "retryAfterSeconds": null,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 60
+          }
+        }
+      }
+    },
+    {
+      "name": "the oldest waiter starts first and one already waits under queueMax 1: refused",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 1
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 30
+          }
+        }
+      }
+    },
+    {
+      "name": "the oldest waiter starts first and queueMax is 0: refused",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:01Z"
+        }
+      ],
+      "running": [],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:09Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 0
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": false,
+        "error": {
+          "code": "queue-full",
+          "message": "the agent's queue for this context is full: start again later",
+          "data": {
+            "retryable": true,
+            "retryAfterSeconds": 30
+          }
+        }
+      }
+    },
+    {
+      "name": "an older newcomer would start at once",
+      "queue": [
+        {
+          "id": "w1",
+          "caller": "a",
+          "at": "2026-10-22T09:00:05Z"
+        }
+      ],
+      "running": [],
+      "job": {
+        "id": "jn",
+        "caller": "n",
+        "at": "2026-10-22T09:00:01Z"
+      },
+      "limits": {
+        "concurrency": 1,
+        "perCaller": 1,
+        "queueMax": 0
+      },
+      "retryAfterSeconds": 30,
+      "expected": {
+        "admit": true
+      }
+    }
+  ],
+  "caller": [
+    {
+      "name": "the owner's own agent under a token",
+      "accepted": {
+        "ok": true,
+        "principal": "urn:fabric:person:example:owner",
+        "caller": "writer",
+        "chain": [
+          "writer"
+        ]
+      },
+      "credential": "hub-credential",
+      "expected": "[\"delegated\",\"urn:fabric:person:example:owner\",\"writer\"]"
+    },
+    {
+      "name": "another agent of the owner is another caller",
+      "accepted": {
+        "ok": true,
+        "principal": "urn:fabric:person:example:owner",
+        "caller": "assistant",
+        "chain": [
+          "assistant"
+        ]
+      },
+      "credential": "hub-credential",
+      "expected": "[\"delegated\",\"urn:fabric:person:example:owner\",\"assistant\"]"
+    },
+    {
+      "name": "a partner's agent with the owner's agent id under the same sub is another caller",
+      "accepted": {
+        "ok": true,
+        "principal": "urn:fabric:person:example:owner",
+        "caller": "writer",
+        "chain": [
+          "writer",
+          "org:partner_7k"
+        ]
+      },
+      "credential": "hub-credential",
+      "expected": "[\"delegated\",\"urn:fabric:person:example:owner\",\"writer\",\"org:partner_7k\"]"
+    },
+    {
+      "name": "another person behind the same hub credential is another caller",
+      "accepted": {
+        "ok": true,
+        "principal": "urn:fabric:person:example:guest",
+        "caller": "writer",
+        "chain": [
+          "writer"
+        ]
+      },
+      "credential": "hub-credential",
+      "expected": "[\"delegated\",\"urn:fabric:person:example:guest\",\"writer\"]"
+    },
+    {
+      "name": "a chain of agents keys on its outermost actor",
+      "accepted": {
+        "ok": true,
+        "principal": "urn:fabric:person:example:owner",
+        "caller": "writer",
+        "chain": [
+          "writer",
+          "planner"
+        ]
+      },
+      "credential": "hub-credential",
+      "expected": "[\"delegated\",\"urn:fabric:person:example:owner\",\"writer\"]"
+    },
+    {
+      "name": "no token: the credential (T0, T1, DL-26)",
+      "credential": "local-session-7",
+      "expected": "[\"credential\",\"local-session-7\"]"
+    },
+    {
+      "name": "a gate's pass with no token is no token: the credential",
+      "accepted": {
+        "ok": true,
+        "tier": "T0",
+        "principal": null,
+        "caller": null,
+        "chain": [],
+        "claims": null,
+        "kid": null
+      },
+      "credential": "local-session-7",
+      "expected": "[\"credential\",\"local-session-7\"]"
+    },
+    {
+      "name": "a refused token has no key: the call is refused (DL-10)",
+      "accepted": {
+        "ok": false,
+        "code": "unauthenticated",
+        "detail": "bad-signature"
+      },
+      "credential": "local-session-7",
+      "expected": null
+    },
+    {
+      "name": "an empty principal has no key",
+      "accepted": {
+        "ok": true,
+        "principal": "",
+        "caller": "writer",
+        "chain": [
+          "writer"
+        ]
+      },
+      "credential": "local-session-7",
+      "expected": null
+    },
+    {
+      "name": "neither readable",
+      "credential": "",
+      "expected": null
+    },
+    {
+      "name": "a gate pass with principal null and a caller is no token",
+      "accepted": {
+        "ok": true,
+        "principal": null,
+        "caller": "x"
+      },
+      "credential": "cred",
+      "expected": "[\"credential\",\"cred\"]"
+    },
+    {
+      "name": "a chain that is not an array is no partner",
+      "accepted": {
+        "ok": true,
+        "principal": "p",
+        "caller": "c",
+        "chain": "org:x"
+      },
+      "credential": "cred",
+      "expected": "[\"delegated\",\"p\",\"c\"]"
+    },
+    {
+      "name": "a chain of one organization is no partner",
+      "accepted": {
+        "ok": true,
+        "principal": "p",
+        "caller": "c",
+        "chain": [
+          "org:x"
+        ]
+      },
+      "credential": "cred",
+      "expected": "[\"delegated\",\"p\",\"c\"]"
+    },
+    {
+      "name": "a chain whose last item is not a string is no partner",
+      "accepted": {
+        "ok": true,
+        "principal": "p",
+        "caller": "c",
+        "chain": [
+          "w",
+          7
+        ]
+      },
+      "credential": "cred",
+      "expected": "[\"delegated\",\"p\",\"c\"]"
+    },
+    {
+      "name": "an organization with no id is still the last link",
+      "accepted": {
+        "ok": true,
+        "principal": "p",
+        "caller": "c",
+        "chain": [
+          "w",
+          "org:"
+        ]
+      },
+      "credential": "cred",
+      "expected": "[\"delegated\",\"p\",\"c\",\"org:\"]"
+    },
+    {
+      "name": "an organization in the middle of the chain is no partner",
+      "accepted": {
+        "ok": true,
+        "principal": "p",
+        "caller": "c",
+        "chain": [
+          "w",
+          "org:x",
+          "planner"
+        ]
+      },
+      "credential": "cred",
+      "expected": "[\"delegated\",\"p\",\"c\"]"
+    },
+    {
+      "name": "ok as a string is refused",
+      "accepted": {
+        "ok": "true",
+        "principal": "p",
+        "caller": "c"
+      },
+      "credential": "cred",
+      "expected": null
+    },
+    {
+      "name": "a caller that is empty is refused",
+      "accepted": {
+        "ok": true,
+        "principal": "p",
+        "caller": ""
+      },
+      "credential": "cred",
+      "expected": null
+    },
+    {
+      "name": "an accepted verdict that is not an object: the credential",
+      "accepted": "verdict",
+      "credential": "cred",
+      "expected": "[\"credential\",\"cred\"]"
+    },
+    {
+      "name": "an accepted array: the credential",
+      "accepted": [
+        "ok"
+      ],
+      "credential": "cred",
+      "expected": "[\"credential\",\"cred\"]"
+    },
+    {
+      "name": "a credential that is not a string",
+      "accepted": null,
+      "credential": 7,
+      "expected": null
+    },
+    {
+      "name": "a lone surrogate is written escaped",
+      "accepted": {
+        "ok": true,
+        "principal": "\ud800",
+        "caller": "w "
+      },
+      "credential": "cred",
+      "expected": "[\"delegated\",\"\\ud800\",\"w \"]"
+    },
+    {
+      "name": "a credential with quotes and a backslash",
+      "credential": "a\"b\\c",
+      "expected": "[\"credential\",\"a\\\"b\\\\c\"]"
+    }
+  ],
+  "position": [
+    {
+      "name": "first of three",
+      "statusMessage": "queued 1 of 3",
+      "expected": {
+        "position": 1,
+        "length": 3
+      }
+    },
+    {
+      "name": "last of three",
+      "statusMessage": "queued 3 of 3",
+      "expected": {
+        "position": 3,
+        "length": 3
+      }
+    },
+    {
+      "name": "a position past the length",
+      "statusMessage": "queued 4 of 3",
+      "expected": null
+    },
+    {
+      "name": "position zero",
+      "statusMessage": "queued 0 of 3",
+      "expected": null
+    },
+    {
+      "name": "a pause is not a place in the queue",
+      "statusMessage": "quota-exhausted until 2026-10-22T10:00:00Z",
+      "expected": null
+    },
+    {
+      "name": "extra words",
+      "statusMessage": "queued 1 of 3 behind a long job",
+      "expected": null
+    },
+    {
+      "name": "a leading zero",
+      "statusMessage": "queued 01 of 3",
+      "expected": null
+    },
+    {
+      "name": "not a string",
+      "statusMessage": 7,
+      "expected": null
+    },
+    {
+      "name": "the largest length",
+      "statusMessage": "queued 1 of 999999",
+      "expected": {
+        "position": 1,
+        "length": 999999
+      }
+    },
+    {
+      "name": "a length of seven digits",
+      "statusMessage": "queued 1 of 1000000",
+      "expected": null
+    },
+    {
+      "name": "a full-width digit",
+      "statusMessage": "queued １ of 3",
+      "expected": null
+    },
+    {
+      "name": "a trailing newline",
+      "statusMessage": "queued 1 of 3\n",
+      "expected": null
+    },
+    {
+      "name": "a leading space",
+      "statusMessage": " queued 1 of 3",
+      "expected": null
+    },
+    {
+      "name": "upper case",
+      "statusMessage": "Queued 1 of 3",
+      "expected": null
+    },
+    {
+      "name": "two spaces",
+      "statusMessage": "queued  1 of 3",
+      "expected": null
+    },
+    {
+      "name": "null",
+      "statusMessage": null,
+      "expected": null
+    }
+  ],
+  "status": [
+    {
+      "name": "1 of 1",
+      "position": 1,
+      "length": 1,
+      "expected": "queued 1 of 1"
+    },
+    {
+      "name": "1 of 3",
+      "position": 1,
+      "length": 3,
+      "expected": "queued 1 of 3"
+    },
+    {
+      "name": "3 of 3",
+      "position": 3,
+      "length": 3,
+      "expected": "queued 3 of 3"
+    },
+    {
+      "name": "0 of 1",
+      "position": 0,
+      "length": 1,
+      "expected": null
+    },
+    {
+      "name": "2 of 1",
+      "position": 2,
+      "length": 1,
+      "expected": null
+    },
+    {
+      "name": "999999 of 999999",
+      "position": 999999,
+      "length": 999999,
+      "expected": "queued 999999 of 999999"
+    },
+    {
+      "name": "1 of 1000000",
+      "position": 1,
+      "length": 1000000,
+      "expected": null
+    },
+    {
+      "name": "1.5 of 2",
+      "position": 1.5,
+      "length": 2,
+      "expected": null
+    },
+    {
+      "name": "1 of 2.5",
+      "position": 1,
+      "length": 2.5,
+      "expected": null
+    },
+    {
+      "name": "\"1\" of 2",
+      "position": "1",
+      "length": 2,
+      "expected": null
+    },
+    {
+      "name": "true of 2",
+      "position": true,
+      "length": 2,
+      "expected": null
+    },
+    {
+      "name": "null of 1",
+      "position": null,
+      "length": 1,
+      "expected": null
+    },
+    {
+      "name": "-1 of 3",
+      "position": -1,
+      "length": 3,
+      "expected": null
+    },
+    {
+      "name": "9007199254740992 of 9007199254740992",
+      "position": 9007199254740992,
+      "length": 9007199254740992,
+      "expected": null
+    },
+    {
+      "name": "1 of -1",
+      "position": 1,
+      "length": -1,
+      "expected": null
+    }
+  ],
+  "rules": [
+    {
+      "name": "job-queue-callerless-slot",
+      "kind": "job-queue",
+      "value": {
+        "queue": [
+          {
+            "id": "j2",
+            "caller": "a",
+            "at": "2026-10-22T09:00:01Z"
+          },
+          {
+            "id": "j3",
+            "caller": "b",
+            "at": "2026-10-22T09:00:02Z"
+          }
+        ],
+        "running": [
+          {
+            "id": "j1",
+            "caller": "a"
+          },
+          {
+            "id": "j0"
+          }
+        ],
+        "limits": {
+          "concurrency": 2,
+          "perCaller": 1,
+          "queueMax": 3
+        },
+        "started": "j3"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-131",
+          "instancePath": "/started",
+          "message": "nothing may start now"
+        }
+      ]
+    },
+    {
+      "name": "job-queue-fair",
+      "kind": "job-queue",
+      "value": {
+        "queue": [
+          {
+            "id": "j2",
+            "caller": "a",
+            "at": "2026-10-22T09:00:01Z"
+          },
+          {
+            "id": "j3",
+            "caller": "b",
+            "at": "2026-10-22T09:00:02Z"
+          }
+        ],
+        "running": [
+          {
+            "id": "j1",
+            "caller": "a"
+          }
+        ],
+        "limits": {
+          "concurrency": 2,
+          "perCaller": 1,
+          "queueMax": 3
+        },
+        "started": "j3"
+      },
+      "findings": []
+    },
+    {
+      "name": "job-queue-over-concurrency",
+      "kind": "job-queue",
+      "value": {
+        "queue": [
+          {
+            "id": "j2",
+            "caller": "a",
+            "at": "2026-10-22T09:00:01Z"
+          },
+          {
+            "id": "j3",
+            "caller": "b",
+            "at": "2026-10-22T09:00:02Z"
+          }
+        ],
+        "running": [
+          {
+            "id": "j1",
+            "caller": "a"
+          },
+          {
+            "id": "j0",
+            "caller": "c"
+          }
+        ],
+        "limits": {
+          "concurrency": 2,
+          "perCaller": 1,
+          "queueMax": 3
+        },
+        "started": "j3"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-131",
+          "instancePath": "/started",
+          "message": "nothing may start now"
+        }
+      ]
+    },
+    {
+      "name": "job-queue-starved",
+      "kind": "job-queue",
+      "value": {
+        "queue": [
+          {
+            "id": "j2",
+            "caller": "a",
+            "at": "2026-10-22T09:00:01Z"
+          },
+          {
+            "id": "j3",
+            "caller": "b",
+            "at": "2026-10-22T09:00:02Z"
+          }
+        ],
+        "running": [
+          {
+            "id": "j1",
+            "caller": "a"
+          }
+        ],
+        "limits": {
+          "concurrency": 2,
+          "perCaller": 1,
+          "queueMax": 3
+        },
+        "started": "j2"
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-131",
+          "instancePath": "/started",
+          "message": "the job to start is j3"
+        }
+      ]
+    },
+    {
+      "name": "service-load-context-twice",
+      "kind": "service-load",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              },
+              {
+                "context": "personal",
+                "queued": 1,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/1/byContext/1/context",
+          "message": "context personal appears twice in one window"
+        }
+      ]
+    },
+    {
+      "name": "service-load-future-window",
+      "kind": "service-load",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T09:30:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/1/start",
+          "message": "a window starts after the report was generated"
+        }
+      ]
+    },
+    {
+      "name": "service-load-gap",
+      "kind": "service-load",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:30:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/1/start",
+          "message": "windows are not in order one windowSeconds apart"
+        }
+      ]
+    },
+    {
+      "name": "service-load-ok",
+      "kind": "service-load",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "findings": []
+    },
+    {
+      "name": "service-load-p50-above-p95",
+      "kind": "service-load",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 9000,
+                  "p95": 1200
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/0/byContext/1/waitMs",
+          "message": "p50 is above p95"
+        }
+      ]
+    },
+    {
+      "name": "service-load-run-time-without-end",
+      "kind": "service-load",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0,
+                "runMs": {
+                  "p50": 10,
+                  "p95": 20
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/1/byContext/0/runMs",
+          "message": "a run time with no job ended in the window"
+        }
+      ]
+    },
+    {
+      "name": "service-well-known-load-invalid",
+      "kind": "service-well-known",
+      "value": {
+        "protocol": "fabric-service/0.1",
+        "service": {
+          "id": "example-agent",
+          "instance": "default",
+          "name": "Example Agent",
+          "version": "0.2.0",
+          "build": {
+            "commit": "8b80be9",
+            "dirty": false,
+            "builtAt": "2026-09-28T17:40:00Z"
+          }
+        },
+        "process": {
+          "pid": 51234,
+          "startedAt": "2026-09-28T17:41:02Z"
+        },
+        "status": "degraded",
+        "degraded": [
+          {
+            "source": "llm",
+            "reason": "No model key: drafting is paused."
+          }
+        ],
+        "summary": [
+          {
+            "label": "Jobs running",
+            "value": 2
+          },
+          {
+            "label": "Awaiting you",
+            "value": 1,
+            "attention": true
+          }
+        ],
+        "surfaces": {
+          "dashboard": {
+            "path": "/dashboard",
+            "login": true
+          },
+          "mcp": {
+            "path": "/mcp",
+            "transport": "streamable-http"
+          },
+          "events": {
+            "path": "/fabric/v1/events"
+          }
+        },
+        "update": {
+          "available": null
+        },
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1": {
+            "path": "load",
+            "windowSeconds": 5,
+            "limits": {
+              "concurrency": 0,
+              "perCaller": 1,
+              "queueMax": 1
+            }
+          }
+        }
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "service-well-known-load-ok",
+      "kind": "service-well-known",
+      "value": {
+        "protocol": "fabric-service/0.1",
+        "service": {
+          "id": "example-agent",
+          "instance": "default",
+          "name": "Example Agent",
+          "version": "0.2.0",
+          "build": {
+            "commit": "8b80be9",
+            "dirty": false,
+            "builtAt": "2026-09-28T17:40:00Z"
+          }
+        },
+        "process": {
+          "pid": 51234,
+          "startedAt": "2026-09-28T17:41:02Z"
+        },
+        "status": "degraded",
+        "degraded": [
+          {
+            "source": "llm",
+            "reason": "No model key: drafting is paused."
+          }
+        ],
+        "summary": [
+          {
+            "label": "Jobs running",
+            "value": 2
+          },
+          {
+            "label": "Awaiting you",
+            "value": 1,
+            "attention": true
+          }
+        ],
+        "surfaces": {
+          "dashboard": {
+            "path": "/dashboard",
+            "login": true
+          },
+          "mcp": {
+            "path": "/mcp",
+            "transport": "streamable-http"
+          },
+          "events": {
+            "path": "/fabric/v1/events"
+          }
+        },
+        "update": {
+          "available": null
+        },
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1": {
+            "path": "/fabric/v1/load",
+            "windowSeconds": 3600,
+            "limits": {
+              "concurrency": 4,
+              "perCaller": 2,
+              "queueMax": 50
+            }
+          }
+        }
+      },
+      "findings": []
+    }
+  ],
+  "declarations": [
+    {
+      "name": "service-load-extension",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "catalogue": true,
+      "findings": []
+    },
+    {
+      "name": "service-load-extension-no-concurrency",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 0,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "catalogue": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "service-load-extension-absolute-path",
+      "value": {
+        "path": "https://example.com/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "catalogue": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "service-load-extension-network-path",
+      "value": {
+        "path": "//evil.example/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "catalogue": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "not an object",
+      "value": "load",
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "null",
+      "value": null,
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "an array",
+      "value": [
+        {
+          "path": "/fabric/v1/load",
+          "windowSeconds": 3600,
+          "limits": {
+            "concurrency": 4,
+            "perCaller": 2,
+            "queueMax": 50
+          }
+        }
+      ],
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "no path",
+      "value": {
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "no limits",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "an extra member",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        },
+        "note": "x"
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "a relative path",
+      "value": {
+        "path": "load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "the root path",
+      "value": {
+        "path": "/",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a path with a space",
+      "value": {
+        "path": "/a b",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "a path with a no-break space",
+      "value": {
+        "path": "/a b",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "a path with a byte-order mark",
+      "value": {
+        "path": "/a﻿b",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "a path with a separator control",
+      "value": {
+        "path": "/a\u001cb",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a path with a line separator",
+      "value": {
+        "path": "/a b",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "a path of 256 characters",
+      "value": {
+        "path": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a path of 257 characters",
+      "value": {
+        "path": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "a path of 256 code points in astral characters",
+      "value": {
+        "path": "/😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a path of 257 code points in astral characters",
+      "value": {
+        "path": "/😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "a path that is a number",
+      "value": {
+        "path": 7,
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "windowSeconds 59",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 59,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "windowSeconds 60",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 60,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "windowSeconds 86400",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 86400,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "windowSeconds 86401",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 86401,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "windowSeconds 60.5",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 60.5,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "windowSeconds a string",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": "3600",
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "windowSeconds true",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": true,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "limits not an object",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": [
+          4,
+          2,
+          50
+        ]
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "limits with an extra member",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 50,
+          "burst": 3
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "limits without queueMax",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "concurrency 1024",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 1024,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "concurrency 1025",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 1025,
+          "perCaller": 2,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "perCaller 0",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 0,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "perCaller 1.5",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 1.5,
+          "queueMax": 50
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "queueMax 0",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 0
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "queueMax 100000",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 100000
+        }
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "queueMax 100001",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": 100001
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "queueMax -1",
+      "value": {
+        "path": "/fabric/v1/load",
+        "windowSeconds": 3600,
+        "limits": {
+          "concurrency": 4,
+          "perCaller": 2,
+          "queueMax": -1
+        }
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    },
+    {
+      "name": "everything wrong at once",
+      "value": {
+        "path": "//x",
+        "windowSeconds": 1,
+        "limits": {
+          "concurrency": 0,
+          "perCaller": 0,
+          "queueMax": -1,
+          "x": 1
+        },
+        "y": 2
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    }
+  ],
+  "documents": [
+    {
+      "name": "no extensions",
+      "value": {},
+      "findings": []
+    },
+    {
+      "name": "extensions not an object",
+      "value": {
+        "extensions": [
+          "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1"
+        ]
+      },
+      "findings": []
+    },
+    {
+      "name": "another extension only",
+      "value": {
+        "extensions": {
+          "https://example.com/x": {}
+        }
+      },
+      "findings": []
+    },
+    {
+      "name": "the key with a valid value",
+      "value": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1": {
+            "path": "/fabric/v1/load",
+            "windowSeconds": 3600,
+            "limits": {
+              "concurrency": 4,
+              "perCaller": 2,
+              "queueMax": 50
+            }
+          }
+        }
+      },
+      "findings": []
+    },
+    {
+      "name": "the key with a null value",
+      "value": {
+        "extensions": {
+          "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1": null
+        }
+      },
+      "findings": [
+        {
+          "code": "FAC-SEM-133",
+          "instancePath": "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1load~10.1"
+        }
+      ]
+    }
+  ],
+  "reports": [
+    {
+      "name": "service-load",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true,
+      "catalogue": true,
+      "findings": []
+    },
+    {
+      "name": "service-load-caller",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                },
+                "caller": "urn:fabric:agent:example:writer"
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "catalogue": false,
+      "findings": []
+    },
+    {
+      "name": "service-load-negative-count",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": -1,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "catalogue": false,
+      "findings": []
+    },
+    {
+      "name": "not an object",
+      "value": [],
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "the wrong type",
+      "value": {
+        "type": "service-load/2",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "no windows",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "windowSeconds 59",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 59,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/1/start",
+          "message": "windows are not in order one windowSeconds apart"
+        }
+      ]
+    },
+    {
+      "name": "windowSeconds a string",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": "3600",
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/1/start",
+          "message": "windows are not in order one windowSeconds apart"
+        }
+      ]
+    },
+    {
+      "name": "windows not an array",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": {}
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a window without byContext",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z"
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a window with an extra member",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ],
+            "end": "2026-10-22T09:00:00Z"
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "an organization without an id",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "org:",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a context in upper case",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "Personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a row without failed",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a waitMs with an extra member",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 1,
+                  "p95": 2,
+                  "p99": 3
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a negative p50",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": -1,
+                  "p95": 2
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a fractional count",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 1.5,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a generatedAt that is no time",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "now",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a start with no day",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-02-30T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "168 windows",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-15T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T23:00:00Z",
+            "byContext": []
+          }
+        ]
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "169 windows",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-15T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-15T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-16T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-17T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-18T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-19T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-20T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T00:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T01:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T02:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T03:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T04:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T05:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T06:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T07:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T08:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T09:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T10:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T11:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T12:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T13:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T14:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T15:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T16:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T17:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T18:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T19:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T20:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T21:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T22:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-21T23:00:00Z",
+            "byContext": []
+          },
+          {
+            "start": "2026-10-22T00:00:00Z",
+            "byContext": []
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "65 rows in one window",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "org:o0",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o1",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o2",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o3",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o4",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o5",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o6",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o7",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o8",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o9",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o10",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o11",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o12",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o13",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o14",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o15",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o16",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o17",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o18",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o19",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o20",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o21",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o22",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o23",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o24",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o25",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o26",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o27",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o28",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o29",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o30",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o31",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o32",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o33",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o34",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o35",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o36",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o37",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o38",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o39",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o40",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o41",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o42",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o43",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o44",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o45",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o46",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o47",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o48",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o49",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o50",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o51",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o52",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o53",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o54",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o55",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o56",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o57",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o58",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o59",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o60",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o61",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o62",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o63",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:o64",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "equal percentiles",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 5,
+                  "p95": 5
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a run time after a failure only",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 0,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "an unreadable windowSeconds blames every later window",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": "x",
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/1/start",
+          "message": "windows are not in order one windowSeconds apart"
+        }
+      ]
+    },
+    {
+      "name": "an unreadable generatedAt flags no window as late",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": 7,
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "non-object windows are skipped and not counted",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          7,
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "non-object rows are skipped and not counted",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              null,
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": [
+        {
+          "code": "FAC-SEM-132",
+          "instancePath": "/windows/0/byContext/1/context",
+          "message": "context personal appears twice in one window"
+        }
+      ]
+    },
+    {
+      "name": "percentiles that are not numbers are not compared",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": "9",
+                  "p95": 1
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a run time with no counts at all",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": "0",
+                "failed": null,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "a generatedAt with a space for T",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22 11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a generatedAt in lower case",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22t11:05:00z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a start at a leap second",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-21T23:59:60Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true,
+      "findings": []
+    },
+    {
+      "name": "a generatedAt without a zone",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T09:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "findings": []
+    },
+    {
+      "name": "an offset start in order",
+      "value": {
+        "type": "service-load/1",
+        "generatedAt": "2026-10-22T11:05:00Z",
+        "windowSeconds": 3600,
+        "windows": [
+          {
+            "start": "2026-10-22T11:00:00+02:00",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 1,
+                "completed": 12,
+                "failed": 1,
+                "waitMs": {
+                  "p50": 40,
+                  "p95": 900
+                },
+                "runMs": {
+                  "p50": 8000,
+                  "p95": 31000
+                }
+              },
+              {
+                "context": "org:org_7kq2m4xw",
+                "queued": 3,
+                "running": 2,
+                "completed": 30,
+                "failed": 0,
+                "waitMs": {
+                  "p50": 1200,
+                  "p95": 9000
+                },
+                "runMs": {
+                  "p50": 6000,
+                  "p95": 22000
+                }
+              }
+            ]
+          },
+          {
+            "start": "2026-10-22T10:00:00Z",
+            "byContext": [
+              {
+                "context": "personal",
+                "queued": 0,
+                "running": 0,
+                "completed": 0,
+                "failed": 0
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true,
+      "findings": []
+    }
+  ]
+}
