@@ -309,6 +309,27 @@ class LifecycleRuleTests(unittest.TestCase):
             key = "2rHJkKR3HPKhvnZRjBcyYugNz2g0gTAKrWDEmg" + "/hqbs="  # its `/` splits it, yet it is no path
             self.assertTrue(any("LC-21" in r for r in env(key)["receipts"]), "LC-21 has no name check to fall back on")
 
+    def test_a_url_whose_host_new_url_refuses_still_fails_lc_21(self):
+        """Storage is the closed side: secret_url reads a URL whose host `new URL` refuses as an argument only (FAA-309),
+        but a password stored in a manifest or plugin.json is a credential whatever its host, so the LC-21 gates read
+        the host-unchecked form, as repository_credential does."""
+        stored = ("https://u:pw@ex ample.com/mcp", "https://h.example\u00a0/mcp?token=abcdef", "foo://:/mcp?token=abcdef")
+        for url in stored:
+            with self.subTest(url=url):
+                self.assertFalse(ADAPTER._secrets.secret_url(url))  # the reader's answer, as `new URL` reads it
+                with tempfile.TemporaryDirectory() as temp:
+                    root = Path(temp)
+                    self.scaffold(root)
+                    manifest = json.loads((root / "fabric-agent.json").read_text())
+                    manifest["capabilities"][0]["profile"]["connection"]["url"] = url
+                    (root / "fabric-agent.json").write_text(json.dumps(manifest))
+                    self.assertTrue(any("LC-21" in r and "capability[0].url" in r for r in self.receipts(root)["receipts"]))
+                    plugin = root / "plugins" / "example"
+                    (plugin / ".claude-plugin").mkdir(parents=True)
+                    (plugin / ".claude-plugin" / "plugin.json").write_text(json.dumps(
+                        {"name": "example", "mcpServers": {"example": {"type": "http", "url": url}}}))
+                    self.assertTrue(any("LC-21" in r and "plugin plugins/example" in r for r in self.receipts(root)["receipts"]))
+
     def test_the_detector_copies_are_identical(self):
         base = Path(__file__).resolve().parents[1] / "plugins/fabric-agent-adapter/skills"
         self.assertEqual((base / "adapting-projects-to-fabric/scripts/fabric_secrets.py").read_bytes(),
