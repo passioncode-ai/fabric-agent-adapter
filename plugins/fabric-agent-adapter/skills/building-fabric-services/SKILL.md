@@ -82,7 +82,9 @@ MCP registration into a client config, the login flow or the CSRF header.
 When other agents or Fabric call the service over MCP, it follows `fabric-interop/0.1`:
 each manifest capability is the tool of its name, long work is a job with a stable id,
 a question for a person is an elicitation, and every call carries one trace. A job a limit stops or pauses, and an
-effect nobody saw, have their own codes and a key per caller (DEC-0087). Read
+effect nobody saw, have their own codes and a key per caller (DEC-0087); work held by the service's own limits is
+said on the job, pushed to the operator once per hold and lifted by their scoped answer (`scripts/fabric_holds.py`,
+FAA-298). Read
 [the interop reference](references/interop.md) before writing an MCP tool; the helpers
 are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
 [`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs). When the callers are agents of the estate, the

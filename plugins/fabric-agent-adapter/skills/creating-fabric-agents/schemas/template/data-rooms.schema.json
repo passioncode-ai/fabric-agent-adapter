@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/passioncode-ai/fabric-agent-adapter/schemas/template/data-rooms.schema.json",
+  "title": "data-rooms.json of an agent template: the rooms and blocks it reads or writes ([] when none)",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "room",
+      "blocks",
+      "access"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "room": {
+        "type": "string",
+        "minLength": 1
+      },
+      "blocks": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      "access": {
+        "enum": [
+          "read",
+          "write",
+          "read-write"
+        ]
+      },
+      "scope": {
+        "type": "string",
+        "minLength": 1,
+        "description": "what the access covers, in words (\"its own block\", \"aggregate cells only\")"
+      },
+      "classes": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minItems": 1,
+        "uniqueItems": true,
+        "description": "the data classes it may touch in the block"
+      },
+      "level": {
+        "type": "string",
+        "minLength": 1,
+        "description": "whose level bounds the read (\"the asker's level\")"
+      },
+      "required": {
+        "type": "boolean"
+      },
+      "variants": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      "use": {
+        "type": "string"
+      },
+      "notes": {
+        "type": "string"
+      }
+    }
+  }
+}

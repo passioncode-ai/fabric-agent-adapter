@@ -1,0 +1,7 @@
+[
+  {"source_class": "knowledge base", "connector": "the knowledge base's MCP server", "grant": "knowledge:read",
+   "required": true, "direction": "read"},
+  {"source_class": "tracker", "connector": "the tracker's API", "grant": "issues:write", "required": false,
+   "when": "the organization keeps gaps in a tracker", "direction": "write", "scope": "new issues only",
+   "variants": ["cloud"]}
+]

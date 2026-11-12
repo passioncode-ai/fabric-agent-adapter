@@ -431,6 +431,19 @@
    "sha256": "2b4d6c144f496dbd8788f616de9956bb8b6e89290713c406aa601511c82f4a46"
   },
   {
+   "module": "fabric_holds",
+   "file": "fabric_holds.py",
+   "layer": "L3",
+   "imports": [
+    "fabric_actions",
+    "fabric_base",
+    "fabric_interop_rules",
+    "fabric_paths",
+    "fabric_secrets"
+   ],
+   "sha256": "cf4e8a92b685878adea9af6baf7d40037faee31e5359774b8d8481b8588c8cb3"
+  },
+  {
    "module": "fabric_hub",
    "file": "fabric_hub.py",
    "layer": "L4",
@@ -946,6 +959,19 @@
     "fabric-service"
    ],
    "sha256": "989040aed33b2712a258244192bdf70e811a51076aa1b62f2adc2a6db051dbed"
+  },
+  {
+   "module": "fabric-holds",
+   "file": "fabric-holds.mjs",
+   "layer": "L3",
+   "imports": [
+    "fabric-actions",
+    "fabric-base",
+    "fabric-interop-rules",
+    "fabric-paths",
+    "fabric-secrets"
+   ],
+   "sha256": "8ecce5c18e1c7f9a26502dc77507c163e17d2cd4d661905e3c9d8f1964dbe2e8"
   },
   {
    "module": "fabric-hub",
@@ -6898,6 +6924,7 @@
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
    "fabric_interop.py": "2b4d6c144f496dbd8788f616de9956bb8b6e89290713c406aa601511c82f4a46",
+   "fabric_holds.py": "cf4e8a92b685878adea9af6baf7d40037faee31e5359774b8d8481b8588c8cb3",
    "fabric_hub.py": "484d0480e2ae2b82f62647104e1383576646f226045a444d4c9dc1c5e5c7eee2",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
    "fabric_board_link.py": "37aacd7afb0b7971c60f434d489fbfc556a70d8da87257179d891be4d2b661b0",
@@ -6944,6 +6971,7 @@
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458",
    "fabric-interop.mjs": "989040aed33b2712a258244192bdf70e811a51076aa1b62f2adc2a6db051dbed",
+   "fabric-holds.mjs": "8ecce5c18e1c7f9a26502dc77507c163e17d2cd4d661905e3c9d8f1964dbe2e8",
    "fabric-hub.mjs": "081d5b2fda552fe6ee737c22e1e87fa113568cb4e9d864c110a6a0aec758b22f",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
    "fabric-board-link.mjs": "a21fcfe6f4e701b1f5142a008ceeb7eea42c251a01688f9022539235b6f80b62",

@@ -1,0 +1,3 @@
+[
+  {"room": "knowledge room", "blocks": ["answers"], "access": "read", "level": "the asker's level"}
+]

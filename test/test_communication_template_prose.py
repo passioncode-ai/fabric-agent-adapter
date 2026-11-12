@@ -6,6 +6,12 @@ import unittest
 from test_action_and_dashboard_prose import ROOT, flat
 
 TEMPLATE = "creating-fabric-agents/references/communication-agent-template.md"
+# FAA-265 moved the prompt into the template folder; the reader's page keeps how to use it.
+FOLDER_TEMPLATE = "creating-fabric-agents/templates/communication-agent/TEMPLATE.md"
+
+
+def template_text():
+    return flat(TEMPLATE) + " " + flat(FOLDER_TEMPLATE)
 SCENARIO = "a-channel-agent-starts-from-the-communication-template"
 # Each expected line of the scenario, and the template phrases it rests on (whitespace normalised).
 RESTS_ON = {
@@ -33,7 +39,7 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
     def test_every_expected_line_has_its_phrases(self):
         expected = scenario()["expected"]
         self.assertEqual(len(expected), len(RESTS_ON))
-        body = flat(TEMPLATE)
+        body = template_text()
         for i, phrases in RESTS_ON.items():
             for phrase in phrases:
                 with self.subTest(line=i, phrase=phrase):
@@ -47,9 +53,9 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
         for kind in ("support.quality_daily", "answer.cited", "support.handed_off", "support.diagnosed",
                      "knowledge.learned", "knowledge.retracted", "support.tickets_daily"):
             with self.subTest(kind=kind):
-                self.assertIn(kind, flat(TEMPLATE))
+                self.assertIn(kind, template_text())
                 events.make_event("1", "2026-11-07T00:00:00Z", kind, "info", "x")
-        self.assertNotIn("handedOff", flat(TEMPLATE))
+        self.assertNotIn("handedOff", template_text())
 
     def test_the_recipe_readme_skips_check_reply_by_the_templates_routes(self):
         readme = flat("building-fabric-services/recipes/support-agent/README.md")
@@ -57,14 +63,14 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
                        "a triage reply", "never the draft's markers"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, readme)
-                self.assertIn(phrase, flat(TEMPLATE))
+                self.assertIn(phrase, template_text())
         self.assertNotIn("no fact to cite", readme)
-        self.assertNotIn("no fact to cite", flat(TEMPLATE))
+        self.assertNotIn("no fact to cite", template_text())
 
     def test_the_declaration_rules_a_builder_follows_hold_under_the_probe(self):
         """0.75.0 readings, round 10: a real answered signal drops the queue's recommendation (FAC-SEM-164), and the
         operator's in-chat decision is carried out once, never held again (CA-8, the standard's 4.10)."""
-        body = flat(TEMPLATE)
+        body = template_text()
         for phrase in ("replaces with a real signal and then drops its `recommendation`",
                        "carried out once within CA-8's bounds and never held again"):
             with self.subTest(phrase=phrase):
@@ -72,7 +78,7 @@ class TheTemplateCarriesWhatItsScenarioGrades(unittest.TestCase):
 
     def test_the_changelog_counts_the_adversarial_batches_the_template_lists(self):
         import re
-        body = flat(TEMPLATE)
+        body = template_text()
         listed = body.split("The adversarial batches, each with its expected behaviour, all passing: ", 1)[1]
         listed = listed.split(" - Clarifying questions", 1)[0]
         said = re.search(r"the acceptance with (\d+) adversarial batches",

@@ -92,6 +92,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_profiles` | runner and model profiles ([profiles](profiles.md)) |
 | L3 | `fabric_interop_rules` | `fabric-interop/0.1` rules without a service: constants, `InteropError`, trace context, job limits (DEC-0087; FAA-92), a job's approval step under the mandate (`job_step`, C3.3) |
 | L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools; re-exports the rule layer ([interop](interop.md)) |
+| L3 | `fabric_holds` | work a service holds by its own limits (FAA-298): the held job's `statusMessage` in the pause grammar (`waiting_message`, `read_waiting`, `hold_job`), one push per hold and the operator's scoped lift (`HoldBook`: `hold`, `release`, `lift`, `admit`, `limit`) ([interop](interop.md#work-held-by-the-services-own-limits)) |
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
 | L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data, and the operator's mandate a request carries (FAA-135, imports `fabric_mandate` and `fabric_interop_rules` for the FAA-139 reading) |

@@ -2,7 +2,7 @@
 
 A service answers one inbound question from its own knowledge file, or hands it to a person. It is a step of an
 agent that answers people, not that agent: see the paragraph after the table. Under the creating-fabric-agents
-template (`communication-agent-template.md`) the plan-and-draft call writes the draft, not this recipe's `answer()`:
+template (`templates/communication-agent/`, read through `references/communication-agent-template.md`) the plan-and-draft call writes the draft, not this recipe's `answer()`:
 the draft carries a `[KB:<id>]` marker for each knowledge id the plan used, and the agent runs `check_reply(draft,
 question, prompt_ids, max_chars=..., sources=...)` on it for the code checks. `prompt_ids` are the ids of the items
 placed in the plan's prompt, never the plan's own list (an id the plan names outside them is held as a suspected
