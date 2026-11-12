@@ -11,6 +11,11 @@ export const PROTOCOL = 'fabric-service/0.1';
 
 export const EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/service/0.1';
 
+// DEC-0140 PR-1 (contract project-comms.md, interop.md's C3.1 amendment): the capability of a Project's primary
+// responder, a session's. No service serves it as a tool or declares it (surfaces.mcp.capabilities, an action's tool),
+// and the board kit never enrolls a service's responder for it (FAA-244).
+export const PRIMARY_CAPABILITY = 'project.work';
+
 // Lifecycle rules: references/lifecycle.md (the rule for this kit's users; it implements the public
 // contract's service specification, Lifecycle), the same values as fabric_service.py.
 // A launchd-supervised copy that finds the lock held backs off in-process before its exit 75 (LC-03).

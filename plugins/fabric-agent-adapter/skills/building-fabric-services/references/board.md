@@ -27,7 +27,9 @@ skill's business (working-with-fabric, `references/project-board.md`).
 A **request** is addressed to a Project and one of its capabilities (`video.render`), never to a service. One
 **responder slot** exists per Project and capability; a service holds it under a **`board.respond` grant** the
 operator gives in Fabric (Settings → Agent access): callee `fabric`, capability `board.respond`, resource
-`board:<project id>/<capability>`. A pid, a descriptor or a localhost origin authorizes nothing.
+`board:<project id>/<capability>`. A pid, a descriptor or a localhost origin authorizes nothing. The capability is
+never `project.work`: DEC-0140 PR-1 reserves it for a Project's primary responder, a coding session, and `Responder`
+refuses it with `invalid_arguments` (FAA-244).
 
 1. Ask once, through the hub's door: `HubClient().request_board_access(agent_id, project_id, [capability], reason)`
    (`requestBoardAccess`). Keep the answer's `pollSecret` in memory or a 0600 file.

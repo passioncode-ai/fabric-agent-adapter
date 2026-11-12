@@ -395,6 +395,13 @@ class FailureTests(Conversation):
         self.assertEqual(self.tools().count("com.complete"), 1)
         self.assertEqual(self.checkpoint(), {})
 
+    def test_the_reserved_primary_capability_is_refused(self):
+        # FAA-244, DEC-0140 PR-1: `project.work` is a Project's primary responder's, a session's, never a service's
+        with self.assertRaises(fb.BoardError) as raised:
+            self.responder(capabilities=["video.render", "project.work"])
+        self.assertEqual(raised.exception.code, "invalid_arguments")
+        self.assertIn("project.work", str(raised.exception))
+
     def test_authority_changed_stops_claiming_and_says_what_to_ask(self):
         r = self.responder()
         r.step()

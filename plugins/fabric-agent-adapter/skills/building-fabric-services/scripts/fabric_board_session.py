@@ -148,6 +148,9 @@ class Responder(SlotKeeper):
         caps = list(capabilities)
         if not caps or any(not isinstance(c, str) or not _CAPABILITY.fullmatch(c) for c in caps) or len(set(caps)) != len(caps):
             raise BoardError("invalid_arguments", "Name each capability once, [a-z][a-z0-9._-]{1,127}.")
+        if _fs.PRIMARY_CAPABILITY in caps:  # FAA-244: DEC-0140 PR-1, a session's slot, never a service's
+            raise BoardError("invalid_arguments", "%s is a Project's primary responder's, a session's: a service answers "
+                             "the capabilities it declares (DEC-0140 PR-1)." % _fs.PRIMARY_CAPABILITY)
         self.hub, self.project = hub, _hub._project(project_id)
         #: FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; None reads none).
         self.mandate_from, self.agent_id, self.wall = _link.mandate_options(agent_id, mandate_from), agent_id, wall

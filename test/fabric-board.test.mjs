@@ -275,6 +275,13 @@ test('lease_expired while working stops the handler; accepted work comes back by
   assert.deepEqual(h.checkpoint(), {});
 });
 
+test('the reserved primary capability project.work is refused (FAA-244, DEC-0140 PR-1)', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  assert.throws(() => h.responder({ capabilities: ['video.render', 'project.work'] }),
+    (e) => e.code === 'invalid_arguments' && /project\.work/.test(e.message));
+});
+
 test('authority_changed stops claiming; no epoch fails closed; another protocol revision is schema-unsupported', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

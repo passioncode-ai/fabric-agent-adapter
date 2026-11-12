@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { credentialName, repositoryCredential, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
-import { ID, INSTANCE, LOCAL_PATH, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
+import { ID, INSTANCE, LOCAL_PATH, PRIMARY_CAPABILITY, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
@@ -418,6 +418,9 @@ export function configurationProblems(doc) {
 // `a2a` (DEC-0122) is surfaces.a2a, where the service serves its public Agent Card (a2aSurface builds one); passed here
 // or in `surfaces`, never both, and refused when it is not the schema's. A reader pinned before DEC-0122 refuses the
 // member, so a service carries it only once its readers are pinned at or after it.
+// FAA-244: DEC-0140 PR-1 reserves the primary responder's capability; a service never publishes it.
+const reserved = (where) => `${where}: ${PRIMARY_CAPABILITY} is reserved for a Project's primary responder, a session (DEC-0140 PR-1); a service never serves it as a tool or declares it.`;
+
 export function buildWellKnown({ id, instance, name, version, build, startedAt, status, degraded = [], surfaces, summary, updateAvailable = null, pid = process.pid, extensions, configuration, protocols, actions, a2a }) {
   if (!STATUSES.includes(status)) throw new ServiceError(`status must be one of ${STATUSES.join(', ')}.`);
   if (!surfaces?.events) throw new ServiceError('surfaces.events is required.');
@@ -430,6 +433,7 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
     const problems = a2aSurfaceProblems(surfaces.a2a);
     if (problems.length) throw new ServiceError(`surfaces.a2a: ${problems.join('; ')}.`);
   }
+  if (Array.isArray(surfaces.mcp?.capabilities) && surfaces.mcp.capabilities.includes(PRIMARY_CAPABILITY)) throw new ServiceError(reserved('surfaces.mcp.capabilities'));
   if (!(build?.commit || build?.digest)) throw new ServiceError('build needs a commit or a digest.');
   const doc = {
     protocol: PROTOCOL,
@@ -461,6 +465,7 @@ export function buildWellKnown({ id, instance, name, version, build, startedAt, 
       // compared with the capabilities this document's MCP surface lists.
       const findings = actionsExtensionRules({ extensions: { [ACTIONS_EXTENSION_KEY]: extensions[ACTIONS_EXTENSION_KEY] }, surfaces });
       if (findings.length) throw new ServiceError(`Actions declaration: ${findings.map((f) => f.message).join('; ')}.`);
+      if ((extensions[ACTIONS_EXTENSION_KEY]?.actions ?? []).some((a) => a?.tool === PRIMARY_CAPABILITY)) throw new ServiceError(reserved("an action's tool"));
     }
     doc.extensions = { ...extensions };
   }
