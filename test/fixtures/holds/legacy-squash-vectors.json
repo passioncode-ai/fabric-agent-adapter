@@ -1,0 +1,117 @@
+{
+ "about": "FAA-320: a hold book 0.81.0's Python twin wrote (callers squashed with str.split(), which also takes U+001C to U+001F and U+0085) is read under both squashes, in both kit twins (fabric_holds.py, fabric-holds.mjs); a record written since 0.83.0 carries squash 'ecmascript' and is read under the ECMAScript squash alone.",
+ "book": {
+  "holds": [
+   {
+    "id": "h-old-py",
+    "reason": "daily-quota",
+    "caller": "example agent",
+    "work": "render",
+    "since": "2026-11-12T08:00:00Z",
+    "until": null,
+    "jobs": [
+     "j1"
+    ],
+    "closed": null
+   },
+   {
+    "id": "h-old-share",
+    "reason": "caller-share",
+    "caller": "example agent",
+    "work": "render",
+    "since": "2026-11-12T08:00:00Z",
+    "until": null,
+    "jobs": [],
+    "closed": null
+   },
+   {
+    "id": "h-new",
+    "reason": "concurrency",
+    "caller": "other caller",
+    "work": "render",
+    "since": "2026-11-12T08:00:00Z",
+    "until": null,
+    "jobs": [],
+    "closed": null,
+    "squash": "ecmascript"
+   }
+  ],
+  "lifts": [
+   {
+    "id": "l-old-py",
+    "reason": "money",
+    "caller": "example agent",
+    "job": null,
+    "from": "2026-11-12T08:00:00Z",
+    "until": null,
+    "usd": 5,
+    "left": 5,
+    "at": "2026-11-12T08:00:00Z",
+    "decision": {
+     "by": "operator",
+     "via": "relayed-instruction",
+     "action": "limit.lift",
+     "target": "money",
+     "instruction": "five more dollars",
+     "at": "2026-11-12T08:00:00Z"
+    }
+   }
+  ]
+ },
+ "cases": [
+  {
+   "call": "hold",
+   "args": {
+    "caller": "example\u001cagent",
+    "work": "render",
+    "reason": "daily-quota"
+   },
+   "joins": "h-old-py"
+  },
+  {
+   "call": "hold",
+   "args": {
+    "caller": "example\u0085agent",
+    "work": "render",
+    "reason": "daily-quota"
+   },
+   "joins": "h-old-py"
+  },
+  {
+   "call": "release",
+   "args": {
+    "caller": "example\u001fagent",
+    "reason": "caller-share"
+   },
+   "closes": "h-old-share"
+  },
+  {
+   "call": "release",
+   "args": {
+    "caller": "other\u001ccaller",
+    "reason": "concurrency"
+   },
+   "closes": null
+  },
+  {
+   "call": "admit",
+   "args": {
+    "caller": "example\u001dagent",
+    "reason": "money",
+    "cost_usd": 2
+   },
+   "lift": "l-old-py"
+  },
+  {
+   "call": "lift",
+   "args": {
+    "caller": "example\u001eagent",
+    "reason": "caller-share",
+    "jobs": 1
+   },
+   "lifts": [
+    "h-old-share"
+   ]
+  }
+ ]
+}
