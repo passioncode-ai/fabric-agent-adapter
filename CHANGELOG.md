@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.83.0 (2026-11-12)
+
+Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
+
 ## 0.82.0 (2026-11-12)
 
 Wave 4 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`). Kit modules
