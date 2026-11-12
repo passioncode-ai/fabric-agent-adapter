@@ -490,8 +490,19 @@ export class ForeignUserAnswer {
 // The well-known answer at a loopback origin, read only on a connection whose server end is this OS account's process
 // (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, a ForeignUserAnswer when the listener is another
 // account's or its owner cannot be told.
-export async function wellKnownOf(origin, { vouchPid = null } = {}) {
-  const m = /^http:\/\/127\.0\.0\.1:([0-9]{1,5})$/.exec(origin);
+// Every loopback spelling (127.0.0.1, another 127/8 address, localhost, [::1]) goes on a checked connection, never the
+// unchecked way (FAA-257): the host, without brackets, and the port, or null.
+function loopbackOrigin(origin) {
+  let url;
+  try { url = new URL(String(origin)); } catch { return null; }
+  const host = url.hostname.replace(/^\[|\]$/g, '');
+  const loop = host === 'localhost' || host === '::1' || (net.isIPv4(host) && host.startsWith('127.'));
+  if (url.protocol !== 'http:' || !loop || !url.port) return null;
+  return { host, port: Number(url.port) };
+}
+
+export async function wellKnownOf(origin, { vouchPid = null, ask = undefined } = {}) {
+  const m = loopbackOrigin(origin);
   if (!m) {
     try {
       const response = await fetch(`${origin}/.well-known/fabric-service`, { signal: AbortSignal.timeout(2000) });
@@ -502,14 +513,14 @@ export async function wellKnownOf(origin, { vouchPid = null } = {}) {
   }
   // A CheckedAgent without keep-alive: the request goes on the very socket it checked, and the socket closes after the
   // answer, so a poll leaves no connection open behind it.
-  return loopbackWellKnown(Number(m[1]), new CheckedAgent({ keepAlive: false, vouchPid }));
+  return loopbackWellKnown(m.port, new CheckedAgent({ keepAlive: false, vouchPid, ...(ask ? { ask } : {}) }), m.host);
 }
 
 // The well-known answer at 127.0.0.1:<port> over `agent`, whose connections check their server end: null when nothing
 // answers or the answer is not JSON, a ForeignUserAnswer when the agent refused the listener.
-function loopbackWellKnown(port, agent) {
+function loopbackWellKnown(port, agent, host = '127.0.0.1') {
   return new Promise((resolve) => {
-    const req = http.request({ host: '127.0.0.1', port, path: '/.well-known/fabric-service', agent,
+    const req = http.request({ host, port, path: '/.well-known/fabric-service', agent,
       timeout: 2000 }, (res) => {
       const chunks = [];
       res.on('data', (c) => chunks.push(c));

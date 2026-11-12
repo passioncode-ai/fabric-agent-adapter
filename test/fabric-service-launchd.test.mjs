@@ -767,3 +767,22 @@ test("FAA-278: jobWellKnownOf reads only what launchd's job accepted", { skip: p
   assert.ok(other instanceof ForeignUserAnswer, String(other));
   assert.match(other.reason, /not the LaunchDaemon's pid 999999/);
 });
+
+test('FAA-257: an origin spelled localhost is read on a checked connection too, never sent unchecked', async (t) => {
+  const { wellKnownOf } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const http = await import('node:http');
+  const seen = [];
+  const server = http.createServer((req, res) => { seen.push(req.url); res.end(JSON.stringify({ service: { id: 'example-agent', instance: 'default' } })); });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const port = server.address().port;
+  for (const origin of [`http://127.0.0.1:${port}`, `http://localhost:${port}`]) {
+    const answer = await wellKnownOf(origin, { ask: { ownUid: 424242, ownSid: 'S-1-5-21-9-9-9-424242' } });
+    assert.ok(answer instanceof ForeignUserAnswer, origin);
+    assert.match(answer.reason, /^foreign-user: /);
+  }
+  assert.deepEqual(seen, [], 'nothing reached a listener read as another account\'s');
+  assert.equal((await wellKnownOf(`http://localhost:${port}`)).service.id, 'example-agent');
+  const facade = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-service.mjs');
+  assert.equal(facade.wellKnownOf, wellKnownOf, 'the facade carries it, as the Python one carries well_known_of (FAA-259)');
+});

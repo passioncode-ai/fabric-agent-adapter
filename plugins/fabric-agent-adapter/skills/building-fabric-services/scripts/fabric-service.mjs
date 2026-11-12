@@ -180,6 +180,7 @@ export {
   launchdPlist,
   SYSTEM_DAEMONS,
   launchdDomain,
+  wellKnownOf,
   jobWellKnownOf,
   ForeignUserAnswer,
   launchdLoaded,

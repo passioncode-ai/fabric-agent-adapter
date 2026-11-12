@@ -346,7 +346,7 @@
     "fabric_peer_owner",
     "fabric_secrets"
    ],
-   "sha256": "6f10d6e60222c6725434a93253873762e8c4b55fe1cc16ef12c18f2dfbb16798"
+   "sha256": "6842a1b1663950a05074b94de2d7f5f36475c543e08a22a441dbb94cf1281d33"
   },
   {
    "module": "fabric_service",
@@ -370,7 +370,7 @@
     "fabric_time",
     "fabric_usage"
    ],
-   "sha256": "b89807fda5511fde764db52bd6fd38c4e10d170bc65ef15ab526c5805ef6c17b"
+   "sha256": "cc619eea1467a6bdf32c00f51ac8de8e66afd8808d619050ad2a8e67126740c9"
   },
   {
    "module": "fabric_profiles",
@@ -513,7 +513,7 @@
     "fabric_time",
     "fabric_usage"
    ],
-   "sha256": "d06a40f83f2fb8bd441ab3485ae882f1fbdd9cd7a9c1ec175eb47cb8ae2cce81"
+   "sha256": "a415db7475c3359fa15c85979a63a3a223a0ad7f85f878bcc2d638acccb44090"
   }
  ],
  "node": [
@@ -857,7 +857,7 @@
     "fabric-peer-owner",
     "fabric-secrets"
    ],
-   "sha256": "8301d7dace103688a46550ae13524438a66127f16281e00871529f625a841e70"
+   "sha256": "ed23afbf779440cc32418f18edf1721ae2e70c6687b5e5859b22372874c67d8e"
   },
   {
    "module": "fabric-service",
@@ -879,7 +879,7 @@
     "fabric-supervisors",
     "fabric-usage"
    ],
-   "sha256": "9bd51543ccba48e79e7fbfdbe478ab899985cbb59d3aca20a315ea1c6f568ba3"
+   "sha256": "a62bba8c6314e482778b4b793bc60eacaef211a4b0bea571a7e05c58299cf944"
   },
   {
    "module": "fabric-profiles",
@@ -1016,7 +1016,7 @@
     "fabric-time",
     "fabric-usage"
    ],
-   "sha256": "6041f3ab30f516658e1dbab4897a651cc8509b2136cfa8e769802c6b40ec2f35"
+   "sha256": "4e3e73a1b8882bdde4cbb311f6f4a5e2f048fa81fa245409a16df1e6cab03e19"
   }
  ],
  "history": {
@@ -6388,8 +6388,8 @@
    "fabric_auth.py": "74ccc10239b65a3567cec5213a7b344cbd88d6eee1fd1c5f7be1d6daf985993c",
    "fabric_events.py": "da3fe3e3e19d4c9754b90c719e9c069a3ac85e080b9fffd07adbaf63b5bfcf0d",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
-   "fabric_supervisors.py": "6f10d6e60222c6725434a93253873762e8c4b55fe1cc16ef12c18f2dfbb16798",
-   "fabric_service.py": "b89807fda5511fde764db52bd6fd38c4e10d170bc65ef15ab526c5805ef6c17b",
+   "fabric_supervisors.py": "6842a1b1663950a05074b94de2d7f5f36475c543e08a22a441dbb94cf1281d33",
+   "fabric_service.py": "cc619eea1467a6bdf32c00f51ac8de8e66afd8808d619050ad2a8e67126740c9",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
    "fabric_interop.py": "d27e31834611a37cf2a117746f2f60fc187ccc48718eb546ff923c5d0fce7dea",
@@ -6401,7 +6401,7 @@
    "fabric_board_fixture.py": "69761ce205ec640762ec9b591c6903e5a87f844e8d423b041681924027e39d1e",
    "fabric_board.py": "f86c40b8291f8c818f6924910f4022b013d5fd107abaf8825dd0aa6c5e418638",
    "fabric_http.py": "b11b9930c3f0ab911a9cd325086a4c07a5ed4c246799d290f6085245669f4994",
-   "fabric_openrouter.py": "d06a40f83f2fb8bd441ab3485ae882f1fbdd9cd7a9c1ec175eb47cb8ae2cce81",
+   "fabric_openrouter.py": "a415db7475c3359fa15c85979a63a3a223a0ad7f85f878bcc2d638acccb44090",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
    "fabric-identifiers.mjs": "a18c2a501a4aa170bfd3d99e571ad6b7662649b4d3b9d2a540c002ea42811bbf",
@@ -6433,8 +6433,8 @@
    "fabric-auth.mjs": "10ff37a39f9e3adb4d0f05db66c45f49b10eef582e9220c213907964109d7e52",
    "fabric-events.mjs": "c95c07e2745e52fddbb7237b89824123f240d4f8d6b14f5cb269a09e1845c3ba",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
-   "fabric-supervisors.mjs": "8301d7dace103688a46550ae13524438a66127f16281e00871529f625a841e70",
-   "fabric-service.mjs": "9bd51543ccba48e79e7fbfdbe478ab899985cbb59d3aca20a315ea1c6f568ba3",
+   "fabric-supervisors.mjs": "ed23afbf779440cc32418f18edf1721ae2e70c6687b5e5859b22372874c67d8e",
+   "fabric-service.mjs": "a62bba8c6314e482778b4b793bc60eacaef211a4b0bea571a7e05c58299cf944",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458",
    "fabric-interop.mjs": "989040aed33b2712a258244192bdf70e811a51076aa1b62f2adc2a6db051dbed",
@@ -6446,7 +6446,7 @@
    "fabric-board-fixture.mjs": "83c4b7e33ee47b68385faf2569d38d5c8a0c5cb0f8656090f41e1b0eed2f436e",
    "fabric-board.mjs": "15fbb4441fcf7d2f285375b75de64ad6cffea129c515084c110245376b07775f",
    "fabric-http.mjs": "b83b4c0c208763d56c3eebda5fe9e4a46d595cd91227699bf6876e65a3c7f9b9",
-   "fabric-openrouter.mjs": "6041f3ab30f516658e1dbab4897a651cc8509b2136cfa8e769802c6b40ec2f35",
+   "fabric-openrouter.mjs": "4e3e73a1b8882bdde4cbb311f6f4a5e2f048fa81fa245409a16df1e6cab03e19",
    "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
    "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0"
   }
