@@ -45,7 +45,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 
-export const PEER_OWNER_VERSION = '1.1.0+kit.4'; // the Python twin's, Observatory's 1.1.0 with the kit's differences
+export const PEER_OWNER_VERSION = '1.2.0+kit.5'; // the Python twin's, Observatory's 1.2.0 with the kit's differences
 export const THIS_ACCOUNT = 'this-account';
 export const ANOTHER_ACCOUNT = 'another-account';
 export const SYSTEM = 'system';
@@ -420,7 +420,7 @@ async function ownerOf(local, remote, opts = {}, server = false) {
     // Linux: a connection not yet accept()ed is printed with uid 0 and inode 0; it belongs to the listener on its local
     // address and dies with it, so that listener answers. An accepted connection's own row carries the uid of the
     // process that accepted it: it answers itself, so a listener swapped after another account accepted the client
-    // cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e; the contract's pending CT-254, FAA-258).
+    // cannot pass (Project Observatory's 1.2.0 reading, board thread ced00f6e; the contract's CT-254, released).
     // A server row its owner already closed (an orphan) also has inode 0 and reads so: no process holds it, so nothing
     // sent to it reaches anyone (0.74.0 unit reading 6).
     return oneOwner(listenersOf(table.rows, found[0].local), table.how, opts, 'not-accepted');
@@ -464,7 +464,7 @@ export function peer(socket, opts) {
 // For a client's connected socket: who accepted it. The row whose local address is the server's and whose remote
 // address is this socket's own, the server process's accepted socket, so a listener swapped after listen cannot pass
 // for the one that answers. On Linux a connection not yet accept()ed has no owner of its own (inode 0): its listener
-// answers (the contract's pending CT-254, FAA-258).
+// answers (the contract's CT-254, HA-2's Linux source).
 export function serverEnd(socket, opts) {
   if (!socket.remoteAddress || !socket.localAddress) return Promise.resolve(owner(UNKNOWN, { reason: 'socket: not connected' }));
   return ownerOf(address(socket.remoteAddress, socket.remotePort), address(socket.localAddress, socket.localPort), opts, true);

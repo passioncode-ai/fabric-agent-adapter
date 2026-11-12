@@ -1,0 +1,12 @@
+{
+  "levels": {
+    "owner": {"without_asking": ["change the knowledge source"], "with_approval": [], "escalates": []},
+    "administrator": {"without_asking": ["read every gap"], "with_approval": ["change the knowledge source"],
+                      "escalates": ["spend above the budget"]},
+    "project_architect": {"without_asking": ["read the project's gaps"], "with_approval": [],
+                          "escalates": ["change the knowledge source"]},
+    "member": {"without_asking": ["ask a question"], "with_approval": ["file a gap for another project"],
+               "escalates": ["read another member's questions"]}
+  },
+  "never": ["send a message outside the organization"]
+}

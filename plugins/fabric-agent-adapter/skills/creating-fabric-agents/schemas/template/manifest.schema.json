@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/passioncode-ai/fabric-agent-adapter/schemas/template/manifest.schema.json",
+  "title": "manifest.json of an agent template: placement, contract, doors, dashboard, base model per task, budget",
+  "description": "placement, doors, models, dashboard and budget sit at the top level, or in every entry of `variants` when the variants differ. Their inner shape is the template's own in schema 1.",
+  "type": "object",
+  "required": [
+    "template",
+    "version",
+    "contract"
+  ],
+  "additionalProperties": false,
+  "patternProperties": {
+    "^x-[a-z0-9-]+$": {}
+  },
+  "properties": {
+    "template": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,63}$",
+      "description": "equals TEMPLATE.md's template.id"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+      "description": "equals TEMPLATE.md's template.version"
+    },
+    "contract": {
+      "description": "one protocol the template was checked against, or a map of them by role",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/protocol"
+        },
+        {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/protocol"
+          }
+        }
+      ]
+    },
+    "placement": {
+      "type": [
+        "object",
+        "string"
+      ]
+    },
+    "doors": {
+      "type": [
+        "object",
+        "array"
+      ]
+    },
+    "models": {
+      "type": [
+        "object",
+        "array"
+      ]
+    },
+    "dashboard": {
+      "type": [
+        "object",
+        "string"
+      ]
+    },
+    "budget": {
+      "type": [
+        "object",
+        "string"
+      ]
+    },
+    "schedules": {
+      "type": [
+        "array",
+        "object",
+        "string"
+      ]
+    },
+    "limits": {
+      "type": "object"
+    },
+    "events": {
+      "type": "array"
+    },
+    "variants": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "placement": {
+            "type": [
+              "object",
+              "string"
+            ]
+          },
+          "doors": {
+            "type": [
+              "object",
+              "array"
+            ]
+          },
+          "models": {
+            "type": [
+              "object",
+              "array"
+            ]
+          },
+          "dashboard": {
+            "type": [
+              "object",
+              "string"
+            ]
+          },
+          "budget": {
+            "type": [
+              "object",
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "protocol": {
+      "type": "object",
+      "required": [
+        "name",
+        "home",
+        "checked_against"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "home": {
+          "type": "string",
+          "minLength": 1
+        },
+        "checked_against": {
+          "type": "string",
+          "minLength": 1,
+          "description": "the version or date checked against: \"checked against\", never \"requires\""
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "description": "the protocol's extensions the template uses, by name"
+        },
+        "applies_to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

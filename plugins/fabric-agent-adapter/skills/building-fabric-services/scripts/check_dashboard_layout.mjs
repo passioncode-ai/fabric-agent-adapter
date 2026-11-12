@@ -127,6 +127,25 @@ async function serviceTarget(spec, dir) {
   return { url, declared, name: `${id}.${instance}` };
 }
 
+// DEC-0154 PL-3 and HA-2 (FAA-260 items 2 and 14): a raw loopback address opens in the browser only while its port's
+// listener is this OS account's, read from the socket table just before the page opens. The browser connects on its
+// own, so this is the listener's owner, not that connection's: a listener swapped in between stays a residue
+// (SECURITY.md). A copy of this file alone cannot tell the owner and opens no loopback page.
+async function loopbackRefusal(target) {
+  let url;
+  try { url = new URL(target); } catch { return null; }
+  if (url.protocol !== 'http:') return null;
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (!(host === 'localhost' || host.endsWith('.localhost') || /^127\./.test(host) || host === '::1'
+    || host === '0.0.0.0' || /^::ffff:(127\.|7f)/.test(host))) return null;
+  const po = await import('./fabric-peer-owner.mjs').catch(() => null);
+  if (!po) return 'fabric-peer-owner.mjs is not beside this file: the loopback listener\'s owner cannot be told, so the page is not opened (DEC-0154 HA-2)';
+  const port = Number(url.port || 80);
+  const who = await po.listener(port);
+  if (who.kind === po.THIS_ACCOUNT) return null;
+  return `foreign-user: the listener on port ${port} reads as ${who.kind}${who.reason ? ` (${who.reason})` : ''}, so the page is not opened (DEC-0154 PL-3, HA-2)`;
+}
+
 // Runs inside the page. Everything it reports is measured from the rendered layout.
 function measure([floor, cap]) {
   const de = document.documentElement;
@@ -319,6 +338,8 @@ async function main(argv) {
   try {
     const context = await browser.newContext({ viewport: { width: Math.max(...opts.widths), height: opts.height } });
     const page = await context.newPage();
+    const refused = await loopbackRefusal(target);
+    if (refused) return notRun(refused);
     const response = await page.goto(target, { waitUntil: 'load' });
     if (response && !response.ok()) {
       return notRun(`the page answered HTTP ${response.status()}`);

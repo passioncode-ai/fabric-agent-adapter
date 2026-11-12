@@ -16,7 +16,7 @@ const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 
 
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const temp = () => tempDir('fabric-supervisor-');
-const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'q'.repeat(24)}`;
+const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'Q1'}${'q'.repeat(22)}`;
 
 // Stands in for systemctl and schtasks: fails a call naming a word in `fail`, prints `out[word]` for one naming it.
 function recorder(fail = [], out = {}) {

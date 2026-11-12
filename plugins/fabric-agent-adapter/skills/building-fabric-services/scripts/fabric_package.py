@@ -700,8 +700,76 @@ def compose(draft: Dict[str, Any], files: Dict[str, bytes]) -> Tuple[Dict[str, A
     return pkg, notes
 
 
+#: The agent's source manifest (contract DEC-0149, ``fabric-source/1``): when the folder carries one, ``pack`` writes
+#: ``secrets[]`` from its secret slots and ``state[]`` from its store slots' paths, and FAC-SEM-160 holds them equal.
+SOURCE_FILE = "fabric.source.json"
+
+
+def _source_manifest(files: Dict[str, bytes]) -> Optional[Dict[str, Any]]:
+    """The folder's source manifest, or None when it has none; a refusal when it is no ``fabric-source/1`` object."""
+    if SOURCE_FILE not in files:
+        return None
+    source = _load_json(files[SOURCE_FILE], SOURCE_FILE)
+    if source.get("format") != "fabric-source/1":
+        raise PackageError("%s is not a fabric-source/1 manifest (its format member)." % SOURCE_FILE)
+    return source
+
+
+def source_members(source: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """``secrets[]`` from the secret slots (name, purpose, optional) and ``state[]`` from the store slots (path, purpose)."""
+    secrets: List[Dict[str, Any]] = []
+    state: List[Dict[str, Any]] = []
+    for slot in _objects(source.get("slots")):
+        if slot.get("kind") == "secret" and isinstance(slot.get("name"), str):
+            secrets.append(dict({"name": slot["name"], "purpose": slot.get("purpose")}, **({"optional": True} if slot.get("optional") is True else {})))
+        elif slot.get("kind") == "store" and isinstance(slot.get("path"), str):
+            state.append({"path": slot["path"], "purpose": slot.get("purpose")})
+    return secrets, state
+
+
+def source_package_findings(source: Any, pkg: Any) -> List[Dict[str, str]]:
+    """FAC-SEM-160 (contract ``sourcePackageFindings``): the package's secrets[] are the source's secret slots, by name
+    and optional; its state[] paths are the store slots' paths when state[] holds any entry."""
+    if not isinstance(source, dict) or not isinstance(pkg, dict):
+        return []
+    out: List[Dict[str, str]] = []
+
+    def flag(at: str, message: str) -> None:
+        out.append({"code": "FAC-SEM-160", "instancePath": at, "message": message})
+    slots = _objects(source.get("slots"))
+    secrets = {s["name"]: s.get("optional") is True for s in slots if s.get("kind") == "secret" and isinstance(s.get("name"), str)}
+    stores = list(dict.fromkeys(s["path"] for s in slots if s.get("kind") == "store" and isinstance(s.get("path"), str)))
+    packaged = [(e, i) for i, e in enumerate(pkg.get("secrets") if isinstance(pkg.get("secrets"), list) else []) if isinstance(e, dict)]
+    names = {e.get("name") for e, _ in packaged}
+    for name in secrets:
+        if name not in names:
+            flag("/package/secrets", "the source's secret slot %s is not in the package's secrets[]" % name)
+    for entry, index in packaged:
+        name = entry.get("name")
+        if not isinstance(name, str) or name not in secrets:
+            flag("/package/secrets/%d/name" % index, "secrets[%d] is no secret slot of the source" % index)
+        elif secrets[name] != (entry.get("optional") is True):
+            flag("/package/secrets/%d/optional" % index, "secrets[%d] is %soptional in the source" % (index, "" if secrets[name] else "not "))
+    state = pkg.get("state")
+    if not isinstance(state, list) or not state:
+        return out
+    paths = {e.get("path") for e in _objects(state)}
+    for path in stores:
+        if path not in paths:
+            flag("/package/state", "a store slot's path of the source is not in the package's state[]")
+    for index, entry in ((i, e) for i, e in enumerate(state) if isinstance(e, dict)):
+        if not isinstance(entry.get("path"), str) or entry["path"] not in stores:
+            flag("/package/state/%d/path" % index, "state[%d] is no store slot of the source" % index)
+    return out
+
+
 def _all_problems(pkg: Dict[str, Any], files: Dict[str, bytes]) -> List[Dict[str, str]]:
     problems = [dict(p, rule="schema") for p in schema_problems(pkg)]
+    if SOURCE_FILE in files:
+        try:
+            problems += [dict(p, rule=p["code"]) for p in source_package_findings(_source_manifest(files), pkg)]
+        except PackageError as exc:
+            problems.append({"rule": "source", "instancePath": "/files", "message": str(exc)})
     problems += [dict(p, rule="path") for p in path_problems(pkg)]
     problems += [dict(p, rule=p["code"]) for p in package_findings(pkg)]
     problems += [{"rule": "folder", "problem": p["problem"], "instancePath": p["path"], "message": FOLDER_MESSAGES.get(p["problem"], p["problem"])}
@@ -716,6 +784,24 @@ FOLDER_MESSAGES = {
 }
 
 
+def _secrets_lacking(draft: Dict[str, Any], secrets: List[Dict[str, Any]]) -> List[str]:
+    """The names a hand-written secrets[] declares that the source manifest has no secret slot for, in their order."""
+    have = {s["name"] for s in secrets}
+    declared = draft.get("secrets") if isinstance(draft.get("secrets"), list) else []
+    lacking: List[str] = []
+    for entry in declared:
+        name = entry.get("name") if isinstance(entry, dict) else None
+        if isinstance(name, str) and name not in have and name not in lacking:
+            lacking.append(name)
+    return lacking
+
+
+def _lacking_message(lacking: List[str]) -> str:
+    return ("%s declares no secret slot for %s, which %s's secrets[] names: pack writes secrets[] from the manifest's "
+            "slots and never drops a declared secret. Add each as a slot of kind secret to %s (or take it out of "
+            "secrets[]), then pack again" % (SOURCE_FILE, ", ".join(lacking), PACKAGE_FILE, SOURCE_FILE))
+
+
 def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
     """Pack ``folder`` (see the module's doc). The answer names the digest, ``agentRef`` and every problem; with
     ``apply`` and no problem, ``fabric.package.json`` is rewritten."""
@@ -725,8 +811,24 @@ def pack(folder: Any, apply: bool = False) -> Dict[str, Any]:
         raise PackageError("Write %s in the folder first: schema, kind, id, version, publisher, licence and, for an agent, "
                            "resultSignal and evals with its receipt. pack fills in agentRef, files[] and digest." % PACKAGE_FILE)
     draft = _load_json(files[PACKAGE_FILE], PACKAGE_FILE)
+    source = _source_manifest(files)
+    written: List[str] = []
+    refused: List[Dict[str, str]] = []
+    if source is not None:  # DEC-0149: secrets[] and state[] come from the source manifest's slots
+        secrets, state = source_members(source)
+        lacking = _secrets_lacking(draft, secrets)
+        if lacking:  # a declared secret is never dropped: the manifest gains its slot first
+            refused.append({"rule": "source", "instancePath": "/secrets", "message": _lacking_message(lacking)})
+        elif secrets or "secrets" in draft:
+            draft["secrets"] = secrets
+            written.append("secrets[]")
+        if state and draft.get("state") != []:  # an empty state[] is a copy packed without state, kept
+            draft["state"] = state
+            written.append("state[]")
     pkg, notes = compose(draft, files)
-    problems = _all_problems(pkg, files)
+    if written:
+        notes.append("%s written from %s" % (" and ".join(written), SOURCE_FILE))
+    problems = refused + _all_problems(pkg, files)
     suite = pkg.get("evals", {}).get("suite") if isinstance(pkg.get("evals"), dict) else None
     if isinstance(suite, str) and suite in files and any(p.get("instancePath") == "/evals/receipt/suite" for p in problems):
         notes.append("the suite packed is %s: run it again and write that receipt" % sha256_of(files[suite]))

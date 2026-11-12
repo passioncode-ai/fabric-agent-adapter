@@ -16,7 +16,7 @@ import { tempDir } from './temp-dir.mjs';
 const scripts = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const temp = () => tempDir('fabric-launchd-');
 const label = () => `ai.passioncode.test.lifecycle-${crypto.randomBytes(4).toString('hex')}`;
-const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'q'.repeat(24)}`;
+const fakeKey = (prefix) => `${prefix}${'s'}${'k-'}${'Q1'}${'q'.repeat(22)}`;
 const UID = 501;
 const noSleep = async () => {};
 
@@ -798,4 +798,129 @@ test('a loopback origin with the default port is read on a checked connection, n
     globalThis.fetch = real;
   }
   assert.deepEqual(fetched, []);
+});
+
+// FAA-286: the 0.78.0 readings' risks, the twin of the Python tests in LaunchdSystemDomainTests.
+const sysOpts = { origin: 'http://127.0.0.1:47201', serviceId: 'example-agent', timeout: 1, platform: 'darwin', uid: UID,
+  domain: 'system', euid: 0, sleep: noSleep };
+
+test('FAA-286 item 18: a domain name is no plist path', () => {
+  for (const name of ['system', 'gui', 'gui/501']) {
+    assert.throws(() => k.launchdDomain(name, { platform: 'darwin', uid: UID }), /is a launchd domain, not a plist path/);
+  }
+});
+
+test('FAA-286 items 14 and 21: a folder the domain contradicts is refused before anything', async (t) => {
+  const s = setup(t);
+  const agents = path.join(s.dir, 'LaunchAgents');
+  fs.mkdirSync(agents);
+  const fake = systemFake();
+  await assert.rejects(k.launchdInstall(s.name, path.join(agents, `${s.name}.plist`), s.body('1', { userName: 'agentuser' }),
+    { ...sysOpts, run: fake.run }), /LaunchAgents folder/);
+  await assert.rejects(k.launchdInstall(s.name, `/Library/LaunchDaemons/${s.name}.plist`, s.body('1'),
+    { ...sysOpts, domain: 'gui', run: fake.run }), /loads at boot as a LaunchDaemon/);
+  assert.deepEqual(fake.calls, []);
+  assert.equal(fs.existsSync(path.join(agents, `${s.name}.plist`)), false);
+});
+
+test('FAA-286 item 7: a binary plist is named so, never a missing UserName', async (t) => {
+  const s = setup(t);
+  const fake = systemFake();
+  for (const text of ['bplist00\u0000rest', Buffer.from('bplist00rest', 'latin1')]) {
+    await assert.rejects(k.launchdInstall(s.name, s.plist, text, { ...sysOpts, run: fake.run }),
+      (err) => /binary plist/.test(err.message) && !/needs UserName/.test(err.message));
+  }
+  assert.deepEqual(fake.calls, []);
+});
+
+test('FAA-286 item 13: the short-name refusal is words, never a regex', async (t) => {
+  const s = setup(t);
+  const numbered = s.body('1', { userName: 'agentuser' }).replace('<string>agentuser</string>', '<string>501</string>');
+  await assert.rejects(k.launchdInstall(s.name, s.plist, numbered, { ...sysOpts, run: systemFake().run }),
+    (err) => err.message.includes(k.USER_NAME_RULE) && !/\$\)/.test(err.message));
+});
+
+test('FAA-286 item 6: a leftover LaunchAgent of the label in the UserName\'s home is refused', async (t) => {
+  const s = setup(t);
+  const home = path.join(s.dir, 'home');
+  fs.mkdirSync(path.join(home, 'Library', 'LaunchAgents'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'Library', 'LaunchAgents', `${s.name}.plist`), s.body('1'));
+  const fake = systemFake();
+  const run = (argv) => (argv[0] === 'dscl' ? { status: 0, stdout: `NFSHomeDirectory: ${home}\n`, stderr: '' } : fake.run(argv));
+  await assert.rejects(k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...sysOpts, run }), /second copy/);
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  assert.ok(!fake.calls.some((c) => c[1] === 'bootstrap'));
+});
+
+test('FAA-286 item 15: a system bootstrap that fails removes the plist it wrote, and names one that was there', async (t) => {
+  const s = setup(t);
+  const body = s.body('1', { userName: 'agentuser' });
+  await assert.rejects(k.launchdInstall(s.name, s.plist, body, { ...sysOpts, run: systemFake({ bootstrapError: 'Bootstrap failed: 5: Input/output error' }).run }),
+    /the plist this call wrote was removed/);
+  assert.equal(fs.existsSync(s.plist), false);
+  fs.writeFileSync(s.plist, body);
+  await assert.rejects(k.launchdInstall(s.name, s.plist, body, { ...sysOpts, run: systemFake({ bootstrapError: 'Bootstrap failed: 5: Input/output error' }).run }),
+    /stays and loads at the next boot/);
+  assert.equal(fs.existsSync(s.plist), true);
+});
+
+test('FAA-286 item 9: an uninstall naming another label\'s plist is refused', async (t) => {
+  const s = setup(t);
+  const other = label();
+  fs.writeFileSync(s.plist, k.launchdPlist(other, ['/bin/echo'], { workingDirectory: s.dir, stdoutPath: path.join(s.dir, 'l') }));
+  for (const domain of [null, 'system']) {
+    const fake = systemFake({ loaded: [s.name, other] });
+    await assert.rejects(k.launchdUninstall(s.name, s.plist, { run: fake.run, platform: 'darwin', uid: UID, domain, euid: 0, sleep: noSleep }),
+      (err) => err.message.includes(`holds launchd label ${other}, not ${s.name}`));
+    assert.ok(!fake.calls.some((c) => c[1] === 'bootout'));
+  }
+  assert.equal(fs.existsSync(s.plist), true);
+});
+
+test('FAA-286 items 2 and 11: the job agent proves a restricted table by lsof, never a wildcard; a // plist path is the system domain', async (t) => {
+  const http = await import('node:http');
+  const { jobWellKnownOf } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const po = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-peer-owner.mjs');
+  const server = http.createServer((req, res) => res.end(JSON.stringify({ service: { id: 'example-agent', instance: 'default' } })));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const port = server.address().port;
+  const me = process.getuid?.() ?? 501;
+  const restricted = async () => { throw new po.TableUnreadable(`${po.TABLE_RESTRICTED}: netstat printed nothing to this process`); };
+  const ask = (bind) => ({ platform: 'darwin', read: restricted,
+    run: async (file) => (file === po.LSOF ? `p4242\nf3\nn${bind}:${port}\n` : file === po.PS ? `${me}\n` : ''), ownUid: me });
+  const origin = `http://127.0.0.1:${port}`;
+  const doc = await jobWellKnownOf(origin, { jobPid: 4242, jobUid: me, ask: ask('127.0.0.1') });
+  assert.equal(doc?.service?.id, 'example-agent', 'the job pid listening on exactly 127.0.0.1 proves a restricted table');
+  const wildcard = await jobWellKnownOf(origin, { jobPid: 4242, jobUid: me, ask: ask('*') });
+  assert.ok(wildcard instanceof ForeignUserAnswer, 'a wildcard bind is never vouched for');
+  const wrongUid = await jobWellKnownOf(origin, { jobPid: 4242, jobUid: me + 1, ask: ask('127.0.0.1') });
+  assert.ok(wrongUid instanceof ForeignUserAnswer && /runs as uid/.test(wrongUid.reason));
+  assert.equal(k.launchdDomain('//Library/LaunchDaemons/a.b.plist', { platform: 'darwin', uid: UID }), 'system');
+});
+
+test('FAA-286 items 10 and 11: only the root dict is read, a dangling key or a bad reference anywhere is unreadable', async (t) => {
+  const s = setup(t);
+  // a root <array> holding <key>UserName</key> names no UserName, as plistlib reads it
+  const arrayRoot = `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<array>\n\t<key>Label</key>\n\t<string>${s.name}</string>\n\t<key>UserName</key>\n\t<string>agentuser</string>\n</array>\n</plist>\n`;
+  const fake = systemFake();
+  await assert.rejects(k.launchdInstall(s.name, s.plist, arrayRoot, { ...sysOpts, run: fake.run }), /needs UserName/);
+  const whole = s.body('1', { userName: 'agentuser' });
+  const at = whole.lastIndexOf('</dict>');
+  const dangling = `${whole.slice(0, at)}\t<key>Dangling</key>\n${whole.slice(at)}`;
+  await assert.rejects(k.launchdInstall(s.name, s.plist, dangling, { ...sysOpts, run: fake.run }), /needs UserName/);
+  assert.equal(fs.existsSync(s.plist), false, 'nothing written');
+  // a sibling whose bad reference sits in another top-level string, or nested in a value, holds no label: it cannot be
+  // read, as expat refuses the whole file, and the reference is not in the Label the old check read
+  const sibling = path.join(s.dir, 'someone-else.plist');
+  const base = s.body('1', { userName: 'otheruser', environment: { MODE: 'x' } });
+  for (const odd of [base.replace(`<string>${s.dir}</string>`, `<string>&#xD800;${s.dir}</string>`),
+    base.replace('<string>x</string>', '<string>&#x110000;x</string>')]) {
+    assert.notEqual(odd, base);
+    fs.writeFileSync(sibling, odd);
+    const doc = await k.launchdInstall(s.name, s.plist, s.body('1', { userName: 'agentuser' }), { ...sysOpts, run: systemFake().run,
+      fetchJobWellKnown: async () => ({ service: { id: 'example-agent', instance: 'default' } }) });
+    assert.equal(doc.service.id, 'example-agent');
+    fs.rmSync(s.plist);
+  }
 });

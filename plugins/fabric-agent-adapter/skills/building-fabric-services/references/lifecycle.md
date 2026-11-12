@@ -145,27 +145,34 @@ it at boot, before any login, as the account its `UserName` names.
   install requires (without it the job would run as root, which every client refuses); the file goes in
   `/Library/LaunchDaemons/<label>.plist`. A plist there is in the system domain by its path (the folder's case is
   ignored); `domain="system"` (Node: `domain: 'system'`) says so for any path, and an explicit domain wins over the
-  path. Everything else is a LaunchAgent's.
+  path, except that an install refuses a pair launchd would contradict: `domain="system"` with a plist in a
+  `LaunchAgents` folder (launchd also loads that into `gui/<uid>` at login) and `domain="gui"` with a plist in
+  `/Library/LaunchDaemons` (launchd loads it at boot as root). A domain name given as the plist path (`"system"`,
+  `"gui"`) is refused, never read as a relative path (FAA-286). Everything else is a LaunchAgent's.
   `UserName` is the account whose Fabric and agents call the service: clients of another account refuse it (HA-2).
 - **Who runs which step.** The release, the descriptor and the service token are written as the `UserName` (steps 1 and
   2 above, for example with `sudo -u <user> -H`), so they live in that user's home with its modes, and the plist's
   working directory and log paths name that home; only the plist, `launchd_install` and `launchd_uninstall` run as root,
   and at uninstall `remove_descriptor` runs as the `UserName` again. A service moved from a LaunchAgent is uninstalled
-  as one first, so launchd never holds both. The descriptor's `lifecycle.plist` names the path exactly,
+  as one first, so launchd never holds both: the install refuses a plist of the same label left in the `UserName`'s
+  `~/Library/LaunchAgents`, and the probe's `lifecycle.one-copy` fails a label loaded in both domains (FAA-286). The descriptor's `lifecycle.plist` names the path exactly,
   `/Library/LaunchDaemons/<label>.plist`: a host that reads the folder by its spelling then knows the domain too.
 - **The label is the machine's.** `/Library/LaunchDaemons` and the system domain are shared by every account of the
   Mac, so a LaunchDaemon's label is unique on the machine, not per account (put the account in it on a Mac with a
   personal and an organization account); an install refuses, before writing anything, a label another plist holds
   (the one launchd loaded the job from, or any plist of that label in the same folder) and the plist at its path when it
   names another `UserName` or another label; an uninstall refuses a label another plist holds before its `bootout`,
-  which would stop that plist's job, so pass it the label the plist at its path names.
+  which would stop that plist's job, so pass it the label the plist at its path names; in either domain an uninstall
+  refuses a plist at its path that names another label, before its `bootout` (FAA-286).
 - **Root installs and removes it.** `launchd_install` and `launchd_uninstall` in the system domain refuse, before writing
   anything, in a process that is not root, and name the command to run as root (`launchctl bootstrap system <plist>`,
   `launchctl bootout system/<label>`, removing the plist and `launchctl enable system/<label>`, as `launchd_uninstall`
   does). `purge` is refused: the data belongs to the `UserName`, so remove it as that user. Upgrade is the same install
   again as root, so a descriptor's `commands.update` for a LaunchDaemon runs as root, writes the new release (and any
   descriptor it rewrites) as the `UserName` as an install does, and runs only the plist and `launchd_install` as root; a
-  host without root reports it as the operator's. A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
+  host without root reports it as the operator's. Its commands name absolute paths: `~` would be root's home, and the
+  probe's `lifecycle.plist` fails a LaunchDaemon command that starts with `~`, as it fails a LaunchDaemon plist without
+  `UserName` (FAA-286). A host's verbs need root too and keep LC-14 (off stays off, across a boot as well as a login): stop is
   `bootout` + `disable system/<label>`, start is `enable` + `bootstrap system <plist>`, restart is
   `kickstart -k system/<label>`; a host or broker without root reports the job read-only.
 - **Status and pid read without root**: `launchd_loaded(label, "system")` and `launchd_pid(label, "system")` ask
@@ -177,23 +184,32 @@ it at boot, before any login, as the account its `UserName` names.
   that pid accepted, while the pid runs as the `UserName`'s uid (`ps`) and listens on exactly `127.0.0.1` (`lsof -p`);
   an install refuses a `UserName` that is not a short name, no account of the Mac or root, and an origin other than
   `http://127.0.0.1:<port>`, where nothing could prove it. Where the socket table is restricted it accepts a port that
-  pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (CT-261). A `ProgramArguments` wrapper that
+  pid listens on at exactly `127.0.0.1`, the weaker vouch SECURITY.md names (DEC-0155 RT-3). A `ProgramArguments` wrapper that
   starts the server as a child cannot pass either check, and the refusal says so: start the server with `exec`. An
   install refused after its bootstrap leaves the job loaded, and its plist starts it again at boot; the error says so,
-  and as root `launchctl bootout system/<label>` and removing the plist (or `launchd_uninstall`) take it away. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist must live
+  and as root `launchctl bootout system/<label>` and removing the plist (or `launchd_uninstall`) take it away. A
+  bootstrap that fails all five tries removes the plist the call wrote, and names one that was there before, which
+  would load at the next boot (FAA-286). A plist that does not parse is refused as such before anything is written,
+  never as a missing `UserName`; the Node installer refuses a binary plist and reads only the root dict's keys. For hosts and the probe the domain comes from the plist's folder alone, so a LaunchDaemon's plist must live
   in `/Library/LaunchDaemons` even when the installer is given `domain="system"`: the installer neither moves nor checks
   it. A descriptor field for the domain is the contract's CT-234, open.
 - **A contract exception, accepted in principle.** At the pin, HA-2 reads a launch daemon's listener as another
-  account's and nothing it answers as the service's; the contract's later RT-3 vouches only for the caller's own uid. The
+  account's and nothing it answers as the service's; the pin's RT-3 (DEC-0155) vouches only for the caller's own uid. The
   root installer reads its own job's token-free well-known answer anyway, proved by launchd's pid, that pid's uid and its
   bind on exactly `127.0.0.1` (`lsof -p`, never a wildcard), and sends no credential; under a restricted socket table the
-  first proof is the CT-261 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
+  first proof is the RT-3 weaker vouch (the pid listens on the port; that it accepted the connection is not shown). The contract owner accepted this in
   principle as DEC-0161 (RT-3 extended to launchd's system domain, the restricted-table vouch included; proposed, its
   text after its readings), so it stays a departure from the pin until the next repin (FAA-288).
   Every other client keeps HA-2 as written.
 - **Hosts.** A host or broker that reads launchd only in `gui/<uid>` sees a LaunchDaemon as not loaded and must not load
   its plist into `gui/<uid>`. Fabric Dashboards from 0.8.39 takes the domain from the plist's folder and offers no verbs
-  for a system job; the lifecycle broker is still asked (FAA-287).
+  for a system job; the lifecycle broker is still asked (FAA-287). A product with its own launchd reader (a status
+  page's `launchd_pid`, an installer of its own in another language) that asks only `gui/<uid>` reports a LaunchDaemon
+  as not loaded: move that reader to the plist's domain before the product moves to the system domain (FAA-286).
+- **Off macOS the twins differ, on purpose.** Python's `launchd_domain()` answers `gui/<uid>` on Linux (it refuses only
+  Windows), so the kit's launchd tests run on Linux CI against a fake `launchctl`; Node's `launchdDomain()` refuses off
+  `darwin` unless a test passes `platform: 'darwin'`. Neither runs launchd off macOS: install with
+  `systemd_install` / `task_install` there (FAA-286 item 5, recorded rather than aligned).
 
 ## One copy under a supervisor
 

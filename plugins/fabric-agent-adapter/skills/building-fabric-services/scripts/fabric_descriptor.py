@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import hashlib
 import http.server
+import ipaddress
 import json
 import os
 import re
 import socket
 import socketserver
 import subprocess
+import threading
 import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -88,18 +90,100 @@ _NOT_LAUNCHD = ("systemd", "task-scheduler", "node", "person")
 _AUTH_HEADER = re.compile(r"[A-Za-z][A-Za-z0-9-]{0,63}")
 
 
+#: How a loopback server treats the OS account of the process that connected (DEC-0154 HA-2's server side, HA-3;
+#: FAA-227): `refuse` (the default) closes a connection whose peer is another OS account's before reading a byte of
+#: it and serves the rest, labelled; `strict` also refuses a peer whose owner cannot be told and a system account
+#: other than root (uid 0, which can read every account's files and installs a LaunchDaemon); `off` reads no table.
+PEER_CHECKS = ("refuse", "strict", "off")
+
+
+def connection_refusal(owner: Any, mode: str = "refuse") -> Optional[str]:
+    """Why a server refuses the peer `owner` (a fabric_peer_owner.Owner) under `mode`, or None to serve it. The reason
+    is the owner's kind, or for `unknown` its reason; it names no address and nothing the peer sent."""
+    if mode not in PEER_CHECKS:
+        raise ValueError("peer_check must be one of %s" % ", ".join(PEER_CHECKS))
+    if mode == "off" or owner is None:
+        return None
+    kind = getattr(owner, "kind", fabric_peer_owner.UNKNOWN)
+    if kind == fabric_peer_owner.ANOTHER_ACCOUNT:
+        return kind
+    if mode == "strict" and kind != fabric_peer_owner.THIS_ACCOUNT:
+        if kind == fabric_peer_owner.SYSTEM and getattr(owner, "uid", None) == 0:
+            return None
+        return getattr(owner, "reason", None) or kind
+    return None
+
+
+def is_loopback_peer(client_address: Any) -> bool:
+    """Whether an accepted connection's peer address is a loopback one (127.0.0.0/8, ::1, or either IPv4-mapped): the
+    only peers whose owner can be another account of this computer (DEC-0154 HA-2). An address that cannot be read
+    counts as loopback, so its owner is still read from the table."""
+    try:
+        return ipaddress.ip_address(fabric_peer_owner.norm_host(str(client_address[0]))).is_loopback
+    except Exception:
+        return True
+
+
 class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
     """ThreadingHTTPServer for a loopback service: threads are daemons, and the bind asks
     no resolver. HTTPServer.server_bind() calls socket.getfqdn() between bind() and listen();
     on a Mac with a slow resolver the port then stays bound but silent, so a host sees
-    neither an answer nor a refusal."""
+    neither an answer nor a refusal.
+
+    Each accepted connection's peer is told from the computer's socket table (`fabric_peer_owner.peer`) in the
+    connection's own thread, before the handler reads a byte (DEC-0154 HA-2's server side, FAA-227). `peer_check`
+    (`PEER_CHECKS`) decides which owners are closed unread; a served handler finds its peer's owner with
+    `self.server.peer_owner()`. A refusal writes one line to stderr with the owner's kind, uid and pid and nothing the
+    peer sent (`peer_refused`), and counts in `peer_refusals`. The check applies to loopback peers only: a peer at
+    another address (a service bound to 0.0.0.0) is no local account, so its table is not read and it is served under
+    `refuse` and `strict` alike, with `peer_owner()` None."""
 
     daemon_threads = True
+    peer_check = "refuse"
+    #: The reader of an accepted socket's peer; a test replaces it.
+    peer_reader = staticmethod(lambda sock: fabric_peer_owner.peer(sock))
+
+    def __init__(self, server_address: Any, handler: Any, bind_and_activate: bool = True, *,
+                 peer_check: Optional[str] = None) -> None:
+        mode = self.peer_check if peer_check is None else peer_check
+        connection_refusal(None, mode)  # refuses an unknown mode before the port is bound
+        self.peer_check = mode
+        self.peer_refusals = 0
+        self._peer = threading.local()
+        super().__init__(server_address, handler, bind_and_activate)
 
     def server_bind(self) -> None:
         socketserver.TCPServer.server_bind(self)
         host, port = self.server_address[:2]
         self.server_name, self.server_port = host, port
+
+    def peer_owner(self) -> Any:
+        """The owner of the peer this thread's handler serves (None under `peer_check="off"`)."""
+        return getattr(self._peer, "owner", None)
+
+    def finish_request(self, request: Any, client_address: Any) -> None:
+        owner = None
+        if self.peer_check != "off" and is_loopback_peer(client_address):
+            try:
+                owner = self.peer_reader(request)
+            except Exception as exc:  # a reader that fails is an owner nobody can tell, never a crash of the server
+                owner = fabric_peer_owner.Owner(fabric_peer_owner.UNKNOWN, None, None, "none",
+                                                "reader: %s" % type(exc).__name__)
+        reason = connection_refusal(owner, self.peer_check)
+        if reason is not None:
+            self.peer_refusals += 1
+            self.peer_refused(owner, reason)
+            return  # process_request_thread closes the socket unread (shutdown_request)
+        self._peer.owner = owner
+        try:
+            super().finish_request(request, client_address)
+        finally:
+            self._peer.owner = None
+
+    def peer_refused(self, owner: Any, reason: str) -> None:
+        """One line on stderr per refused connection; override to log it elsewhere. Never the peer's bytes."""
+        _sys.stderr.write("fabric: refused a loopback peer (%s, uid %s, pid %s) before reading it (DEC-0154)\n"
+                          % (reason, getattr(owner, "uid", None), getattr(owner, "pid", None)))
 
 
 def descriptor_path(service_id: str, instance: str = "default", directory: Optional[Path] = None) -> Path:

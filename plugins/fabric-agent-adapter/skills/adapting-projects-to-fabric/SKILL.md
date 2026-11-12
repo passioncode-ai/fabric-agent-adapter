@@ -9,9 +9,9 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.80.2"
+  version: "0.81.0"
   contract-version: "0.1.0"
-  contract-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
+  contract-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
 ---
 
 # Adapting projects to Fabric
@@ -84,7 +84,7 @@ Use exactly:
 
 - contract version `0.1.0`;
 - repository `https://github.com/passioncode-ai/fabric-agent-contract`;
-- commit `18f8d48762edc5bfb1433657cbfe1c16196df1a6`.
+- commit `93e7db164c7829e2783b4b7705c4113bb5201131`.
 
 This is the default for new bundles. When checking an issued legacy bundle, preserve its
 explicit supported lock and use that exact clean checkout. Never silently upgrade or
@@ -184,7 +184,9 @@ path, line and kind, never repeating a value, and changes nothing. Then move eac
 instance value into the instance configuration outside the repository, read through a named variable with a neutral
 default and a committed `*.example`; a key into the secret store, named only. Run the check again until it exits 0; it is a floor under the owner's review, not a secret scanner.
 A value already committed stays in Git history: say so; a fresh history is the owner's act (no history rewrite, no
-force-push).
+force-push). Then lay down the source manifest, `fabric.source.json` (DEC-0149): `scripts/adapt_project.py source
+<project-root> --dry-run` proposes it, the author narrows `include` and names each key and store as a slot, and the
+check reads the source under it (the reference, *The source manifest*).
 
 ### 5. Make probes safe and meaningful
 

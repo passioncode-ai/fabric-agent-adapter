@@ -163,6 +163,50 @@ class WithoutPlaywright(unittest.TestCase):
             server.server_close()
         self.assertEqual(seen, [])
 
+    def test_a_raw_loopback_page_opens_only_after_its_listener_is_this_accounts(self):
+        """FAA-260 items 2 and 14 (DEC-0154 PL-3, HA-2): before the browser opens a raw loopback address, the probe
+        reads the port's listener; a port nobody holds, or a probe copied alone, opens nothing."""
+        with tempfile.TemporaryDirectory() as empty:
+            base = Path(empty).resolve()
+            log = base / "opened.txt"
+            stub = base / "node_modules" / "playwright"
+            stub.mkdir(parents=True)
+            (stub / "package.json").write_text('{"name":"playwright","version":"0.0.0-stub","main":"index.js"}')
+            (stub / "index.js").write_text(
+                "const fs = require('fs');\n"
+                "const page = { goto: async (u) => { fs.appendFileSync(process.env.STUB_LOG, u + '\\n'); "
+                "return { ok: () => false, status: () => 599 }; } };\n"
+                "module.exports = { webkit: { launch: async () => ({ close: async () => {}, "
+                "newContext: async () => ({ newPage: async () => page }) }) } };\n")
+            env = dict(os.environ, FABRIC_PLAYWRIGHT="", NODE_PATH="", STUB_LOG=str(log))
+            alone = base / PROBE.name
+            shutil.copy(PROBE, alone)
+            held = socket.socket()
+            held.bind(("127.0.0.1", 0))
+            held.listen(1)
+            try:
+                port = held.getsockname()[1]
+                # a copy alone cannot tell the owner: nothing opens
+                _, report, _ = probe("http://127.0.0.1:%d/" % port, "--playwright", str(base), cwd=str(base), env=env,
+                                     script=alone)
+                self.assertIn("HA-2", json.dumps(report))
+                self.assertFalse(log.exists())
+                # a port nobody holds is not opened either
+                _, report, _ = probe("http://127.0.0.1:%d/" % free_port(), "--playwright", str(base), cwd=str(base),
+                                     env=env)
+                self.assertIn("reads as none", json.dumps(report))
+                self.assertFalse(log.exists())
+                # this account's listener opens (where the table is restricted, the probe says so instead)
+                _, report, _ = probe("http://127.0.0.1:%d/" % port, "--playwright", str(base), cwd=str(base), env=env)
+                opened = log.read_text().split() if log.exists() else []
+                if not opened:
+                    self.assertIn("table-restricted", json.dumps(report))
+                else:
+                    self.assertEqual(opened, ["http://127.0.0.1:%d/" % port])
+                    self.assertIn("HTTP 599", json.dumps(report))
+            finally:
+                held.close()
+
     def test_usage_errors_exit_2(self):
         self.assertEqual(subprocess.run([NODE, str(PROBE)], capture_output=True).returncode, 2)
         self.assertEqual(subprocess.run([NODE, str(PROBE), "x", "--widths", "10"], capture_output=True).returncode, 2)

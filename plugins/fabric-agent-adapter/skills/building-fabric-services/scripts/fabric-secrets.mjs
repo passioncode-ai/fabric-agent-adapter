@@ -38,8 +38,12 @@ export function credentialName(name) {
 
 /** A JWT or JWS anywhere in a value. */
 export const JWT_SHAPE = /eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*/;
-/** A value that says it is a credential, or a provider key's shape. */
-export const SECRET_VALUE = /(^bearer\s.+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})/i;
+/** A value that says it is a credential (`Bearer ` at its start, in any case), or a provider key's shape with its prefix
+ * in its canonical case only, at the start of a value, after a character that is no ASCII letter or digit, or after an
+ * escape; an `sk-` key holds a digit and an upper-case letter with 16 or more characters, or a digit with 32 or more,
+ * within 256 characters (the contract's SECRET_VALUE at the pin, DEC-0151). A match includes its boundary character:
+ * callers test, never read the matched text or its index. */
+export const SECRET_VALUE = /(^[Bb][Ee][Aa][Rr][Ee][Rr]\s.+|(?:^|[^A-Za-z0-9]|%[0-9A-Fa-f]{2}|\\[nrt"']|\\u[0-9A-Fa-f]{4}|\\x[0-9A-Fa-f]{2}|\\[bfv0ae]|\\[0-7]{1,3}|%25[0-9A-Fa-f]{2}|\x1b\[[0-9;:]*m|(?:\\u001[bB]|\\x1[bB]|\\e|\\033|\\33)\[[0-9;:]*m)(?:sk-(?=[A-Za-z0-9_-]{0,255}?\d)(?:(?=[A-Za-z0-9_-]{0,255}?[A-Z])[A-Za-z0-9_-]{16,}|[A-Za-z0-9_-]{32,})|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}))/;
 const LONG_RUN = /[A-Za-z0-9+/=_-]{40,}/g;
 export const longSecret = (value) => (value.match(LONG_RUN) ?? []).some((run) => /[a-z]/.test(run) && /[A-Z]/.test(run) && /[0-9]/.test(run));
 
@@ -91,7 +95,10 @@ export function secretUrl(value) {
 const REPOSITORY_URI = /^([A-Za-z][A-Za-z0-9+.-]*:(?:\/\/[^/?#]*)?)([^?#]*)([\s\S]*)$/;
 const REPOSITORY_NAME = /^(?:[a-z0-9._-]+|[A-Za-z._-]+)$/; // lower case, or letters with no digit (readings 8)
 const REPOSITORY_AUTHORITY = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
-const KEY_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))(?:${SECRET_VALUE.source})`, 'i');
+// A repository name's own key shapes, boundary-free and case-sensitive (DEC-0151): SECRET_VALUE takes a consuming
+// boundary, so composed after a separator look-behind it would miss a key after `-`, `.` or `_`.
+const REPOSITORY_KEYS = 'sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}';
+const KEY_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))(?:${REPOSITORY_KEYS})`);
 const JWT_AT_A_WORD = new RegExp(`(?:^|(?<=[._-]))${JWT_SHAPE.source}`);
 const SPECIAL_QUERY = /^(?:https?|wss?|ftp|file):/i; // whose query also encodes `'`, as the URL standard does
 

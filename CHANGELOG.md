@@ -1,5 +1,84 @@
 # Changelog
 
+## 0.81.0 (2026-11-12)
+
+Wave 3 of the backlog sweep of 2026-11-12. **The contract pin moves to `93e7db16` (`v0.1.0+2026-11-08.1`)**: DEC-0149
+(`fabric-source/1`), CT-254 (HA-2's Linux source, the hybrid the kit already read), DEC-0151, DEC-0152, DEC-0155.
+Bundles pinned at `18f8d487` stay valid (FAA-258; impact map `docs/evidence/specs/2026-11-12-faa-258-repin-93e7db16-impact-map.md`).
+New kit modules: `fabric_holds` and `fabric-holds.mjs`. Kit modules change: `fabric_secrets`, `fabric_protocols`,
+`fabric_peer_owner` (`1.2.0+kit.5`), `fabric_package`, `fabric_descriptor`, `fabric_http`, `fabric_supervisors`, the
+facade `fabric_service`, and their Node twins.
+
+### Added
+
+- **`npx @passioncode-ai/fabric-agent-adapter new <folder> --id <agent-id> [--profile ...] [--service]`** (North Star G21,
+  FAA-270), and `new_agent.py` behind it: one command creates an agent project with the contract built in: the bundle
+  pinned at the contract, `fabric.source.json`, a placement guard reading Observatory's `observatory-placement/1` record
+  with its tests, and with `--service` the service kit's sample (its modules copied by `fabric_kit.py install`).
+  Idempotent, refuses a folder holding other files without `--force`, JSON last. It needs Python 3.9 or later on the
+  machine. Turning a sentence into an agent (`new "<sentence>"`, `test`) stays FAA-26, waiting on Fabric's
+  `fabric.agent.create`.
+- **`fabric.source.json` (DEC-0149, `fabric-source/1`)** (FAA-261): `fabric_source_tree.py` ports the contract's source
+  rules and matches all 140 of its vendored vectors; `fabric_source_check.py check` reads the source a manifest names,
+  by path, line and column, never the value; `adapt_project.py source` lays the manifest down with the kit's slots
+  (`PUBLISHER_URI` behind the `createdBy` sentinel, `PLACEMENT_RECORD`, and for a service `SUPERVISOR_LABEL` and
+  `SERVICE_PORT`; FAA-188's part 2); `pack` writes `secrets[]` and `state[]` from the slots, and FAC-SEM-160 refuses a
+  package that differs.
+- **Work held by a service's own limits** (FAA-298): new kit modules `fabric_holds` and `fabric-holds.mjs` (L3). A held
+  job says why it waits in `statusMessage` with the contract's pause grammar (the job schema is closed); the operator gets
+  one push per hold, and the answer is recorded as a scoped lift that falls back when its window ends; a new probe rule
+  `limits.holds`.
+- **Agent template folders** (FAA-265): five JSON Schemas and `template_check.py` in creating-fabric-agents; the
+  communication agent template moved into `templates/communication-agent/` with its manifest, connections, access, data
+  rooms, checks, assembly and changelog; `validate.py` checks every shipped template folder.
+
+### Changed
+
+- The probe's `limits.holds` reads a service that declares limits but does not use `fabric_holds` as NOT_RUN with a
+  migration note, not FAIL, and counts only code files (a vendored `check_service_rules.py` and docs naming `HoldBook`
+  no longer pass it). `LoopbackHTTPServer` and `loopbackServer` read the socket table only for a loopback peer: a peer
+  at another address (a `0.0.0.0` bind) is served with no owner under `refuse` and `strict` (the 0.81.0 seam reading).
+- **A kit service refuses a loopback peer of another OS account before it reads the request** (DEC-0154 HA-2 and HA-3,
+  FAA-227): `LoopbackHTTPServer` takes `peer_check` and Node's new `loopbackServer(httpServer, {peerCheck})` holds each
+  connection paused until the check passes; `refuse` (the default) closes another account's peer and serves the rest,
+  `strict` also refuses an owner it cannot tell, `off` reads nothing.
+- `fabric_http` and `fabric-http.mjs` check plain http that reaches loopback by its connected address, `insecure=True` and
+  a loopback proxy included (FAA-260). The probe times the well-known answer after the owner check, fails a deeply
+  nested body cleanly, compares port claims as ports (`:08080` is `:8080`), names the listener on a failed connect, and
+  no longer stops on a well-known body that is not an object; the layout probe opens a loopback page only after its
+  listener is this account's (FAA-260).
+- The dashboard link gate opens a raw loopback address in a browser only when `listener_owner` is `this-account` as
+  well as the host `not_installed` (FAA-251).
+- LaunchDaemon installs and uninstalls refuse contradicting domains, leftover LaunchAgents, another label's plist and an
+  unparseable or binary plist, and remove a plist a failed bootstrap wrote; the probe fails a LaunchDaemon without
+  `UserName`, with a `~` command, or loaded in both domains (FAA-286).
+- **The kit's credential detector is the contract's DEC-0151 `SECRET_VALUE`**, in both twins and the three dashboard
+  link checkers: a provider prefix counts only in its canonical case and after a boundary; an `sk-` key needs a digit and
+  an upper-case letter (16 characters or more) or a digit (32 or more), so `SK-...`, `sk-learn-...` and an `sk-` inside a
+  word are no longer keys. Repository names keep their own boundary-free key shapes, as DEC-0151 asks (FAA-258).
+- `fabric_protocols` lists `fabric-source/1`; `fabric_peer_owner` is `1.2.0+kit.5`, one version line with Observatory's
+  1.2.0, the Linux reading unchanged (FAA-258).
+- Every vendored contract vector is regenerated at the new pin with the contract's own generators;
+  `make_load_vectors.mjs` reads the pin from the lock file. SECURITY.md, lifecycle.md and protocol.md name DEC-0155 RT-3
+  for the vouch; SA-6 (DEC-0152) is the accepted board rule (FAA-258).
+
+### Fixed
+
+- `fabric_source_check.py` refuses a copy without `fabric_source_tree.py` with exit 2 and the file's name, not a
+  traceback and exit 1; `pack` (both kits) refuses by name a hand-written `secrets[]` naming a secret `fabric.source.json`
+  has no slot for, instead of dropping it (the 0.81.0 seam reading). The Windows job runs the loopback peer check.
+
+### Upgrading
+
+- A door that gave T0 because `strict` served the peer must also check that the peer's owner is named
+  (`peer_owner()` / `connectionOwner`): a peer off loopback has none and is T2. A folder whose `fabric.package.json`
+  names secrets its `fabric.source.json` lacks fails `pack` until they are added as `secret` slots.
+- A service that serves loopback HTTP keeps serving its own account's callers; pass `peer_check="strict"` to refuse an
+  owner the table cannot tell. A caller of the dashboard link gate passes `listener_owner`. An outside test that runs
+  this checkout's probe needs a readable socket table.
+- A service that vendors the kit takes the changed `fabric_secrets`, `fabric_protocols` and `fabric_peer_owner` with
+  `fabric_kit.py install`. A string the 0.80 detector called a key may no longer be one (see Changed).
+
 ## 0.80.2 (2026-11-12)
 
 0.80.1 was tagged and never published: its `windows` job (run 43212508702) failed one test, so `release` and `publish`

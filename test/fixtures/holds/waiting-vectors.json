@@ -1,0 +1,34 @@
+{
+  "about": "FAA-298: a held job's statusMessage in the pause grammar and its reading, the same in both kit twins (fabric_holds.py, fabric-holds.mjs).",
+  "write": [
+    {"input": {"reason": "daily-quota", "since": "2026-11-12T09:00:00Z", "until": "2026-11-13T00:00:00Z", "message": "100 of 100 renders today"},
+     "statusMessage": "quota-exhausted until 2026-11-13T00:00:00Z: waiting daily-quota since 2026-11-12T09:00:00Z: 100 of 100 renders today"},
+    {"input": {"reason": "concurrency", "since": "2026-11-12T09:00:00.250Z"},
+     "statusMessage": "quota-exhausted: waiting concurrency since 2026-11-12T09:00:00.250Z"},
+    {"input": {"reason": "money", "since": "2026-11-12T09:00:00Z", "message": "  the month's   USD 100 is spent  "},
+     "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z: the month's USD 100 is spent"},
+    {"input": {"reason": "caller-share", "since": "2026-11-12T09:00:00Z", "until": "2026-11-12T10:00:00Z", "message": ""},
+     "statusMessage": "quota-exhausted until 2026-11-12T10:00:00Z: waiting caller-share since 2026-11-12T09:00:00Z"}
+  ],
+  "refuse": [
+    {"reason": "rate", "since": "2026-11-12T09:00:00Z"},
+    {"reason": "money", "since": "2026-11-12 09:00:00Z"},
+    {"reason": "money", "since": "2026-11-12T09:00:00Z", "until": "2026-11-12T10:00:00+01:00"},
+    {"reason": "money", "since": "2026-02-30T09:00:00Z"}
+  ],
+  "read": [
+    {"answer": {"job": {"id": "j1", "status": "working", "statusMessage": "quota-exhausted until 2026-11-13T00:00:00Z: waiting daily-quota since 2026-11-12T09:00:00Z: 100 of 100 renders today"}},
+     "waiting": {"reason": "daily-quota", "since": "2026-11-12T09:00:00Z", "until": "2026-11-13T00:00:00Z", "message": "100 of 100 renders today"}},
+    {"answer": {"job": {"id": "j1", "status": "working", "statusMessage": "quota-exhausted: waiting concurrency since 2026-11-12T09:00:00.250Z"}},
+     "waiting": {"reason": "concurrency", "since": "2026-11-12T09:00:00.250Z"}},
+    {"answer": {"job": {"id": "j1", "status": "working", "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z: note: a colon inside"}},
+     "waiting": {"reason": "money", "since": "2026-11-12T09:00:00Z", "message": "note: a colon inside"}},
+    {"answer": {"job": {"id": "j1", "status": "working", "statusMessage": "quota-exhausted until 2026-11-13T00:00:00Z: the provider's quota"}}, "waiting": null},
+    {"answer": {"job": {"id": "j1", "status": "working", "statusMessage": "quota-exhausted: waiting rate since 2026-11-12T09:00:00Z"}}, "waiting": null},
+    {"answer": {"job": {"id": "j1", "status": "working", "statusMessage": "quota-exhausted: waiting money since 2026-02-30T09:00:00Z"}}, "waiting": null},
+    {"answer": {"job": {"id": "j1", "status": "working", "statusMessage": "queued 2 of 5"}}, "waiting": null},
+    {"answer": {"job": {"id": "j1", "status": "completed", "statusMessage": "quota-exhausted: waiting money since 2026-11-12T09:00:00Z"}}, "waiting": null},
+    {"answer": {"job": {"id": "j1", "status": "working"}}, "waiting": null},
+    {"answer": "not an answer", "waiting": null}
+  ]
+}

@@ -12,9 +12,9 @@ import { tempDir } from './temp-dir.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/kit-hostile-inputs-core.json'), 'utf8'));
 
-// {"fakeKey": prefix} becomes prefix + "sk-" + 24 "q" (a key-shaped value made here, never stored in the fixture).
+// {"fakeKey": prefix} becomes prefix + "sk-" + "Q1" + 22 "q" (a digit and an upper-case letter: a key under DEC-0151) (a key-shaped value made here, never stored in the fixture).
 const built = (value) => {
-  if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 1 && 'fakeKey' in value) return `${value.fakeKey}${'s'}${'k-'}${'q'.repeat(24)}`;
+  if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 1 && 'fakeKey' in value) return `${value.fakeKey}${'s'}${'k-'}${'Q1'}${'q'.repeat(22)}`;
   if (Array.isArray(value)) return value.map(built);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, v]) => [key, built(v)]));
   return value;

@@ -1,0 +1,32 @@
+{
+  "template": "communication-agent",
+  "version": "1.0.0",
+  "contract": {
+    "service": {"name": "fabric-service/0.1", "home": "fabric-agent-contract", "checked_against": "0.1.0",
+                "extensions": ["channel-agent"]},
+    "interop": {"name": "fabric-interop/0.1", "home": "fabric-agent-contract", "checked_against": "0.1.0"}
+  },
+  "doors": [
+    {"tool": "the agent's own capabilities as MCP tools", "effect": "read", "notes": "named per organization in assembly"},
+    {"surface": "/fabric/v1/events", "effect": "read", "notes": "support.quality_daily and the agent's own kinds (prompt section 5)"},
+    {"surface": "usage report", "effect": "read", "notes": "cost per provider and model, every limit in its budgets"}
+  ],
+  "models": {
+    "triage": "the strongest open-vendor planning model, reasoning effort low",
+    "plan_and_draft": "the same planning model, one call with the whole context",
+    "final_pass": "the planning model, only when an action returned new facts or an injection is suspected",
+    "checker": "an open-vendor model of another vendor than the drafter",
+    "research": "the planning model at a higher effort, or an open-vendor model that wins on the replay set",
+    "judge": "an open-vendor model of another vendor than the writers and the checkers",
+    "rule": "every lane that reads what people wrote runs only on open-vendor models, its fallbacks included (prompt rule 6)"
+  },
+  "dashboard": {"opens_in": "Fabric Dashboards", "pages": ["/dashboard"]},
+  "budget": {"monthly_usd_default": 100, "stop_in_code": "just under the key's limit, window month",
+             "evals": "judge_budget_usd and replay_budget_usd above 0 in the channel-agent declaration"},
+  "events": ["support.quality_daily", "answer.cited", "support.handed_off", "support.diagnosed", "knowledge.learned",
+             "knowledge.retracted", "support.tickets_daily"],
+  "variants": {
+    "local": {"placement": {"per": "organization, machine or project", "where": ["own machine"]}},
+    "cloud": {"placement": {"per": "organization, machine or project", "where": ["cloud"]}}
+  }
+}

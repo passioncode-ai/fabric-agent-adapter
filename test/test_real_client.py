@@ -4,10 +4,12 @@ Opt-in (FABRIC_REAL_CLIENT=1, and `claude` on PATH). SDK-level tests cannot see 
 client refuses: Claude Code 2.1.285 opens with `initialize`, which the kit once answered with
 -32601, and a client may refuse a whole tools/list over one outputSchema. The CLI runs in a
 throwaway directory with --strict-mcp-config and a temporary config (mode 600, the token in a
-header); it is stopped as soon as it has printed its init event, before any model call. The
-operator's own Claude Code configuration is never read or written.
+header) written only after the probe's listener.owner reads the port as this OS account's (DEC-0154 HA-2); it is
+stopped as soon as it has printed its init event, before any model call. The operator's own Claude Code
+configuration is never read or written.
 """
 
+import importlib
 import json
 import os
 from pathlib import Path
@@ -50,6 +52,13 @@ class RealClientTests(unittest.TestCase):
                         time.sleep(0.1)
                 subprocess.run([sys.executable, str(SCRIPTS / "sample_service.py"), "register", "--port", str(port),
                                 "--data-dir", str(data), "--services-dir", str(services)], check=True, capture_output=True)
+                # DEC-0154 HA-2 (FAA-260 item 4): the token goes into a client config only for a port this OS account's
+                # process holds, as surfaces-and-auth.md asks of every mcp.json writer.
+                sys.path.insert(0, str(SCRIPTS))
+                verdict, evidence = importlib.import_module("check_service_rules").listener_owner_verdict(port)
+                if verdict != "PASS" and "table-restricted" in evidence:
+                    self.skipTest("NOT_RUN: this interpreter sees a restricted socket table (%s)" % evidence)
+                self.assertEqual(verdict, "PASS", evidence)
                 config = work / "mcp.json"
                 fd = os.open(str(config), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(fd, "w") as handle:

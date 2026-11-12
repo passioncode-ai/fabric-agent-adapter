@@ -59,7 +59,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L0 | `fabric_time` | strict RFC 3339, UTC days, formatting, day windows, the clock ([dates](#dates-and-times)) |
 | L0 | `fabric_identifiers` | identifier equality by normal form (DEC-0076) |
 | L0 | `fabric_secrets` | the contract's one credential detector (DEC-0044) |
-| L0 | `fabric_peer_owner` | which OS account owns each end of a loopback connection, from the computer's socket table (DEC-0154 HA-2, FAA-226): `listener`, `server_end`, `peer`, `CheckedHTTPConnection`; the Python file is Project Observatory's `peer_owner.py` 1.1.0 vendored from commit `f86f0622` with the readings its header names (`1.1.0+kit.4`), the Node twin reads netstat, `/proc` and the owner SID where Python reads `sysctl`, `/proc` and `GetExtendedTcpTable`; on a restricted macOS table (FAA-267) a caller may vouch with a pid it started, proved by `lsof -p` |
+| L0 | `fabric_peer_owner` | which OS account owns each end of a loopback connection, from the computer's socket table (DEC-0154 HA-2, FAA-226): `listener`, `server_end`, `peer`, `CheckedHTTPConnection`; the Python file is Project Observatory's `peer_owner.py`, vendored from commit `f86f0622` (1.1.0) and read against `2180235c` (1.2.0, whose Linux rule it carries), with the readings its header names (`1.2.0+kit.5`; Observatory's 1.3.x libproc proof is FAA-292), the Node twin reads netstat, `/proc` and the owner SID where Python reads `sysctl`, `/proc` and `GetExtendedTcpTable`; on a restricted macOS table (FAA-267) a caller may vouch with a pid it started, proved by `lsof -p` |
 | L0 | `fabric_tailnet` | who calls an agent behind `tailscale serve` and what that person may open (FAA-297): `Tailscale-User-Login` only on the agent's own serve listener from a loopback peer, groups from a generated `tailnet-perimeter/1` file, a personal SHA-256-stored key for MCP no wider than the groups; `authorize`, `load_perimeter`, `load_keys`, `hash_key`, refusals 401/403 with a code ([surfaces-and-auth.md](surfaces-and-auth.md#behind-tailscale-serve)) |
 | L1 | `fabric_crypto` | Ed25519 signing (a Montgomery ladder that does not branch on the key) and verification, P-256 verification, base64url, sha256 |
 | L1 | `fabric_base` | the protocol name, `ServiceError`, small shared helpers |
@@ -82,7 +82,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_lock` | the instance lock and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |
-| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document |
+| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document, the loopback HTTP server that refuses another OS account's peer before reading it (`LoopbackHTTPServer`, Node `loopbackServer`; FAA-227) |
 | L3 | `fabric_context` | one instance per context (FAA-125, N-11): a context's instance, folders, descriptor, lock and marker; not in the facade, installed with `--module fabric_context` ([contexts](estate-record.md#one-instance-per-context-the-helper)) |
 | L3 | `fabric_auth` | the token, the network guard, login codes |
 | L3 | `fabric_events` | events, paging, the JSONL event log (DEC-0029) |
@@ -92,6 +92,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_profiles` | runner and model profiles ([profiles](profiles.md)) |
 | L3 | `fabric_interop_rules` | `fabric-interop/0.1` rules without a service: constants, `InteropError`, trace context, job limits (DEC-0087; FAA-92), a job's approval step under the mandate (`job_step`, C3.3) |
 | L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools; re-exports the rule layer ([interop](interop.md)) |
+| L3 | `fabric_holds` | work a service holds by its own limits (FAA-298): the held job's `statusMessage` in the pause grammar (`waiting_message`, `read_waiting`, `hold_job`), one push per hold and the operator's scoped lift (`HoldBook`: `hold`, `release`, `lift`, `admit`, `limit`) ([interop](interop.md#work-held-by-the-services-own-limits)) |
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
 | L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data, and the operator's mandate a request carries (FAA-135, imports `fabric_mandate` and `fabric_interop_rules` for the FAA-139 reading) |

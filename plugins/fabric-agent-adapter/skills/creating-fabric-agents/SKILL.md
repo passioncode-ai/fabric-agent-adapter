@@ -9,9 +9,9 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.80.2"
+  version: "0.81.0"
   contract-version: "0.1.0"
-  contract-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
+  contract-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
 ---
 
 # Creating Fabric-compatible agents
@@ -116,9 +116,12 @@ prior art of its own:
   calling other agents, stops for a person, learning loops, the loop guard.
 - [agents-that-answer-people.md](references/agents-that-answer-people.md): what an agent that
   answers people carries from its first release, each part with the check that proves it.
-- [communication-agent-template.md](references/communication-agent-template.md): the template prompt
-  for an agent that talks with people on a channel (support, sales and leads, community, inbox, reviews): the measured
-  inbound pipeline, business patterns, knowledge, the learning loop and acceptance.
+- [communication-agent-template.md](references/communication-agent-template.md): how to use the template
+  for an agent that talks with people on a channel (support, sales and leads, community, inbox, reviews); its prompt
+  (the measured inbound pipeline, business patterns, knowledge, the learning loop and acceptance) is the folder
+  `templates/communication-agent/`.
+- [agent-templates.md](references/agent-templates.md): a template folder for a kind of agent, its schema and
+  `scripts/template_check.py`, which a template passes before it is done.
 
 ## Step 2: the project skeleton
 
@@ -159,6 +162,9 @@ run it with the owner's list of their own strings, or record that none was given
 
 ## Step 3: scaffold the provider bundle
 
+For a project that does not exist yet, one command writes this step's bundle with the source manifest and the
+placement guard: `npx @passioncode-ai/fabric-agent-adapter new <folder> --id <agent-id>` ([new-agent.md](references/new-agent.md)).
+
 Reuse the sibling skill's scaffolder against the new skeleton with the profile chosen at
 step 0:
 
@@ -171,10 +177,14 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/adapt_project.py
   [--idempotency required|supported|none] [--cost-preset <id> <max-usd> "<label>" ... --default-cost-preset <id>]
 ```
 
+The source manifest comes with the bundle: `adapt_project.py source <project-root>` lays down `fabric.source.json`
+(DEC-0149) with the kit's slots, and the source check reads the source under it ([the source and the
+instance](references/source-and-instance.md), *The source manifest*).
+
 The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
 does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
 
-Pin exactly contract `0.1.0` at commit `18f8d48762edc5bfb1433657cbfe1c16196df1a6` and
+Pin exactly contract `0.1.0` at commit `93e7db164c7829e2783b4b7705c4113bb5201131` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check

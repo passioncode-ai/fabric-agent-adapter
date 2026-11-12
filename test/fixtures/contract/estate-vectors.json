@@ -40329,7 +40329,7 @@
             "secrets": [
               {
                 "agentRef": "urn:fabric:agent:example:inbox-digest",
-                "slot": "GHP_EXAMPLE0SLOT0NAME0NOT0A0TOKEN000000",
+                "slot": "AKIAEXAMPLE0SLOT0NAME0NOT0A0KEY0000",
                 "from": "m-4c1e"
               }
             ]
@@ -40428,7 +40428,7 @@
           }
         ],
         "revocations": [],
-        "digest": "sha256:5f319110808d50ee024b673345d6960afa5733888e8e7cd15f5b9cd9b7312a30",
+        "digest": "sha256:1ba4ce303aa5f332f6391d6a88291d7dc8e6f4361a374e6426b67eaeb9e5bd2f",
         "signature": {
           "format": "webauthn-assertion",
           "credentialId": "0nGFzb4RDddKfO7TtqkdYA",

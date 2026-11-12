@@ -9,10 +9,10 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional.
 metadata:
   author: PassionCode.ai
-  version: "0.80.2"
+  version: "0.81.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "18f8d48762edc5bfb1433657cbfe1c16196df1a6"
+  extension-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
 ---
 
 # Building Fabric services
@@ -82,7 +82,9 @@ MCP registration into a client config, the login flow or the CSRF header.
 When other agents or Fabric call the service over MCP, it follows `fabric-interop/0.1`:
 each manifest capability is the tool of its name, long work is a job with a stable id,
 a question for a person is an elicitation, and every call carries one trace. A job a limit stops or pauses, and an
-effect nobody saw, have their own codes and a key per caller (DEC-0087). Read
+effect nobody saw, have their own codes and a key per caller (DEC-0087); work held by the service's own limits is
+said on the job, pushed to the operator once per hold and lifted by their scoped answer (`scripts/fabric_holds.py`,
+FAA-298). Read
 [the interop reference](references/interop.md) before writing an MCP tool; the helpers
 are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
 [`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs). When the callers are agents of the estate, the

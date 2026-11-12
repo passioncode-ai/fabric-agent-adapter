@@ -388,6 +388,60 @@ test('both kits pack and sign the same folder to the same bytes', { skip: !hasPy
   assert.equal(pyRefusal.stdout.trim(), lines.join('\n'));
 });
 
+test('FAA-261: pack writes secrets[] and state[] from fabric.source.json, as the Python kit does', (t) => {
+  const dir = tempDir(t);
+  const source = { format: 'fabric-source/1', include: ['lib/', 'bin/', 'skills/', 'evals/'], slots: [
+    { name: 'MAIL_OAUTH', kind: 'secret', purpose: 'Reads the mailbox the digest summarises' },
+    { name: 'BOARD_TOKEN', kind: 'secret', purpose: 'Posts to the board', optional: true },
+    { name: 'DIGESTS', kind: 'store', purpose: 'Digests already written', path: 'digests' },
+    { name: 'SUPERVISOR_LABEL', kind: 'config', purpose: "This installation's launchd label" }] };
+  const make = (name) => {
+    const root = path.join(dir, name);
+    fs.mkdirSync(root);
+    writeAgent(root, { secrets: [{ name: 'MAIL_OAUTH', purpose: 'an older purpose, rewritten from the source' }] });
+    fs.writeFileSync(path.join(root, k.SOURCE_FILE), JSON.stringify(source));
+    return root;
+  };
+  const node = make('node');
+  const answer = k.pack(node, { apply: true });
+  assert.ok(answer.ok, JSON.stringify(answer.problems));
+  assert.ok(answer.notes.includes('secrets[] and state[] written from fabric.source.json'));
+  const pkg = readPkg(node);
+  assert.deepEqual(pkg.secrets, [{ name: 'MAIL_OAUTH', purpose: 'Reads the mailbox the digest summarises' }, { name: 'BOARD_TOKEN', purpose: 'Posts to the board', optional: true }]);
+  assert.deepEqual(pkg.state, [{ path: 'digests', purpose: 'Digests already written' }]);
+  delete pkg.secrets[1].optional;
+  assert.deepEqual(k.sourcePackageFindings(source, pkg).map((f) => f.instancePath), ['/package/secrets/1/optional']);
+  if (hasPython) {
+    const py = make('py');
+    const r = spawnSync('python3', [path.join(scripts, 'fabric_package.py'), 'pack', py, '--apply'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.equal(fs.readFileSync(path.join(py, k.PACKAGE_FILE), 'utf8'), fs.readFileSync(path.join(node, k.PACKAGE_FILE), 'utf8'));
+  }
+  // 0.81.0 seam reading: a hand-written secrets[] the manifest lacks a slot for is never dropped; pack refuses
+  writeAgent(node, { secrets: [{ name: 'MAIL_OAUTH', purpose: 'p' }, { name: 'OTHER_KEY', purpose: 'q' }, { name: 'THIRD_KEY', purpose: 'r' }] });
+  const refused = k.pack(node, { apply: true });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.applied, false);
+  assert.deepEqual([refused.problems[0].rule, refused.problems[0].instancePath], ['source', '/secrets']);
+  assert.ok(refused.problems[0].message.includes('OTHER_KEY, THIRD_KEY'));
+  assert.ok(!refused.problems[0].message.includes('MAIL_OAUTH'));
+  assert.deepEqual(refused.package.secrets.map((s) => s.name), ['MAIL_OAUTH', 'OTHER_KEY', 'THIRD_KEY']);
+  assert.equal(readPkg(node).secrets[1].name, 'OTHER_KEY');
+  if (hasPython) {
+    const r = spawnSync('python3', [path.join(scripts, 'fabric_package.py'), 'pack', node], { encoding: 'utf8' });
+    const { package: _p, ...pyAnswer } = JSON.parse(r.stdout);
+    const { package: _q, ...nodeAnswer } = refused;
+    assert.deepEqual(pyAnswer, nodeAnswer, 'the same refusal from both twins');
+  }
+  fs.writeFileSync(path.join(node, k.SOURCE_FILE), JSON.stringify({ ...source, slots: source.slots.filter((s) => s.kind !== 'secret') }));
+  assert.ok(k.pack(node).problems[0].message.includes('MAIL_OAUTH, OTHER_KEY, THIRD_KEY'));
+  fs.writeFileSync(path.join(node, k.SOURCE_FILE), JSON.stringify(source));
+  writeAgent(node, { state: [] });
+  assert.deepEqual(k.pack(node).package.state, []);
+  fs.writeFileSync(path.join(node, k.SOURCE_FILE), JSON.stringify({ format: 'fabric-source/2', include: ['lib/'] }));
+  assert.throws(() => k.pack(node), /not a fabric-source\/1 manifest/);
+});
+
 test('FAA-91: a folder swapped for a link while its files are read, and swapped back before the walk ends, is refused', (t) => {
   // Node has no openat: readFolder lists a folder by its path. A swap that lasts while a file is opened, and is undone
   // before the folder's closing check, used to read the file through the link; the folder is now checked after each read.

@@ -22,6 +22,7 @@ import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
 from fabric_secrets import ascii_decoded, repository_name, secret_argument  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
+import fabric_supervisors as _sup  # noqa: E402 - where a LaunchDaemon's plist lives (FAA-278)
 import socket  # noqa: E402
 
 
@@ -47,7 +48,17 @@ def listener_owner_verdict(port: int) -> Tuple[str, str]:
     except ConnectionRefusedError:
         return "NOT_RUN", "nothing listens on %s (down)" % where
     except OSError as exc:  # a full backlog, a timeout: the well-known rule reports what answers, each call checked
-        return "NOT_RUN", "could not connect to %s to tell its owner (%s)" % (where, type(exc).__name__)
+        # The listener table still names who holds the port (0.74.0 product reading 10, FAA-260 item 12): another
+        # account's or root's listener is foreign-user without a connection; any other owner is named beside NOT_RUN.
+        held = po.listener(port)
+        if held.kind in (po.ANOTHER_ACCOUNT, po.SYSTEM):
+            why = "another OS account's process" if held.kind == po.ANOTHER_ACCOUNT else "a system account's process"
+            return "FAIL", ("foreign-user: %s is listened on by %s (its listener read by %s; the connect failed with %s); "
+                            "no credential was sent and nothing it answers is read as this service's"
+                            % (where, why, held.method, type(exc).__name__))
+        named = held.kind if held.kind != po.UNKNOWN else "unknown (%s)" % held.reason
+        return "NOT_RUN", "could not connect to %s to tell its owner (%s); its listener reads as %s" % (
+            where, type(exc).__name__, named)
     try:
         owner = po.server_end(sock)
     finally:
@@ -59,6 +70,39 @@ def listener_owner_verdict(port: int) -> Tuple[str, str]:
         owner.kind, "a process whose owner cannot be told (%s)" % owner.reason)
     return "FAIL", ("foreign-user: %s is held by %s (read by %s); no credential was sent and nothing it answers is read "
                     "as this service's" % (where, why, owner.method))
+
+def port_claim_verdict(path: Path, d: Dict[str, Any], directory: Path, port: int, remote: bool) -> Tuple[str, str]:
+    """`descriptor.port-claim`: (verdict, evidence). Another descriptor here declares this `id.instance`, or a local
+    origin on the same port, compared by the port as the writers refuse it, so `:08080` beside `:8080` is one port
+    (0.74.0 seam reading 10, FAA-260)."""
+    me = "%s.%s" % (d.get("id"), d.get("instance", "default"))
+    clashes = []
+    for other_path, other in fs.read_descriptors(directory):
+        key = "%s.%s" % (other.get("id"), other.get("instance", "default"))
+        if other_path.resolve() == path.resolve():
+            continue
+        if key == me:
+            clashes.append("%s declared again in %s" % (me, other_path.name))
+        # DEC-0069: a descriptor without an origin (an app's) claims no port, so two of them never clash.
+        elif not remote and "origin" in d and fs.placement_of(other) != "remote" and port and _port_or_none(
+                other.get("origin")) == port:
+            clashes.append("port %d also claimed by %s" % (port, key))
+    if remote:
+        unique = "a remote origin claims no port here"
+    elif "origin" not in d:
+        unique = "an app's descriptor names no origin, so it claims no port (FAC-SEM-010)"
+    else:
+        unique = "no other descriptor here declares port %d (HA-1's claim on the computer is FAA-225)" % port
+    return ("FAIL" if clashes else "PASS"), ("; ".join(clashes) or unique)
+
+
+def _port_or_none(origin: Any) -> Optional[int]:
+    """The port a local origin claims, or None for an origin the descriptor rules refuse (descriptor.valid names it)."""
+    try:
+        return fs.port_of(str(origin))
+    except fs.ServiceError:
+        return None
+
 
 _LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, never a user before an `@`
 _SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path
@@ -91,9 +135,37 @@ import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
 
 
-def plist_problems(plist: dict, label: object, token: object = None) -> list:
-    """What makes a service's launchd job unfit to stay up: identity, restart, secrets."""
+def other_domain_copy(label: object, domain: str) -> Optional[str]:
+    """The other launchd domain when it also has job `label` loaded, a second copy (FAA-286 item 6), else None."""
+    other = ("gui/%d" % getattr(os, "getuid", lambda: 0)()) if domain == "system" else "system"
+    try:
+        out = subprocess.run(["launchctl", "print", "%s/%s" % (other, label)], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return other if out.returncode == 0 else None
+
+
+def in_launch_daemons(plist_path: Path) -> bool:
+    """Whether a plist sits in /Library/LaunchDaemons, where launchd loads it at boot as a LaunchDaemon (FAA-278)."""
+    folder = re.sub(r"^/{2,}", "/", str(Path(os.path.abspath(str(plist_path))).parent))
+    return folder.lower() == str(_sup.SYSTEM_DAEMONS).lower()  # the supervisors' own, which a test may point elsewhere
+
+
+def plist_problems(plist: dict, label: object, token: object = None, *, system: bool = False,
+                   commands: object = None) -> list:
+    """What makes a service's launchd job unfit to stay up: identity, restart, secrets. A LaunchDaemon (`system`) also
+    needs UserName, or it runs as root (FAA-286 item 22), and its descriptor's commands an absolute path, since a
+    `~` would be root's home when the job's update runs as root (item 23)."""
     problems = []
+    if system and not (isinstance(plist.get("UserName"), str) and plist.get("UserName")):
+        problems.append("a LaunchDaemon without UserName runs as root, and every client refuses root's listener "
+                        "(DEC-0154 HA-2)")
+    if system and isinstance(commands, dict):
+        for name, argv in sorted(commands.items()):
+            first = argv[0] if isinstance(argv, list) and argv else argv
+            if isinstance(first, str) and first.startswith("~"):
+                problems.append("commands.%s starts with ~, which is root's home for a LaunchDaemon: write the absolute "
+                                "path" % name)
     if plist.get("Label") != label:
         problems.append("Label %r" % plist.get("Label"))
     if plist.get("RunAtLoad") is not True:
@@ -729,3 +801,63 @@ def service_checkout(descriptor: Any, repo: Optional[str]) -> Tuple[Optional[Pat
         if same_repository(_git_out(Path(top), "remote", "get-url", "origin") or "", source):
             return Path(top), "the checkout of %s that holds %s" % (shown_repository(source), place)
     return None, "no checkout of %s holds the descriptor's commands, manifest or launchd job; pass --repo" % shown_repository(source)
+
+
+# FAA-298: a service with limits of its own holds work visibly (fabric_holds), never silently.
+_HOLD_USE = "HoldBook|waiting_message|waitingMessage|hold_job|holdJob"  # git grep -E is POSIX: no word boundary
+#: the kit's own copies, and a vendored copy of this file (its pattern names the kit's words): neither is a use
+_HOLD_KIT_FILES = ("fabric_holds.py", "fabric-holds.mjs", "check_service_rules.py")
+#: only code holds work: a README or a note naming HoldBook is no use of it (0.81.0 seam reading)
+_HOLD_CODE = ("*.py", "*.mjs", "*.js", "*.ts")
+
+
+def declared_limits(wk: Any, usage_report: Any = None) -> List[str]:
+    """The limits a service declares: the load declaration's `limits` (DEC-0104), and the usage report's `budget` and
+    `budgets` (DEC-0021, DEC-0027) when the probe read one. An invalid load declaration reads as not declared."""
+    import fabric_load  # noqa: E402 - beside this file
+    found: List[str] = []
+    view = fabric_load.load_view(wk)
+    limits = (view.get("load") or {}).get("limits") if view.get("valid") else None
+    if isinstance(limits, dict):
+        found += ["load %s %s" % (name, limits[name]) for name in ("concurrency", "perCaller", "queueMax") if name in limits]
+    if isinstance(usage_report, dict):
+        budget = usage_report.get("budget")
+        if isinstance(budget, dict) and "limitUsd" in budget:
+            found.append("usage budget USD %s a %s" % (budget.get("limitUsd"), budget.get("period")))
+        budgets = usage_report.get("budgets")
+        if isinstance(budgets, list) and budgets:
+            found.append("usage budgets (%d)" % len(budgets))
+    return found
+
+
+def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
+                  budget: float = OPENS_IN_HOST_BUDGET) -> Tuple[str, str]:
+    """`limits.holds` over one checkout: PASS when a tracked file outside the kit's own copy and the tests holds work
+    through fabric_holds (HoldBook, waiting_message, hold_job) in a code file (.py, .mjs, .js, .ts); NOT_RUN when it
+    declares none, or its checkout or git cannot be read in the budget. A service that declares limits and holds none
+    through the kit is NOT_RUN with a migration note naming fabric_holds, never FAIL: services built before the module
+    existed could not have adopted it, and whether one holds work silently or refuses it cannot be read from its tree."""
+    if not limits:
+        return "NOT_RUN", "the service declares no limits (a load declaration's limits, a usage report's budget or budgets)"
+    if repo is None:
+        return "NOT_RUN", why
+    if not shutil.which("git"):
+        return "NOT_RUN", "git is not installed"
+    try:
+        listed = subprocess.run(["git", "-C", str(repo), "grep", "-I", "-l", "-z", "-E", _HOLD_USE, "--"]
+                                + list(_HOLD_CODE), capture_output=True,
+                                timeout=max(0.05, budget))
+    except subprocess.TimeoutExpired:
+        return "NOT_RUN", "the %.1f s budget ran out while git read %s" % (budget, repo)
+    except OSError as exc:
+        return "NOT_RUN", "git could not read %s: %s" % (repo, exc)
+    if listed.returncode not in (0, 1):
+        return "NOT_RUN", "git grep could not read %s" % repo
+    users = [p for p in listed.stdout.decode("utf-8", "surrogateescape").split("\0")
+             if p and p.rsplit("/", 1)[-1] not in _HOLD_KIT_FILES and not _TEST_PATH.search(p)]
+    if users:
+        return "PASS", "declares %s; %s hold(s) work through fabric_holds" % ("; ".join(limits), ", ".join(users[:5]))
+    return "NOT_RUN", ("migration: declares %s, and no tracked code file outside the kit and the tests holds work "
+                       "through fabric_holds (HoldBook, waiting_message, hold_job) yet. Adopt fabric_holds so each hold "
+                       "is said on the job, the operator is pushed once per hold and takes a scoped lift (FAA-298, "
+                       "references/interop.md); until then this rule is not run" % "; ".join(limits))

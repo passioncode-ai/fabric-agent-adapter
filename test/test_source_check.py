@@ -79,6 +79,19 @@ def growth(work, small, large, runs=3):
     return best[large] / max(best[small], 1e-9)
 
 
+def _sas_signature(escaped: bool = False) -> str:
+    """A random SAS signature (32 bytes, base64, percent-encoded as Azure writes it) in the shape the long-run rule
+    reads: upper case, lower case and a digit (`fabric_secrets._long_secret`). One in about 1500 draws has no digit and
+    is outside the rule by its definition, so drawing until it fits keeps the test about the reading, not the dice.
+    `escaped`: one that holds `%2B` or `%2F`, so the percent-decoding is exercised too."""
+    import base64, re, secrets as rnd
+    from urllib.parse import quote
+    while True:
+        raw = base64.b64encode(rnd.token_bytes(32)).decode()
+        sig = quote(raw, safe="")
+        if all(re.search(c, raw) for c in ("[a-z]", "[A-Z]", "[0-9]")) and (not escaped or "%2B" in sig or "%2F" in sig):
+            return sig
+
 class Tree(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -305,11 +318,7 @@ class Findings(Tree):
         self.assertEqual(sc.SECRET_FILE_OK.pattern, packer.SECRET_FILE_OK.pattern)
 
     def test_a_url_that_carries_a_credential(self):
-        import base64, secrets as rnd
-        from urllib.parse import quote
-        sig = ""
-        while "%2B" not in sig and "%2F" not in sig:  # Azure writes a SAS signature percent-encoded
-            sig = quote(base64.b64encode(rnd.token_bytes(32)).decode(), safe="")
+        sig = _sas_signature(escaped=True)
         self.write("a.env", "BLOB_URL=https://a.blob.core.windows.net/c/f?sv=2022-11-02&sig=%s\n" % sig)
         self.write("b.env", "DATABASE_URL=postgres://app:%s@db.internal/app\n" % (LONG_RANDOM[:12] + "9"))
         # what says it is synthetic is the value, never the host: a real signature on an `examples` container
@@ -326,9 +335,8 @@ class Findings(Tree):
         self.assertNotIn(sig, out)
 
     def test_json_escapes_and_a_nested_url_do_not_hide_a_credential(self):
-        import base64, secrets as rnd
         from urllib.parse import quote
-        sig = quote(base64.b64encode(rnd.token_bytes(32)).decode(), safe="")
+        sig = _sas_signature()
         pw = LONG_RANDOM[:15] + "7"
         lines = ('{"sas": "?sv=1\\u0026sig=%s"}' % sig,  # Go's encoding/json writes & as \u0026
                  '{"u": "https://a.blob.core.windows.net/c?sv=1\\u0026sig=%s"}' % sig,
@@ -815,7 +823,8 @@ class WhatIsRead(Tree):
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
-        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_source_homes.py", "fabric_secrets.py"):
+        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_source_homes.py", "fabric_source_restart.py",
+                     "fabric_secrets.py"):
             shutil.copy(SCRIPTS / name, tools / name)
         self.git("init", "-q")
         self.git("add", "-A")
@@ -1463,7 +1472,9 @@ class Refusals(Tree):
         self.assertIn("1 home name(s) declared", out)
 
     def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
-        siblings = ("fabric_source_ignore.py", "fabric_source_homes.py", "fabric_secrets.py")
+        siblings = ("fabric_source_ignore.py", "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py",
+                    "fabric_source_tree.py")  # 0.81.0 seam: the tree module, imported only when a manifest is there
+        (self.root / "fabric.source.json").write_text("{}\n", encoding="utf-8")
         for missing in siblings:  # reading 38, seam: each sibling left behind in turn
             tools = self.tmp / ("tools-" + missing)
             tools.mkdir()
@@ -1474,6 +1485,7 @@ class Refusals(Tree):
             self.assertEqual(done.returncode, 2, done.stderr)
             self.assertIn(missing + " must sit beside this file", done.stderr)
             self.assertNotIn("Traceback", done.stderr)
+        (self.root / "fabric.source.json").unlink()
         # reading 40, unit: a sibling from another version (a missing name, a syntax error) is named as such
         for name, broken in (("fabric_source_homes.py", lambda s: s.replace("def _spellings(", "def _spelled(")),
                              ("fabric_source_ignore.py", lambda s: s + "\ndef broken(:\n")):

@@ -1,7 +1,7 @@
 {
   "about": "The call queue and the load report of DEC-0104 at the pin: nextQueuedJob, admitJob, jobCallerKey, readQueuePosition and queueStatusMessage, FAC-SEM-131 and FAC-SEM-132 (code, instancePath, message), FAC-SEM-133 (code and instancePath), and the validity of service-load/1 and the load extension, each answered by the contract's functions and validator. Written by make_load_vectors.mjs, never by hand. expected is exactly what the reference returns, with null for undefined; a case without `accepted` passes none.",
   "source": "fixtures/vectors/agent-network.json, fixtures/semantic/{job-queue,service-load,service-well-known-load}-*.json, fixtures/catalogue.json, src/agent-network.ts",
-  "commit": "18f8d48762edc5bfb1433657cbfe1c16196df1a6",
+  "commit": "93e7db164c7829e2783b4b7705c4113bb5201131",
   "extensionKey": "https://fabric.passioncode.ai/agent-contract/extensions/load/0.1",
   "queue": [
     {

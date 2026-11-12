@@ -111,7 +111,8 @@
         "answers initialize (and ping) for clients that still open with a handshake, echoing a supported protocol version",
         "roots every tool's outputSchema at type object, the job union included ({type: object, oneOf: [envelope, handle]})",
         "proves it with the real client: FABRIC_REAL_CLIENT=1 test/test_real_client.py, or claude -p with --strict-mcp-config and a throwaway --mcp-config, never the operator's own config",
-        "check_service.py: interop.output-schema-object PASS"
+        "check_service.py: interop.output-schema-object PASS",
+        "writes the token into the throwaway client config only after check_service.py's listener.owner reads the port as this OS account's (DEC-0154 HA-2)"
       ]
     },
     {
@@ -420,7 +421,8 @@
         "passes its own input gate as admit: a request body is data, never a prompt or an instruction; a refused request is completed failed_known with the gate's sentence",
         "stops acting on fenced, lease_expired and authority_changed; checkpoints (fsync) before each step; on restart reconciles unknown outcomes from observe and takes accepted work back only through com.responder_replace's transferred attempts (DEC-0078), leaving it held when Fabric does not answer them, never a com.claim read-back",
         "never sends com.submit, com.cancel, com.read_ack or com.directory through a board session, fails closed when com.status names no idempotency epoch, and checks a directory page with FAC-SEM-107 before looking a Project up",
-        "checks it with check_service.py (board.responder) and names the live board smoke NOT_RUN without a disposable Fabric"
+        "checks it with check_service.py (board.responder) and names the live board smoke NOT_RUN without a disposable Fabric",
+        "tells the listener's owner before the board credential leaves (DEC-0154 HA-2): the hub client refuses another account's or an untellable hub as foreign-user, nothing sent, and the session reports it as board.down"
       ]
     },
     {
@@ -609,7 +611,7 @@
       "expected": [
         "resolves the exact registered service key with the fabric-dashboards MCP (list_services or link with service and path) and hands over its open_link as the primary action",
         "opens it only through the host: the open tool with fallback=never; never `open <url>`, `open -a Safari`, `xdg-open`, `webbrowser.open` or `shell.openExternal` aimed at the service's pages",
-        "a browser only on a confirmed not_installed host; an installed host that failed is reported, never replaced by HTTP",
+        "a browser only on a confirmed not_installed host, and a raw http://127.0.0.1:<port> address only after its listener reads as this OS account's (the link gate's listener_owner this-account, DEC-0154 PL-3); an installed host that failed is reported, never replaced by HTTP",
         "runs scripts/check_dashboard_link.py from the skill's own directory on the action before it prints or opens it, in the project's checks; the probe's dashboard.opens-in-host rule fails a tracked file that opens the dashboard with a browser opener"
       ]
     },

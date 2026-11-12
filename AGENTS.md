@@ -18,14 +18,15 @@
 
 Fabric Agent Adapter: makes any agent or existing project Fabric-compatible (a Provider under
 the Fabric Agent Contract): Agent Skills, reference kits and a conformance probe. It is how an
-agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm package (`@passioncode-ai/fabric-agent-adapter`): the skills installer, and since 0.31.0 the `pack`, `sign` and `verify` commands for a `fabric-package/1` folder (contract DEC-0050, DEC-0051; `building-fabric-services/scripts/fabric_package.py`, `fabric-package.mjs`). It
+agent becomes one Fabric can bind; it also works on its own. It ships as a Claude Code plugin and a public npm package (`@passioncode-ai/fabric-agent-adapter`): the skills installer, and since 0.31.0 the `pack`, `sign` and `verify` commands for a `fabric-package/1` folder (contract DEC-0050, DEC-0051; `building-fabric-services/scripts/fabric_package.py`, `fabric-package.mjs`), and since 0.81.0 `new`, a new agent project with the contract built in (FAA-270; `adapting-projects-to-fabric/scripts/new_agent.py`). It
 carries five skills: `adapting-projects-to-fabric` and `creating-fabric-agents`, which adapt a
 project to the [Fabric Agent Contract](https://github.com/passioncode-ai/fabric-agent-contract),
 and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` local service
 that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`; job limits per DEC-0087), and checks the estate record, share grants and the estate ceremonies (`fabric_estate.py`, `fabric_share.py`, `fabric_ceremonies.py` and their Node twins).
 Agents that are not services get a `fabric-provider/0.1` entry from
 `adapting-projects-to-fabric/scripts/fabric_provider.py`; `fabric_source_check.py` beside it finds an agent's instance
-data in its source tree without repeating it (FAA-188). The fourth, `working-with-fabric`, is the
+data in its source tree without repeating it (FAA-188), under the source manifest `fabric.source.json` with the
+contract's tree check (`fabric_source_tree.py`, held to `test/fixtures/contract/source-vectors.json`, FAA-261). The fourth, `working-with-fabric`, is the
 other side: a coding agent opened outside Fabric working in a project through it (Fabric 0.4.0 REQ-07),
 with the plugin's Claude Code session hooks (`scripts/fabric_session.py`, COM-04). The fifth, `observing-products`,
 puts an agent on a standing watch over one product (observer mode, FAA-290): the channel inventory
@@ -177,12 +178,13 @@ this repository both obeys it and ships its service layer
   folder; it writes none, having no prompt to check.
 
 No `.mcp.json`, no launchd job, no port, no per-session server, no login item. Nothing idles on its own; the one
-long-lived process, `watch-mail`, runs only while an agent waits on the board, under that agent's watcher. `install.sh` and `bin/fabric-agent-adapter.js` (the installer and `pack`/`sign`/`verify`) run once when a person calls them and exit.
+long-lived process, `watch-mail`, runs only while an agent waits on the board, under that agent's watcher. `install.sh` and `bin/fabric-agent-adapter.js` (the installer, `pack`/`sign`/`verify` and `new`) run once when a person calls them and exit.
 
 | What | Started by | Cadence | With no window | Stopped by | Idle budget |
 |---|---|---|---|---|---|
 | `install.sh`, `npx @passioncode-ai/fabric-agent-adapter` | a person | on demand | nothing | exits when done | 0 |
 | `npx @passioncode-ai/fabric-agent-adapter pack\|sign\|verify`, `fabric_package.py`, `fabric-package.mjs` | a person or their agent | on demand | nothing | exits when done; writes only `fabric.package.json` in the folder named, and only with `--apply` | 0 |
+| `npx @passioncode-ai/fabric-agent-adapter new`, `new_agent.py` | a person or their agent | on demand | nothing | exits when done; writes only inside the folder named (a new or empty one, or with `--force`) | 0 |
 | `dashboard_kit.py notice` (plugin `SessionStart` hook) | Claude Code, at session start or `/clear` | once per session | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook session-start\|stop\|session-end` (plugin hooks) | Claude Code | per session start or `/clear`, per turn, per session end | nothing | exits when done (≤ 5 s timeout) | 0 |
 | `fabric_session.py hook user-prompt-submit` (plugin hook) | Claude Code | per prompt | nothing | exits when done (≤ 5 s timeout) | 0 |

@@ -7,13 +7,15 @@ first commit, so that its owner can hand the source over later without rewriting
 by itself: handing over, a new remote, a push or a change of visibility stays the owner's act, each time (a personal
 agent stays private until its owner says so about that act).
 
-The format of a source manifest, export and import is the contract's to decide (CT-194). What follows does not depend
-on it.
+The format of a source manifest, export and import is the contract's: DEC-0149 (`fabric-source/1`, its `source.md`) at
+the pin. The kit lays down `fabric.source.json` ([the source manifest](#the-source-manifest)), and the check reads the
+source under it.
 
 ## Contents
 
 - [The layout](#the-layout)
 - [The data home and its kind](#the-data-home-and-its-kind)
+- [The source manifest](#the-source-manifest)
 - [The check](#the-check)
 
 ## The layout
@@ -42,11 +44,11 @@ on it.
 - **Fixtures on neutral ids.** A test that needs a home folder, an owner or an account uses `example`, `example-agent`,
   `owner@example.com` or a one-letter home, and a credential-shaped test value says it is synthetic
   (`sk-test-not-a-key`) or is assembled at run time.
-- **Two names stay in the source until the contract decides (CT-194).** A service's supervisor label is the agent's
-  own name, reverse-DNS on the publisher's domain (`com.example.example-agent`), and `AGENTS.md` names it (LC-09):
-  never the owner's account or name. A provider's `createdBy` names the publisher; until one is chosen it
-  keeps the scaffold's sentinel, and a person's name or account is never written there. The adapter moves both when the
-  contract decides how an instance renames them (FAA-188 part 2).
+- **Two names are slots, never values (DEC-0149, FAA-188 part 2).** A service's supervisor label is the agent's own
+  name, reverse-DNS on the publisher's domain (`com.example.example-agent`), and `AGENTS.md` names it (LC-09): never the
+  owner's account or name; the label an installation runs under is its `SUPERVISOR_LABEL` slot, with its port in
+  `SERVICE_PORT`. A provider's `createdBy` names the publisher; the source keeps the scaffold's sentinel, and the
+  publisher's URI is the installation's `PUBLISHER_URI` slot, so a person's name or account is never written there.
 
 ## The data home and its kind
 
@@ -68,6 +70,41 @@ on it.
   --exclude-standard`, as building-fabric-services' `references/package.md` makes it; never the checkout itself, whose ignored
   configuration and dependency folders `--every-file` reads too), each exit 0, with the owner's list or its absence recorded, until the contract's export (CT-194)
   replaces it.
+
+## The source manifest
+
+`fabric.source.json` at the source's root says what is source and which slots an installation fills, never a value
+(DEC-0149, `fabric-source/1`):
+
+| Member | What |
+|---|---|
+| `include` | the source, default deny: a file outside every entry is not source; an entry ending in `/` is a folder, no globs |
+| `exclude` | holes in `include`, read in any letter case and Unicode form (a file an entry names only in another spelling is left out, and the check says `excluded-by-fold`) |
+| `binaries` | the binary files that are source (an icon, a font); another binary blocks |
+| `unchecked` | source paths that travel unread, each with its reason (synthetic test vectors, a licence naming a holder on the owner's list) |
+| `publicAddresses` | the e-mail addresses the source may carry (a support address); another one warns |
+| `slots` | what an installation fills, by name: `secret` (a key), `config` (a setting: a repository URL, a folder, the supervisor label, the publisher's identity), `store` (a data store, with its path in the data folder), `endpoint` (the operator's infrastructure by role) |
+
+- **Laying it down.** A new agent gets it from `new_agent.py` (creating-fabric-agents' `references/new-agent.md`); an
+  existing project from `adapt_project.py source <project-root>` (adapting-projects-to-fabric's scripts), which proposes `include` from the
+  project's top-level entries (what Git would commit, instance data by its name left out) and names the kit's slots
+  (`PUBLISHER_URI` where a provider manifest is there, `PLACEMENT_RECORD`, and with `--service` `SUPERVISOR_LABEL` and
+  `SERVICE_PORT`); `--secret NAME:PURPOSE` and `--store NAME:PATH:PURPOSE` add the agent's own. `--dry-run` prints the
+  proposal and writes nothing; an existing manifest is the owner's and is replaced only with `--force`. The author then
+  narrows `include` to what is source.
+- **The check under it.** When the folder it checks holds `fabric.source.json`, `fabric_source_check.py check` reads
+  the source the manifest names and reports the contract's kinds (`fabric_source_tree.py`, held to the contract's
+  vectors): blocking `home-path`, `credential`, `binary`, `nested-repository`, `instance-string`, `missing`,
+  `no-include` and the manifest's own findings (FAC-SEM-156, FAC-SEM-157); warnings `email`, `link-outside`,
+  `no-license`, `unused-exclude`, `excluded-by-fold`, each by path, line and column (UTF-16 units), never by the text
+  found. Exit 1 on a blocking finding, 0 when only warnings remain and every source file was read, 2 when one was not.
+  `.fabric-source-ignore` and `--exclude` are not read there: `exclude` and `unchecked` say it. A declared home
+  (`home: <name>`) is still found in every source file.
+- **Packing it.** `pack` (building-fabric-services' `references/package.md`) writes the package's `secrets[]` from the secret slots and `state[]` from the store slots' paths, and refuses a
+  package whose members differ (FAC-SEM-160); an empty `state[]` is a copy packed without state, and stays so. A
+  hand-written `secrets[]` naming a secret the manifest has no slot for is refused by name, never dropped.
+- **Handing it over** stays the owner's act, each time, on their word for that act (the contract's `source.md`,
+  Handing over).
 
 ## The check
 

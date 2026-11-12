@@ -60,7 +60,7 @@ class DashboardLinksTest(unittest.TestCase):
         for page in ['/dashboard?code=one-time', '/dashboard?api_key=x', '/dashboard?apikey=x', '/dashboard?key=x',
                      '/dashboard?auth=x', '/dashboard?accessToken=x', '/dashboard?Login-Code=x', '/dashboard?session_id=x',
                      '/dashboard?client_secret=x', '/dashboard?x=eyJhbGciOiJ.eyJzdWIiOiIx.c2ln',
-                     '/dashboard?x=sk-abcdefghijklmnopqrstuv', '/dashboard?x=Bearer%20abc',
+                     '/dashboard?x=sk-' + 'Ab1' + 'cdefghijklmnopqrstuv',  # a key DEC-0151 reads, built from pieces '/dashboard?x=Bearer%20abc',
                      '/dashboard?note=aB3' + 'xY9' * 13, '/dashboard#token=abc', '/dashboard#/jobs?code=abc',
                      '/dashboard?tab=jobs&TOKEN=x']:
             with self.subTest(page=page):
@@ -186,6 +186,7 @@ class DashboardLinksTest(unittest.TestCase):
         # `unsupported`, so the gate keeps refusing it. dashboard-links.md says so.
         item = json.loads((ROOT / 'test/evals/dashboard-links/cases.json').read_text())['cases'][0]['input']
         item['action'] = {'kind': 'browser_link', 'url': item['resolved']['http_url']}
+        item['listener_owner'] = 'this-account'
         for state, fallback, ok in (('not_installed', 'if_absent', True), ('not_installed', 'never', False),
                                     ('unsupported', 'if_absent', False), ('unsupported', 'never', False),
                                     ('handler_mismatch', 'if_absent', False), ('unknown', 'if_absent', False)):
@@ -199,6 +200,28 @@ class DashboardLinksTest(unittest.TestCase):
             encoding='utf-8').split())
         for words in ('`unsupported`', 'DEC-0123 PL-3', 'the operator', 'macOS never reports it', 'no fallback'):
             self.assertIn(words, doc, words)
+
+    def test_a_raw_loopback_address_opens_only_after_its_listener_is_this_accounts(self):  # FAA-251, DEC-0154 PL-3
+        item = json.loads((ROOT / 'test/evals/dashboard-links/cases.json').read_text())['cases'][0]['input']
+        item['action'] = {'kind': 'browser_link', 'url': item['resolved']['http_url']}
+        item['host'] = {'state': 'not_installed'}
+        item['fallback'] = 'if_absent'
+        for owner, ok in (('this-account', True), ('another-account', False), ('system', False), ('unknown', False),
+                          ('none', False), ('foreign-user', False), (None, False), ('mine', False), (1, False)):
+            with self.subTest(owner=owner):
+                if owner is None:
+                    item.pop('listener_owner', None)
+                else:
+                    item['listener_owner'] = owner
+                result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(item), text=True,
+                                        capture_output=True)
+                self.assertEqual(result.returncode, 0 if ok else 1)
+        # the owner never gates the native link: Fabric Dashboards checks its own listener (FD-158)
+        item['listener_owner'] = 'another-account'
+        item['host'] = {'state': 'available'}
+        item['action'] = {'kind': 'native_link', 'url': item['resolved']['open_link']}
+        result = subprocess.run([sys.executable, str(SCRIPT)], input=json.dumps(item), text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0)
 
     def test_shared_payload_is_self_contained_and_identical(self):
         for relative in ['scripts/check_dashboard_link.py', 'references/dashboard-links.md']:
