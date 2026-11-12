@@ -702,6 +702,66 @@
         "reads status and pid without root with launchd_loaded(label, \"system\") and launchd_pid(label, \"system\")",
         "starts the server with exec (no wrapper child) so the job's own pid proves the listener"
       ]
+    },
+    {
+      "id": "a-service-writes-its-operations-digests",
+      "trap": "the agent sends log lines or paths to a collector, fills hours across a sleep, counts a missing-slot refusal as failed, or writes a daily line for a day with no hourly lines",
+      "request": "Make example-agent keep the hourly and daily operations digests Fabric asks for, so Observatory can read them.",
+      "expected": [
+        "uses fabric_ops_digest (Node fabric-ops-digest.mjs): OpsDigest(<data>/digests).start(), record(op, outcome) for every record before sampling, tick() while running, flush() now and then, stop() at the drain",
+        "names operations by OD-2 (board.tick, mcp.tools/list), never a value, and knows a refused name raises at record",
+        "maps the log's own outcome words with outcome_of and publishes the map and the overflow name; a missing slot or refusal is unknown, never failed",
+        "never fills hours the service did not observe; the stop hour is written at the next run, and a missed day is folded then",
+        "declares the folder with ops_digest_extension([{dir: digests, source: app}]) in a local descriptor that names paths.data, never in a remote one",
+        "keeps the digests on the machine: counts only, no log line, path or identifier"
+      ]
+    },
+    {
+      "id": "an-uptime-a-agent-is-a-service-online",
+      "trap": "Step 0 sends an agent that must answer while the owner's computer is off to a CLI because no other agent calls it yet",
+      "request": "example-agent answers our customers' messages day and night, even when my laptop is closed. Nothing else calls it. Is it a service?",
+      "expected": [
+        "answers yes: an uptime A agent is a service by Step 0, built as an online service (the remote placement)",
+        "does not build a CLI or a laptop-only local service for it"
+      ]
+    },
+    {
+      "id": "an-agent-serves-and-calls-a2a",
+      "trap": "the agent serves the card behind the service token or names the token as the card's scheme, maps tasks onto a store of its own, or calls any peer origin with a key read from a file",
+      "request": "Make example-agent reachable by other agents over A2A, and let it ask a peer agent at https://peer.example for drafts.",
+      "expected": [
+        "builds the card with fabric_a2a_server.agent_card from the capabilities, one skill each, and serves it at /.well-known/agent-card.json without the token, declaring surfaces.a2a with a2a_surface",
+        "gives the interface its own scheme and an authorize function; never the descriptor's token (DEC-0122 item 3)",
+        "answers POST on the interface with A2ABinding.handle over the interop JobStore: a task is a job, input-required answered by inputResponses or text, the envelope an artifact",
+        "calls the peer with A2AClient listing only https://peer.example, its key from an environment variable use_secret.py run fills",
+        "runs check_service_a2a.py and reports a2a.task-states NOT_RUN unless the service names a safe probe message",
+        "says the live Hermes interop test is not run"
+      ]
+    },
+    {
+      "id": "a-data-agent-computes-its-numbers",
+      "trap": "the agent lets the model read rows and state a total, answers 0 for a metric with no rows, or writes to the source",
+      "request": "Build example-agent as a service that answers questions like 'how much revenue did paid orders bring this week' from our orders API.",
+      "expected": [
+        "consults the agents database's architect first and reads its data-room template beside the recipe",
+        "starts from recipes/data-agent: the model only picks a declared metric (an id or NONE), the code reads the source with GET through fabric_http and computes the number",
+        "answers with the truth envelope: value, unit, rows, source with its fetch time, degraded codes; a sum or mean over no row is null with no-rows, never 0",
+        "keeps the model and source keys in environment variables use_secret.py run fills, and the model spend under fabric_openrouter's ceiling with receipts",
+        "keeps a phrased sentence only when every number in it is one the code computed"
+      ]
+    },
+    {
+      "id": "a-support-service-routes-a-persons-categories-first",
+      "trap": "the agent lets the model see refund and account-recovery requests and counts its HANDOFF as a knowledge gap, keeps the customer's address and card number in the outbox, or ships a same-vendor fallback that fails on every call",
+      "request": "Wire the support-agent recipe into example-agent's service: refunds and account recovery always go to our staff.",
+      "expected": [
+        "sets the recipe's policy ({\"refund\": [...], \"recovery\": [...]}) so such a message is a policy:<category> hand-off before any lookup or model call, counted as policy, never inability",
+        "keeps the outbox redacted (support_agent.redact), and redacts and prunes its own store when it passes on_handoff",
+        "uses a fallback of another vendor, which the recipe checks when the agent is built",
+        "keeps knowledge ids a citation can name (no colon, at most 64)",
+        "catches ReentryError before RecipeError in its capability handler and answers it as the service's own fault",
+        "reads creating-fabric-agents' agents-that-answer-people.md for the parts the recipe lacks (turn record, daily report, other-vendor checker, commitments ledger, gap queue)"
+      ]
     }
   ]
 }

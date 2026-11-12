@@ -123,7 +123,8 @@
       "expected": [
         "asks, during the grill, which of the agent's lanes read what members, clients or the public send, and records the answer as each model profile's `reads` (DEC-0083): `user-content`, `operator` or `web`",
         "gives a lane that reads user content an open-vendor route: with `fallback: none` its first model is `open-vendor` in the catalogue, with `between-turns` at least one is (FAC-SEM-112); never a closed vendor alone",
-        "does not choose the model itself or name a vendor list: which models are open-vendor is the catalogue's fact, and the profile is resolved in Fabric"
+        "does not choose the model itself or name a vendor list: which models are open-vendor is the catalogue's fact, and the profile is resolved in Fabric",
+        "records the grill's Step 0 'Does it answer people?' row and loads references/agents-that-answer-people.md, since it drafts replies people read"
       ]
     },
     {
@@ -152,11 +153,12 @@
       "request": "Create a fabric-compatible example-agent that answers customer messages for the person and for two organizations they work with, runs while their laptop is closed, reads screenshots customers send, and uses OpenRouter models.",
       "expected": [
         "asks the grill's 'Where does it run, for whom?' row: a personal cloud machine joined to the estate with an enroll token read from stdin or a 0600 file, and one instance per context (personal, org:<id>) with its own secrets, spend and journal",
-        "asks 'Which models?': per lane a primary and a fallback of another vendor, an open-vendor model on the lane that reads customer messages (reads: user-content), a model whose catalog input_modalities include image for screenshots, declared as classes",
+        "asks 'Which models?': per lane a primary and a fallback of another vendor, an open-vendor model on the lane that reads customer messages (reads: user-content), a model whose catalog input_modalities include image for screenshots, named as catalogue models in the profile and narrowed by classes on the spend policy or grant",
         "asks 'Who pays?': one OpenRouter key per agent and context with its own ceiling (USD 100 a month by default), read from the environment, checked before each call; the person's personal key never pays for an organization",
         "asks 'How does it learn?': decisions with reasons, one trace per turn, failures turned into planted fixtures before fixes, learnings proposed and not self-approved",
         "names which capabilities need the person's machine and what they answer when it is off",
-        "reads references/where-agents-run.md, models-and-providers.md, orchestration-and-learning.md and practices.md before scaffolding"
+        "reads references/where-agents-run.md, models-and-providers.md, orchestration-and-learning.md and practices.md before scaffolding",
+        "records the grill's Step 0 'Does it answer people?' row and loads references/agents-that-answer-people.md, since the agent answers customer messages"
       ]
     },
     {
@@ -196,7 +198,7 @@
         "records every inbound message in one turn with a trace id and an outcome from the fixed list, and publishes one support.quality_daily per closed UTC day and channel on the events feed, with notMeasured named and never 0, its value valid against the contract's support-quality-daily.schema.json and a judge's calibration carried only once its readers adopted DEC-0144",
         "declares lanes with a fallback of another vendor than its primary, a checker of another vendor than the writer and a judge of another vendor than both, counts what the fallback recovered, and changes the writer model or reasoning budget only after an offline replay",
         "puts deterministic false-state gates before the model checker, gives the checker the material before the instructions, takes numbers and account state from tools, and re-reads the conversation's live tail before sending",
-        "on a refusal repairs once, then runs one research turn, then holds honestly, and the hold comes back by itself when the gap closes",
+        "on a refusal repairs once, then runs one research turn, then holds honestly, and the hold comes back by itself when the gap closes; a money refusal (an amount or a price) is never researched, and the research turn has a hard time cap whose hold counts as infrastructure",
         "counts hand-offs by cause (policy, inability, infrastructure), never as answers, keeps them out of the judge's sample, and keeps a commitments ledger",
         "reads the knowledge service's answer flag with no threshold of its own, queues every abstention and every inability, a hold on the material included, as a gap (a hold after an outage opens none) and asks again after it closes, and re-reads its feed once when it starts reading a new event kind"
       ]
@@ -258,11 +260,11 @@
       "id": "a-channel-agent-starts-from-the-communication-template",
       "request": "Build a Fabric agent that answers our users in a Telegram support chat and qualifies sales leads from the same chat. Where do I start, and how does it handle an incoming message?",
       "expected": [
-        "starts from the agents database's template when one is named, read beside communication-agent-template.md, else loads that template and fills its brief (section 0) with the owner before the build",
+        "starts from the agents database's template when one is named, read beside communication-agent-template.md: where they disagree the template wins, and a prompt part the template lacks is built too and reported back as feedback on the template; else loads that template and fills its brief (section 0) with the owner before the build",
         "batches a person's burst into one turn and claims the ticket before any model call",
-        "triages the whole batch with the planning model at low thinking: only a batch with no ask gets its reply there",
-        "analyses, plans and drafts in one call (injection check, product-only scope, the knowledge ids it used), with no separate cheap drafter",
-        "runs a final pass only when an action returned new facts or an injection is suspected",
+        "triages the whole batch with the planning model at low thinking: only a batch with no ask gets its reply there (the prompt's pipeline, where the database's template has none of its own)",
+        "analyses, plans and drafts in one call (injection check, product-only scope, the knowledge ids it used), with no separate cheap drafter (the prompt's pipeline, where the database's template has none of its own)",
+        "runs a final pass only when an action returned new facts or an injection is suspected (the prompt's pipeline, where the database's template has none of its own)",
         "keeps the pre-send gates and a checker of another vendor than the drafter",
         "hands a lead to the sales agent's queue with a summary and the lead's consent; the sales agent owns the CRM and the qualification, and prices come only from the knowledge or the CRM",
         "gives the agent's model key USD 100 a month by default, its own stop under the key's limit"
@@ -323,6 +325,16 @@
         "writes each JSON file in the canonical shape of schemas/template/ (source_class, direction read|write|read-write|call, levels owner, administrator, project_architect, member, never), with a template's own key only as x-<name>",
         "runs scripts/template_check.py on the folder from the skill's own directory and fixes every error before calling the template done; --legacy only for an older folder being migrated, its warnings fixed",
         "keeps the template's content in the agents database and only its format in the adapter, never names a private organization or agent in it"
+      ]
+    },
+    {
+      "id": "a-private-agent-built-for-a-client",
+      "trap": "the agent applies the PassionCode.ai repository standard and its licence to an agent the person builds for a client, or drops the kit files' own licence from the copy",
+      "request": "Build a Fabric-compatible example-agent for one of my clients; the client owns it and its code stays private.",
+      "expected": [
+        "treats it as an agent someone builds for themselves or a client, outside the PassionCode.ai repository standard: its licence is its owner's choice, and the organization publishes and lists nothing about it",
+        "writes a LICENSE naming the copyright holder the person names, and keeps the copied kit files' own licence (AGPL-3.0-only or the PassionCode commercial licence)",
+        "keeps the agent's data out of its repository, in the data home the grill records"
       ]
     }
   ]

@@ -110,7 +110,8 @@ Every new agent is given an uptime category on its first day, and the README nam
   exists. Its data lives where the cloud reaches it, in a durable store (a database, an object store, the private
   `<agent>-data` repository), never the host's own folder, which a platform such as Heroku does not keep across a
   restart.
-- **B, local only.** Nothing needs it while the machine sleeps: a local service and no cloud. It reads an A agent's
+- **B, local only.** Nothing needs it while the machine sleeps: no cloud, and a local service only when other
+  agents call it or it shows a page (building-fabric-services Step 0), else a CLI or a local runner. It reads an A agent's
   data through that agent's MCP or API, never from its store.
 
 A B agent that gains a capability that must answer around the clock becomes A for that capability; record the change

@@ -1,0 +1,28 @@
+{
+  "stateDir": "state",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "fallback": "qwen/qwen3.8-flash",
+  "keyEnv": "OPENROUTER_API_KEY",
+  "ceilingUsd": 1.0,
+  "window": "day",
+  "phrase": false,
+  "prices": {
+    "deepseek/deepseek-v4.1-flash": {"prompt": 0.0000002, "completion": 0.0000008},
+    "qwen/qwen3.8-flash": {"prompt": 0.0000001, "completion": 0.0000004}
+  },
+  "source": {
+    "name": "orders",
+    "url": "https://data.example/api/orders",
+    "rowsAt": "rows",
+    "keyEnv": "EXAMPLE_ORDERS_KEY",
+    "maxAgeSeconds": 300
+  },
+  "metrics": [
+    {"id": "orders.paid.count.7d", "description": "Paid orders in the last 7 days", "kind": "count",
+     "where": {"status": "paid"}, "window": {"field": "paidAt", "days": 7}},
+    {"id": "orders.paid.revenue.7d", "description": "Revenue of paid orders in the last 7 days", "kind": "sum",
+     "field": "amount", "unit": "USD", "decimals": 2, "where": {"status": "paid"}, "window": {"field": "paidAt", "days": 7}},
+    {"id": "orders.paid.mean.7d", "description": "Average paid order in the last 7 days", "kind": "mean",
+     "field": "amount", "unit": "USD", "decimals": 2, "where": {"status": "paid"}, "window": {"field": "paidAt", "days": 7}}
+  ]
+}

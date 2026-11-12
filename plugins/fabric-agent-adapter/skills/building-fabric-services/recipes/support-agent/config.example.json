@@ -12,5 +12,9 @@
   "prices": {
     "deepseek/deepseek-v4.1-flash": {"prompt": 0.0000002, "completion": 0.0000008},
     "qwen/qwen3.8-flash": {"prompt": 0.0000001, "completion": 0.0000004}
+  },
+  "policy": {
+    "refund": ["refund", "money back", "chargeback"],
+    "recovery": ["recover my account", "account was stolen"]
   }
 }

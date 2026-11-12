@@ -762,5 +762,94 @@ class Recipe(unittest.TestCase):
         self.assertFalse((self.dir / "state" / "handoffs.jsonl").exists(), "on_handoff replaces the outbox")
 
 
+class Wave5(unittest.TestCase):
+    """FAA-264 (1), FAA-182 (13) and FAA-116's code parts: citable ids at load, the reentry check first, the
+    reentrant lock held by a test, the vendor check at load, a person's categories routed first, a redacted outbox."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp(prefix="support-agent-"))
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        self.knowledge = sa.Knowledge.load(RECIPE / "knowledge.example.json")
+
+    def agent(self, transport, **kwargs):
+        client = fo.Client(ceiling_usd=1.0, ledger=sa.fabric_usage.JsonlUsageLedger(self.dir / "usage.jsonl"),
+                           prices=PRICES, environ={"OPENROUTER_API_KEY": KEY}, transport=transport, sleep=lambda s: None)
+        kwargs.setdefault("knowledge", self.knowledge)
+        return sa.SupportAgent(client=client, model="a/one", fallback=kwargs.pop("fallback", "b/two"), state_dir=self.dir, **kwargs)
+
+    def test_an_entry_id_a_citation_cannot_name_is_refused_at_load(self):
+        for ident in ("faq:reset", "x" * 65):
+            with self.subTest(ident=ident[:10]):
+                with self.assertRaises(sa.RecipeError):
+                    sa.Knowledge([{"id": ident, "answer": "Open Settings."}])
+        self.assertIn("faq.reset", sa.Knowledge([{"id": "faq.reset", "answer": "Open Settings."}]).entries)
+
+    def test_a_bad_input_from_on_handoff_is_a_reentry_error(self):
+        import threading
+        agent = self.agent(model_says("Open Settings."))
+        refused = []
+
+        def handoff(row):
+            try:
+                agent.answer("bad id!", "")
+            except sa.ReentryError:
+                refused.append("reentry")
+            except sa.RecipeError:
+                refused.append("plain")
+        agent.on_handoff = handoff
+        worker = threading.Thread(target=lambda: agent.answer("m-1", "How do I reset my password?"), daemon=True)
+        worker.start()
+        worker.join(5)
+        self.assertEqual(refused, ["reentry"])
+
+    def test_prune_from_on_handoff_on_the_same_thread_completes(self):
+        import threading
+        agent = self.agent(model_says())
+        pruned = []
+        agent.on_handoff = lambda row: pruned.append(agent.prune(30))
+        worker = threading.Thread(target=lambda: agent.answer("m-1", "What is the weather on Mars?"), daemon=True)
+        worker.start()
+        worker.join(5)
+        self.assertFalse(worker.is_alive(), "a plain Lock in place of the RLock hangs here")
+        self.assertEqual(len(pruned), 1)
+
+    def test_a_same_vendor_fallback_is_refused_at_load(self):
+        with self.assertRaises(sa.RecipeError):
+            self.agent(model_says(), fallback="a/two")
+
+    def test_a_persons_category_goes_to_a_person_first(self):
+        model = model_says("Open Settings [KB:password-reset].")
+        handoffs = []
+        agent = self.agent(model, policy={"refund": ["refund", "money back"]}, on_handoff=handoffs.append)
+        decision = agent.answer("m-1", "I want my money back for the password reset")
+        self.assertEqual(decision["reasons"], ["policy:refund"])
+        self.assertEqual(model.calls, [], "no model call for a person's category")
+        self.assertEqual(agent.answer("m-2", "How do I reset my password?")["action"], "reply")
+        with self.assertRaises(sa.RecipeError):
+            self.agent(model_says(), policy={"refund": []})
+
+    def test_the_outbox_keeps_the_question_redacted(self):
+        agent = self.agent(model_says())
+        agent.answer("m-1", "Mars weather? write to me at jo@example.org or +1 415 555 0100, card 4111 1111 1111 1111, "
+                            "key " + "Ab1" * 12)
+        row = json.loads((self.dir / "handoffs.jsonl").read_text().splitlines()[0])
+        for kept in ("jo@example.org", "555 0100", "4111", "Ab1Ab1"):
+            self.assertNotIn(kept, row["question"])
+        self.assertIn("[email]", row["question"])
+
+
+class CheckReplyTwins(unittest.TestCase):
+    """FAA-264 (10): support-agent.mjs's checkReply answers the shared cases as check_reply does (its Node suite is
+    support-agent-recipe.test.mjs); this side keeps the fixture honest."""
+
+    def test_the_shared_cases(self):
+        cases = json.loads((ROOT / "test/fixtures/support-check-reply-cases.json").read_text(encoding="utf-8"))["cases"]
+        self.assertGreaterEqual(len(cases), 30)
+        for case in cases:
+            with self.subTest(case["name"]):
+                self.assertEqual(sa.check_reply(case["draft"], case["question"], case["given"], max_chars=case["maxChars"],
+                                                sources=case["sources"]), case["expected"])
+
+
 if __name__ == "__main__":
     unittest.main()
