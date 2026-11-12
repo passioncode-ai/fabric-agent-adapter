@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:passioncode-ai:fabric-agent-adapter:tailnet-groups:1",
+  "title": "tailnet-groups/1: who may open which door of a service behind tailscale serve (FAA-324)",
+  "description": "The groups file an organization writes for a service that reads Tailscale-User-Login through fabric_tailnet_identity (Python) or fabric-tailnet-identity.mjs (Node). A login is allowed at a door for a capability when it belongs to a group that has a rule for that door listing the capability, or listing \"*\". Logins are compared lowercased as ASCII. One rule this schema cannot say and the module enforces: every rule's group is a key of groups. A file that is unreadable or breaks this schema closes every door of the service until it is fixed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "groups", "rules"],
+  "properties": {
+    "schema": {
+      "const": "tailnet-groups/1"
+    },
+    "about": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Free text for the people who keep the file; the service never reads it."
+    },
+    "groups": {
+      "type": "object",
+      "description": "Group name to its members' Tailscale login names.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9._:/-]{0,127}$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._%+-]{1,128}@[A-Za-z0-9.-]{1,125}$"
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["group", "door", "capabilities"],
+        "properties": {
+          "group": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._:/-]{0,127}$",
+            "description": "A key of groups."
+          },
+          "door": {
+            "enum": ["dashboard", "mcp", "service"],
+            "description": "dashboard: the service's pages; mcp: its MCP endpoint; service: its own door (an API, a webhook)."
+          },
+          "capabilities": {
+            "oneOf": [
+              {
+                "const": "*",
+                "description": "Every capability of the door."
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9._:/-]{0,127}$"
+                },
+                "description": "The capability names the service asks for at this door (a page, a tool, an action)."
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
