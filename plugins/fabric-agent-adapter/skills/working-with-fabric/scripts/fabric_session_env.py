@@ -357,13 +357,47 @@ def _stdio_entry(entry: Any) -> Optional[Dict[str, Any]]:
             "fabricMcp": name in ("fabric-mcp", "fabric-mcp.cmd")}
 
 
+#: Claude Code's own variable for its folder, and Fabric Switchboard's for the person's folder a Switchboard home is
+#: built from (0.7.14 and later); a home of an earlier Switchboard lies in its data folder (FAA-218).
+CLAUDE_CONFIG_ENV = "CLAUDE_CONFIG_DIR"
+SWITCHBOARD_SOURCE_ENV = "SWITCHBOARD_CLAUDE_SOURCE_DIR"
+SWITCHBOARD_DATA = "ai.passioncode.fabric-switchboard"
+
+
+def claude_folders(env: Optional[Dict[str, str]] = None) -> Dict[str, Optional[Path]]:
+    """The launcher's `claudeFolders` (passioncode lib/launcher.js, PC-129; FAA-218): `read` is where the session's
+    Claude Code files are, CLAUDE_CONFIG_DIR when set, else ~/.claude; `write` is where settings, plugins and user MCP
+    servers are written, None for Claude Code's default (~/.claude with ~/.claude.json). In a Switchboard home `write`
+    is SWITCHBOARD_CLAUDE_SOURCE_DIR when it is absolute, ~/.claude's default for a home of an earlier Switchboard."""
+    env = os.environ if env is None else env
+    home = _home(env)
+    value = env.get(CLAUDE_CONFIG_ENV) or ""
+    config = Path(os.path.abspath(value)) if value else None
+    named = env.get(SWITCHBOARD_SOURCE_ENV) or ""
+    source: Optional[Path] = None
+    if config is not None:
+        if named and os.path.isabs(named):
+            source = Path(os.path.abspath(named))
+        elif SWITCHBOARD_DATA in re.split(r"[\\/]", str(config)):
+            source = home / ".claude"
+    write = (None if source == home / ".claude" else source) if source is not None else config
+    return {"read": config or home / ".claude", "write": write}
+
+
+def claude_json(env: Optional[Dict[str, str]] = None) -> Path:
+    """The `.claude.json` Claude Code reads in this environment: inside CLAUDE_CONFIG_DIR when it is set (Claude Code
+    2.1.299 reads and `claude mcp add` writes it there, FAA-234), else ~/.claude.json. In a Switchboard home that is the
+    home's own, the servers Switchboard carried into it."""
+    env = os.environ if env is None else env
+    return (claude_folders(env)["read"] if env.get(CLAUDE_CONFIG_ENV) else _home(env)) / ".claude.json"
+
+
 def claude_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
     """Claude Code's MCP server `fabric` for this folder: local, then project (.mcp.json), then user scope.
     Only command and args are returned, with the folder a local or project entry was found in; an entry's env is never
     read out."""
-    home = _home(env)
     config: Dict[str, Any] = {}
-    text = read_small(home / ".claude.json", CONFIG_CAP)
+    text = read_small(claude_json(env), CONFIG_CAP)
     if text:
         try:
             loaded = json.loads(text)

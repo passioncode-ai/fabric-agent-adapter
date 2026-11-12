@@ -135,7 +135,8 @@ class Base(unittest.TestCase):
                                  "FABRIC_SERVICES_DIR", "FABRIC_LAUNCHED_SESSION", "FABRIC_ACP_SESSION",
                                  "FABRIC_BRIDGE_URL", "KILO_CONFIG_CONTENT", "FABRIC_DISPATCH_WORKFLOW",
                                  "FABRIC_DISPATCH_HANDOFF", "FABRIC_DISPATCH_REQUEST",
-                                 "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID", "PASSIONCODE_APPLICATIONS")}
+                                 "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID", "PASSIONCODE_APPLICATIONS",
+                                 "CLAUDE_CONFIG_DIR", "SWITCHBOARD_CLAUDE_SOURCE_DIR")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"
@@ -343,6 +344,52 @@ class Registrations(Base):
         reg = fs.claude_registration(self.repo, self.env)
         self.assertEqual((reg["scope"], reg["fabricMcp"]), ("project", True))
         self.assertNotIn("env", reg)
+
+    def test_claude_config_dir_is_where_claude_code_reads_its_registration(self):
+        # FAA-218, FAA-234: with CLAUDE_CONFIG_DIR set, Claude Code reads (and `claude mcp add` writes)
+        # $CLAUDE_CONFIG_DIR/.claude.json, never ~/.claude.json (the launcher's claudeFolders, lib/launcher.js).
+        self.register()  # ~/.claude.json: not the file this session reads once the variable is set
+        config = self.base / "claude-folder"
+        config.mkdir()
+        env = dict(self.env, CLAUDE_CONFIG_DIR=str(config))
+        self.assertIsNone(fs.claude_registration(self.repo, env))
+        (config / ".claude.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "/x/fabric-mcp"}}}))
+        reg = fs.claude_registration(self.repo, env)
+        self.assertEqual((reg["scope"], reg["command"]), ("user", "/x/fabric-mcp"))
+        self.assertEqual(fs.claude_json(env), config / ".claude.json")
+        self.assertEqual(fs.claude_json(self.env), self.home / ".claude.json")
+
+    def test_claude_folders_follow_the_launcher(self):
+        # lib/launcher.js claudeFolders: read is CLAUDE_CONFIG_DIR or ~/.claude; write is the Switchboard source when
+        # one is named (absolute), ~/.claude's default (None) for an older Switchboard home, else CLAUDE_CONFIG_DIR.
+        home = self.home
+        self.assertEqual(fs.claude_folders(self.env), {"read": home / ".claude", "write": None})
+        mine = self.base / "mine"
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(mine))), {"read": mine, "write": mine})
+        sb = self.base / "Library/Application Support/ai.passioncode.fabric-switchboard/homes/a"
+        source = self.base / "src"
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb), SWITCHBOARD_CLAUDE_SOURCE_DIR=str(source))),
+                         {"read": sb, "write": source})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb))), {"read": sb, "write": None})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb), SWITCHBOARD_CLAUDE_SOURCE_DIR="rel")),
+                         {"read": sb, "write": None})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(mine), SWITCHBOARD_CLAUDE_SOURCE_DIR="rel")),
+                         {"read": mine, "write": mine})
+        self.assertEqual(fs.claude_folders(dict(self.env, CLAUDE_CONFIG_DIR=str(sb),
+                                                SWITCHBOARD_CLAUDE_SOURCE_DIR=str(home / ".claude"))),
+                         {"read": sb, "write": None})
+        self.assertEqual(fs.claude_folders(dict(self.env, SWITCHBOARD_CLAUDE_SOURCE_DIR=str(source))),
+                         {"read": home / ".claude", "write": None})
+
+    def test_the_session_hook_reads_the_claude_config_dir_registration(self):
+        config = self.base / "claude-folder"
+        config.mkdir()
+        (config / ".claude.json").write_text(json.dumps({"mcpServers": {"fabric": {"command": "/x/fabric-mcp"}}}))
+        self.hub()
+        (self.repo / "fabric-agent.json").write_text("{}")
+        done, _ = self.run_hook("session-start", {"session_id": SID, "cwd": str(self.repo), "source": "startup"},
+                                extra_env={"CLAUDE_CONFIG_DIR": str(config)})
+        self.assertIn("fabric_whoami", done.stdout)
 
     def test_an_http_entry_is_not_fabric_mcp(self):
         self.register(kind="http")
