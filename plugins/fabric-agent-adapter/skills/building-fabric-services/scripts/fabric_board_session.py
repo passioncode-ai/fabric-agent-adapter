@@ -168,9 +168,7 @@ class Responder(SlotKeeper):
         self.state = "idle"
         self.wait_until = 0.0
         self.stopping = False
-        #: Set when shutdown starts; `draining` then says whether it found work to drain (FAA-186), None before.
-        self.shutting_down = threading.Event()
-        self.draining: Optional[bool] = None
+        self.shutting_down, self.draining = threading.Event(), None  # shutdown began; it found work to drain (FAA-186)
         self.claim_keys: Dict[str, str] = {}
         self._probing: set = set()  # moved slots whose move-back claim lost its answer: asked again under the same key
         self._said: Dict[str, str] = {}
@@ -985,10 +983,8 @@ class Responder(SlotKeeper):
     def shutdown(self, drain: float = DRAIN_SECONDS) -> None:
         """Stop claiming, give running work up to `drain` seconds to finish and be completed, then leave the session
         (its DELETE releases the slots). What is still open stays in the checkpoint for the next start."""
-        self.stopping = True
-        work = self.current
-        self.draining = work is not None  # what this shutdown waits for, published before it waits (FAA-186)
-        self.shutting_down.set()
+        self.stopping, work = True, self.current
+        self.draining = work is not None; self.shutting_down.set()  # noqa: E702 - published before it waits (FAA-186)
         if work is not None and not work.done.wait(drain):
             work.ctx.stopped.set()
         if work is not None and work.done.is_set() and self.session is not None:
