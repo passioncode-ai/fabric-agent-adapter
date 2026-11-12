@@ -43,6 +43,8 @@ export {
   mandateSpend,
   keptStep,
   UNREADABLE_PROJECT,
+  UNREADABLE_AGENT,
+  identifiedAgent,
   actionRefusalToolResult,
   usageFindings,
   usageToward,

@@ -226,6 +226,30 @@ test('requestMeta carries the mandate in _meta, copied, and never one FAC-SEM-14
   for (const bad of ['yes', [], widened]) assert.throws(() => i.requestMeta(PARENT, { mandate: bad }), i.InteropError);
 });
 
+// FAA-135: a Node service reads its own per-agent credential and passes identifiedAgent(its hook's answer) as
+// callerAgent; the twin of test_interop's identify_agent tests.
+test('identifiedAgent reads a hook\'s answer, and the chain is bound with it at actionGate and jobStep', () => {
+  assert.equal(i.identifiedAgent(null), null);
+  assert.equal(i.identifiedAgent(undefined), null);
+  assert.equal(i.identifiedAgent('example-lead'), 'example-lead');
+  assert.equal(i.identifiedAgent('example-lead.prod'), 'example-lead.prod');
+  for (const bad of ['', 'Example', 'agent:remote', 7, true, ['example-lead'], { id: 'example-lead' }, new String('example-lead')]) {
+    assert.equal(i.identifiedAgent(bad), i.UNREADABLE_AGENT, String(bad));
+  }
+  const gate = (callerAgent) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta: { mandate: leadMandate() },
+    target: 'reply-7', now: NOW, self: 'example-agent', effect: 'reply', callerAgent: i.identifiedAgent(callerAgent) });
+  assert.equal(gate('example-lead').ok, true);
+  assert.equal(gate(null).ok, true, 'no per-agent credential: the chain\'s end alone binds it, as before');
+  for (const other of ['example-other', 'Not An Agent', 42]) {
+    assert.deepEqual(refusalError(gate(other).refusal).error.data, { detail: 'mandate-not-for-this-call' }, String(other));
+  }
+  const step = (callerAgent) => i.jobStep({ mandate: leadMandate(), tier: 'T0', now: NOW, self: 'example-agent', capability: 'reviews.approve',
+    key: 'approve-reply', effect: 'reply', callerAgent: i.identifiedAgent(callerAgent) });
+  assert.equal(step('example-lead').covered, true);
+  assert.equal(step('example-other').detail, 'mandate-not-for-this-call');
+  assert.equal(step(7).detail, 'mandate-not-for-this-call');
+});
+
 test('actionGate reads a mandate only for a service that names its agent id, and names what it does not cover', () => {
   const gate = (extra) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta: { mandate: leadMandate() }, target: 'reply-7', now: NOW, self: 'example-agent', effect: 'reply', ...extra });
   assert.deepEqual(gate(), {

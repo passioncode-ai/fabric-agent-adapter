@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { ServiceError } from './fabric-base.mjs';
 import { jcs, refusalFromAction, refusalToolResult } from './fabric-delegation.mjs';
 import { actionDecision, decisionShape, jobCapability } from './fabric-actions.mjs'; // DEC-0121
-import { EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, mandateCovers, mandateProblem, withoutSource } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
+import { EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, isAgentId, mandateCovers, mandateProblem, withoutSource } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
 import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 import { isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 
@@ -276,6 +276,25 @@ export function jobStep({ mandate, tier, now, self, capability, key, effect, cal
  */
 /** The project of a call whose project could not be read: never in a mandate's projects (FAA-139). */
 export const UNREADABLE_PROJECT = '\u0000unreadable';
+
+/**
+ * The caller's agent id when a service's own hook answered something no chain can hold (an id the registry refuses, not
+ * a string, or the hook threw): passed as callerAgent it matches no agent, so every mandate reads
+ * mandate-not-for-this-call (fail closed, FAA-135). Never an agent id (isAgentId refuses it).
+ */
+export const UNREADABLE_AGENT = '\u0000unreadable-agent';
+
+/**
+ * FAA-135: the caller's agent id as a service's own hook named it from a per-agent credential (contract delegation.md,
+ * `surfaces.mcp.auth: own`), read as the mandate chain binds it: pass the answer as actionGate's and jobStep's
+ * `callerAgent`. null or undefined (no per-agent credential) is null, and the chain's end alone binds the mandate, as
+ * before; an agent id the registry accepts is that id; anything else is UNREADABLE_AGENT. A hook that throws: pass
+ * UNREADABLE_AGENT. The Python twin's McpToolServer(identify_agent=) reads it so; never a name the call carries.
+ */
+export function identifiedAgent(value) {
+  if (value === null || value === undefined) return null;
+  return isAgentId(value) ? value : UNREADABLE_AGENT;
+}
 
 /** A spend estimate as a mandate reads it (FAA-139): a finite number stays, anything else is none (a ceiling refuses it). */
 export function mandateSpend(value) {

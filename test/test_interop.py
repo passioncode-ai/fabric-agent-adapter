@@ -1013,6 +1013,51 @@ class McpMandateTests(unittest.TestCase):
         server = self.server(agent_id="example-agent", authorize=verdict("example-lead"))
         self.assertFalse(self.call(server, {"mandate": lead_mandate()})["isError"])
 
+    def test_identify_agent_binds_a_per_agent_credentials_agent_id(self):
+        """FAA-135: a service that authenticates its caller with a per-agent credential names its agent id through
+        identify_agent(headers, tier); the mandate's chain must then hold it before this agent. None binds nothing (the
+        chain's end alone binds, as before); a name the registry refuses, or a hook that raises, binds an id no chain
+        holds (fail closed); a delegation's caller is read first."""
+        def boom(headers, tier):
+            raise RuntimeError("the credential store is down")
+        cases = [(lambda h, t: "example-lead", None, False), (lambda h, t: None, None, False),
+                 (lambda h, t: "example-other", None, "mandate-not-for-this-call"),
+                 (lambda h, t: "Not An Agent", None, "mandate-not-for-this-call"),
+                 (lambda h, t: 42, None, "mandate-not-for-this-call"), (boom, None, "mandate-not-for-this-call"),
+                 (lambda h, t: "example-other", "example-lead", False)]
+        for hook, delegated, refused in cases:
+            options = {"agent_id": "example-agent", "identify_agent": hook}
+            if delegated:
+                options["authorize"] = lambda tool, headers, tier="T2": {"ok": True, "tier": tier, "principal": "person:p",
+                                                                         "caller": delegated}
+            with self.subTest(hook=hook, delegated=delegated):
+                result = self.call(self.server(**options), {"mandate": lead_mandate()})
+                if refused:
+                    error = result["structuredContent"]["error"]
+                    self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": refused}))
+                else:
+                    self.assertFalse(result["isError"], result)
+                    self.assertEqual(self.seen[-1].record["via"], "mandate")
+
+    def test_identify_agent_reads_the_headers_and_the_tier(self):
+        heard = []
+        server = self.server(agent_id="example-agent", identify_agent=lambda h, t: heard.append((h, t)) or "example-lead")
+        params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"},
+                  "_meta": {"traceparent": PARENT, "mandate": lead_mandate()}}
+        result = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params},
+                               {"Authorization": "Bearer example"}, tier="T1")["result"]
+        self.assertFalse(result["isError"], result)
+        self.assertEqual(heard, [({"Authorization": "Bearer example"}, "T1")])
+
+    def test_identified_agent_reads_a_hooks_answer(self):
+        self.assertIsNone(fi.identified_agent(None))
+        self.assertEqual(fi.identified_agent("example-lead"), "example-lead")
+        self.assertEqual(fi.identified_agent("example-lead.prod"), "example-lead.prod")
+        for unreadable in ("", "Example", "agent:remote", 7, True, ["example-lead"], {"id": "example-lead"}):
+            with self.subTest(value=unreadable):
+                self.assertEqual(fi.identified_agent(unreadable), fi.UNREADABLE_AGENT)
+        self.assertFalse(fm.is_agent_id(fi.UNREADABLE_AGENT))
+
     def test_a_t2_callers_mandate_changes_nothing(self):
         server = self.server(agent_id="example-agent", identify=lambda headers, tier: "agent:remote")
         error = self.call(server, {"mandate": lead_mandate()}, tier="T2")["structuredContent"]["error"]
@@ -1156,6 +1201,27 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertEqual(record, {"by": "operator", "via": "mandate", "task": "answer the reviews",
                                   "chain": ["example-lead", "example-agent"], "source": SOURCE})
         self.assertEqual(self.jobs.get(job_id)["status"], "working")
+
+    def test_identify_agent_binds_the_steps_mandate_at_the_start_and_at_the_answer(self):
+        """FAA-135: the agent id identify_agent names for the start call binds the chain at the job's own approval step;
+        an answer's mandate is read with the agent id the answering call's credential names."""
+        self.start({"mandate": relayed_mandate()}, identify_agent=lambda headers, tier: "example-other")
+        job_id, record = self.step()
+        self.assertIsNone(record)
+        self.assertIn("mandate-not-for-this-call", self.jobs.get(job_id)["statusMessage"])
+        self.start({"mandate": relayed_mandate()}, identify_agent=lambda headers, tier: "example-lead")
+        job_id, record = self.step()
+        self.assertEqual(record["via"], "mandate")
+        server = self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})},
+                            input_actions=True, identify_agent=lambda headers, tier: "example-other")
+        job_id, _ = self.step()
+        answer = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"approve-reply": {
+                "action": "accept", "content": {"choice": "yes"}}}},
+            "_meta": {"traceparent": PARENT, "mandate": relayed_mandate()}}}
+        error = server.handle(answer, tier="T0")["result"]["structuredContent"]["error"]
+        self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": "mandate-not-for-this-call"}))
+        self.assertEqual(self.inputs, [])
 
     def test_a_step_it_does_not_cover_waits_naming_the_part(self):
         self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
