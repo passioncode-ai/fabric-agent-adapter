@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.80.1 (2026-11-12)
+
+0.80.0 was tagged and never published: its release run (43209105658) failed `floors`, `python` and `windows` on two
+tests of 0.80.0's own (FAA-239, FAA-240) that held only on macOS, so `release` and `publish` were skipped. 0.80.1 is
+0.80.0 with the two tests fixed, and is the release that ships it. No module changes.
+
+### Fixed
+
+- `test_a_copy_outside_the_launchers_folder_is_named` wrote `hub.json` where the runner's own platform keeps it while
+  `status` read darwin's; it writes it where darwin keeps it.
+- `test_the_launchers_folder_is_macos_only` set a Windows temporary folder as a darwin path, which is not absolute
+  there; it uses a POSIX path.
+
 ## 0.80.0 (2026-11-12)
 
 Wave 2 and the first part of wave 3 of the backlog sweep of 2026-11-12. The contract pin stays `18f8d487`. A new kit

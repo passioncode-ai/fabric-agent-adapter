@@ -2412,8 +2412,9 @@ class Status(Base):
 
     def test_the_launchers_folder_is_macos_only(self):
         # FAA-240 item 1: status's darwin guard on launcher_folder (removing it fails this)
-        env = dict(self.env, PASSIONCODE_APPLICATIONS=str(self.base / "Apps"))
-        self.assertEqual(fs.status(self.repo, env, "darwin")["launcherFolder"], str(self.base / "Apps"))
+        apps = "/opt/example/Apps"  # a darwin path on any runner: a Windows temp folder is not absolute there (0.80.0 CI)
+        env = dict(self.env, PASSIONCODE_APPLICATIONS=apps)
+        self.assertEqual(fs.status(self.repo, env, "darwin")["launcherFolder"], apps)
         for platform in ("linux", "win32"):
             self.assertIsNone(fs.status(self.repo, env, platform)["launcherFolder"], platform)
 
@@ -2447,6 +2448,7 @@ class Status(Base):
         mine.parent.mkdir(parents=True)
         mine.write_text("")
         self.register(command=str(mine))
+        self.root = fs.fabric_root("darwin", env=self.env)  # status reads darwin's hub.json on any runner (0.80.0 CI)
         self.hub()
         report = fs.status(self.repo, env, "darwin")
         self.assertEqual((report["fabricMcp"], report["ownCopyOutside"]), (None, str(mine)))
