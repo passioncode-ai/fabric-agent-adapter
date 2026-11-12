@@ -4,7 +4,8 @@
 
 Wave 4 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`). Kit modules
 change: `fabric_secrets`, `fabric_connections`, `fabric_peer_owner` (`1.2.0+kit.6`), `fabric_descriptor`,
-`fabric_holds`, `fabric_hub`, `fabric-delegation.mjs`, and their Node twins; dashboard kit 1.1.7.
+`fabric_holds`, `fabric_hub`, `fabric_lock`, the facade `fabric_service`, `fabric-delegation.mjs`, and their Node twins;
+dashboard kit 1.1.7.
 
 ### Changed
 
@@ -34,6 +35,22 @@ change: `fabric_secrets`, `fabric_connections`, `fabric_peer_owner` (`1.2.0+kit.
   `gui/<uid>` first, then in the probe's own; `in_launch_daemons` is `fabric_supervisors._in_daemons`, imported.
 - **Dashboard kit 1.1.7** (FAA-314): `fabric-button.js` reads credentials with DEC-0151's `SECRET_VALUE`, held to the
   contract's `secretValue` and `credentialName` vectors.
+
+### Fixed
+
+- **A copy holding the instance lock stops when its lock file is replaced** (FAA-303, the 0.79.0 seam reading). On
+  macOS `flock` and `O_EXLOCK` lock an inode, so a data folder swapped under a running copy let a second copy lock the
+  new file and start. `hold_single_instance` / `holdSingleInstance` now start `InstanceLock.watch` /
+  `InstanceLock#watch` there: every `LOCK_WATCH_SECONDS` (2 s) it compares the locked inode with the file at the path,
+  and once the path names another file the copy exits 75 with one sentence naming the path (`lost_lock_message` /
+  `lostLockMessage`; `on_lost` / `onLost` replaces that reaction). The two copies overlap for at most one interval.
+  Linux and Windows keep their path-keyed name and are unchanged.
+- **Tests that failed under load** (FAA-308): the linear-time tests for `raw_values` and the minified JSON line read the
+  thread's CPU time, not the wall clock (kept on Windows), so a load near 110 no longer fails them, while a quadratic
+  implementation still does; the board sample's probe test lets `well-known.fast`, which times the machine, go either
+  way, as `test_probe_interop` does.
+- A flaky test drew a SAS signature without a digit about once in 1500 runs, a shape the long-run rule excludes by its
+  definition; it now draws one in the rule's shape.
 
 ### Added
 
