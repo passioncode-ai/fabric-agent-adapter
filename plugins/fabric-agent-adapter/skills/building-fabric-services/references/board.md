@@ -323,7 +323,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   a slot is moved the responder reads `com.status` once a renewal (20 s; one read a tick for every moved slot, FAA-194 (5)) and, when the slot's generation is past the
   recorded move, sends one `com.claim` under a fresh key, as PR-2's "Learning the slot is its own" says (FAA-165,
   0.60.0); the move itself drops the claim key of that capability, whose receipt the move made dead. A claim that
-  lands is the slot held again: the record loses `moved`, the request it handed out is worked (with none, its own
+  lands is the slot held again (`board.slot.returned`, info, says so; FAA-194 (8)): the record loses `moved`, the request it handed out is worked (with none, its own
   enroll renews the lease at once), accepted work left `lapsed` comes back with a transfer, and a later move is said
   again. `lease_expired` (the move reached this session and its lease lapsed first) enrolls again. `held` asks again
   at the next renewal. `idempotency_window_expired` or `capacity_exceeded` asks again at the next renewal under a

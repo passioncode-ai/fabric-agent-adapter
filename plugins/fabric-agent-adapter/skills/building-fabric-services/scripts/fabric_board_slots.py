@@ -208,7 +208,9 @@ class SlotKeeper:
             self.slots[capability] = {"state": "held", "generation": generation, "renewed_at": float("-inf")}  # no lease yet
             self._held_at(capability, generation)
             self._said.pop("board.slot.moved", None)  # a later move is said again
-        return True
+        self._emit("board.slot.returned", "info", "The %s slot on this Project is this service's again: the operator moved it "
+                   "back here, and it answers it from now on." % capability, capability=capability, generation=generation)
+        return True  # FAA-194 (8): the feed no longer ends on the move's warning
 
     def take_back(self, capability: str) -> None:
         """The operator's act, never the kit's: forget the move; the next tick enrolls once the slot is free (FAA-155)."""

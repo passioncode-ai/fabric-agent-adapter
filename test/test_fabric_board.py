@@ -1427,6 +1427,24 @@ class MovedBackTwoCapabilitiesTests(Conversation):
         self.assertIsNotNone(r.session)
         self.assertEqual({c: s["holder"] for c, s in self.board.slots.items()}, {"video.render": mine, "video.cut": mine})
 
+    def test_a_move_back_is_said(self):
+        """FAA-194 (8): a move back left no event, so the feed ended on board.slot.moved's warning; it says the slot is
+        this service's again (board.slot.returned, info, the capability its subject)."""
+        r = self.responder()
+        r.step()
+        mine = self.board.slots["video.cut"]["holder"]
+        self.board.move("video.cut")
+        self.board.advance(20)
+        r.step()
+        self.board.move("video.cut", to=mine)
+        self.board.advance(20)
+        r.step()
+        back = [e for e in self.events if e[0] == "board.slot.returned"]
+        self.assertEqual(len(back), 1, self.kinds())
+        self.assertEqual(back[0][1], "info")
+        self.assertIn("video.cut", back[0][2])
+        self.assertIn("moved it back", back[0][2])
+
     def test_moved_slots_share_one_status_read_a_tick(self):
         """FAA-194 (5): each moved slot read its own com.status once a renewal; a tick now reads it once for all of them."""
         r = self.responder()

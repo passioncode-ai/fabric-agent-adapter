@@ -208,14 +208,17 @@ export class SlotKeeper {
   }
 
   /** The slot is this session's again at `generation`: held, its record rewritten without the move (FAA-165). */
-  back(capability, held, generation) {
-    return this.locked(() => {
+  async back(capability, held, generation) {
+    const back = await this.locked(() => {
       if (!sameRecord(this.checkpoint.slots[capability], held)) return false; // a takeBack forgot it; its own next tick enrolls
       this.slots[capability] = { state: 'held', generation, renewedAt: -Infinity }; // no lease yet
       this.heldAt(capability, generation);
       delete this.said['board.slot.moved']; // a later move is said again
       return true;
     });
+    // FAA-194 (8): the feed no longer ends on the move's warning
+    if (back) this.emit('board.slot.returned', 'info', `The ${capability} slot on this Project is this service's again: the operator moved it back here, and it answers it from now on.`, { capability, generation });
+    return back;
   }
 
   /**

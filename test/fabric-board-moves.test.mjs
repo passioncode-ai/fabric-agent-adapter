@@ -273,3 +273,18 @@ test('FAA-187 (21): a notify notice carries the link the service gives for its k
     assert.throws(() => new fb.Responder({ ...h.options(), links: bad }), (e) => e.code === 'invalid_arguments', JSON.stringify(bad));
   }
 });
+
+// FAA-194 (8): a move back says the slot is this service's again.
+test('FAA-194 (8): a move back is said', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  const r = h.responder();
+  await r.step();
+  const mine = (await h.control({ op: 'state' })).slots['video.cut'].holder;
+  await h.control({ op: 'move', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.cut', to: mine });
+  await h.advance(20);
+  await r.step();
+  assert.equal(h.events.filter((k) => k === 'board.slot.returned').length, 1, h.events.join(', '));
+});
