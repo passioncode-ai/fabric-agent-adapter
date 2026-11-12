@@ -843,8 +843,8 @@ class WhatIsRead(Tree):
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
-        for name in ("fabric_source_check.py", "fabric_source_ignore.py", "fabric_source_homes.py", "fabric_source_restart.py",
-                     "fabric_secrets.py"):
+        for name in ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py", "fabric_source_homes.py",
+                     "fabric_source_restart.py", "fabric_secrets.py"):
             shutil.copy(SCRIPTS / name, tools / name)
         self.git("init", "-q")
         self.git("add", "-A")
@@ -1493,7 +1493,7 @@ class Refusals(Tree):
 
     def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
         siblings = ("fabric_source_ignore.py", "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py",
-                    "fabric_source_tree.py")  # 0.81.0 seam: the tree module, imported only when a manifest is there
+                    "fabric_source_tree.py", "fabric_source_check_cli.py")  # 0.81.0 seam: the tree module, imported only when a manifest is there
         (self.root / "fabric.source.json").write_text("{}\n", encoding="utf-8")
         for missing in siblings:  # reading 38, seam: each sibling left behind in turn
             tools = self.tmp / ("tools-" + missing)
@@ -1865,6 +1865,54 @@ class TheAdapterChecksItself(unittest.TestCase):
             code, out, err = run(["check", str(ROOT), "--instance-strings", str(empty)])
         self.assertEqual(code, 0, out + err)
 
+
+
+class TheDetectorIsReadByItsPublicNames(unittest.TestCase):
+    """FAA-190 (2), (12), (89), (104): the check and its tree module read only fabric_secrets' public names, every one
+    of them is checked inside the import guard, and the command line lives in a sibling, so the check stays under the
+    kit's 1000 lines."""
+
+    def secrets_names(self, name):
+        import ast
+        tree = ast.parse((SCRIPTS / name).read_text(encoding="utf-8"))
+        return {node.attr for node in ast.walk(tree)
+                if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == "_secrets"}
+
+    def test_only_public_names_are_read(self):
+        for name in ("fabric_source_check.py", "fabric_source_check_cli.py"):
+            with self.subTest(name):
+                private = sorted(n for n in self.secrets_names(name) if n.startswith("_"))
+                self.assertEqual(private, [], "%s reads private names of fabric_secrets" % name)
+
+    def test_every_name_the_check_reads_is_checked_when_it_loads(self):
+        used = self.secrets_names("fabric_source_check.py") | self.secrets_names("fabric_source_check_cli.py")
+        self.assertTrue(used)
+        self.assertLessEqual(used, set(sc.SECRETS_NAMES))
+        for name in sc.SECRETS_NAMES:
+            self.assertTrue(hasattr(sc._secrets, name), name)
+
+    def test_a_detector_from_another_version_is_refused_with_exit_2(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        tools, root = tmp / "tools", tmp / "root"
+        tools.mkdir()
+        root.mkdir()
+        for name in ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py",
+                     "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py"):
+            shutil.copy(SCRIPTS / name, tools / name)
+        older = (tools / "fabric_secrets.py").read_text(encoding="utf-8") + "\ndel BEARER_INSIDE  # as before 0.83.0\n"
+        (tools / "fabric_secrets.py").write_text(older, encoding="utf-8")
+        (root / "a.txt").write_text("plain\n", encoding="utf-8")
+        done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(root), "--every-file"],
+                              capture_output=True, text=True)
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("fabric_secrets.py beside this file is from another version", done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
+
+    def test_the_command_line_is_a_sibling(self):
+        self.assertLessEqual(len((SCRIPTS / "fabric_source_check.py").read_text(encoding="utf-8").splitlines()), 950)
+        self.assertTrue((SCRIPTS / "fabric_source_check_cli.py").is_file())
+        self.assertEqual(sc.run.__module__, "fabric_source_check")  # the entry point keeps its name
 
 if __name__ == "__main__":
     unittest.main()

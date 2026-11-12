@@ -118,12 +118,21 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 | Kind | Finds |
 |---|---|
 | `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name holds a space, a dash, a dot, an underscore or an apostrophe (each a dash in the dashed form; a slashed name also ends at a space) declares it with `home: <name>` in the owner's list, which reads it whole in every form, and one whose home name is not ASCII, or holds another character, lists it as a plain string (a typographic apostrophe a keyboard typed, which the folder's name does not hold, is written as `'` in `home:`; a folder whose name holds `’` is listed as a plain string with `’` kept and declared too with `home: <name>` written with `'`, which reads the dashed forms; its URL-encoded `’` is not read; a name outside ASCII of one or two characters cannot be checked) |
-| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
+| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (a run of 40 or more characters mixing upper case, lower case and digits, so a shorter key under `X_API_KEY=` is not read; but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
 ```bash
 python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check <project-root>
 ```
+
+Run it by path, with its scripts folder whole: it loads its siblings (`fabric_source_ignore.py`,
+`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_check_cli.py`, `fabric_source_tree.py` and the
+contract's detector `fabric_secrets.py`) and refuses with exit `2` when one is missing or from another version, a
+detector without one of the public names it reads included (FAA-190). `python3 -m fabric_source_check` writes its own
+`.pyc` before the check turns bytecode off; run by path, it writes nothing. `ROOT` defaults to the current folder.
+`--json` prints one object: `mode` (`git` or a walk), `files`, `findings` (`path`, `line`, `kind`, `rule`),
+`notRead`, `skipped`, `dependencies`, `instanceStrings`, `ownerHomes`, `instanceList`, `blocking` (a finding) and
+`complete` (every file read); `--help` names each option.
 
 - It **never repeats** a value it found: no value, no line holding one, no entry of the owner's list and not the
   folder it checks reaches its output. A file's path is checked like its text (line `0` of a finding), and printed
@@ -171,7 +180,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
   percent-encodings or an escaped apostrophe (`\'`, `\x27`, `\u0027`, `&#39;`, `&#x27;`, `&apos;`), the same separators it is found with in every form; a home that is also your name goes in the list
   as a plain string too, to be found in text. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
-  (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows). A list inside the tree is refused, because it would
+  (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; on Windows `%APPDATA%` when it is absolute, else `~\AppData\Roaming`). A list inside the tree is refused, because it would
   travel with the source. A person who already keeps private terms for org-index's `check_private.py`
   (`~/.config/passioncode/private-terms.txt`) passes that file with `--instance-strings`; this check matches a term
   anywhere in a word, and it does not look for e-mail addresses or account ids by their shape.

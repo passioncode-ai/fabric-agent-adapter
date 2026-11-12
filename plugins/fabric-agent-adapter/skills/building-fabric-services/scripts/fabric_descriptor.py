@@ -55,7 +55,7 @@ from fabric_usage import (
 DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
 
 
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.7"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.8"
 
 
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")
@@ -197,9 +197,11 @@ def read_descriptors(directory: Optional[Path] = None) -> List[Tuple[Path, Dict[
         return found
     for path in sorted(root.glob("*.json")):
         try:
-            found.append((path, json.loads(path.read_text(encoding="utf-8"))))
-        except (OSError, ValueError):
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, RecursionError):
             continue
+        if isinstance(value, dict):  # a file that holds no object is no descriptor (FAA-200 (50))
+            found.append((path, value))
     return found
 
 
@@ -222,10 +224,11 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
         return problems
     if descriptor["protocol"] != PROTOCOL:
         problems.append("protocol must be %s" % PROTOCOL)
-    if not _ID.match(str(descriptor["id"])):
-        problems.append("id must match %s" % _ID.pattern)
-    if not _INSTANCE.match(str(descriptor["instance"])):
-        problems.append("instance must match %s" % _INSTANCE.pattern)
+    for key, pattern in (("id", _ID), ("instance", _INSTANCE)):  # a string before its pattern (FAA-200 (9), (36))
+        if not isinstance(descriptor[key], str):
+            problems.append("%s must be a string" % key)
+        elif not pattern.match(descriptor[key]):
+            problems.append("%s must match %s" % (key, pattern.pattern))
     if remote:
         problems.extend(remote_origin_problems(descriptor["origin"]))
     elif "origin" in descriptor and not _ORIGIN.match(str(descriptor["origin"])):
@@ -234,11 +237,11 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
     if "tokenFile" not in auth:
         problems.append("auth.tokenFile is required")
     elif not _LOCAL_PATH.match(str(auth["tokenFile"])):
-        problems.append("auth.tokenFile must be a local path, never a network share")
+        problems.append("auth.tokenFile must be an absolute local path (/, ~/ or a drive letter), never a relative path, never a network share")
     paths = descriptor.get("paths") or {}
     for value in ([paths["data"]] if "data" in paths else []) + list(paths.get("logs") or []):
         if not _LOCAL_PATH.match(str(value)):
-            problems.append("paths must be local paths, never a network share: %r" % value)
+            problems.append("paths must be absolute local paths (/, ~/ or a drive letter), never a relative path, never a network share: %r" % value)
     header = auth.get("header", "Authorization")
     scheme = auth.get("scheme", "Bearer")
     if not (isinstance(header, str) and _AUTH_HEADER.fullmatch(header)):
@@ -405,7 +408,7 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             elif "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
                 problems.append("source.repository with a user is a URL with an authority (https://user@host/path), never an scp form")
             elif fabric_secrets.repository_credential(repository):  # its name is no key (0.62.0 seam reading 6)
-                problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository")
+                problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one")
     if "peer" in descriptor:
         peer = descriptor.get("peer")
         if not isinstance(peer, dict):
@@ -589,8 +592,15 @@ def port_listener_refusal(port: int, reader: Optional[Any] = None) -> Optional[s
             "FAA-225)." % (port, uid))
 
 
+def warn_no_source(descriptor: Dict[str, Any], stacklevel: int = 2) -> None:
+    """The rewrite warning of a descriptor that names no source.repository (FAA-198)."""
+    me = "%s.%s" % (descriptor["id"], descriptor["instance"])
+    warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY),
+                  NoSourceRepositoryWarning, stacklevel=stacklevel + 1)
+
+
 def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = None, *, _stacklevel: int = 2,
-                     port_owner: Optional[Any] = None) -> Path:
+                     port_owner: Optional[Any] = None, _warned: bool = False) -> Path:
     """Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim), and a port another
     OS account listens on (FAA-225; ``port_owner(port) -> (kind, uid) | None`` reads it, the kit's own by default).
 
@@ -604,9 +614,8 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
     refusal = source_refusal(descriptor, root)
     if refusal:
         raise ServiceError(refusal)
-    if not names_repository(descriptor):
-        warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY),
-                      NoSourceRepositoryWarning, stacklevel=_stacklevel)
+    if not names_repository(descriptor) and not _warned:  # register_remote warns itself, before its token (FAA-200 (1))
+        warn_no_source(descriptor, _stacklevel)
     # DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
     port = None if placement_of(descriptor) == "remote" or "origin" not in descriptor else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):

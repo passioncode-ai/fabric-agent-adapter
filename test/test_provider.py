@@ -92,22 +92,31 @@ class DirectoryTests(unittest.TestCase):
         self.manifest.write_text(json.dumps({"contractVersion": "0.1.0", "provider": {"id": "https://agents.example/providers/example-agent"}, "capabilities": []}))
 
     def e(self, **extra):
-        return entry(manifest=str(self.manifest), **extra)
+        return entry(manifest=self.manifest.as_posix(), **extra)
 
     def tearDown(self):
         self.temp.cleanup()
 
-    def test_default_directory_is_beside_services(self):
-        with mock.patch.dict(os.environ, {"FABRIC_SERVICES_DIR": str(self.services)}, clear=False):
-            os.environ.pop("FABRIC_PROVIDERS_DIR", None)
-            self.assertEqual(fp.providers_dir(), self.services.parent / "providers")
-        with mock.patch.dict(os.environ, {"FABRIC_PROVIDERS_DIR": str(self.providers)}):
+    def test_the_directory_follows_fabrics_registry_dirs(self):
+        # FAA-189 (2): Fabric's registryDirs reads FABRIC_PROVIDERS_DIR, else the platform's Fabric root; a set
+        # FABRIC_SERVICES_DIR moves the services folder only, never the providers folder beside it.
+        base = Path(self.temp.name)
+        env = {k: v for k, v in os.environ.items() if k not in ("FABRIC_SERVICES_DIR", "FABRIC_PROVIDERS_DIR", "XDG_DATA_HOME")}
+        with mock.patch.dict(os.environ, dict(env, FABRIC_SERVICES_DIR=str(self.services), XDG_DATA_HOME=str(base / "data")),
+                             clear=True), mock.patch.object(fp.sys, "platform", "linux"):
+            self.assertEqual(fp.services_dir(), self.services)
+            self.assertEqual(fp.providers_dir(), base / "data" / "passioncode-fabric" / "providers")
+        with mock.patch.dict(os.environ, dict(env, FABRIC_PROVIDERS_DIR=str(self.providers))):
             self.assertEqual(fp.providers_dir(), self.providers)
+        home = dict(env, FABRIC_PROVIDERS_DIR="~/p", HOME=str(base), USERPROFILE=str(base))  # every home a platform reads
+        with mock.patch.dict(os.environ, home, clear=True), mock.patch.object(fp.Path, "home", return_value=base):
+            self.assertEqual(fp.providers_dir(), base / "p")
 
     def test_write_is_private_and_reinstall_is_allowed(self):
         path = fp.write_provider_entry(self.e(), self.providers, self.services)
         self.assertEqual(path, self.providers / "example-agent.json")
-        self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
+        if os.name == "posix":  # a mode is POSIX's; Windows keeps the file in the user's own folder
+            self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         self.assertEqual(json.loads(path.read_text())["id"], "example-agent")
         fp.write_provider_entry(self.e(name="Example Agent 2"), self.providers, self.services)
         self.assertEqual(json.loads(path.read_text())["name"], "Example Agent 2")
@@ -129,9 +138,19 @@ class DirectoryTests(unittest.TestCase):
             fp.write_provider_entry(self.e(providerId="https://agents.example/providers/example-writer"), self.providers, self.services)
         self.assertIn("FAC-SEM-014", str(caught.exception))
         with self.assertRaises(fp.ProviderError) as caught:
-            fp.write_provider_entry(entry(manifest=str(self.manifest.parent / "missing" / "fabric-agent.json")), self.providers, self.services)
+            fp.write_provider_entry(entry(manifest=(self.manifest.parent / "missing" / "fabric-agent.json").as_posix()), self.providers, self.services)
         self.assertIn("FAC-SEM-014", str(caught.exception))
         self.assertFalse(self.providers.exists() and any(self.providers.iterdir()))
+
+    def test_a_manifest_holding_nan_does_not_resolve(self):
+        # FAA-194 (38): NaN and Infinity are no JSON, as pack, sign and verify read the provider manifest
+        for constant in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(constant):
+                self.manifest.write_text('{"provider": {"id": "https://agents.example/providers/example-agent"}, '
+                                         '"capabilities": [], "n": %s}' % constant)
+                problems = fp.manifest_problems(self.e())
+                self.assertEqual(len(problems), 1)
+                self.assertIn("does not resolve", problems[0])
 
     def test_validate_reads_the_file_name(self):
         path = fp.write_provider_entry(self.e(), self.providers, self.services)
@@ -165,6 +184,15 @@ class DirectoryTests(unittest.TestCase):
                 mock.patch.object(fp.Path, "home", return_value=base):
             self.assertEqual(fp.providers_dir(), base / "AppData" / "Local" / "passioncode-fabric" / "providers")
 
+    def test_a_drive_relative_argument_is_read_by_the_file_it_names(self):
+        # FAA-189 (8): on Windows `C:example-agent.json` names example-agent.json in drive C's folder; its stem is
+        # example-agent, never `C:example-agent` (off Windows a colon is part of a name).
+        self.assertEqual(fp.argument_stem("C:example-agent.json", "win32"), "example-agent")
+        self.assertEqual(fp.argument_stem("c:sub\\example-agent.json", "win32"), "example-agent")
+        self.assertEqual(fp.argument_stem("C:\\x\\example-agent.json", "win32"), "example-agent")
+        self.assertEqual(fp.argument_stem("C:example-agent.json", "linux"), "C:example-agent")
+        self.assertEqual(fp.argument_stem("/x/example-agent.json", "darwin"), "example-agent")
+
     @unittest.skipIf(sys.platform == "win32", "a file name holding a backslash exists only off Windows")
     def test_validate_reads_the_stem_after_either_separator(self):
         # CT-193 (FAC-SEM-014, registry-rules.ts): the stem is what follows the last / or \\, on every platform.
@@ -194,7 +222,7 @@ class DirectoryTests(unittest.TestCase):
     def test_cli_writes_and_removes(self):
         env = dict(os.environ, FABRIC_PROVIDERS_DIR=str(self.providers), FABRIC_SERVICES_DIR=str(self.services))
         write = subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "write", "--id", "example-agent",
-                                "--name", "Example Agent", "--manifest", str(self.manifest),
+                                "--name", "Example Agent", "--manifest", self.manifest.as_posix(),
                                 "--provider-id", "https://agents.example/providers/example-agent",
                                 "--installed-by", "test", "--env", "EXAMPLE_API_KEY=secret-ref:example-agent/EXAMPLE_API_KEY",
                                 "--stdio", "~/.local/bin/example-agent", "mcp"], capture_output=True, text=True, env=env)
@@ -202,7 +230,7 @@ class DirectoryTests(unittest.TestCase):
         written = json.loads((self.providers / "example-agent.json").read_text())
         self.assertEqual(written["run"]["mcp"]["stdio"]["command"], ["~/.local/bin/example-agent", "mcp"])
         refused = subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "write", "--id", "example-writer",
-                                  "--name", "W", "--manifest", str(self.manifest), "--provider-id", "https://agents.example/providers/example-writer", "--installed-by", "t",
+                                  "--name", "W", "--manifest", self.manifest.as_posix(), "--provider-id", "https://agents.example/providers/example-writer", "--installed-by", "t",
                                   "--env", "K=literal-value", "--stdio", "/bin/x"], capture_output=True, text=True, env=env)
         self.assertEqual(refused.returncode, 1)
         self.assertNotIn("literal-value", refused.stderr)
@@ -229,14 +257,19 @@ class SchemaParityTests(unittest.TestCase):
                     "https://me@corp.example:hunter2@github.com/a/b", "wss:u@x:pw@h/a", "ssh://a\\b:pw@host/r",
                     "https://github.com/a/b?t=ghp_" + "a1B2" * 9,
                     "https://h\\u:hunter2@x.example/o/r", "https://u\\:hunter2@h.example/o/r"):  # as git reads it (seam r10)
-            self.assertIn("source.repository carries no password or credential: it names the repository",
-                          fp.validate_provider_entry(entry(source={"repository": bad})), bad)
+            self.assertTrue(any(p.startswith("source.repository carries no password or credential: it names the repository")
+                                for p in fp.validate_provider_entry(entry(source={"repository": bad}))), bad)
         self.assertEqual(fp.validate_provider_entry(entry(source={"repository": "ssh://git@example.com/a.git"})), [])
         for good in ("https://h/x?a=b:c@d", "https://github.com/a:b", "https://github.com/example-org/task-pipeline-dashboard"):
             self.assertEqual(fp.validate_provider_entry(entry(source={"repository": good})), [], good)
         for opaque in ("https:u@h:443/a", "bot:fixture@github.com:example-org/r", "bot:fixture@github.com:example-org/r?x=://",
                        "bot:fixture@github.com:example-org/r#://", "https:u@h/o/r/x://y"):  # a user is an authority's (readings 7, 8)
             self.assertNotEqual(fp.validate_provider_entry(entry(source={"repository": opaque})), [], opaque)
+
+    def test_a_mixed_case_name_with_a_digit_is_told_the_remedy(self):
+        # FAA-200 (19), as the service kit says it
+        problems = fp.validate_provider_entry(entry(source={"repository": "https://github.com/example/Agent" + "Qx7a" * 10}))
+        self.assertTrue(any("write the repository's name in lower case if it is one" in p for p in problems), problems)
 
     def test_a_uri_is_rfc_3986_characters_as_the_contract_reads_it(self):
         # FAA-127: ajv-formats `uri` refuses a byte-order mark, a zero-width space, a non-ASCII path and an IDN host;
@@ -324,7 +357,7 @@ class CliRefusalTests(unittest.TestCase):
 
     def run_writer(self, *tail):
         return subprocess.run([sys.executable, str(SCRIPTS / "fabric_provider.py"), "write", "--id", "example-agent", "--name", "Example Agent",
-                               "--manifest", str(self.manifest), "--provider-id", "https://agents.example/providers/example-agent",
+                               "--manifest", self.manifest.as_posix(), "--provider-id", "https://agents.example/providers/example-agent",
                                "--installed-by", "test"] + list(tail), capture_output=True, text=True, env=self.env)
 
     def test_env_with_url_is_refused(self):

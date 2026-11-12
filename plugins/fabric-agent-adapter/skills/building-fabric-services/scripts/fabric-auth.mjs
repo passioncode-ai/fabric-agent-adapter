@@ -7,7 +7,7 @@ import { PROTOCOL, ServiceError, nowIso } from './fabric-base.mjs';
 import { tokenMatches, windowsTokenProblem } from './fabric-platform.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { isPlainObject } from './fabric-usage.mjs';
-import { descriptorPath, namesRepository, sourceRefusal, validateDescriptor, writeDescriptor } from './fabric-descriptor.mjs';
+import { descriptorPath, namesRepository, sourceRefusal, validateDescriptor, warnNoSource, writeDescriptor } from './fabric-descriptor.mjs';
 
 export const SESSION_COOKIE = 'fabric_session';
 
@@ -286,9 +286,11 @@ export function registerRemote({ id, instance = 'default', name, summary, origin
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const refusal = sourceRefusal(d, dir); // before the token is written: a refused install leaves nothing (FAA-198)
   if (refusal) throw new ServiceError(refusal);
+  const warned = !namesRepository(d);
+  if (warned) warnNoSource(d); // before the token: a warning that throws leaves both files as they were (FAA-200 (1))
   ensurePrivateDir(path.dirname(tokenFile));
   atomicWrite(tokenFile, String(token).trim(), 0o600);
-  return writeDescriptor(d, dir);
+  return writeDescriptor(d, dir, { warned });
 }
 
 export function cookieValue(header, name = SESSION_COOKIE) {

@@ -12,13 +12,13 @@ import { protocolsFindings } from './fabric-protocols.mjs';
 import { CONNECTIONS_EXTENSION_KEY, connectionsView } from './fabric-connections.mjs';
 import { ACTIONS_EXTENSION_KEY, actionsExtension, actionsExtensionRules } from './fabric-actions.mjs';
 import { a2aSurfaceProblems } from './fabric-a2a.mjs';
-import { ROUTES } from './fabric-usage.mjs';
+import { ROUTES, isPlainObject } from './fabric-usage.mjs';
 
 // The embedded dashboard declaration (fabric-dashboard/0.1, DEC-0036 ED-9), under the well-known
 // document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 
-export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.7';
+export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.8';
 
 export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 
@@ -47,7 +47,8 @@ export function readDescriptors(dir = servicesDir()) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter((n) => n.endsWith('.json')).sort().flatMap((n) => {
     try {
-      return [[path.join(dir, n), JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'))]];
+      const value = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'));
+      return isPlainObject(value) ? [[path.join(dir, n), value]] : []; // no object, no descriptor (FAA-200 (50))
     } catch {
       return [];
     }
@@ -66,14 +67,16 @@ export function validateDescriptor(d) {
   }
   if (problems.length) return problems;
   if (d.protocol !== PROTOCOL) problems.push(`protocol must be ${PROTOCOL}`);
-  if (!ID.test(d.id)) problems.push(`id must match ${ID}`);
-  if (!INSTANCE.test(d.instance)) problems.push(`instance must match ${INSTANCE}`);
+  for (const [key, pattern] of [['id', ID], ['instance', INSTANCE]]) { // a string before its pattern (FAA-200 (9), (36))
+    if (typeof d[key] !== 'string') problems.push(`${key} must be a string`);
+    else if (!pattern.test(d[key])) problems.push(`${key} must match ${pattern}`);
+  }
   if (remote) problems.push(...remoteOriginProblems(d.origin));
   else if (d.origin !== undefined && !ORIGIN.test(d.origin)) problems.push('origin must be http://127.0.0.1:<port>');
   if (!d.auth?.tokenFile) problems.push('auth.tokenFile is required');
-  else if (!LOCAL_PATH.test(String(d.auth.tokenFile))) problems.push('auth.tokenFile must be a local path, never a network share');
+  else if (!LOCAL_PATH.test(String(d.auth.tokenFile))) problems.push('auth.tokenFile must be an absolute local path (/, ~/ or a drive letter), never a relative path, never a network share');
   for (const value of [...(d.paths?.data !== undefined ? [d.paths.data] : []), ...(d.paths?.logs ?? [])]) {
-    if (!LOCAL_PATH.test(String(value))) problems.push(`paths must be local paths, never a network share: ${JSON.stringify(value)}`);
+    if (!LOCAL_PATH.test(String(value))) problems.push(`paths must be absolute local paths (/, ~/ or a drive letter), never a relative path, never a network share: ${JSON.stringify(value)}`);
   }
   if (!(typeof (d.auth?.header ?? 'Authorization') === 'string' && AUTH_HEADER.test(d.auth?.header ?? 'Authorization'))) problems.push(`auth.header must match ${AUTH_HEADER.source}`);
   if (!['Bearer', 'none'].includes(d.auth?.scheme ?? 'Bearer')) problems.push('auth.scheme is Bearer or none');
@@ -198,7 +201,7 @@ export function descriptorMemberProblems(d) {
       else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential'); // before the host
       else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
       else if (repository.includes('@') && !HIERARCHICAL.test(repository)) problems.push('source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'); // readings 7
-      else if (repositoryCredential(repository)) problems.push('FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository'); // its name is no key (seam 6)
+      else if (repositoryCredential(repository)) problems.push("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one"); // its name is no key (seam 6)
     }
   }
   if ('peer' in d) {
@@ -428,15 +431,18 @@ export function portListenerRefusal(port, reader = portOwner) {
  * account listens on (FAA-225; `portOwner(port) -> [kind, uid] | null` reads it, the kit's own by default).
  * FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns
  * (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY), so an installed agent's update keeps working. */
-export function writeDescriptor(d, dir = servicesDir(), { portOwner: reader = portOwner } = {}) {
+/** The rewrite warning of a descriptor that names no source.repository (FAA-198). */
+export function warnNoSource(d) {
+  process.emitWarning(`Descriptor ${d.id}.${d.instance} ${NO_SOURCE_REPOSITORY}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
+}
+
+export function writeDescriptor(d, dir = servicesDir(), { portOwner: reader = portOwner, warned = false } = {}) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
   const refusal = sourceRefusal(d, dir);
   if (refusal) throw new ServiceError(refusal);
-  if (!namesRepository(d)) {
-    process.emitWarning(`Descriptor ${me} ${NO_SOURCE_REPOSITORY}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
-  }
+  if (!namesRepository(d) && !warned) warnNoSource(d); // registerRemote warns itself, before its token (FAA-200 (1))
   // DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
   const port = placementOf(d) === 'remote' || d.origin === undefined ? null : portOf(d.origin);
   for (const [file, other] of readDescriptors(dir)) {

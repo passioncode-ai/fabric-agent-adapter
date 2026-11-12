@@ -39,8 +39,8 @@ that agents act and report.
 |---|---|---|
 | Fabric running, any start incl. compact/resume | 1,243 chars | 893 at startup or `/clear`; 0 on compact/resume |
 | Fabric down, repository without Fabric (`sshlg-skills`) | 678 | 0 |
-| Fabric down, Fabric repository (`asset-foundry`) | 678 | 217 |
-| Dashboard notice (`asset-foundry`) | 480 at startup and resume | 401 (installed path) at startup and `/clear` |
+| Fabric down, Fabric repository (a media agent's repository) | 678 | 217 |
+| Dashboard notice (a media agent's repository) | 480 at startup and resume | 401 (installed path) at startup and `/clear` |
 
 ## Checks run
 

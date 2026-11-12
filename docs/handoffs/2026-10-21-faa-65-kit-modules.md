@@ -59,7 +59,7 @@ card `projects/fabric-agent-adapter/` (vault commit `a05fbc46`). Roll call answe
 - Notes from review round 3 left as notes (not blocking): the `provider` routing param is not refused (documented);
   two `Client` objects on one ledger each reserve only their own calls (documented: one client per key); `redact_url`
   keeps path parameters (documented as scheme, host, port and path).
-- Services that vendor the kit (asset-foundry, cmo-creative-agent, observatory, brand-agent) keep their copies until
+- Services that vendor the kit (four services of the estate) keep their copies until
   they update with `fabric_kit.py install`; their owners decide when.
 
 ## Next task

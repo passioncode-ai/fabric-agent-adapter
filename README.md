@@ -89,8 +89,9 @@ retries, the agent's own key, a spend ceiling before every attempt, usage receip
 [connectors](plugins/fabric-agent-adapter/skills/building-fabric-services/references/connectors.md)); the draft-and-check step of a support agent as a
 [recipe](plugins/fabric-agent-adapter/skills/building-fabric-services/recipes/support-agent/README.md)
 (the whole agent starts from the [agents database](plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/agents-database.md)'s
-template when one is named (a closed database reached through Fabric's board, or by a grant holder from its own checkout; every ask is
-optional and never blocks), read beside creating-fabric-agents'
+template when one is named (a closed database reached through Fabric's board, or by a grant holder from its own checkout; an ask is
+made only from a folder that is already a Fabric Project and never from a run Fabric started on a board request, and it never
+blocks), read beside creating-fabric-agents'
 [communication agent template](plugins/fabric-agent-adapter/skills/creating-fabric-agents/references/communication-agent-template.md),
 else from that template);
 a complete `scripts/sample_service.py`; and `scripts/check_service.py`, a live probe. A service that answers
@@ -260,7 +261,9 @@ claude plugin validate . --strict
 
 `test/validate.py` reads every SKILL.md front matter as strictly as a YAML parser does; an
 unquoted value holding `: ` fails it. `python3 test/validate.py --frontmatter <SKILL.md ...>`
-checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`. Start in
+checks copies installed elsewhere, such as `~/.agents/skills/*/SKILL.md`. Before a push or a release,
+`python3 test/validate.py --private-terms` checks the tracked files against the operator's private-terms list
+(path and line only; exit 2 when the list is absent, which is not a pass; CONTRIBUTING.md step 6). Start in
 [AGENTS.md](AGENTS.md); contributions follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Use

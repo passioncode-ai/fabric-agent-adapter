@@ -36,7 +36,7 @@ order the open work should be done so the adapter is ready for the first organiz
 | Board | `com.status`, `com.list {unread: true}` | 31 unread, read in full and marked; 2 requests addressed here, `queued` |
 | Fabric tasks | `fabric_work_list`, `fabric_tasks_list` | 9 tasks in `review` (finished, the operator closes them); 1 claim of an ended session, lapsed |
 | Contract | `git log 2f020a6..origin/main` in fabric-agent-contract, its tags and `docs/backlog.md` | 71 commits and 3 releases past the pin (`v0.1.0+2026-10-24`, `+2026-10-24.2`, `+2026-10-25`), DEC-0112 to DEC-0121; 18 open CT rows name the adapter |
-| Roadmap | fabric-workspace `knowledge/roadmap.md` at `e5eae7f5` | the first organization is the RM-28 pilot (two organizations in Vesta at `org.passioncode.ai`); the adapter's part there is packing and sharing (FAA-27, done in 0.31.0) and later publishing (FAA-28) |
+| Roadmap | fabric-workspace `knowledge/roadmap.md` at `e5eae7f5` | the first organization is the RM-28 pilot (two organizations on the organization platform at `org.passioncode.ai`); the adapter's part there is packing and sharing (FAA-27, done in 0.31.0) and later publishing (FAA-28) |
 | Leases | `agent_sync.py residue`, `git ls-remote origin 'refs/agent-sync/*'` | one foreign lease `AUTO-PROJECT-REGISTRATION`, expired 7 days 18 hours |
 
 **Not read.** The board history before today's unread messages was not paged through (about 5 pages of 100 per call);
@@ -110,7 +110,7 @@ release is tagged and on npm; they can be closed.
 2. **FAA-121** the same day: one board message to fabric-agent-contract with a receipt per CT row.
 3. **0.50.0, the contract release:** FAA-117 (repin and DEC-0121) with FAA-118 (Dashboards-only rule); this unblocks
    CT-125 and CT-127, so every service with a dashboard can pin `v0.1.0+2026-10-25`. Reply on `92c6f277` and `38b5b8a8`.
-4. **Pilot check:** with 0.50.0 installed, one personal agent packed, signed, shared into both Vesta organizations
+4. **Pilot check:** with 0.50.0 installed, one personal agent packed, signed, shared into both organizations on the organization platform
    (`org:<id>` placement, DEC-0082) and its dashboard opened from Fabric Dashboards; what fails becomes a row.
 5. **Then** FAA-116 when its reference lands, FAA-28 and FAA-63 when their owners publish.
 
@@ -118,12 +118,12 @@ release is tagged and on npm; they can be closed.
 
 Asked and answered in the session; the answer follows each question.
 
-1. Which organization is "the first"? **The RM-28 pilot pair** (PassionCode.ai and Appvillis in Vesta).
+1. Which organization is "the first"? **The RM-28 pilot pair** (PassionCode.ai and a business organization on the organization platform).
 2. "One new finished project that we integrate"? **An estate release:** the adapter, the contract, Fabric's hub
    (CT-125) and the services with a dashboard ship in order, coordinated by the adapter (FAA-124; proposed on the board,
    thread `0144d916`).
 3. The dashboard kit's labels? **Data attributes and built-in Russian** chosen by the page's `lang`, English by default
-   (FAA-119); the strings go through Copylot.
+   (FAA-119); the strings go through the copy checker.
 4. FAA-87 needs `npm login` on npmjs.com: not answered; it stays a human gate.
 5. A2A? **The adapter drafts `surfaces.a2a` and proposes it to the contract** (FAA-123).
 

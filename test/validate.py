@@ -1116,7 +1116,89 @@ def validate_repo() -> List[str]:
     errors.extend(shipped_pattern_problems())
     errors.extend(https_legend_problems())
     errors.extend(shipped_template_problems())
+    errors.extend(private_term_problems()[0])
     return errors
+
+
+# FAA-243: no tracked file carries a term of the operator's private list (org-index `scripts/check_private.py`, rule P1:
+# his private repositories, organizations, agents and clients). The list is private by that rule and lives only on his
+# machine, so this check holds no term: it reads the list where check_private.py does ($PASSIONCODE_PRIVATE_TERMS, else
+# ~/.config/passioncode/private-terms.txt) and is not run where there is none (hosted CI). A finding names the path and
+# the line, never the term. The terms match as check_private.py matches them: case-insensitive, not inside a run of
+# ASCII letters and digits.
+PRIVATE_TERMS_ENV = "PASSIONCODE_PRIVATE_TERMS"
+# A file whose lines another change of this wave rewrites; each entry names why, and an entry whose file holds no term
+# any more fails, so the list empties itself.
+PRIVATE_TERMS_PENDING: Dict[str, str] = {
+    "test/test_fabric_session_dispatch.py": "wave 5 batch C owns the file (FAA-243)",
+}
+
+
+def private_terms_file() -> Path:
+    import os
+    named = os.environ.get(PRIVATE_TERMS_ENV)
+    return Path(named) if named else Path.home() / ".config/passioncode/private-terms.txt"
+
+
+def private_terms_pattern(lines: List[str]) -> "Optional[re.Pattern[str]]":
+    """One alternation of the list's terms, longest first (check_private.py's load_terms); None for an empty list."""
+    terms = sorted({t.strip() for t in lines if t.strip() and not t.strip().startswith("#")}, key=len, reverse=True)
+    if not terms:
+        return None
+    return re.compile(r"(?<![A-Za-z0-9])(?:" + "|".join(re.escape(t) for t in terms) + r")(?![A-Za-z0-9])", re.IGNORECASE)
+
+
+def private_term_lines(text: str, pattern: "re.Pattern[str]") -> List[int]:
+    return [n for n, line in enumerate(text.splitlines(), 1) if pattern.search(line)]
+
+
+def tracked_files(root: Path = ROOT) -> List[str]:
+    """Every tracked file and every untracked one Git does not ignore, as check_private.py reads a work tree; outside a
+    work tree (a copy without `.git`), every file but the usual generated folders, never nothing."""
+    import subprocess
+    if (root / ".git").exists():
+        try:
+            listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                                    capture_output=True, check=False)
+        except OSError:
+            listed = None
+        if listed is not None and listed.returncode == 0:
+            return sorted({rel for rel in listed.stdout.decode("utf-8", "replace").split("\0") if rel})
+    skip = {".git", "node_modules", "__pycache__", ".venv", "venv"}
+    return sorted(p.relative_to(root).as_posix() for p in root.rglob("*")
+                  if p.is_file() and not skip.intersection(p.relative_to(root).parts))
+
+
+def private_term_problems(root: Path = ROOT, terms: Optional[Path] = None,
+                          pending: Optional[Dict[str, str]] = None) -> Tuple[List[str], bool]:
+    """(problems, whether the check ran). Paths and lines only: the term is never printed (FAA-243)."""
+    pending = PRIVATE_TERMS_PENDING if pending is None else pending
+    terms = private_terms_file() if terms is None else terms
+    if not terms.is_file():
+        return [], False
+    pattern = private_terms_pattern(terms.read_text(encoding="utf-8").splitlines())
+    if pattern is None:
+        return [], True
+    problems: List[str] = []
+    seen = set()
+    for rel in tracked_files(root):
+        path = root / rel
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        if b"\0" in data[:8192]:
+            continue  # binary, as check_private.py skips it
+        lines = private_term_lines(data.decode("utf-8", "replace"), pattern)
+        if lines:
+            seen.add(rel)
+        if lines and rel not in pending:
+            problems.append("%s: line%s %s name%s a term of the operator's private list: replace it with a neutral word "
+                            "(FAA-243)" % (rel, "s" if len(lines) > 1 else "", ", ".join(map(str, lines)),
+                                           "" if len(lines) > 1 else "s"))
+    for rel in sorted(rel for rel in set(pending) - seen if (root / rel).is_file()):
+        problems.append("PRIVATE_TERMS_PENDING names %s, which holds no private term now: remove it (FAA-243)" % rel)
+    return problems, True
 
 
 def shipped_template_problems(root: Path = ROOT) -> List[str]:
@@ -1168,6 +1250,14 @@ def validator_self_test() -> List[str]:
         return ["validator self-test missed a page that defers to a private source"]
     if private_source_deferrals("Provenance: fabric-workspace LC-14.\n\nThe operator's intent wins.\n"):
         return ["validator self-test flagged a deferral in a paragraph that names no private source"]
+    made_up = "example" + "-private-" + "term"  # a term put together at run time: no list's, no line of this file
+    planted_terms = private_terms_pattern([made_up, "# a comment", ""])
+    hits = private_term_lines("a line\nsee EXAMPLE-private-TERM here\nexample-private-terms\nxexample-private-term\n",
+                              planted_terms)
+    if hits != [2]:
+        return ["validator self-test read the private-terms list wrongly (FAA-243): lines %r, not [2]" % hits]
+    if private_terms_pattern(["# only a comment", " "]) is not None:
+        return ["validator self-test built a private-terms pattern from an empty list (FAA-243)"]
     planted = "---\nname: x\ndescription: Use when X extension: which. NOT for Y.\n---\n"
     try:
         parse_frontmatter(planted)
@@ -1204,14 +1294,27 @@ def main(argv: List[str]) -> int:
         if not errors:
             print("OK: %d SKILL.md front matter block(s) parse strictly" % len(argv[1:]))
         return 1 if errors else 0
+    if argv == ["--private-terms"]:
+        problems, ran = private_term_problems()
+        if not ran:
+            print("NOT_RUN: no private-terms list at %s (set %s); the check needs the operator's local list"
+                  % (private_terms_file(), PRIVATE_TERMS_ENV))
+            return 2
+        for problem in problems:
+            print("ERROR: %s" % problem)
+        if not problems:
+            print("OK: no tracked file names a term of the private list")
+        return 1 if problems else 0
     if argv:
-        print("usage: validate.py [--frontmatter SKILL.md ...]")
+        print("usage: validate.py [--frontmatter SKILL.md ... | --private-terms]")
         return 2
     errors = validator_self_test() + validate_repo()
     if errors:
         for error in errors:
             print("ERROR: %s" % error)
         return 1
+    if not private_term_problems()[1]:
+        print("NOTE: private terms not checked: no list at %s (FAA-243)" % private_terms_file())
     print("OK: Fabric Agent Adapter distribution is valid")
     return 0
 
