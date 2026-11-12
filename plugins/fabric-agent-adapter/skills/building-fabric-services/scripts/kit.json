@@ -371,7 +371,7 @@
     "fabric_time",
     "fabric_usage"
    ],
-   "sha256": "e50c62d3c76314482c3c4c6fad6437ada648992807e9c4f6a527584b303b4d9e"
+   "sha256": "1d997c92acde1465494b5c47fd602d3af8e66bbdff7bc1322e2160e137c09408"
   },
   {
    "module": "fabric_profiles",
@@ -881,7 +881,7 @@
     "fabric-supervisors",
     "fabric-usage"
    ],
-   "sha256": "fd3ae1609924ee2607f124a862dd8d749b9b597ce7806f79c5cd20eefaaa8178"
+   "sha256": "1d6388da72798708e3c953ef33bbfae5940c73f71ed70f639261afd526c2d70e"
   },
   {
    "module": "fabric-profiles",
@@ -6579,7 +6579,7 @@
    "fabric_events.py": "da3fe3e3e19d4c9754b90c719e9c069a3ac85e080b9fffd07adbaf63b5bfcf0d",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
    "fabric_supervisors.py": "a24148ff243608d987abae96f82a371ba3a7fb92716d55fc65c649b9ac2634b1",
-   "fabric_service.py": "e50c62d3c76314482c3c4c6fad6437ada648992807e9c4f6a527584b303b4d9e",
+   "fabric_service.py": "1d997c92acde1465494b5c47fd602d3af8e66bbdff7bc1322e2160e137c09408",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "9bdb7989e57b9d0b0d15eb9982d396499823a5e2c528230b71c67866c736e0f5",
    "fabric_interop.py": "2b4d6c144f496dbd8788f616de9956bb8b6e89290713c406aa601511c82f4a46",
@@ -6624,7 +6624,7 @@
    "fabric-events.mjs": "c95c07e2745e52fddbb7237b89824123f240d4f8d6b14f5cb269a09e1845c3ba",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
    "fabric-supervisors.mjs": "e6dd1d4e46726fe25151009e0a4ea5a0a048a451307bd8fd3c8d15775ecf377d",
-   "fabric-service.mjs": "fd3ae1609924ee2607f124a862dd8d749b9b597ce7806f79c5cd20eefaaa8178",
+   "fabric-service.mjs": "1d6388da72798708e3c953ef33bbfae5940c73f71ed70f639261afd526c2d70e",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "b4e386c359a48e49ffff8a842215760c18a7c98a0af4754a808a35fb2820d458",
    "fabric-interop.mjs": "989040aed33b2712a258244192bdf70e811a51076aa1b62f2adc2a6db051dbed",
