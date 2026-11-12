@@ -276,6 +276,10 @@ def _bounded_int(literal: str) -> int:
     return int(literal)
 
 
+#: `mandate/1` as a block may write it: its slash plain or JSON-escaped (`\\/`, `\\u002f`).
+_KIND_WRITTEN = re.compile(r"mandate(?:/|\\/|\\u002[fF])1")
+
+
 def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """The mandate a request carries, read only when the service opted in (`agent_id` and `mandate_from` set), the board
     verified the sender (`provenance: trusted`) and its Project is one `mandate_from` names (or `PERSONAL_BOARD`): a T1
@@ -298,7 +302,7 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
         try:
             value = json.loads(block, parse_constant=_no_constant, parse_int=_bounded_int)
         except (ValueError, RecursionError):
-            if "mandate/1" in block:
+            if _KIND_WRITTEN.search(block):  # the kind as written, a JSON escape of its slash included (FAA-196 (13))
                 return None, "mandate-unreadable"
             continue
         if isinstance(value, dict) and value.get("kind") == "mandate/1":

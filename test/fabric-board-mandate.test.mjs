@@ -153,6 +153,9 @@ for (const [name, extra] of [['no mandateFrom', { mandateFrom: null }], ['no age
 
 for (const [name, text, code] of [['two blocks', body(JSON.stringify(mandate()), JSON.stringify(mandate())), 'mandate-blocks'],
   ['an unreadable block', body('{"kind": "mandate/1", "task": '), 'mandate-unreadable'],
+  // FAA-196 (13): the kind written with a JSON escape is the same kind, so its broken block is said too
+  ['an escaped kind', body('{"kind": "mandate\\/1", "task": '), 'mandate-unreadable'],
+  ['a unicode-escaped kind', body('{"kind": "mandate\\u002F1", "task": '), 'mandate-unreadable'],
   ['NaN', body(`${JSON.stringify(mandate()).slice(0, -1)}, "x": NaN}`), 'mandate-unreadable']]) {
   test(`FAA-135: ${name} is no mandate, named by its code`, async (t) => {
     const h = await fakeHub(t);

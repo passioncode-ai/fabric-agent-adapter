@@ -240,7 +240,7 @@ export function readMandate(request, mandateFrom, agentId) {
     try {
       value = JSON.parse(block);
     } catch {
-      if (block.includes('mandate/1')) return { mandate: null, unread: 'mandate-unreadable' };
+      if (/mandate(?:\/|\\\/|\\u002[fF])1/.test(block)) return { mandate: null, unread: 'mandate-unreadable' }; // the kind as written, its slash JSON-escaped too (FAA-196 (13))
       continue;
     }
     if (isObj(value) && value.kind === 'mandate/1') {

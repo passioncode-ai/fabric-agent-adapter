@@ -475,7 +475,7 @@
     "fabric_service",
     "fabric_time"
    ],
-   "sha256": "c0edaf3626ddf3583ff2818cccfec943546160d8a2535e9f6723749233ab7ae6"
+   "sha256": "17d92556c29791226c6b2d3c45f287cf228fa2154eacb20a209f86f6fa0627ca"
   },
   {
    "module": "fabric_board_slots",
@@ -1006,7 +1006,7 @@
     "fabric-service",
     "fabric-time"
    ],
-   "sha256": "d374073891a8543ab98d54d1780fb2a2e7fe325206636c8d27e8e5dfd389df20"
+   "sha256": "31d5dd7c6a1f3d4d521779d41ca9fd8e6f6ae5657115159dde7f66a169816509"
   },
   {
    "module": "fabric-board-slots",
@@ -7125,7 +7125,7 @@
    "fabric_holds.py": "277533ec3bf1766a5a583d852dec9a048f63d9a8d1984cfc6e32df3218849c59",
    "fabric_hub.py": "029885d4b67c1318e6f11a3f871b099cc91bb575a6f15447838ccca900e320c0",
    "fabric_board_shapes.py": "0a0e8d3d40e33dfd8c457aedb85330b2ff25f8c49a33eb6cbd5a5cc8a5007f7e",
-   "fabric_board_link.py": "c0edaf3626ddf3583ff2818cccfec943546160d8a2535e9f6723749233ab7ae6",
+   "fabric_board_link.py": "17d92556c29791226c6b2d3c45f287cf228fa2154eacb20a209f86f6fa0627ca",
    "fabric_board_slots.py": "eeb0edf503fe3d3568d3d70465bdf61675d1b116e5a5c20a6e5727637605a3fe",
    "fabric_board_session.py": "b3d77fed84b422fcb1c92078316208e333a70816580a8d0767a55915103fae2d",
    "fabric_board_fixture.py": "4178b0b23b4dec6375cd041cef209ed2f3e5279ec60c57e578765ecd81705504",
@@ -7172,7 +7172,7 @@
    "fabric-holds.mjs": "bab47b2cdad663dc39a581d0d30d33c59bb847016431e18a63b326fefd612160",
    "fabric-hub.mjs": "fc67751815b9e0a540ae86026603d577bcb9669f3572e0b2c16d1dbfcf76d569",
    "fabric-board-shapes.mjs": "c1db7b7bd0d58d82bb6d8dfbc3cd1547a256a333052d367e82ff1b3edf2804d7",
-   "fabric-board-link.mjs": "d374073891a8543ab98d54d1780fb2a2e7fe325206636c8d27e8e5dfd389df20",
+   "fabric-board-link.mjs": "31d5dd7c6a1f3d4d521779d41ca9fd8e6f6ae5657115159dde7f66a169816509",
    "fabric-board-slots.mjs": "e48ceaac04da6b1b39b2f9c0a8b6ea74de41538eb67310976ea58bad436fa873",
    "fabric-board-session.mjs": "00a1cf3a1fad74488ebb1b8df0711f63623760990ef036d7c2a8d85511d67df5",
    "fabric-board-fixture.mjs": "e52d514ddd7677d67ce7a1938567b1b62027897b239bea9898b05181c6e3e31b",

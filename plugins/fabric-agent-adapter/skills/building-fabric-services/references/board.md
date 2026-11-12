@@ -121,7 +121,7 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   any other id as written. The mandate is a block fenced ` ```json `, the opening and the closing fence each at the start
   of its own line, with no indent (lowercase; an indented fence, as inside a list item, is not read either; ` ````json `, ` ```JSON ` and `~~~` are not read), whose value has `kind: "mandate/1"`; any other JSON
   block, a decision block included, is not read, with no warning. A fence quoted inside another fenced block is still
-  read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one whose text holds `mandate/1` and is
+  read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one whose text holds `mandate/1` (its slash plain or JSON-escaped, `\/` or `\u002f`, FAA-196 (13)) and is
   not JSON (`NaN` included), read as none (a broken block without `mandate/1` is skipped, and a mandate beside it
   is still read), and the responder emits `board.request.mandate_unread` (a warning) with the
   request id and its `reason`, `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or

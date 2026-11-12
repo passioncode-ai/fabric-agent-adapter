@@ -186,6 +186,9 @@ class BoardMandateTests(Conversation):
         m = json.dumps(mandate())
         cases = {"two": (body(m, m), "mandate-blocks"),
                  "unreadable": (body('{"kind": "mandate/1", "task": '), "mandate-unreadable"),
+                 # FAA-196 (13): the kind written with a JSON escape is the same kind, so its broken block is said too
+                 "escaped": (body('{"kind": "mandate\\/1", "task": '), "mandate-unreadable"),
+                 "unicode": (body('{"kind": "mandate\\u002F1", "task": '), "mandate-unreadable"),
                  "nan": (body(m[:-1] + ', "x": NaN}'), "mandate-unreadable")}
         for name, (text, code) in cases.items():
             with self.subTest(name):
