@@ -44,10 +44,12 @@ response = server.handle(json_rpc_message)          # POST /mcp body in, JSON re
 ```
 
 - A handler returns the value for `structuredContent`; for a job it returns
-  `ctx.start_job()`, and `on_job_started(job_id, ctx)` does or schedules the work.
+  `ctx.start_job()`, and `on_job_started(job_id, ctx)` does or schedules the work. An `InteropError` it raises (a
+  refused `approval_step`) fails the job just created with `tool-error` and answers the call as one (FAA-196 (28)).
 - `jobs.request_input(job_id, {"title_choice": fi.choice_request(...)}, "Two titles are ready.")`
   stops for a person. Fabric answers through `fabric.job.get` with `inputResponses`; the
-  server calls `on_input(job_id, answers, ctx)` with the answers that matched.
+  server calls `on_input(job_id, answers, ctx)` with the answers that matched; an `InteropError` it raises is answered
+  as a `tool-error`, as a handler's is (FAA-196 (27)). `steps=` is a JSON object or none (FAA-196 (26)).
 - `jobs.complete(job_id, fi.result_envelope(outcome=..., producer=..., ...))`,
   `jobs.fail(job_id, code, message, data=None)`, `jobs.cancel(job_id)`; a limit or an unseen effect has its own calls
   ([Limits and uncertain effects](#limits-and-uncertain-effects)). A terminal job never changes

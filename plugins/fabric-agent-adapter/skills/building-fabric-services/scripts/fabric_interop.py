@@ -521,7 +521,11 @@ class CallContext:
         if self.server.jobs is None:
             raise InteropError("This server has no job store.")
         handle = self.server.jobs.create(self.tool, self.arguments, self.traceparent, poll_interval_ms, self.delegation)
-        self.server.job_started(handle["job"]["id"], self)
+        try:
+            self.server.job_started(handle["job"]["id"], self)
+        except InteropError as exc:  # a refused start: the job it created ends with it, never left working (FAA-196 (28))
+            self.server.jobs.fail(handle["job"]["id"], "tool-error", str(exc)[:_MAX_ERROR_MESSAGE] or "The job's start was refused.")
+            raise
         return handle
 
     def approval_step(self, job_id: str, key: str, request: Dict[str, Any], *, effect: str, spend_usd: Any = None,
@@ -942,7 +946,10 @@ class McpToolServer:
                 matched = self.jobs.answer(job_id, responses)
                 if matched and self._on_input:
                     private = self.jobs.private(job_id)
-                    self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span, delegation, **context))
+                    try:
+                        self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span, delegation, **context))
+                    except InteropError as exc:  # answered as the handler path answers one (FAA-196 (27))
+                        return tool_result({"error": {"code": "tool-error", "message": str(exc)}}, is_error=True, traceparent=job_span)
             return tool_result({"job": self.jobs.get(job_id)}, traceparent=job_span)
         except UnknownJob:
             return unknown_job_result(job_id, traceparent=span)

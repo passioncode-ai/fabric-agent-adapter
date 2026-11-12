@@ -1231,6 +1231,46 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": "mandate-not-for-this-call"}))
         self.assertEqual(self.inputs, [])
 
+    def test_an_interop_error_in_on_input_is_a_tool_error(self):
+        """FAA-196 (27): an InteropError from `on_input` (a refused request_input or approval_step) left handle() and the
+        transport sent no reply; it is answered as a tool-error, as the handler path answers one."""
+        def refusing(job_id, matched, ctx):
+            raise fi.InteropError("Step 'x': an input request's key with its effect class (DEC-0125).")
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        jobs, started = fi.JobStore(Path(temp.name) / "jobs"), []
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, on_input=refusing,
+                                  on_job_started=lambda job_id, ctx: started.append(job_id))
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "reviews.approve", "arguments": {}, "_meta": {"traceparent": PARENT}}}, tier="T0")
+        job_id = started[0]
+        jobs.request_input(job_id, {"approve-reply": fi.choice_request("Publish the reply?", "choice", [("yes", "Yes")])})
+        answer = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"approve-reply": {
+                "action": "accept", "content": {"choice": "yes"}}}}, "_meta": {"traceparent": PARENT}}}
+        result = server.handle(answer, tier="T0")["result"]
+        self.assertTrue(result["isError"])
+        self.assertEqual(result["structuredContent"]["error"]["code"], "tool-error")
+
+    def test_a_refused_start_fails_the_job_it_created(self):
+        """FAA-196 (28): when `on_job_started` raises InteropError the call is answered tool-error; the job start_job
+        created is failed with the same message, never left `working` with no owner."""
+        def refusing(job_id, ctx):
+            raise fi.InteropError("The job's approval step names its effect class (DEC-0125).")
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        jobs = fi.JobStore(Path(temp.name) / "jobs")
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, on_job_started=refusing)
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        result = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "reviews.approve", "arguments": {}, "_meta": {"traceparent": PARENT}}}, tier="T0")["result"]
+        self.assertTrue(result["isError"])
+        (job_file,) = [f for f in (Path(temp.name) / "jobs").glob("*.json")]
+        job = jobs.get(job_file.stem)
+        self.assertEqual((job["status"], job["error"]["code"]), ("failed", "tool-error"))
+        self.assertIn("effect class", job["error"]["message"])
+
     def test_a_step_it_does_not_cover_waits_naming_the_part(self):
         self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
         job_id, record = self.step()
