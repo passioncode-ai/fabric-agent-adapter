@@ -38,7 +38,7 @@ unset the walk is used). A committed symbolic link is checked by the path it nam
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
-(`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` on Windows) when it exists: one string per
+(`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; `%APPDATA%` when absolute on Windows) when it exists: one string per
 line, a line starting with `#` a comment, `home: <name>` declaring the owner's home name (never neutral), strings
 shorter than three characters ignored, matched without regard to case. A list inside ROOT
 is refused: it would travel with the source. The summary says whether Git chose the files or every file was read.

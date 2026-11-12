@@ -78,10 +78,14 @@ def run_check(argv: Optional[List[str]], check: Callable[..., Dict[str, object]]
     parser = _Parser(prog="fabric_source_check.py", description="Find instance data in an agent's source.")
     sub = parser.add_subparsers(dest="command", required=True)
     cmd = sub.add_parser("check", help="read the source tree and report instance data without repeating it")
-    cmd.add_argument("root", nargs="?", default=".")
-    cmd.add_argument("--instance-strings", metavar="FILE")
-    cmd.add_argument("--exclude", action="append", default=[], metavar="GLOB")
-    cmd.add_argument("--json", action="store_true")
+    cmd.add_argument("root", nargs="?", default=".", help="the folder to check (default: the current folder)")
+    cmd.add_argument("--instance-strings", metavar="FILE", help="the owner's list (default: FABRIC_INSTANCE_STRINGS, else "
+                     "passioncode-fabric/%s in the user's configuration folder)" % LIST_NAME)
+    cmd.add_argument("--exclude", action="append", default=[], metavar="GLOB",
+                     help="leave matching paths out, as a .fabric-source-ignore line does (repeatable)")
+    cmd.add_argument("--json", action="store_true", help="one JSON object: mode, files, findings, notRead, skipped, "
+                     "dependencies, instanceStrings, ownerHomes, instanceList, blocking, complete; exit 0 clean and "
+                     "complete, 1 a finding, 2 a file not read or no run")
     cmd.add_argument("--every-file", action="store_true", help="read every file, not only what Git would commit")
     try:
         args = parser.parse_args(argv)
