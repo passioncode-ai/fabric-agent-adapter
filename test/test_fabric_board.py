@@ -2407,8 +2407,10 @@ class SampleWiringTests(unittest.TestCase):
         self.assertEqual(sorted(k for k in kinds if "`%s`" % k not in board_md), [])
 
     def test_every_board_notice_level_is_one_the_event_log_takes(self):
-        """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refuses, so a service with
-        emit=log.append (the reference service) never logged them. Every level both twins pass is one LEVELS holds."""
+        """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refused before FAA-276, so
+        a service with emit=log.append (the reference service) never logged them. Since FAA-276 the log stores `warn`
+        (the dashboard kit's chip for "a person is needed") as `warning`; the responder still passes the stored name, so
+        every level both twins pass is one LEVELS holds and nothing depends on the alias (FAA-277 (6))."""
         import re
         fabric_events = importlib.import_module("fabric_events")
         scripts = Path(importlib.import_module("fabric_board").__file__).parent

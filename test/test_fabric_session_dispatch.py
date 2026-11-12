@@ -554,7 +554,7 @@ class Hooks(Base):
         self.assertIn("gate-id", helped.stdout)
 
     def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
-        # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made
+        # FAA-213 (a board participant's report, thread 1add3c03): a workflow closed over a queued or claimed request made
         # Fabric's next dispatch fail at the take-back on every cycle (Fabric's main at a6f0ffda; later a new workflow)
         text = cli.dispatch_contract(FULL)
         self.assertIn("On an error you cannot get past: complete the request failed_known if you hold its fence; close the "
