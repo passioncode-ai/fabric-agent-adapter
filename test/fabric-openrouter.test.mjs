@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 import * as fo from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-openrouter.mjs';
 import { makeUsageReceipt } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-usage.mjs';
+import * as http from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-http.mjs';
 
 const CASES = JSON.parse(fs.readFileSync(new URL('./fixtures/kit-openrouter-cases.json', import.meta.url), 'utf8'));
 const NOW = 1792584000; // 2026-10-21T12:00:00Z
@@ -230,4 +231,15 @@ test('an answer without usage counts at its own worst case', async () => {
     transport: async () => ({ status: 200, headers: {}, body: ok }) });
   await cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 900 });
   await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 200 }), (e) => e.kind === 'ceiling');
+});
+
+test('FAA-257: a loopback base URL another OS account holds is foreign-user at once, the fallback never tried', async () => {
+  const calls = [];
+  const ledger = new Ledger();
+  const cl = new fo.Client({ ceilingUsd: 1, ledger, prices: CASES.prices, env: { OPENROUTER_API_KEY: KEY }, now: () => NOW,
+    transport: async (a) => { calls.push(a); throw new http.HttpError('connect: foreign-user: the server on port 1 belongs to system; nothing was sent', { url: '<redacted>', kind: 'foreign-user' }); } });
+  await assert.rejects(cl.chat(MESSAGES, { model: 'a/one', fallback: 'b/two', maxTokens: 100 }),
+    (e) => e.kind === 'foreign-user' && /another OS account/.test(e.message));
+  assert.equal(calls.length, 1, 'the fallback model is not tried on the same refused listener');
+  assert.deepEqual(ledger.rows, []);
 });

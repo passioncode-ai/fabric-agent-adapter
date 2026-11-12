@@ -305,6 +305,24 @@ class Rules(unittest.TestCase):
         self.assertEqual(ledger.rows[0]["tokensMeasured"], False)
         self.assertIsNone(ledger.rows[0]["costUsd"])
 
+    def test_a_loopback_base_url_another_account_holds_is_foreign_user_at_once(self):
+        # FAA-257: nothing was sent, so nothing is counted, and the fallback on the same base_url is never tried
+        calls = []
+
+        def refused(*a):
+            calls.append(a[1])
+            raise fo.fabric_http.HttpError("connect: foreign-user: the server on port 1 belongs to system; nothing was "
+                                           "sent", url="<redacted>", kind="foreign-user")
+        ledger = Ledger()
+        c = fo.Client(ceiling_usd=1.0, ledger=ledger, prices=CASES["prices"], environ={"OPENROUTER_API_KEY": KEY},
+                      transport=refused, now=lambda: NOW)
+        with self.assertRaises(fo.OpenRouterError) as caught:
+            c.chat(MESSAGES, model="a/one", fallback="b/two", max_tokens=100)
+        self.assertEqual(caught.exception.kind, "foreign-user")
+        self.assertIn("another OS account", str(caught.exception))
+        self.assertEqual(len(calls), 1, "the fallback model is not tried on the same refused listener")
+        self.assertEqual(ledger.rows, [])
+
     def test_an_unmeasured_attempt_counts_at_its_own_worst_case(self):
         steps = [{"error": "timeout"}]
         c, _ = client({"ceilingUsd": 0.0021, "steps": steps}, [], Ledger(), retries=0)
