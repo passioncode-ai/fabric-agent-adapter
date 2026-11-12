@@ -65,8 +65,8 @@ host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`,
 agent's pages. A browser only when `host_status` confirms `not_installed`, and
 a raw `http://127.0.0.1:<port>` address only after the listener on that port is
 this OS account's (DEC-0154 PL-3 and HA-2; the adapter's `building-fabric-services/scripts/fabric_peer_owner.py`: `server_end` of a connection it opens and sends nothing on; `check_service.py <id>.<instance>` prints it as `listener.owner`): a
-`foreign-user` listener is reported, never opened (the link gate below does not
-read the owner yet, FAA-251). An installed host that failed
+`foreign-user` listener is reported, never opened (the link gate below takes
+that owner as `listener_owner`). An installed host that failed
 to open is reported, not replaced by HTTP. Links
 carry no token or login code. Every completion and notification action passes
 the Fabric Agent Adapter's link gate before delivery: `check_dashboard_link.py`
@@ -119,7 +119,12 @@ Its trusted context is supplied by the host, not by untrusted model output:
 
 `native_link` must equal the resolved open_link, with an available host on the
 viewer's device. `browser_link` must equal http_url, with confirmed not_installed,
-if_absent policy and the same device. Contract DEC-0123 PL-3 also allows a browser
+if_absent policy, the same device and `"listener_owner": "this-account"`: the kind
+the host read for the listener on http_url's port (`fabric_peer_owner`'s
+`this-account`, `another-account`, `system`, `unknown`, `none`, or
+`check_service.py`'s `foreign-user`); any other, or none given, refuses the
+browser (DEC-0154 PL-3, FAA-251). The native link does not take it: Fabric
+Dashboards checks its own listener. Contract DEC-0123 PL-3 also allows a browser
 on `unsupported` (a system the host does not ship for); the gate treats
 `unsupported` as no fallback, by the operator's rule that a browser opens only on a
 confirmed `not_installed`, and macOS never reports it (FAA-137). `remote_open` instead contains `device_id`,
