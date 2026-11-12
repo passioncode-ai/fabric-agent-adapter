@@ -2534,6 +2534,11 @@ class SampleWiringTests(unittest.TestCase):
         import ast
         moved = ast.literal_eval("(" + slots[start:slots.index("% capability", start)] + ")")
         self.assertLessEqual(len(moved % ("c" * 128)), 500)
+        # FAA-187 (30): a notify banner shows plain text, so the notice carries no Markdown backticks, in both kits
+        self.assertNotIn("`", moved)
+        node = (scripts / "fabric-board-slots.mjs").read_text(encoding="utf-8")
+        line = next(l for l in node.splitlines() if "moved to another session. This service" in l)
+        self.assertNotIn("\\`", line)
 
     def test_the_probe_passes_the_sample_with_its_board_on(self):
         """0.56.0 product r28, seam r28: registered with the board, the take-back tool the well-known lists is in the
