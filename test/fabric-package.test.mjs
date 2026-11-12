@@ -174,6 +174,8 @@ test('pack refuses what must not ship', (t) => {
   for (const junk of ['.git', '__pycache__']) {
     fs.mkdirSync(path.join(root, 'bin', junk));
     assert.throws(() => k.pack(root), new RegExp(`bin/${junk.replace('.', '\\.')}`));
+    // FAA-190 (26): a refusal never offers removing `.git` in place, which would carry an ignored instance
+    assert.throws(() => k.pack(root), (e) => e.message.includes('pack a clean copy') && !e.message.includes('remove these'));
     fs.rmdirSync(path.join(root, 'bin', junk));
   }
   fs.symlinkSync('/etc/hosts', path.join(root, 'hosts'));

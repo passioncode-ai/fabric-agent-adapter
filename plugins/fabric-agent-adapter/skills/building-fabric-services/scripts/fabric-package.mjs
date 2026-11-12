@@ -452,7 +452,7 @@ export function readFolder(folder) {
     }
   };
   walk(folder, '');
-  if (refused.length) throw new PackageError(`Not packed: remove these or pack a clean copy: ${refused.sort().join('; ')}`);
+  if (refused.length) throw new PackageError(`Not packed: pack a clean copy (what Git would commit, references/package.md); delete only litter and credential files in place: ${refused.sort().join('; ')}`);
   return files;
 }
 

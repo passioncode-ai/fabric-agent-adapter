@@ -627,7 +627,7 @@ def read_folder(folder: Any) -> Dict[str, bytes]:
         if _BY_FOLDER:
             os.close(top)  # type: ignore[arg-type]
     if refused:
-        raise PackageError("Not packed: remove these or pack a clean copy: " + "; ".join(sorted(refused)))
+        raise PackageError("Not packed: pack a clean copy (what Git would commit, references/package.md); delete only litter and credential files in place: " + "; ".join(sorted(refused)))
     return files
 
 

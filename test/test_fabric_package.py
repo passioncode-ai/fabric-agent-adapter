@@ -164,8 +164,11 @@ class PackTests(unittest.TestCase):
         (self.root / ".env.example").unlink()
         for litter in (".git", "__pycache__"):
             (self.root / "bin" / litter).mkdir()
-            with self.assertRaisesRegex(fp.PackageError, "bin/%s" % litter):
+            with self.assertRaisesRegex(fp.PackageError, "bin/%s" % litter) as caught:
                 fp.pack(self.root)
+            # FAA-190 (26): a refusal never offers removing `.git` in place, which would carry an ignored instance
+            self.assertIn("pack a clean copy", str(caught.exception))
+            self.assertNotIn("remove these", str(caught.exception))
             (self.root / "bin" / litter).rmdir()
         os.symlink("/etc/hosts", self.root / "hosts")
         with self.assertRaisesRegex(fp.PackageError, "symlink"):

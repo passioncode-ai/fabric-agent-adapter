@@ -29,7 +29,7 @@ The person writes the descriptive part; `pack` fills in the rest.
 | You write | `pack` writes |
 |---|---|
 | `schema` (`fabric-package/1`), `kind` (`agent` or `skill-set`), `id` (kebab-case, the plugin name), `version` (semver), `publisher` (a name, never a key), `licence` (SPDX) | `agentRef` = `urn:fabric:agent:<publisher>:<id>`, after `publisher` (an agent only; a hand-written one that differs is refused) |
-| an agent: `resultSignal {name, says}`, `evals {suite, receipt {ranAt, suite, passed, failed, skipped?}}`, and as needed `provider`, `service`, `secrets[]` (slots: name and purpose, never a value), `requires`, `costPresets`, `state[]`, `dependencies[]` | `files[]`: every file but `fabric.package.json`, in UTF-16 order, each with `sha256:` and its hex digest |
+| an agent: `resultSignal {name, says}`, `evals {suite, receipt {ranAt, suite, passed, failed, skipped?}}`, and as needed `provider`, `service`, `secrets[]` (slots: name and purpose, never a value), `requires`, `costPresets`, `state[]`, `dependencies[]`; an agent with no `provider` (a consumer agent, DEC-0071) must carry `skills` and `requires` with `requires.mcp`, which the schema refuses it without (FAA-190) | `files[]`: every file but `fabric.package.json`, in UTF-16 order, each with `sha256:` and its hex digest |
 | a skill set: `layer`, `skills` | `digest` |
 
 The evals receipt's `suite` is the SHA-256 of the suite **as packed**. When the suite changes, run it again and write that
@@ -66,8 +66,9 @@ file names needs an ignore line of its own at the new path); a link whose target
 the way to it (an ancestor, or a folder a link above it led into) is removed, so the copy ends; a target that leaves
 that tree or lies in what `.gitignore` keeps out, such as an instance folder in the checkout, is removed, since it is
 the instance or another project. Source the agent shares from outside the tree (a monorepo's common code, linked or
-imported by a relative path) is copied into the agent's tree at the path it is reached by and committed before
-packing. List each link removed and review it: a missing file is not seen by `pack` or `verify`. Leave out dependency
+imported by a relative path) is copied into the agent's tree and committed before packing, and every import that
+reached it by a relative path leaving the tree (`../../common/x`) is changed to the copied path, or the package
+imports a path that is not in it (FAA-190). List each link removed and review it: a missing file is not seen by `pack` or `verify`. Leave out dependency
 folders (`node_modules`, virtual environments, which hold install paths and binaries), what `.gitignore` keeps out as
 instance (the real configuration, an instance folder in the checkout) and the files `pack` refuses by name (a
 credential-free `.npmrc` that `.fabric-source-ignore` names for the check included). `pack` does not read
@@ -76,8 +77,9 @@ and a private `*.jwk` by their names: keep them in the instance.
 
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
 `*.pyc`, and files that are credentials by name (`.env` and `.env.*` but `.env.example|sample|template`, `*.pem`, `*.key`,
-`*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa`-style keys, `.npmrc`, `.netrc`, `.pypirc`). Remove them or pack a clean
-copy. A member named twice in `fabric.package.json` is refused too. A folder swapped for a link while it is read is refused as a
+`*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa`-style keys, `.npmrc`, `.netrc`, `.pypirc`). Pack a clean copy (above);
+remove in place only litter (`__pycache__`, `.DS_Store`, `*.pyc`) and a credential file the instance keeps elsewhere, never
+`.git`: a folder packed after deleting it would carry what `.gitignore` kept out, an instance folder among it (FAA-190). A member named twice in `fabric.package.json` is refused too. A folder swapped for a link while it is read is refused as a
 symlink. The Python kit reads each folder through an open handle, so a swap cannot redirect it. The Node kit has no
 such call: it checks each folder before listing it, after each file it reads and after listing it (FAA-91), and does not
 see a swap made and undone between two of those checks. Pack from a folder only you can write to.
