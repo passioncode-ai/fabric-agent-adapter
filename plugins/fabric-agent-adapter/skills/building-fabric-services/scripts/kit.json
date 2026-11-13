@@ -57,6 +57,16 @@
    "sha256": "c60416539be0199182f7969c24a37b14d0db50c8ea5e3e04cea43babfb483407"
   },
   {
+   "module": "fabric_tailnet_identity",
+   "file": "fabric_tailnet_identity.py",
+   "layer": "L0",
+   "imports": [],
+   "data": [
+    "tailnet-groups.schema.json"
+   ],
+   "sha256": "8ea7c76a51db7eaddcc3d174522ace10f8b266a86a1d80d3e17177708c328f0d"
+  },
+  {
    "module": "fabric_crypto",
    "file": "fabric_crypto.py",
    "layer": "L1",
@@ -633,6 +643,16 @@
    "layer": "L0",
    "imports": [],
    "sha256": "aff3591552448bc042af306cd8a9e5cb9102c6b62d6dc05d53db35e35c51e347"
+  },
+  {
+   "module": "fabric-tailnet-identity",
+   "file": "fabric-tailnet-identity.mjs",
+   "layer": "L0",
+   "imports": [],
+   "data": [
+    "tailnet-groups.schema.json"
+   ],
+   "sha256": "ba85705f17074da450bc2edeb51fed70ef241f719c2c8609d6f18e88981af22e"
   },
   {
    "module": "fabric-crypto",
@@ -7165,6 +7185,7 @@
    "fabric_socket_proof.py": "4d5844346b19a15c1e38c152656ccf11662ea1d43ccefec5dfa2546ff1c446e3",
    "fabric_peer_owner.py": "d8675452f24b47ddefbe5625c72c250e0228723ec6f860b2ca0b1855fd1e08d7",
    "fabric_tailnet.py": "c60416539be0199182f7969c24a37b14d0db50c8ea5e3e04cea43babfb483407",
+   "fabric_tailnet_identity.py": "8ea7c76a51db7eaddcc3d174522ace10f8b266a86a1d80d3e17177708c328f0d",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
    "fabric_base.py": "d8c67f345e30332cce3664af77b0e6e07cd477b78c961ac009e9efee1be7e1b2",
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",
@@ -7215,6 +7236,7 @@
    "fabric-socket-proof.mjs": "d980de8ac5bb78b249db15462454a414b4687f45af71b82004f69359b56dc630",
    "fabric-peer-owner.mjs": "732b0cbda4a9c2d61eb0eba1d7126743b326e356e628de5f88dbbbad2990c8d1",
    "fabric-tailnet.mjs": "aff3591552448bc042af306cd8a9e5cb9102c6b62d6dc05d53db35e35c51e347",
+   "fabric-tailnet-identity.mjs": "ba85705f17074da450bc2edeb51fed70ef241f719c2c8609d6f18e88981af22e",
    "fabric-crypto.mjs": "038e03689701e3c9721a1e7f8e0a4d02a52d6a5d1661b0dc84035edc3ebbfcf6",
    "fabric-base.mjs": "1a804bfc3ec5d2479ffc39d3c8d67b056b72af836e1b88102881f9ff632f1901",
    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",
@@ -7259,11 +7281,13 @@
    "fabric-openrouter.mjs": "c6d3c34d6acd10946729b8ffa9f8baaeb71e4101d8d896764975b1b5571c05bf",
    "fabric-a2a-server.mjs": "1f50953ecee924c66bdc61977cc66a791f2126aa7f833aa3f9a1df204cd71d46",
    "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
-   "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0"
+   "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0",
+   "tailnet-groups.schema.json": "94d7885c337b3e24c3c43c758d1bcb3b340b828e564850d9348cd10d43e893a9"
   }
  },
  "data": {
   "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
-  "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0"
+  "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0",
+  "tailnet-groups.schema.json": "94d7885c337b3e24c3c43c758d1bcb3b340b828e564850d9348cd10d43e893a9"
  }
 }
