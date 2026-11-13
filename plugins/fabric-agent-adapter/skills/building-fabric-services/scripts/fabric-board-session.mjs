@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { Backoff, HubError, normalProject } from './fabric-hub.mjs';
 import { PRIMARY_CAPABILITY, acceptedRevisions, feedDataProblems, negotiateRevision } from './fabric-service.mjs';
 import { BoardError, CAPABILITY, LEASE_SECONDS, REQUEST_STATES, SUMMARY_MAX, Stopped, isInt, isObj, outcomeProblems, receiptProblems } from './fabric-board-shapes.mjs';
-import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, readMandate } from './fabric-board-link.mjs';
+import { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD, covers, mandateOptions, noticeLinks, readBackProblem, readMandate, senderAgent } from './fabric-board-link.mjs';
 import { HOLD_RETRY_MAX_SECONDS, LEASE_MARGIN_SECONDS, SESSION_CODES, SlotKeeper } from './fabric-board-slots.mjs';
 
 export { BoardRequest, BoardSession, Checkpoint, PERSONAL_BOARD }; // re-exported: callers import them from here since 0.40.0
@@ -20,6 +20,8 @@ export const POLL_JITTER_SECONDS = 5;
 export const DRAIN_SECONDS = 10;
 /** An idle responder's leave waits this long for the DELETE, so an idle stop ends within LC-01's 5 s (FAA-173). */
 export const IDLE_LEAVE_SECONDS = 3;
+/** `board.down` is said once per outage window: said again only after the board stayed up this long (FAA-187 (22)). */
+export const DOWN_QUIET_SECONDS = 300;
 
 export const EVENT_SCHEMA = 'urn:fabric:schema:board-responder-event:1';
 
@@ -35,16 +37,18 @@ export class WorkContext {
   #responder;
   #entry;
   #caller;
-  constructor(responder, entry, mandate = null, caller = null) {
+  #agent;
+  constructor(responder, entry, mandate = null, caller = null, callerAgent = null) {
     this.#responder = responder;
     this.#entry = entry;
     this.#caller = caller;
+    this.#agent = callerAgent; // FAA-135: the sender's agent id identifyAgent named, binding the mandate's chain
     this.stopped = false;
     this.mandate = mandate; // the operator's mandate the request carried, when the responder reads one (FAA-135)
   }
   /** Whether the request's mandate covers `call` (`mandateCovers`' answer); null when none travelled. */
   mandateCovers(call) {
-    return covers(this.mandate, call, this.#responder.agentId, this.#responder.wall, this.#caller);
+    return covers(this.mandate, call, this.#responder.agentId, this.#responder.wall, this.#caller, this.#agent);
   }
   toJSON() {
     return { stopped: this.stopped }; // never the mandate: it holds the operator's words
@@ -82,33 +86,39 @@ function noticeSubject(value, project, episode) {
  */
 export class Responder extends SlotKeeper {
   constructor({ hub, projectId, capabilities, credentialFile, checkpointFile, handler, admit, observe, emit, service = 'service',
-    now = () => performance.now() / 1000, rand = Math.random, sessionFactory, agentId = null, mandateFrom = null, wall = Date.now } = {}) {
+    now = () => performance.now() / 1000, rand = Math.random, sessionFactory, agentId = null, mandateFrom = null, wall = Date.now, identifyAgent = null, links = null } = {}) {
     super();
-    if (typeof admit !== 'function' || typeof handler !== 'function') throw new BoardError('invalid_arguments', 'A responder needs the service\'s own input gate (admit) and a handler.');
+    if (typeof admit !== 'function' || typeof handler !== 'function' || !(identifyAgent == null || typeof identifyAgent === 'function')) {
+      throw new BoardError('invalid_arguments', 'A responder needs the service\'s own input gate (admit) and a handler; identifyAgent, when given, is a function of the sender (FAA-135).');
+    }
     const caps = [...(capabilities ?? [])];
     if (!caps.length || caps.some((c) => typeof c !== 'string' || !CAPABILITY.test(c)) || new Set(caps).size !== caps.length) throw new BoardError('invalid_arguments', 'Name each capability once, [a-z][a-z0-9._-]{1,127}.');
     // FAA-244: DEC-0140 PR-1, a session's slot, never a service's
     if (caps.includes(PRIMARY_CAPABILITY)) throw new BoardError('invalid_arguments', `${PRIMARY_CAPABILITY} is a Project's primary responder's, a session's: a service answers the capabilities it declares (DEC-0140 PR-1).`);
     Object.assign(this, { hub, capabilities: caps, credentialFile, handler, admit, observe, emitTo: emit, now, rand });
     this.project = normalProject(projectId);
-    // FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; null reads none)
-    Object.assign(this, { mandateFrom: mandateOptions(agentId, mandateFrom), agentId: agentId ?? null, wall });
+    // FAA-135: read the operator's mandate from a trusted request of his own Project (opt-in; null reads none), and bind
+    // its chain with the agent id identifyAgent names for the sender (asked only when a mandate travelled)
+    Object.assign(this, { mandateFrom: mandateOptions(agentId, mandateFrom), agentId: agentId ?? null, wall, identifyAgent: identifyAgent ?? null });
+    this.links = noticeLinks(links); // FAA-187 (21): the page that resolves each notify kind
     this.service = String(service).replace(/[^A-Za-z0-9._-]/g, '-').slice(0, 40) || 'service';
     this.checkpoint = new Checkpoint(checkpointFile);
     this.sessionFactory = sessionFactory ?? ((grant) => new BoardSession(grant));
     this.backoff = new Backoff({ rand });
     this.session = null;
     this.epoch = null;
-    this.slots = {};
+    // FAA-196 (24): maps keyed by a capability's name have no prototype, so `constructor` is a name like any other
+    this.slots = Object.create(null);
     this.current = null;
     this.state = 'idle';
     this.waitUntil = 0;
     this.stopping = false;
     /** Whether shutdown found work to drain, published before it waits; null before shutdown starts (FAA-186). */
     this.draining = null;
-    this.claimKeys = {};
+    this.claimKeys = Object.create(null);
     this.probing = new Set(); // moved slots whose move-back claim lost its answer: asked again under the same key
-    this.said = {};
+    this.said = Object.create(null);
+    this.upSince = null; // when the board was last seen up after a fault (FAA-187 (22))
     this.rr = 0;
     this.reconcileAt = 0;
     /** The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS. */
@@ -118,7 +128,7 @@ export class Responder extends SlotKeeper {
     this.fenceQueue = Promise.resolve();
     this.toResume = []; // transferred requests waiting until nothing runs (finding 39)
     this.suspect = new Set(); // capabilities a fenced call was refused on: com.status says whether they moved (FAA-155)
-    this.confirmed = {}; // this session's: the generation it held, or com.status showed unmoved
+    this.confirmed = Object.create(null); // this session's: the generation it held, or com.status showed unmoved
   }
 
   /** Runs fn after every fenced call queued before it (finding 36): an await inside a call never lets another in. */
@@ -148,7 +158,8 @@ export class Responder extends SlotKeeper {
     // (events-and-notifications.md, "Say who wants what"; 0.56.0 seam r30).
     const subject = noticeSubject(value, this.project, episode);
     try {
-      this.emitTo(kind, level, text, { notify, subject, ...(data ? { data } : {}) });
+      const link = notify && this.links && Object.hasOwn(this.links, kind) ? { link: this.links[kind] } : {}; // the page that resolves it (FAA-187 (21))
+      this.emitTo(kind, level, text, { notify, subject, ...link, ...(data ? { data } : {}) });
     } catch {
       // an event that cannot be written never stops the responder
     }
@@ -190,8 +201,8 @@ export class Responder extends SlotKeeper {
 
   async connect() {
     this.state = 'connecting';
-    this.slots = {}; // the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
-    this.confirmed = {}; // nor its confirmations: a slot may have moved between the two sessions
+    this.slots = Object.create(null); // the previous session's slots are not this one's: a refusal now reconnects (FAA-163)
+    this.confirmed = Object.create(null); // nor its confirmations: a slot may have moved between the two sessions
     this.probing = new Set(); // nor its lost move-back claims
     const grant = await this.hub.joinBoard(this.project, this.credentialFile);
     const missing = this.capabilities.filter((c) => !grant.capabilities.includes(c));
@@ -202,10 +213,10 @@ export class Responder extends SlotKeeper {
     if (missing.length) {
       this.emit('board.access.needed', 'warning', `The operator has not let this service answer ${missing.join(', ')} on this Project; ask in Fabric (Settings → Agent access).`, { notify: true, episode: missing.join(','), capabilities: missing });
     }
-    this.slots = {};
+    this.slots = Object.create(null);
     await this.recover(status, this.capabilities.filter((c) => grant.capabilities.includes(c)));
     this.state = 'ready';
-    for (const kind of ['board.down', 'board.blocked', ...(missing.length ? [] : ['board.access.needed'])]) delete this.said[kind];
+    for (const kind of ['board.blocked', ...(missing.length ? [] : ['board.access.needed'])]) delete this.said[kind]; // board.down waits for its quiet window (step)
   }
 
   async enroll(capability) {
@@ -262,7 +273,7 @@ export class Responder extends SlotKeeper {
   }
 
   async recover(status, capabilities) {
-    const transfer = {};
+    const transfer = Object.create(null);
     const reconcile = [];
     for (const entry of Object.values(this.checkpoint.entries)) {
       if (!capabilities.includes(entry.capability)) continue;
@@ -281,7 +292,7 @@ export class Responder extends SlotKeeper {
       else reconcile.push(entry);
     }
     const responders = (status.responders ?? []).filter(isObj);
-    const generations = Object.fromEntries(responders.map((r) => [r.capability, r.generation ?? 0]));
+    const generations = Object.assign(Object.create(null), Object.fromEntries(responders.map((r) => [r.capability, r.generation ?? 0])));
     const onHold = new Set(responders.filter((r) => r.held === true).map((r) => r.capability)); // DEC-0079
     let failure = null;
     for (const capability of capabilities) {
@@ -470,10 +481,9 @@ export class Responder extends SlotKeeper {
       if (!this.session) await this.connect();
       await this.tick();
       this.backoff.reset();
-      if (this.state === 'down') { // a lost call was sent again and answered: the session held throughout
-        this.state = 'ready';
-        delete this.said['board.down'];
-      }
+      if (this.state === 'down') this.state = 'ready'; // a lost call was sent again and answered: the session held throughout
+      this.upSince ??= now;
+      if (now - this.upSince >= DOWN_QUIET_SECONDS) delete this.said['board.down']; // up a whole window: a later outage is said again
       return this.interval();
     } catch (e) {
       if (!(e instanceof BoardError) && !(e instanceof HubError)) throw e;
@@ -492,6 +502,7 @@ export class Responder extends SlotKeeper {
 
   async fault(e) {
     const code = e.code ?? 'unreachable';
+    this.upSince = null;
     const connecting = this.state === 'connecting' && !Object.values(this.slots).some((s) => s?.state === 'held');
     let wait = this.backoff.next();
     const left = this.leaseLeft() - LEASE_MARGIN_SECONDS;
@@ -554,9 +565,10 @@ export class Responder extends SlotKeeper {
       await this.gone(capability);
       this.suspect.delete(capability);
     }
+    const shared = {}; // one com.status read a tick for every moved slot (FAA-194 (5))
     for (const [capability, slot] of Object.entries(this.slots)) {
       if (slot.state === 'moved') { // never enrolled again on its own, even when the new holder lapses (FAA-155)
-        if (this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.movedBack(capability); // unless com.status shows a later generation it may hold (FAA-165)
+        if (this.now() - (slot.renewedAt ?? 0) >= RENEW_SECONDS - 0.5) await this.movedBack(capability, shared); // unless com.status shows a later generation it may hold (FAA-165)
         continue;
       }
       if (slot.state === 'paused') {
@@ -581,7 +593,7 @@ export class Responder extends SlotKeeper {
   }
 
   async continueLapsed() {
-    const lapsed = {};
+    const lapsed = Object.create(null);
     for (const entry of Object.values(this.checkpoint.entries)) {
       if (entry.step === 'lapsed' && this.slots[entry.capability]?.state === 'held') (lapsed[entry.capability] ??= []).push(JSON.parse(JSON.stringify(entry)));
     }
@@ -648,13 +660,13 @@ export class Responder extends SlotKeeper {
       revision: receipt.request.revision, step: 'claimed', keys: {}, effect: false };
     this.checkpoint.put(entry);
     const message = await this.call('com.get', { message: entry.message });
-    const req = isObj(message) ? message.request : null;
-    if (message.digest !== entry.digest) {
+    const problem = readBackProblem(message, entry, this.project);
+    if (problem === 'digest-mismatch') {
       this.checkpoint.drop(entry.request);
       this.emit('board.request.skipped', 'warning', 'A claimed request was not accepted: the message read back carries another digest than the claim. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'digest-mismatch' });
       return;
     }
-    if (!isObj(req) || req.id !== entry.request || req.capability !== capability || req.target !== this.project) {
+    if (problem) {
       this.checkpoint.drop(entry.request);
       this.emit('board.request.skipped', 'warning', 'A claimed request was not accepted: it is not addressed to this Project and capability. Nothing was done; the claim lapses.', { request: entry.request, capability, reason: 'not-addressed' });
       return;
@@ -701,12 +713,14 @@ export class Responder extends SlotKeeper {
     return true;
   }
 
-  async runWork(entry, request) {
-    const { mandate, unread } = readMandate(request, this.mandateFrom, this.agentId);
+  async runWork(entry, request, problem = null) {
+    let { mandate, unread } = readMandate(request, this.mandateFrom, this.agentId);
+    if (problem && (mandate !== null || unread)) [mandate, unread] = [null, problem]; // FAA-196 (1): another message than accepted
     if (unread) { // by its code alone: the block holds the operator's words
       this.emit('board.request.mandate_unread', 'warning', `Request ${entry.request} carries a mandate the kit does not read (${unread}); it is worked without one.`, { request: entry.request, reason: unread });
     }
-    const ctx = new WorkContext(this, entry, mandate, isObj(request.sender) ? request.sender.project ?? null : null);
+    const sender = isObj(request.sender) ? request.sender : {};
+    const ctx = new WorkContext(this, entry, mandate, sender.project ?? null, senderAgent(this.identifyAgent, sender, mandate));
     const work = { entry, request, ctx, done: false, outcome: null, failure: null, renewedAt: this.now() };
     this.current = work;
     work.promise = Promise.resolve().then(() => this.handler(request, ctx)).then((outcome) => { work.outcome = outcome; }, (e) => { work.failure = e; }).finally(() => { work.done = true; });
@@ -721,7 +735,7 @@ export class Responder extends SlotKeeper {
       return;
     }
     const message = await this.call('com.get', { message: entry.message });
-    await this.runWork(entry, new BoardRequest(message, entry.capability));
+    await this.runWork(entry, new BoardRequest(message, entry.capability), readBackProblem(message, entry, this.project));
   }
 
   /**

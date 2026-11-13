@@ -5,6 +5,7 @@ re-exports every name here. Part of the service kit (FAA-92, split from fabric_i
 only, Python 3.9+."""
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import math
@@ -20,7 +21,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 from fabric_base import ServiceError  # noqa: E402
 from fabric_actions import action_decision, decision_shape, job_capability  # noqa: E402 - DEC-0121
 from fabric_mandate import (  # noqa: E402 - DEC-0125, DEC-0126
-    EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, mandate_covers, mandate_problem, without_source)
+    EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, is_agent_id, mandate_covers, mandate_problem, without_source)
 
 PROTOCOL = "fabric-interop/0.1"
 EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/interop/0.1"
@@ -377,6 +378,22 @@ def job_step(mandate: Any, *, tier: Any, now: Any, self_id: Any, capability: Any
 UNREADABLE_PROJECT = "\x00unreadable"
 
 
+#: The caller's agent id when a service's identify_agent hook answered something no chain can hold (an id the registry
+#: refuses, not a string, or the hook raised): passed as callerAgent it matches no agent, so every mandate reads
+#: mandate-not-for-this-call (fail closed, FAA-135). Never an agent id (`is_agent_id` refuses it).
+UNREADABLE_AGENT = "\x00unreadable-agent"
+
+
+def identified_agent(value: Any) -> Optional[str]:
+    """FAA-135: the caller's agent id as a service's own hook named it from a per-agent credential (contract delegation.md,
+    `surfaces.mcp.auth: own`), read as the mandate chain binds it (`callerAgent`): None (no per-agent credential) is
+    none, and the chain's end alone binds the mandate, as before; an agent id the registry accepts is that id; anything
+    else is UNREADABLE_AGENT, which no chain holds. Never a name the call itself carries."""
+    if value is None:
+        return None
+    return value if is_agent_id(value) else UNREADABLE_AGENT
+
+
 def mandate_spend(value: Any) -> Any:
     """A spend estimate as a mandate reads it (FAA-139): a number read as a double, as the contract does; one that is
     not a finite double (an int past the float range, NaN, infinity) or not a number is none, which a mandate's
@@ -559,3 +576,83 @@ def repeated_key_decision(job: Any, now: Any, limit_holds: Optional[bool] = None
         return "same"
     return "run" if "resetsAt" not in data or utc_time(data["resetsAt"]) <= at else "same"
 # #endregion job-limits-kit
+
+
+# --- MCP 2026-07-28 header mirroring (moved from fabric_interop in 0.83.0 to make room under the line ceiling) ---
+
+NAMED_METHODS = {"tools/call": "name", "prompts/get": "name", "resources/read": "uri"}
+HEADER_MISMATCH = -32020  # the code the official 2026-07-28 server SDK answers a header/body mismatch with
+
+
+_SENTINEL = ("=?base64?", "?=")
+
+
+def encode_header_value(value: str) -> str:
+    """A body value as an HTTP header value, by MCP 2026-07-28 Streamable HTTP "Value Encoding": as
+    it is when it is printable ASCII without leading or trailing whitespace, otherwise (and for a
+    plain value that itself looks like the sentinel) `=?base64?<base64 of its UTF-8>?=`."""
+    plain = (all(0x20 <= ord(c) <= 0x7E for c in value) and value == value.strip(" ")
+             and not (value.startswith(_SENTINEL[0]) and value.endswith(_SENTINEL[1])))
+    if plain:
+        return value
+    return _SENTINEL[0] + base64.b64encode(value.encode("utf-8")).decode("ascii") + _SENTINEL[1]
+
+
+def decode_header_value(value: str) -> Optional[str]:
+    """The body value a header carries, decoding the Base64 sentinel; None for a header value with
+    invalid characters or a sentinel that is not valid Base64 of UTF-8 (a server rejects both)."""
+    if value.startswith(_SENTINEL[0]) and value.endswith(_SENTINEL[1]) and len(value) >= len(_SENTINEL[0]) + len(_SENTINEL[1]):
+        try:
+            return base64.b64decode(value[len(_SENTINEL[0]):-len(_SENTINEL[1])], validate=True).decode("utf-8")
+        except ValueError:  # binascii.Error and UnicodeDecodeError are both ValueErrors
+            return None
+    if any(not (0x20 <= ord(c) <= 0x7E or c == "\t") for c in value):
+        return None
+    return value
+
+
+def mcp_header_problem(message: Any, headers: Any) -> Optional[str]:
+    """MCP 2026-07-28 Streamable HTTP mirrors the body in `Mcp-Method` (every request and
+    notification) and `Mcp-Name` (`params.name` or `params.uri` of tools/call, prompts/get,
+    resources/read). A server MUST reject a mismatch; a request that declares 2026-07-28 must
+    carry them. Earlier revisions may omit them, but what they send must still agree.
+    `headers` is any case-insensitive mapping with `.get` (http.server's message, a dict)."""
+    if not isinstance(message, dict) or headers is None:
+        return None
+    def header(name: str) -> Optional[str]:
+        value = headers.get(name) if hasattr(headers, "get") else None
+        if value is None and isinstance(headers, dict):
+            value = next((v for k, v in headers.items() if k.lower() == name.lower()), None)
+        if isinstance(value, (list, tuple)):
+            value = value[0] if value else None
+        return None if value is None else str(value)
+    declared = header("MCP-Protocol-Version") == MCP_REVISION
+    method = message.get("method")
+    sent = header("Mcp-Method")
+    if sent is None and declared:
+        return "the body names method %s but the required Mcp-Method header is absent" % method
+    if sent is not None and sent != method:
+        return "Mcp-Method %s disagrees with the body's method %s" % (sent, method)
+    field = NAMED_METHODS.get(str(method))
+    if field:
+        params = message.get("params")
+        value = params.get(field) if isinstance(params, dict) else None
+        named = header("Mcp-Name")
+        if named is None and declared:
+            return "the body carries params.%s but the required Mcp-Name header is absent" % field
+        if named is not None:
+            decoded = decode_header_value(named)
+            if decoded is None:
+                return "Mcp-Name is malformed: invalid characters or a broken =?base64?…?= value"
+            if decoded != str(value):
+                return "Mcp-Name disagrees with the body's params.%s" % field
+    return None
+
+
+def mcp_request_headers(method: str, params: Dict[str, Any]) -> Dict[str, str]:
+    """The standard headers a 2026-07-28 client sends with one request."""
+    out = {"MCP-Protocol-Version": MCP_REVISION, "Mcp-Method": method}
+    field = NAMED_METHODS.get(method)
+    if field and params.get(field) is not None:
+        out["Mcp-Name"] = encode_header_value(str(params[field]))
+    return out

@@ -319,6 +319,29 @@ test('authority_changed stops claiming; no epoch fails closed; another protocol 
   assert.equal(h3.events.at(-1)[3].data.value.reason, 'schema-unsupported');
 });
 
+test('FAA-187 (22): a flapping board is said down once per outage window', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  for (let i = 0; i < 4; i += 1) { // down, up, down, up within the window: one row
+    await hub.control({ op: 'set', values: { down: true } });
+    await h.advance(await r.step());
+    await hub.control({ op: 'set', values: { down: false } });
+    await h.advance(await r.step());
+  }
+  assert.equal(h.kinds().filter((k) => k === 'board.down').length, 1);
+  assert.equal(r.state, 'ready');
+  const { DOWN_QUIET_SECONDS } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-board-session.mjs');
+  for (let i = 0; i < Math.floor(DOWN_QUIET_SECONDS / 20) + 2; i += 1) { // up long enough: the outage window closes
+    await h.advance(20);
+    await r.step();
+  }
+  await hub.control({ op: 'set', values: { down: true } });
+  await h.advance(await r.step());
+  assert.equal(h.kinds().filter((k) => k === 'board.down').length, 2, 'a later outage is said again');
+});
+
 test('Fabric down: bounded backoff, one event, then recovery', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);
@@ -434,6 +457,24 @@ test('the Python and Node kits write a checkpoint each other reads', async () =>
 
 test('selfCheck: the fixture conversation check_service.py runs passes on the Node kit', async () => {
   assert.deepEqual(await fb.selfCheck(), []);
+});
+
+// FAA-187 (23): the fixture's Responder records its notices: a kit that sends none, one at a level the event log
+// refuses, or one without its subject fails the self check.
+test('selfCheck: a kit whose notices are lost fails', async (t) => {
+  const original = fb.Responder.prototype.emit;
+  const cases = [[function silent() {}, 'fenced: no warning notice'],
+    [function warn(kind, level, text, options) { return original.call(this, kind, level === 'warning' ? 'warn' : level, text, options); }, "at level 'warn'"],
+    [function noSubject(kind, level, text, { notify = false } = {}) { this.emitTo(kind, level, text, { notify }); }, 'without its subject']];
+  for (const [planted, said] of cases) {
+    fb.Responder.prototype.emit = planted;
+    try {
+      const problems = await fb.selfCheck();
+      assert.ok(problems.some((p) => p.includes(said)), `${planted.name}: ${problems.join('; ')}`);
+    } finally {
+      fb.Responder.prototype.emit = original;
+    }
+  }
 });
 
 // --- DEC-0079 and DEC-0081 (FAA-42) ------------------------------------------------------------------------------------
@@ -1731,7 +1772,7 @@ test('FAA-163: a lost enroll while another slot holds is asked again; a reconnec
   await hub.control({ op: 'fail', tool: 'com.status', code: 'capacity_exceeded' });
   await h.advance(60);
   await r.step();
-  assert.deepEqual(r.slots, {});
+  assert.deepEqual({ ...r.slots }, {}); // a map with no prototype (FAA-196 (24))
   assert.equal(r.session, null); // refused with no slot held: reconnects, never skips recovery
 });
 
@@ -1857,7 +1898,7 @@ c = fb.Checkpoint(${JSON.stringify(file)}); print(json.dumps(c.slots, sort_keys=
   assert.equal(py.status, 0, py.stderr);
   assert.deepEqual(JSON.parse(py.stdout), { 'video.render': { generation: 3, moved: 4, project: 'p' } });
   const back = new fb.Checkpoint(file);
-  assert.deepEqual(back.slots, { 'text.write': { generation: 1, project: 'p' }, 'video.render': { generation: 3, moved: 4, project: 'p' } });
+  assert.deepEqual({ ...back.slots }, { 'text.write': { generation: 1, project: 'p' }, 'video.render': { generation: 3, moved: 4, project: 'p' } });
   assert.deepEqual(Object.keys(back.entries), ['req_000000001']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -1909,4 +1950,47 @@ test('foreign-user keeps a lost call\'s record, never read as the board\'s refus
   const held = { project: 'p', generation: 1, asking: { op: 'com.enroll', args: { capability: 'video.render' } } };
   await assert.rejects(r.replay('video.render', held, 1), (e) => e.code === 'foreign-user');
   assert.deepEqual(noted, [], 'the asking record is not dropped');
+});
+
+// FAA-196 (24): a capability's name keys the responder's maps (its slots, claim keys, confirmations, transfers): a name
+// an Object.prototype member also has (`constructor`, `toString`, valid capability names) is served as any other.
+test('a capability named like an Object.prototype member is served, after a restart too', async (t) => {
+  const caps = ['constructor', 'tostring', 'valueof'];
+  const hub = await fakeHub(t, caps);
+  const h = harness(hub, { capabilities: caps });
+  const { request: first } = await hub.control({ op: 'queue', capability: 'constructor' });
+  await h.responder().step();
+  let s = await h.state();
+  assert.equal(s.requests[first].state, 'completed');
+  h.outcome = () => new Promise(() => {}); // dies inside the work
+  const { request: second } = await hub.control({ op: 'queue', capability: 'constructor' });
+  await h.responder().step();
+  await hub.control({ op: 'end-sessions' });
+  h.outcome = { state: 'completed', summary: 'Rendered after the restart.' };
+  await h.responder().step();
+  s = await h.state();
+  assert.equal(s.requests[second].state, 'completed');
+});
+
+// FAA-187 (12): close(timeout) bounded each socket read, so a hub that trickles bytes held an idle stop past it; the
+// timeout now bounds the whole DELETE, which then reads as no release.
+test('FAA-187 (12): close bounds the whole DELETE', async (t) => {
+  const http = await import('node:http');
+  const sockets = new Set();
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
+    const timer = setInterval(() => res.write(' '), 100); // a byte at a time, each inside the socket's own timeout
+    res.on('close', () => clearInterval(timer));
+  });
+  server.on('connection', (s) => { sockets.add(s); s.on('close', () => sockets.delete(s)); });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { for (const s of sockets) s.destroy(); server.close(); });
+  const grant = { origin: `http://127.0.0.1:${server.address().port}`, bearer: () => 'b'.repeat(43), capabilities: [] };
+  const post = (origin, body, bearer, options) => fh.postMcp(origin, body, bearer, { ...options, agent: false });
+  const session = new fb.BoardSession(grant, { post });
+  session.mcpSession = 'x';
+  const started = performance.now();
+  assert.equal(await session.close(300), false);
+  assert.ok(performance.now() - started < 2000, 'the whole DELETE is bounded, never each read');
+  assert.equal(session.mcpSession, null);
 });

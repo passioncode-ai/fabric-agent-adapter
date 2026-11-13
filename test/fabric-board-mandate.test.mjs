@@ -61,7 +61,7 @@ async function fakeHub(t) {
     assert.equal(seen.length, 1, 'the handler ran once');
     return seen[0];
   };
-  return { data, events, runOne, options, seen };
+  return { data, events, runOne, options, seen, control };
 }
 
 test('FAA-135: a trusted request from a declared Project carries its mandate', async (t) => {
@@ -72,6 +72,66 @@ test('FAA-135: a trusted request from a declared Project carries its mandate', a
   assert.deepEqual(covered, { ok: true, recordAs: { by: 'operator', via: 'mandate', task: 'task-teaser', chain: ['lead-agent', 'example-agent'], caller: OTHER_PROJECT } });
   assert.equal(outside.ok, false);
   assert.equal(outside.data.detail, 'outside-mandate: capability');
+});
+
+test('FAA-135: identifyAgent binds the sender\'s agent id; null binds nothing, anything else fails closed', async (t) => {
+  const heard = [];
+  const cases = [[(sender) => { heard.push(sender); return 'lead-agent'; }, 'ok'], [() => null, 'ok'], [() => undefined, 'ok'],
+    [() => 'other-agent', 'mandate-not-for-this-call'], [() => 'Lead Agent', 'mandate-not-for-this-call'],
+    [() => { throw new Error('the agent registry is down'); }, 'mandate-not-for-this-call']];
+  for (const [identifyAgent, want] of cases) {
+    const h = await fakeHub(t);
+    const [got, covered] = await h.runOne(body(JSON.stringify(mandate())), { identifyAgent });
+    assert.notEqual(got, null);
+    assert.equal(covered.ok ? 'ok' : covered.data.detail, want, String(identifyAgent));
+  }
+  assert.equal(heard[0].project, OTHER_PROJECT);
+  assert.deepEqual([heard[0].principal.kind, heard[0].principal.provenance], ['agent', 'trusted']);
+  const asked = [];
+  const h = await fakeHub(t);
+  const [none] = await h.runOne(body('{"frames": 24}'), { identifyAgent: (sender) => { asked.push(sender); return 'lead-agent'; } });
+  assert.equal(none, null);
+  assert.deepEqual(asked, [], 'asked only when a mandate travelled');
+  assert.throws(() => new fb.Responder(h.options({ identifyAgent: 'lead-agent' })), (e) => e.code === 'invalid_arguments');
+});
+
+// FAA-196 (1): the resume path (a transferred request run again from a fresh com.get) reads the mandate as the first
+// path does, and none from a message read back under another digest or address, said by its code alone.
+async function resumed(t, tamper) {
+  const h = await fakeHub(t);
+  const { request } = await h.control({ op: 'queue', capability: 'video.render', text: body(JSON.stringify(mandate())), provenance: 'trusted' });
+  await new fb.Responder(h.options({ handler: () => new Promise(() => {}) })).step(); // dies inside the work
+  await h.control({ op: 'end-sessions' });
+  const second = new fb.Responder(h.options());
+  if (tamper) {
+    const call = second.call.bind(second);
+    second.call = async (tool, args) => {
+      const answer = await call(tool, args);
+      if (tool === 'com.get') tamper(answer);
+      return answer;
+    };
+  }
+  await second.step();
+  assert.equal(h.seen.length, 1, 'the handler ran again on the resume path');
+  assert.ok(request);
+  return { h, got: h.seen[0] };
+}
+
+test('FAA-196 (1): a resumed request reads its mandate as the first path does', async (t) => {
+  const { h, got: [m, covered] } = await resumed(t);
+  assert.deepEqual(m, mandate());
+  assert.equal(covered.ok, true);
+  assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread'), []);
+});
+
+test('FAA-196 (1): a resumed request read back under another digest or address carries no mandate', async (t) => {
+  for (const [tamper, reason] of [[(a) => { a.digest = `sha256:${'0'.repeat(64)}`; }, 'digest-mismatch'],
+    [(a) => { a.request = { ...a.request, capability: 'video.cut' }; }, 'not-addressed']]) {
+    const { h, got: [m, covered] } = await resumed(t, tamper);
+    assert.equal(m, null);
+    assert.equal(covered, null);
+    assert.deepEqual(h.events.filter((e) => e[0] === 'board.request.mandate_unread').map((e) => e[3].data.value.reason), [reason]);
+  }
 });
 
 test('FAA-135: the personal board takes any trusted sender', async (t) => {
@@ -93,6 +153,9 @@ for (const [name, extra] of [['no mandateFrom', { mandateFrom: null }], ['no age
 
 for (const [name, text, code] of [['two blocks', body(JSON.stringify(mandate()), JSON.stringify(mandate())), 'mandate-blocks'],
   ['an unreadable block', body('{"kind": "mandate/1", "task": '), 'mandate-unreadable'],
+  // FAA-196 (13): the kind written with a JSON escape is the same kind, so its broken block is said too
+  ['an escaped kind', body('{"kind": "mandate\\/1", "task": '), 'mandate-unreadable'],
+  ['a unicode-escaped kind', body('{"kind": "mandate\\u002F1", "task": '), 'mandate-unreadable'],
   ['NaN', body(`${JSON.stringify(mandate()).slice(0, -1)}, "x": NaN}`), 'mandate-unreadable']]) {
   test(`FAA-135: ${name} is no mandate, named by its code`, async (t) => {
     const h = await fakeHub(t);
@@ -296,10 +359,11 @@ test('FAA-135: reading is linear in the body (0.61.0 readings 3)', () => {
     const request = new BoardRequest({ body: { text }, request: { id: 'r' },
       sender: { project: OTHER_PROJECT, principal: { provenance: 'trusted' } } }, 'video.render');
     let best = Infinity;
-    for (let k = 0; k < 5; k += 1) {
-      const start = performance.now();
+    for (let k = 0; k < 5; k += 1) { // CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+      const start = process.cpuUsage();
       readMandate(request, _PB, 'example-agent');
-      best = Math.min(best, performance.now() - start);
+      const used = process.cpuUsage(start);
+      best = Math.min(best, (used.user + used.system) / 1000);
     }
     return best;
   };
@@ -323,4 +387,20 @@ test('FAA-135: the operator\'s words reach no checkpoint during the work', async
   assert.notEqual(got, null, 'a mandate was read');
   assert.ok(h.seen.checkpoint, 'the request\'s entry is in the checkpoint while it is worked');
   assert.ok(!h.seen.checkpoint.includes(WORDS));
+});
+
+// FAA-196 (11): release() from a finally must not replace the caller's own outcome: a close that throws forgets the
+// descriptor and still closes the name's server.
+test('FAA-196 (11): InstanceLock.release never throws and forgets what it held', async (t) => {
+  const { InstanceLock } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-lock.mjs');
+  const lock = new InstanceLock(path.join(tempDir('faa196-lock-'), 'data'));
+  let closed = false;
+  lock.fd = 987654;
+  lock.server = { close: () => { closed = true; } };
+  t.mock.method(fs, 'closeSync', () => { throw Object.assign(new Error('EIO'), { code: 'EIO' }); });
+  lock.release();
+  assert.deepEqual([lock.fd, lock.server, closed], [null, null, true]);
+  lock.server = { close: () => { throw new Error('ERR_SERVER_NOT_RUNNING'); } };
+  lock.release();
+  assert.equal(lock.server, null);
 });

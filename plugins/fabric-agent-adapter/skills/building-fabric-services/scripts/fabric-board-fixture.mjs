@@ -5,6 +5,7 @@ import path from 'node:path';
 import { Backoff, HubError, MCP_PROTOCOL_VERSION, normalProject, postMcp, toolAnswer } from './fabric-hub.mjs';
 import { COMMS_PROTOCOL, RESPOND_TOOLS } from './fabric-board-shapes.mjs';
 import { BoardSession, Responder } from './fabric-board-session.mjs';
+import { LEVELS } from './fabric-events.mjs'; // the levels the event log takes (FAA-187 (23))
 
 const FIXTURE_PROJECT = '3f2a6b1c-0d4e-4f5a-8b6c-7d8e9f0a1b2c';
 
@@ -28,7 +29,11 @@ function fixtureAnswers(variant) {
   };
 }
 
-/** One scripted conversation per path through this kit, with no Fabric; answers the problems found (empty: it passes). */
+/**
+ * One scripted conversation per path through this kit, with no Fabric; answers the problems found (empty: it passes).
+ * Its notices are recorded: one at a level the event log refuses, one without its subject, or a fenced attempt with no
+ * warning fails it (FAA-187 (23)).
+ */
 export async function selfCheck() {
   const os = await import('node:os');
   const problems = [];
@@ -45,6 +50,8 @@ export async function selfCheck() {
       const answers = fixtureAnswers(variant);
       const calls = [];
       const handled = [];
+      const notices = []; // recorded as JsonlEventLog.append takes them: (kind, level, text, {notify, subject, ...}) (FAA-187 (23))
+      const emit = (kind, level, text, options = {}) => { notices.push([kind, level, options?.subject]); };
       const post = async (origin, body, bearer, { method = 'POST' } = {}) => {
         if (method === 'DELETE') return { status: 200, headers: {}, body: null };
         if (body.method === 'initialize') return { status: 200, headers: { 'mcp-session-id': 'fixture-session' }, body: { jsonrpc: '2.0', id: body.id, result: { protocolVersion: MCP_PROTOCOL_VERSION } } };
@@ -58,9 +65,14 @@ export async function selfCheck() {
       const { HubClient } = await import('./fabric-hub.mjs');
       const responder = new Responder({ hub: new HubClient(root, { post }), projectId: FIXTURE_PROJECT, capabilities: ['fixture.render'], credentialFile: cred,
         checkpointFile: path.join(tmp, 'checkpoint.json'), handler: (request) => { handled.push(request.body); return { state: 'completed', summary: 'Rendered.' }; },
-        admit: () => null, now: () => 0, rand: () => 0.5, sessionFactory: (grant) => new BoardSession(grant, { post }) });
+        admit: () => null, now: () => 0, rand: () => 0.5, sessionFactory: (grant) => new BoardSession(grant, { post }), emit });
       await responder.step();
       const tools = calls.map(([t]) => t);
+      for (const [kind, level, subject] of notices) {
+        if (!LEVELS.includes(level)) problems.push(`${variant}: notice ${kind} at level '${level}', which the event log refuses`);
+        if (!(subject && typeof subject === 'object' && subject.type && subject.id)) problems.push(`${variant}: notice ${kind} without its subject`);
+      }
+      if (variant === 'fenced' && !notices.some(([, level]) => level === 'warning')) problems.push('fenced: no warning notice reached the service\'s emit');
       if (tools.some((t) => !RESPOND_TOOLS.has(t) && t !== 'fabric.board.join')) problems.push(`${variant}: a tool outside the respond scope was sent`);
       if (variant === 'whole') {
         if (tools.join(',') !== 'fabric.board.join,com.status,com.enroll,com.claim,com.get,com.accept,com.complete') problems.push(`whole: the calls were ${tools.join(', ')}`);

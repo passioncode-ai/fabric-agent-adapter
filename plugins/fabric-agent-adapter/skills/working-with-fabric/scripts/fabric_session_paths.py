@@ -8,6 +8,7 @@ from pathlib import Path, PurePath
 from typing import Any
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 
 _DRIVE_MOUNT = re.compile(r"/(?:cygdrive/)?([A-Za-z])(?=/|$)")
@@ -28,13 +29,130 @@ def _windows_path(token: str) -> Optional[str]:
     return ntpath.normpath(token)
 
 
+_OPERATORS = frozenset("();&|<>")
+
+
+def _heredoc_word(command: str, at: int) -> Tuple[str, int]:
+    """A here-document's delimiter word from `at` (blanks first), its quotes taken off as bash does, and where it ends."""
+    while at < len(command) and command[at] in " \t":
+        at += 1
+    word, quote = [], None
+    while at < len(command):
+        char = command[at]
+        if quote:
+            if char == quote:
+                quote = None
+            else:
+                word.append(char)
+        elif char in "'\"":
+            quote = char
+        elif char == "\\" and at + 1 < len(command):
+            at += 1
+            word.append(command[at])
+        elif char in " \t\n" or char in _OPERATORS:
+            break
+        else:
+            word.append(char)
+        at += 1
+    return "".join(word), at
+
+
+def prepare(command: str) -> str:
+    """The command as bash reads its words, before the lexer (FAA-187): a `\\` and newline outside single quotes and
+    outside a comment joins the lines (an escaped backslash before a newline joins nothing, (7)); a comment, a `#` that
+    starts a word, is cut to its line's end (a `#` inside a word is the word's, (2)); a here-document's body and its
+    terminator line are cut out and the redirection left as a here-string, so a quote in a body never breaks the lexer
+    (5), with bash's own terminator rules: the delimiter word as written, its quotes taken off, `<<-` stripping leading
+    tabs, a plain `<<` matching only the bare line, and `<<` inside `((` `))` a shift (9); and a quoted word made only of
+    operator characters (`'&'`, `")"`) becomes a plain word, so the lexer never reads it as an operator (1)."""
+    out: List[str] = []
+    at, size, quote, word_start, arithmetic = 0, len(command), None, True, 0
+    pending: List[Tuple[str, bool]] = []
+    while at < size:
+        char = command[at]
+        if quote == "'":
+            out.append(char)
+            quote = None if char == "'" else quote
+            at += 1
+            continue
+        if char == "\\":
+            if command[at + 1:at + 2] == "\n":
+                at += 2  # a line continuation (outside single quotes)
+                continue
+            out.append(command[at:at + 2])
+            at, word_start = at + 2, False
+            continue
+        if quote == '"':
+            out.append(char)
+            quote = None if char == '"' else quote
+            at += 1
+            continue
+        if char in "'\"":
+            end = command.find(char, at + 1) if char == "'" else -1
+            if char == '"':
+                look = at + 1
+                while look < size and command[look] != '"':
+                    look += 2 if command[look] == "\\" else 1
+                end = look if look < size else -1
+            inner = command[at + 1:end] if end > at else ""
+            after = command[end + 1:end + 2] if end > at else ""
+            if word_start and inner and set(inner) <= _OPERATORS and (after == "" or after in " \t\n" or after in _OPERATORS):
+                out.append("_")  # a quoted operator is a word, never an operator (1)
+                at, word_start = end + 1, False
+                continue
+            quote, word_start = char, False
+            out.append(char)
+            at += 1
+            continue
+        if char == "#" and word_start:
+            while at < size and command[at] != "\n":
+                at += 1  # a comment, to its line's end; the newline stays
+            continue
+        if command.startswith("((", at):
+            arithmetic += 1
+        elif command.startswith("))", at) and arithmetic:
+            arithmetic -= 1
+        if command.startswith("<<<", at):  # a here-string: its word is text, no body follows
+            out.append("<<<")
+            at, word_start = at + 3, True
+            continue
+        if command.startswith("<<", at) and not arithmetic:
+            strip = command[at + 2:at + 3] == "-"
+            word, end = _heredoc_word(command, at + 3 if strip else at + 2)
+            if word:
+                pending.append((word, strip))
+                out.append("<<< _ ")  # the body is text for the command: a here-string stands in for it
+                at, word_start = end, True
+                continue
+        if char == "\n" and pending:
+            out.append("\n")
+            line_start = at + 1
+            for delimiter, strip in pending:
+                while line_start <= size:
+                    line_end = command.find("\n", line_start)
+                    line_end = size if line_end < 0 else line_end
+                    line = command[line_start:line_end]
+                    line_start = line_end + 1
+                    if (line.lstrip("\t") if strip else line) == delimiter:
+                        break
+            pending = []
+            at, word_start = line_start - 1, True  # at the terminator line's newline: it ends the command
+            if at >= size:
+                break
+            continue
+        out.append(char)
+        word_start = char in " \t\n" or char in _OPERATORS
+        at += 1
+    return "".join(out)
+
+
 #: Words after which a command word may still stand (reserved words and the prefixes that run their command here).
 KEYWORDS = frozenset(("{", "!", "then", "do", "else", "elif", "if", "while", "until", "time", "command", "builtin"))
 ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
 
 
 def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None,
-               ends: Optional[List[Optional[str]]] = None) -> List[str]:
+               ends: Optional[List[Optional[str]]] = None, fold_case: Optional[bool] = None) -> List[str]:
     """The folders a Bash command names as `cd <absolute path>` or `git -C <path>`, in order. A relative `-C` is read
     against the folder the command last changed into with an absolute `cd`, else `cwd`; after a `cd` to a relative or
     unknown folder it is dropped (FAA-166). A `cd` inside `( )`, a pipeline's stage or a list sent to the background
@@ -44,19 +162,22 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None,
     `sys.platform == "win32"`) paths are read as Git Bash writes them, with its quoting: an unquoted `C:\\work` is
     `C:work` there too, so a native path counts when it is quoted (FAA-175); Cygwin and MSYS2 Pythons read their own
     POSIX paths (FAA-177). With `ends`, the folder the command leaves the shell in is appended to it: an absolute path,
-    or None when it is not known (a relative cd, popd, an unclosed subshell, a command that does not split; FAA-184)."""
+    or None when it is not known (a relative cd, popd, an unclosed subshell, a command that does not split; FAA-184).
+    `prepare` reads comments, line continuations, here-documents and quoted operators first (FAA-187); a line ending
+    in `|`, `|&`, `&&` or `||` goes on on the next, as in bash (6); a `-C` word bash would expand (`$`, a backtick, a
+    leading `~`) is a folder not known here (8), and `-C ""` runs where the shell is; `git` is matched without case on
+    Windows and, with `fold_case` (default: on macOS), where the file system finds `GIT` as git (11). A `case`
+    pattern's `)` inside a subshell is still read as closing it."""
     import shlex  # only a Stop hook with a transcript needs it
     windows = sys.platform == "win32" if windows is None else windows
+    fold_case = windows or (sys.platform == "darwin" if fold_case is None else fold_case)
     if windows:
         import ntpath as paths
     else:
         import posixpath as paths
     try:
-        # A `\` before a newline joins the lines, as in bash; a `;` and a second newline after each newline keep a `#`
-        # comment, which the lexer reads to the end of its line, newline included, from swallowing the next command or
-        # the line end a here-document counts.
-        command = command.replace("\\\n", "").replace("\n", "\n;\n")
-        lexer = shlex.shlex(command, posix=True, punctuation_chars="();<>|&\n")
+        lexer = shlex.shlex(prepare(command), posix=True, punctuation_chars="();<>|&\n")
+        lexer.commenters = ""  # prepare cut the comments, where bash reads them (a `#` inside a word is the word's)
         lexer.whitespace = " \t\r"  # a newline ends a command, as `;` does
         lexer.whitespace_split = True
         tokens = list(lexer)
@@ -87,45 +208,24 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None,
             base = pipe_start
         pipe_start, in_pipeline = base, False
 
-    heredocs: List[str] = []  # the delimiters of here-documents whose bodies start at the next newline
-
-    def past_heredocs(at: int) -> int:
-        """The index of the newline ending the last pending here-document's delimiter line (or the end): the body is
-        text for a command, never commands of its own."""
-        while heredocs and at < len(tokens):
-            line_end = at
-            while line_end < len(tokens) and "\n" not in tokens[line_end]:
-                line_end += 1
-            if tokens[at:line_end] == [heredocs[0]]:
-                heredocs.pop(0)
-                if not heredocs:
-                    return line_end
-            at = line_end + 1
-        heredocs.clear()
-        return len(tokens)
-
     start = True  # a command word may stand here
+    continued = False  # the last operator was `|`, `|&`, `&&` or `||`: a newline after it goes on (FAA-187 (6))
     index = 0
     while index < len(tokens):
         token = tokens[index]
         if token and set(token) <= separators:
-            at, ends_command, newline = 0, False, False
+            at, ends_command = 0, False
             while at < len(token):
                 pair, char = token[at:at + 2], token[at]
+                if char == "\n" and continued:
+                    at += 1  # the line ended in a pipe or a list operator: the command goes on
+                    continue
                 if pair in ("&&", "||"):
                     end_pipeline()
-                    at, ends_command = at + 2, True
+                    at, ends_command, continued = at + 2, True, True
                     continue
-                if token.startswith("<<<", at):  # a here-string: its word is text, no body follows
+                if token.startswith("<<<", at):  # a here-string (prepare leaves one for a here-document): its word is text
                     at += 3
-                    continue
-                if pair == "<<" and index + 1 < len(tokens):
-                    delimiter = tokens[index + 1]  # <<EOF, <<'EOF', <<-EOF: shlex has taken the quotes off
-                    if delimiter == "-" and index + 2 < len(tokens):
-                        index, delimiter = index + 1, tokens[index + 2]
-                    heredocs.append(delimiter[1:] if delimiter.startswith("-") and len(delimiter) > 1 else delimiter)
-                    index += 1  # the delimiter is no command word
-                    at += 2
                     continue
                 if pair == "&>":  # `&>` and `&>>` redirect, they background nothing
                     at += 3 if token[at + 2:at + 3] == ">" else 2
@@ -133,15 +233,14 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None,
                 if char in "<>":  # a redirection: `2>&1` backgrounds nothing, `>|` pipes nothing
                     at += 2 if token[at + 1:at + 2] in ("&", "|") else 1
                     continue
-                ends_command = True
+                ends_command, continued = True, False
                 if pair == "|&" or char == "|":
-                    base, in_pipeline = pipe_start, True
+                    base, in_pipeline, continued = pipe_start, True, True
                     at += 2 if pair == "|&" else 1
                     continue
                 if char in ";\n":
                     end_pipeline()
                     list_start = base
-                    newline = newline or char == "\n"
                 elif char == "&":
                     end_pipeline()
                     base = pipe_start = list_start
@@ -155,8 +254,9 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None,
                         base, pipe_start, list_start, in_pipeline = stack.pop()
                 at += 1
             start = start or ends_command  # a redirection alone starts no command
-            index = past_heredocs(index + 1) if newline and heredocs else index + 1
+            index += 1
             continue
+        continued = False
         if start and (token in KEYWORDS or ASSIGNMENT.match(token)):
             index += 1  # `{ cd /a; }`, `then cd`, `x=1 cd`, `command cd`: a command word may still follow
             continue
@@ -172,14 +272,16 @@ def bash_paths(command: str, cwd: Path, windows: Optional[bool] = None,
             if folder:
                 found.append(folder)
             base = folder
-        elif start and (paths.basename(token).lower() if windows else paths.basename(token)) in ("git", "git.exe"):
+        elif start and (paths.basename(token).lower() if fold_case else paths.basename(token)) in ("git", "git.exe"):
             look, at, moved = index + 1, base, False
             while look < len(tokens) and tokens[look].startswith("-") and not set(tokens[look]) <= separators:
-                if tokens[look] == "-C" and look + 1 < len(tokens) and not set(tokens[look + 1]) <= separators:
-                    # git reads each relative -C against the one before it and runs in the last
-                    folder = absolute(tokens[look + 1])
-                    if folder is None and at is not None and not tokens[look + 1].startswith("/"):
-                        folder = paths.normpath(paths.join(at, tokens[look + 1]))
+                if tokens[look] == "-C" and look + 1 < len(tokens) and (tokens[look + 1] == "" or not set(tokens[look + 1]) <= separators):
+                    # git reads each relative -C against the one before it and runs in the last; `-C ""` where it is
+                    word = tokens[look + 1]
+                    expands = "$" in word or "`" in word or word.startswith("~")  # a folder not known here (FAA-187 (8))
+                    folder = None if expands else absolute(word)
+                    if folder is None and not expands and at is not None and not word.startswith("/"):
+                        folder = paths.normpath(paths.join(at, word))
                         if windows and not (paths.isabs(folder) and paths.splitdrive(folder)[0]):
                             folder = None  # `C:work`, a drive-relative path: not known here
                     at, moved = folder, True

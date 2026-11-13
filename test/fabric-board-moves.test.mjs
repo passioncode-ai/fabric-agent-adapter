@@ -236,3 +236,94 @@ test('FAA-272: a hub refusal keeps the owner\'s reason; a restricted table is no
     assert.ok(e.message.includes(who.kind), e.message);
   }
 });
+
+// FAA-194 (5): each moved slot read its own com.status once a renewal; a tick now reads it once for all of them.
+test('FAA-194 (5): moved slots share one com.status read a tick', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  const r = h.responder();
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.control({ op: 'move', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  assert.deepEqual(Object.fromEntries(Object.entries(r.slots).map(([c, s]) => [c, s.state])), { 'video.render': 'moved', 'video.cut': 'moved' });
+  for (let k = 0; k < 3; k += 1) {
+    const before = (await h.control({ op: 'state' })).calls.length;
+    await h.advance(20);
+    await r.step();
+    const calls = (await h.control({ op: 'state' })).calls.slice(before);
+    assert.equal(calls.filter((c) => c === 'com.status').length, 1, calls.join(', '));
+  }
+});
+
+// FAA-187 (21): a notify event names the page that resolves it; the responder takes a link per kind from the service.
+test('FAA-187 (21): a notify notice carries the link the service gives for its kind', async (t) => {
+  const h = await fakeHub(t, ['video.render']);
+  const seen = [];
+  const r = new fb.Responder({ ...h.options(), links: { 'board.slot.moved': '/#board' }, emit: (kind, level, text, extra) => seen.push([kind, extra]) });
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  const moved = seen.filter(([kind]) => kind === 'board.slot.moved');
+  assert.equal(moved.length, 1);
+  assert.deepEqual([moved[0][1].notify, moved[0][1].link], [true, '/#board']);
+  assert.ok(seen.every(([kind, extra]) => kind === 'board.slot.moved' || !('link' in extra)));
+  for (const bad of [{ 'board.slot.moved': 'https://elsewhere.example/x' }, { 'board.slot.moved': 7 }, ['board.slot.moved'], 'x']) {
+    assert.throws(() => new fb.Responder({ ...h.options(), links: bad }), (e) => e.code === 'invalid_arguments', JSON.stringify(bad));
+  }
+});
+
+// FAA-194 (8): a move back says the slot is this service's again.
+test('FAA-194 (8): a move back is said', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  const r = h.responder();
+  await r.step();
+  const mine = (await h.control({ op: 'state' })).slots['video.cut'].holder;
+  await h.control({ op: 'move', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.cut', to: mine });
+  await h.advance(20);
+  await r.step();
+  assert.equal(h.events.filter((k) => k === 'board.slot.returned').length, 1, h.events.join(', '));
+});
+
+// FAA-194 (11): the Node twin of test_a_move_back_waits_while_other_work_runs: no move-back claim while work runs.
+test('FAA-194 (11): a move back waits while other work runs', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  t.after(() => release());
+  const r = new fb.Responder({ ...h.options(), handler: async (request) => {
+    if (request.capability === 'video.cut') await gate;
+    return { state: 'completed' };
+  } });
+  await r.step();
+  const mine = (await h.control({ op: 'state' })).slots['video.render'].holder;
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  const { request: cut } = await h.control({ op: 'queue', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step(); // video.cut is claimed and runs
+  assert.ok(r.current);
+  await h.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: render } = await h.control({ op: 'queue', capability: 'video.render' });
+  const before = (await h.control({ op: 'state' })).calls.length;
+  await h.advance(20);
+  await r.step();
+  const state = await h.control({ op: 'state' });
+  const claims = state.calls.slice(before).filter((c, k) => c === 'com.claim' && state.callArgs[before + k]?.capability === 'video.render');
+  assert.deepEqual(claims, [], 'no move-back claim while other work runs');
+  assert.equal(r.slots['video.render'].state, 'moved');
+  release();
+  for (let k = 0; k < 4; k += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await h.advance(20);
+    await r.step();
+  }
+  const done = await h.control({ op: 'state' });
+  assert.equal(done.requests[cut].state, 'completed');
+  assert.equal(done.requests[render].state, 'completed');
+});

@@ -554,7 +554,7 @@ class Hooks(Base):
         self.assertIn("gate-id", helped.stdout)
 
     def test_an_error_closes_the_workflow_only_once_the_request_is_settled(self):
-        # FAA-213 (passioncode-vesta, thread 1add3c03): a workflow closed over a queued or claimed request made
+        # FAA-213 (a board participant's report, thread 1add3c03): a workflow closed over a queued or claimed request made
         # Fabric's next dispatch fail at the take-back on every cycle (Fabric's main at a6f0ffda; later a new workflow)
         text = cli.dispatch_contract(FULL)
         self.assertIn("On an error you cannot get past: complete the request failed_known if you hold its fence; close the "
@@ -791,6 +791,20 @@ class Hooks(Base):
         self.assertIn("that run's `CODEX_HOME` trusts it", flat)
         self.assertIn("since 0.7.8 carries the person's trust", flat, "Switchboard 0.7.8 of 2026-11-04 carries it")
         self.assertNotRegex(flat, r"Switchboard[^.]*not yet in a release", "Switchboard 0.7.8 is released")
+
+    def test_a_run_that_sees_only_whoami_is_named_with_its_remedy(self):
+        # FAA-296: Fabric before 0.3.20 offered a headless run only `fabric_whoami` (CO-563, released in v0.3.20 on
+        # 2026-11-12); the reference names the symptom, the release that fixes it and an older Fabric's reconnect
+        refs = Path(cli.__file__).resolve().parents[1] / "references"
+        run = " ".join((refs / "on-demand-session.md").read_text(encoding="utf-8").split())
+        board = " ".join((refs / "project-board.md").read_text(encoding="utf-8").split())
+        for text in (run, board):
+            with self.subTest(text=text[:30]):
+                self.assertIn("sees only `fabric_whoami`", text)
+                self.assertIn("Fabric 0.3.20", text)
+                self.assertIn("reconnect the `fabric` MCP server", text)
+                self.assertNotIn("expected in the release after v0.3.19", text, "v0.3.20 shipped CO-563")
+        self.assertIn("the latest release is v0.3.20", run)
 
     def test_one_workflow_pattern_for_every_reader(self):
         dashboard_kit = (Path(cli.__file__).resolve().parents[2] / "building-fabric-services/scripts/dashboard_kit.py")

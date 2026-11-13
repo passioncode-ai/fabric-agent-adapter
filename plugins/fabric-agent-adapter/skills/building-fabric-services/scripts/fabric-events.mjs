@@ -18,7 +18,12 @@ const TRACE_ID = /^(?!0{32}$)[0-9a-f]{32}$/;
 
 const SPAN_ID = /^(?!0{16}$)[0-9a-f]{16}$/;
 
-/** One activity event. `level` is one of LEVELS; `warn`, the dashboard chip's name, is stored as `warning`. `data` (DEC-0070) adds machine-readable fields, `{schema, value}`, never a secret: refused here, so no feed carries one. */
+/**
+ * One activity event. `level` is one of LEVELS; `warn`, the dashboard kit's chip for "a person is needed"
+ * (`.fd-s-warn`), is stored as `warning`, the feed's name for the same level, so a reader that draws chips shows a
+ * stored `warning` as the `warn` chip (FAA-276, FAA-277 (6)). `data` (DEC-0070) adds machine-readable fields,
+ * `{schema, value}`, never a secret: refused here, so no feed carries one.
+ */
 export function makeEvent(id, at, kind, given, text, { subject, link, notify, traceId, spanId, data } = {}) {
   const level = typeof given === 'string' && Object.hasOwn(LEVEL_ALIASES, given) ? LEVEL_ALIASES[given] : given;
   if (!LEVELS.includes(level)) throw new ServiceError(`level must be one of ${LEVELS.join(', ')} (or \`warn\` for \`warning\`).`);

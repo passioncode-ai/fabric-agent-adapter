@@ -195,6 +195,18 @@ class JobStoreTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(os.stat(path).st_mode), 0o600)
         self.assertEqual(fi.parse_traceparent(again.traceparent(handle["job"]["id"]))["trace_id"], "4bf92f3577b34da6a3ce929d0e0e4736")
 
+    def test_steps_that_are_no_object_are_refused(self):
+        """FAA-196 (26): a `steps` that is not a JSON object split the kits (an AttributeError or no step); both refuse it
+        with InteropError and the job stays working. None is no steps."""
+        store = fi.JobStore(self.dir)
+        job_id = store.create("example.draft", {})["job"]["id"]
+        request = fi.choice_request("Publish?", "choice", [("yes", "Yes")])
+        for steps in (["approve"], "approve", 7, True, 0, False, ""):
+            with self.subTest(steps=steps), self.assertRaises(fi.InteropError):
+                store.request_input(job_id, {"approve": request}, steps=steps)
+        self.assertEqual(store.get(job_id)["status"], "working")
+        self.assertEqual(store.request_input(job_id, {"approve": request}, steps=None)["status"], "input_required")
+
     def test_unknown_job_is_an_error_never_a_fresh_job(self):
         store = fi.JobStore(self.dir)
         with self.assertRaises(fi.UnknownJob):
@@ -346,10 +358,6 @@ class McpServerTests(unittest.TestCase):
     def test_a_request_without_trace_context_starts_a_new_trace(self):
         result = self.call("tools/call", {"name": "example.echo", "arguments": {"text": "hi"}}, traceparent=None)["result"]
         self.assertIsNotNone(fi.parse_traceparent(result["_meta"]["traceparent"]))
-
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class McpStandardHeaderTests(unittest.TestCase):
@@ -1013,6 +1021,51 @@ class McpMandateTests(unittest.TestCase):
         server = self.server(agent_id="example-agent", authorize=verdict("example-lead"))
         self.assertFalse(self.call(server, {"mandate": lead_mandate()})["isError"])
 
+    def test_identify_agent_binds_a_per_agent_credentials_agent_id(self):
+        """FAA-135: a service that authenticates its caller with a per-agent credential names its agent id through
+        identify_agent(headers, tier); the mandate's chain must then hold it before this agent. None binds nothing (the
+        chain's end alone binds, as before); a name the registry refuses, or a hook that raises, binds an id no chain
+        holds (fail closed); a delegation's caller is read first."""
+        def boom(headers, tier):
+            raise RuntimeError("the credential store is down")
+        cases = [(lambda h, t: "example-lead", None, False), (lambda h, t: None, None, False),
+                 (lambda h, t: "example-other", None, "mandate-not-for-this-call"),
+                 (lambda h, t: "Not An Agent", None, "mandate-not-for-this-call"),
+                 (lambda h, t: 42, None, "mandate-not-for-this-call"), (boom, None, "mandate-not-for-this-call"),
+                 (lambda h, t: "example-other", "example-lead", False)]
+        for hook, delegated, refused in cases:
+            options = {"agent_id": "example-agent", "identify_agent": hook}
+            if delegated:
+                options["authorize"] = lambda tool, headers, tier="T2": {"ok": True, "tier": tier, "principal": "person:p",
+                                                                         "caller": delegated}
+            with self.subTest(hook=hook, delegated=delegated):
+                result = self.call(self.server(**options), {"mandate": lead_mandate()})
+                if refused:
+                    error = result["structuredContent"]["error"]
+                    self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": refused}))
+                else:
+                    self.assertFalse(result["isError"], result)
+                    self.assertEqual(self.seen[-1].record["via"], "mandate")
+
+    def test_identify_agent_reads_the_headers_and_the_tier(self):
+        heard = []
+        server = self.server(agent_id="example-agent", identify_agent=lambda h, t: heard.append((h, t)) or "example-lead")
+        params = {"name": "reviews.approve", "arguments": {"reply": "reply-7"},
+                  "_meta": {"traceparent": PARENT, "mandate": lead_mandate()}}
+        result = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params},
+                               {"Authorization": "Bearer example"}, tier="T1")["result"]
+        self.assertFalse(result["isError"], result)
+        self.assertEqual(heard, [({"Authorization": "Bearer example"}, "T1")])
+
+    def test_identified_agent_reads_a_hooks_answer(self):
+        self.assertIsNone(fi.identified_agent(None))
+        self.assertEqual(fi.identified_agent("example-lead"), "example-lead")
+        self.assertEqual(fi.identified_agent("example-lead.prod"), "example-lead.prod")
+        for unreadable in ("", "Example", "agent:remote", 7, True, ["example-lead"], {"id": "example-lead"}):
+            with self.subTest(value=unreadable):
+                self.assertEqual(fi.identified_agent(unreadable), fi.UNREADABLE_AGENT)
+        self.assertFalse(fm.is_agent_id(fi.UNREADABLE_AGENT))
+
     def test_a_t2_callers_mandate_changes_nothing(self):
         server = self.server(agent_id="example-agent", identify=lambda headers, tier: "agent:remote")
         error = self.call(server, {"mandate": lead_mandate()}, tier="T2")["structuredContent"]["error"]
@@ -1156,6 +1209,67 @@ class JobApprovalStepTests(unittest.TestCase):
         self.assertEqual(record, {"by": "operator", "via": "mandate", "task": "answer the reviews",
                                   "chain": ["example-lead", "example-agent"], "source": SOURCE})
         self.assertEqual(self.jobs.get(job_id)["status"], "working")
+
+    def test_identify_agent_binds_the_steps_mandate_at_the_start_and_at_the_answer(self):
+        """FAA-135: the agent id identify_agent names for the start call binds the chain at the job's own approval step;
+        an answer's mandate is read with the agent id the answering call's credential names."""
+        self.start({"mandate": relayed_mandate()}, identify_agent=lambda headers, tier: "example-other")
+        job_id, record = self.step()
+        self.assertIsNone(record)
+        self.assertIn("mandate-not-for-this-call", self.jobs.get(job_id)["statusMessage"])
+        self.start({"mandate": relayed_mandate()}, identify_agent=lambda headers, tier: "example-lead")
+        job_id, record = self.step()
+        self.assertEqual(record["via"], "mandate")
+        server = self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})},
+                            input_actions=True, identify_agent=lambda headers, tier: "example-other")
+        job_id, _ = self.step()
+        answer = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"approve-reply": {
+                "action": "accept", "content": {"choice": "yes"}}}},
+            "_meta": {"traceparent": PARENT, "mandate": relayed_mandate()}}}
+        error = server.handle(answer, tier="T0")["result"]["structuredContent"]["error"]
+        self.assertEqual((error["code"], error["data"]), ("decision-invalid", {"detail": "mandate-not-for-this-call"}))
+        self.assertEqual(self.inputs, [])
+
+    def test_an_interop_error_in_on_input_is_a_tool_error(self):
+        """FAA-196 (27): an InteropError from `on_input` (a refused request_input or approval_step) left handle() and the
+        transport sent no reply; it is answered as a tool-error, as the handler path answers one."""
+        def refusing(job_id, matched, ctx):
+            raise fi.InteropError("Step 'x': an input request's key with its effect class (DEC-0125).")
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        jobs, started = fi.JobStore(Path(temp.name) / "jobs"), []
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, on_input=refusing,
+                                  on_job_started=lambda job_id, ctx: started.append(job_id))
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "reviews.approve", "arguments": {}, "_meta": {"traceparent": PARENT}}}, tier="T0")
+        job_id = started[0]
+        jobs.request_input(job_id, {"approve-reply": fi.choice_request("Publish the reply?", "choice", [("yes", "Yes")])})
+        answer = {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+            "name": "fabric.job.get", "arguments": {"id": job_id, "inputResponses": {"approve-reply": {
+                "action": "accept", "content": {"choice": "yes"}}}}, "_meta": {"traceparent": PARENT}}}
+        result = server.handle(answer, tier="T0")["result"]
+        self.assertTrue(result["isError"])
+        self.assertEqual(result["structuredContent"]["error"]["code"], "tool-error")
+
+    def test_a_refused_start_fails_the_job_it_created(self):
+        """FAA-196 (28): when `on_job_started` raises InteropError the call is answered tool-error; the job start_job
+        created is failed with the same message, never left `working` with no owner."""
+        def refusing(job_id, ctx):
+            raise fi.InteropError("The job's approval step names its effect class (DEC-0125).")
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        jobs = fi.JobStore(Path(temp.name) / "jobs")
+        server = fi.McpToolServer("example-agent", "1.0.0", jobs=jobs, on_job_started=refusing)
+        server.add_tool({"name": "reviews.approve", "inputSchema": OBJECT}, lambda args, ctx: ctx.start_job())
+        result = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "reviews.approve", "arguments": {}, "_meta": {"traceparent": PARENT}}}, tier="T0")["result"]
+        self.assertTrue(result["isError"])
+        (job_file,) = [f for f in (Path(temp.name) / "jobs").glob("*.json")]
+        job = jobs.get(job_file.stem)
+        self.assertEqual((job["status"], job["error"]["code"]), ("failed", "tool-error"))
+        self.assertIn("effect class", job["error"]["message"])
 
     def test_a_step_it_does_not_cover_waits_naming_the_part(self):
         self.start({"mandate": lead_mandate({"actions": ["other-action"], "effects": ["reply"]})})
@@ -1470,3 +1584,7 @@ class JobApprovalStepTests(unittest.TestCase):
                 said = fi.action_refusal_tool_result(fa.action_decision(inputs))
                 self.assertEqual(said["structuredContent"]["error"]["code"], "operator-decision-required")
                 self.assertEqual(said["structuredContent"]["error"]["data"]["detail"], "mandate-capability-missing")
+
+
+if __name__ == "__main__":  # at the end, so running the file directly runs every class (FAA-196 (12))
+    unittest.main()

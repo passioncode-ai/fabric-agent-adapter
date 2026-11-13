@@ -121,7 +121,7 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   any other id as written. The mandate is a block fenced ` ```json `, the opening and the closing fence each at the start
   of its own line, with no indent (lowercase; an indented fence, as inside a list item, is not read either; ` ````json `, ` ```JSON ` and `~~~` are not read), whose value has `kind: "mandate/1"`; any other JSON
   block, a decision block included, is not read, with no warning. A fence quoted inside another fenced block is still
-  read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one whose text holds `mandate/1` and is
+  read: quote an example in prose, not in a fence. Two `mandate/1` blocks, whoever their chains end in, or one whose text holds `mandate/1` (its slash plain or JSON-escaped, `\/` or `\u002f`, FAA-196 (13)) and is
   not JSON (`NaN` included), read as none (a broken block without `mandate/1` is skipped, and a mandate beside it
   is still read), and the responder emits `board.request.mandate_unread` (a warning) with the
   request id and its `reason`, `mandate-blocks` or `mandate-unreadable`: the block holds his words, which reach no event, log or
@@ -131,6 +131,10 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   than 4300 digits on every Python (the kit refuses it there, as `int_max_str_digits` does from 3.11 and
   the 3.8.14, 3.9.14 and 3.10.7 security releases; a limit configured
   lower, `PYTHONINTMAXSTRDIGITS` on a Python that has one, refuses an integer longer than it).
+- A request transferred to a new session runs again from a fresh `com.get`. Its mandate is read only when the message
+  read back carries the digest the claim took and names this request, capability and Project, as the first claim
+  checks; otherwise it is worked without one, and `board.request.mandate_unread` names `digest-mismatch` or
+  `not-addressed` (FAA-196 (1)).
 - The handler gets `ctx.mandate` (the one block without `source`, or None) and `ctx.mandate_covers(call)` (Node
   `ctx.mandateCovers(call)`, `call` being `{capability, action?, effect, spendUsd?, project?}`: pass `project` when the work
   acts in one, since a call naming none is not limited by the mandate's `projects`; both are read failing closed, as
@@ -145,7 +149,12 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   spend; all five are read up front, whatever the scope limits, so a member that raises raises to the handler (in
   Python a `KeyError` reads as not named), and a Python mapping's default, a `defaultdict`'s
   included, is read as named, the `defaultdict` gaining the key): `mandate_covers` with `tier: "T1"`, `self` the service's `agent_id`, no `callerAgent` (the
-  board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it) and the
+  board names a Project's principal, not an agent id the chain can bind, so the chain's end alone binds it), unless the
+  service passes `identify_agent=` (Node `identifyAgent`, FAA-135): a function of the request's sender (`{project,
+  principal}`, as the board verified it) answering the agent id the service authenticates for it, or None; asked only
+  when a mandate travelled, its agent id must be the one before `agent_id` in the chain, and an id the registry
+  refuses, an answer that is not a string or a hook that raises fails closed (`mandate-not-for-this-call`), as
+  [interop](interop.md) reads `identify_agent`; and the
   responder's wall clock (`wall=`: seconds, `time.time` by default; Node milliseconds, `Date.now`; one that returns a value
   that is not a finite number answers `{"fault": "now-unreadable"}`; a clock that raises passes its error to the handler). It answers `{"ok": True, "recordAs": {by, via: "mandate", task,
   chain, caller}}` (`caller` the sender Project, as MD-3 records it; a sender that names no Project is never read), a
@@ -180,7 +189,7 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
 | `authority_changed`, `not_authorized` | stop claiming; one `board.access.needed` event (notify) saying what to ask for (except `not_authorized` on the move-back claim of a moved slot, read as another session's slot, [below](#when-the-operator-moves-a-slot-to-another-session-faa-155)) |
 | `fenced` on enroll or claim | another live holder: wait for it to lapse; never replace it on its own initiative. When this responder recorded holding the slot, it first reads `com.status`: a newer generation means the slot [moved](#when-the-operator-moves-a-slot-to-another-session-faa-155), and it is not taken again even after that holder lapses |
 | lost after an effect began | keep the entry as `unknown`; `observe(entry)` is asked to settle it with `com.reconcile` |
-| Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning |
+| Fabric down, hub missing | bounded backoff (2 s doubling to 5 minutes, jittered), one `board.down` event, no spinning; a board that flaps is said down once until it stays up `DOWN_QUIET_SECONDS` (300 s, FAA-187 (22)) |
 | one call without an answer while the lease holds | `board.down`, but the session and the running work stay; the call goes again, with the same key, before the lease lapses |
 | `revision_conflict` on `com.renew` or `com.progress` | they store nothing: the revision is read again (`com.get`) and the call sent once more; a second one loses the attempt |
 | `idempotency_conflict` | a key sent with other content is a defect, not an outage: `board.blocked` (notify) naming it, and the session is left |
@@ -311,10 +320,10 @@ held and not transferred). The responder keeps that move instead of undoing it:
   Fabric release through v0.3.19 (2026-11-11) offers the operator's move (the control is CT-174's in Fabric, its agent twin CT-181 in the contract, then CT-125),
   so today every move is another session taking the slot and take-back is the route back; the check below is ready
   for the move. While
-  a slot is moved the responder reads `com.status` once a renewal (20 s) and, when the slot's generation is past the
+  a slot is moved the responder reads `com.status` once a renewal (20 s; one read a tick for every moved slot, FAA-194 (5)) and, when the slot's generation is past the
   recorded move, sends one `com.claim` under a fresh key, as PR-2's "Learning the slot is its own" says (FAA-165,
   0.60.0); the move itself drops the claim key of that capability, whose receipt the move made dead. A claim that
-  lands is the slot held again: the record loses `moved`, the request it handed out is worked (with none, its own
+  lands is the slot held again (`board.slot.returned`, info, says so; FAA-194 (8)): the record loses `moved`, the request it handed out is worked (with none, its own
   enroll renews the lease at once), accepted work left `lapsed` comes back with a transfer, and a later move is said
   again. `lease_expired` (the move reached this session and its lease lapsed first) enrolls again. `held` asks again
   at the next renewal. `idempotency_window_expired` or `capacity_exceeded` asks again at the next renewal under a
@@ -323,7 +332,7 @@ held and not transferred). The responder keeps that move instead of undoing it:
   recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
   landed is not stranded; until then it counts as at most a lease from that key's first send (a fresh key starts
   its own, and it counts only while more than the 10 s margin of that lease is left, then no more, as a lapsed slot), so a second lost answer keeps
-  the session (finding 38). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
+  the session (as any call without an answer does while a lease holds: the failure table above; FAA-194 (34)). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
   dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
   it waits for its attempt's lease (60 s) before it is claimed again (a take-back that lands before the move-back check makes its claim key
   leaves that key to the claim loop, which works the request at once). Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
@@ -405,11 +414,13 @@ Python (`fabric_hub`): `fabric_root(platform, env)`, `locate_hub(root=None, aliv
 `request_board_access(agent_id, project_id, capabilities, reason)`, `poll_access(request_id, poll_secret,
 credential_file)`, `join_board(project_id, credential_file) -> BoardGrant`, `call_door(tool, args)`,
 `call_binding(tool, args, credential_file)`; `pid_alive(pid)` answers True, False, or None for another OS account's
-process (not verified); `Backoff(first=2, cap=300, jitter=0.2, floor=1)`; `HubError(code,
+process (not verified); on Windows it asks OpenProcess for the access Node's `process.kill(pid, 0)` asks (libuv's
+terminate, query and synchronize), so an elevated process of the same user reads None in both kits, as another
+account's does, where limited query access alone would have read it as running (FAA-323); `Backoff(first=2, cap=300, jitter=0.2, floor=1)`; `HubError(code,
 message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,
-admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time)`
+admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time, identify_agent=None, links=None)`
 with `step()`, `run(stop, drain)`, `shutdown(drain)`, `take_back(capability)`; `WorkContext.progress(note)`,
 `.begin_effect(summary)`, `.stopped`, `.mandate`, `.mandate_covers(call)`; `PERSONAL_BOARD`; `BoardSession(grant)`;
 `Checkpoint(path)`; `comms_canonical(value)`, `comms_digest(operation, value)`, `receipt_problems(value, op)`,
@@ -420,4 +431,4 @@ effect_began)`, `self_check()`; `BoardError`, `Stopped`.
 Node: the same names in camelCase (`locateHub(root, {alive, estate, now})`, `new HubClient(root, {alive, timeout,
 estate, post})`, `new Responder({...})` with async `step()`, `run({signal, drain})`, `shutdown(drain)`,
 `takeBack(capability)`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`, `ctx.mandate`, `ctx.mandateCovers(call)`;
-the options `agentId`, `mandateFrom` and `wall` (milliseconds); `selfCheck()`). Both kits read and write the same checkpoint file.
+the options `agentId`, `mandateFrom`, `wall` (milliseconds), `identifyAgent` and `links`; `selfCheck()`). Both kits read and write the same checkpoint file. `links` maps a notify kind to the page on the service that resolves it (`{"board.slot.moved": "/#board"}`, a path, as `make_event` takes one): a notice that notifies carries it as `link`, so the banner opens that page; give it only with an emit that takes `link` (`JsonlEventLog.append` does; FAA-187 (21)). A Node emit receives `{notify, subject, link?, data?}` as one object: spread it before its own `subject` or `link` if it sets its own, or the responder's wins (FAA-187 (27)).

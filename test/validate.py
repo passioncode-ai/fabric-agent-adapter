@@ -1130,7 +1130,6 @@ PRIVATE_TERMS_ENV = "PASSIONCODE_PRIVATE_TERMS"
 # A file whose lines another change of this wave rewrites; each entry names why, and an entry whose file holds no term
 # any more fails, so the list empties itself.
 PRIVATE_TERMS_PENDING: Dict[str, str] = {
-    "test/test_fabric_session_dispatch.py": "wave 5 batch C owns the file (FAA-243)",
 }
 
 

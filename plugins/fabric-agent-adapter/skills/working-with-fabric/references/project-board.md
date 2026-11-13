@@ -175,10 +175,13 @@ one). A run or session that later finds the request answered, or taken and compl
 board.gate.<capability>` and the `commandId` that `gate-id` prints), in its closing `notes` or to the person (FAA-248).
 
 **A dispatched Claude Code run that sees only `fabric_whoami`** among Fabric's tools (a headless `claude -p` session
-reads its list of tools once, and `fabric-mcp` offered the rest only after the call admitted it) is Fabric's CO-563,
-fixed on Fabric's main at `780022af` and expected in the release after v0.3.19. Until then such a run cannot read or
-answer the board: it says so in its exit report (an `in_progress` checkpoint naming CO-563 when it holds the lease, then the retro) and never
-claims the board was read; the request waits for the next run or a live session (FAA-296).
+reads its list of tools once, and `fabric-mcp` offered the rest only after the call admitted it) runs on a Fabric before
+0.3.20: it is Fabric's CO-563 (`780022af`), released in Fabric 0.3.20 on 2026-11-12, which lists the tools from the
+first tool list. The remedy is Fabric 0.3.20 or later; on an older Fabric an interactive session can reconnect the
+`fabric` MCP server (`/mcp`) after `fabric_whoami`, which a headless run cannot. Such a run cannot read or answer the
+board: it says so in its exit report (an `in_progress` checkpoint naming CO-563 and Fabric's version when it holds the
+lease, then the retro) and never claims the board was read; the request waits for the next run or a live session
+(FAA-296).
 
 ## The project directory
 
