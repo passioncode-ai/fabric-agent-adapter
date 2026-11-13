@@ -17,6 +17,12 @@
    isolation: the loopback peer owner, DEC-0154 and DEC-0155, and the tailnet identity at every door). When the
    state changes against them, write fabric-workspace a board message naming the section and the evidence. The
    architect's audit at each release: [docs/evidence/architect/](docs/evidence/architect/README.md).
+1c. **Step 0, before any change** ([rules §0](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/rules.md#0-the-course-check-the-plan-and-the-north-star-before-every-change),
+   the operator, 2026-11-13): the workstation holds the skill families (`npx --yes sshlg-skills@latest update`, the
+   launcher's `setup` and `doctor`), an updated coding harness, the board (`fabric-mcp`), Fabric Dashboards, Switchboard
+   where sessions run and Observatory, all set up; otherwise no change starts. Every change goes through `task-pipeline`,
+   tracked in a workflow (Observatory checkpoints); a changed workflow, template or organization copy is a new
+   versioned revision. Keys come from the operator's Observatory vault, never created beside it.
 2. The PassionCode.ai knowledge base, `fabric-workspace/knowledge/` in your clone (org-index
    `scripts/clone_all.sh` makes it) or https://wiki.passioncode.ai/knowledge: at least its
    [README](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/README.md),
