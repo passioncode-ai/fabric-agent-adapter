@@ -17,11 +17,16 @@ Wave 6 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
 - **`board.slot.returned` means one thing** (FAA-325): the reference service's take-back says `board.slot.taken_back`
   (the slot still away), and the kit says `board.slot.returned` once the slot is held again, after a move back and now
   also once an enroll or replace lands after the operator's take-back (once per take-back in the same process, both
-  twins).
+  twins); a take-back of a slot still held marks nothing.
 - The supervisors' well-known reader uses the kit's one loopback rule (`fabric_socket_proof.loopback_host` /
   `loopbackHost`): `127.1`, `2130706433`, `0x7f.1` and names under `.localhost` go on the checked connection (FAA-326).
-- `fabric_peer_owner` loads `fabric_socket_proof` from beside it by its path and no longer adds the kit folder to the
-  host's `sys.path`; a copy vendored alone keeps the table's answer (FAA-327).
+- `fabric_peer_owner` no longer adds the kit folder to the host's `sys.path` (FAA-327): it asks the `fabric_socket_proof`
+  beside it, the host's imported module when that is the same file (one calibration in a process), else that file by
+  its path; a copy vendored alone keeps the table's answer, and every kit install that brings `fabric_peer_owner` still
+  brings `fabric_socket_proof`. `PEER_OWNER_VERSION` is `1.3.1+kit.8`.
+- The supervisors' well-known reader refuses unread a loopback address the kit's rule does not take, with a zone
+  (`[::1%lo0]`) or IPv4-mapped (`[::ffff:127.0.0.1]`), where `urlopen` or `fetch` would reach the listener without the
+  owner check (0.84.0 seam reading).
 - `test/validate.py` reads the private-terms list with the functions `admit.py` ships (`terms_file`, `terms_pattern`,
   `term_lines`, `listed_files`), pinned to one case table; `admit.py`'s file listing no longer fails when `git` cannot
   run (FAA-328).

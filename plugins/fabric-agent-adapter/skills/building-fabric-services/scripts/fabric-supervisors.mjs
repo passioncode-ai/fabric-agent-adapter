@@ -574,8 +574,18 @@ function loopbackOrigin(origin) {
   return { host, port: Number(url.port || 80) };
 }
 
+// An IPv4-mapped 127/8 origin (`new URL` writes it ::ffff:7f00:1): loopback the kit's rule does not take, which fetch would
+// reach unchecked, so it is refused unread, as the Python twin refuses it (0.84.0 seam reading).
+function mappedLoopback(origin) {
+  let host;
+  try { host = new URL(String(origin)).hostname; } catch { return false; }
+  const m = /^\[::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}\]$/i.exec(host);
+  return !!m && parseInt(m[1], 16) >> 8 === 127;
+}
+
 export async function wellKnownOf(origin, { vouchPid = null, ask = undefined } = {}) {
   const m = loopbackOrigin(origin);
+  if (!m && mappedLoopback(origin)) return null;
   if (!m) {
     try {
       const response = await fetch(`${origin}/.well-known/fabric-service`, { signal: AbortSignal.timeout(2000) });

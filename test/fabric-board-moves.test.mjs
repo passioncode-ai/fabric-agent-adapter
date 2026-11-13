@@ -308,6 +308,18 @@ test('FAA-325: a take-back is said returned only once the slot is held', async (
   assert.equal(h.events.filter((k) => k === 'board.slot.returned').length, 1, 'said once per take-back');
 });
 
+// 0.84.0 seam reading: a take-back of a slot still held marks nothing (twin of test_a_take_back_of_a_held_slot_leaves_no_mark).
+test('a take-back of a held slot leaves no mark', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  const r = h.responder();
+  await r.step();
+  assert.equal(r.slots['video.cut'].state, 'held');
+  r.takeBack('video.cut');
+  assert.ok(!r.takenBack.has('video.cut'));
+  for (let i = 0; i < 4; i += 1) { await h.advance(20); r.waitUntil = 0; await r.step(); }
+  assert.ok(!h.events.includes('board.slot.returned'), h.events.join(', '));
+});
+
 // FAA-194 (11): the Node twin of test_a_move_back_waits_while_other_work_runs: no move-back claim while work runs.
 test('FAA-194 (11): a move back waits while other work runs', async (t) => {
   const h = await fakeHub(t, ['video.render', 'video.cut']);

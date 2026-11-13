@@ -223,6 +223,18 @@ class Install(unittest.TestCase):
     def run_kit(self, *args):
         return subprocess.run([sys.executable, str(SCRIPTS / "fabric_kit.py"), *map(str, args)], capture_output=True, text=True)
 
+    def test_every_closure_with_the_peer_owner_carries_its_socket_proof(self):
+        """0.84.0 seam reading: a sibling loaded by its path hid fabric_socket_proof from the Python closure of
+        fabric_peer_owner (and of every module reaching it) while the Node twin's still named it; the twins' closures
+        differ elsewhere by design, so this pair is held in both languages."""
+        for lang, owner, proof in (("python", "fabric_peer_owner", "fabric_socket_proof"),
+                                   ("node", "fabric-peer-owner", "fabric-socket-proof")):
+            for entry in KIT[lang]:
+                names = {e["module"] for e in fabric_kit.closure(KIT[lang], [entry["module"]])}
+                if owner in names:
+                    with self.subTest(lang=lang, module=entry["module"]):
+                        self.assertIn(proof, names)
+
     def test_the_python_closure_runs_alone(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(self.run_kit("install", tmp).returncode, 0)

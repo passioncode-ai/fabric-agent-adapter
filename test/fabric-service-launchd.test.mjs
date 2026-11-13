@@ -802,6 +802,22 @@ test('FAA-326: a name under .localhost, 127.1 and 2130706433 are read on a check
   assert.deepEqual(fetched, []);
 });
 
+test('an IPv4-mapped loopback origin is never fetched unchecked (0.84.0 seam reading)', async () => {
+  const { wellKnownOf } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const fetched = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (...args) => { fetched.push(String(args[0])); throw new Error('unchecked'); };
+  try {
+    for (const origin of ['http://[::ffff:127.0.0.1]:1', 'http://[::ffff:7f00:1]:1', 'http://[::ffff:127.9.8.7]:1']) {
+      assert.equal(await wellKnownOf(origin), null, origin);
+    }
+    await wellKnownOf('http://[::ffff:10.0.0.1]:1');  // mapped, not loopback: fetched as before
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.deepEqual(fetched, ['http://[::ffff:10.0.0.1]:1/.well-known/fabric-service']);
+});
+
 test('a loopback origin with the default port is read on a checked connection, never fetched (0.79.0 seam reading)', async () => {
   const { wellKnownOf } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
   const fetched = [];

@@ -50,7 +50,7 @@ import net from 'node:net';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-export const PEER_OWNER_VERSION = '1.3.1+kit.7'; // the Python twin's, Observatory's 1.3.1 line with the kit's differences
+export const PEER_OWNER_VERSION = '1.3.1+kit.8'; // the Python twin's, Observatory's 1.3.1 line with the kit's differences
 export const THIS_ACCOUNT = 'this-account';
 export const ANOTHER_ACCOUNT = 'another-account';
 export const SYSTEM = 'system';

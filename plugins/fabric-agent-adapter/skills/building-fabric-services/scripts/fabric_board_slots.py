@@ -226,10 +226,12 @@ class SlotKeeper:
             self.checkpoint.slot(capability, None)
             self.claim_keys.pop(capability, None)  # a receipt from before the take-back may be dead
             self._probing.discard(capability)
-            if (self.slots.get(capability) or {}).get("state") == "moved":
+            state = (self.slots.get(capability) or {}).get("state")
+            if state == "moved":
                 self.slots[capability] = {"state": "contested", "renewed_at": 0.0}
             self._said.pop("board.slot.moved", None)
-            self._taken_back.add(capability)  # board.slot.returned is said once the slot is held again (FAA-325)
+            if state != "held":  # board.slot.returned is said once the slot is held again (FAA-325); held, nothing to say
+                self._taken_back.add(capability)
 
     # -- one capability's refusal (FAA-163) ------------------------------------------------------------------------
     def _retry_later(self, capability: str, entries: List[Dict[str, Any]], exc: BoardError) -> None:

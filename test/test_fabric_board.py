@@ -1470,6 +1470,20 @@ class MovedBackTwoCapabilitiesTests(Conversation):
             r.step()
         self.assertEqual(self.kinds().count("board.slot.returned"), 1, "said once per take-back")
 
+    def test_a_take_back_of_a_held_slot_leaves_no_mark(self):
+        """0.84.0 seam reading: a take-back of a slot this responder still holds marks nothing, so a later unrelated
+        enroll is never said to be the operator's take-back."""
+        r = self.responder()
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        r.take_back("video.cut")
+        self.assertNotIn("video.cut", r._taken_back)
+        for _ in range(4):
+            self.board.advance(20)
+            r.wait_until = 0
+            r.step()
+        self.assertNotIn("board.slot.returned", self.kinds())
+
     def test_moved_slots_share_one_status_read_a_tick(self):
         """FAA-194 (5): each moved slot read its own com.status once a renewal; a tick now reads it once for all of them."""
         r = self.responder()

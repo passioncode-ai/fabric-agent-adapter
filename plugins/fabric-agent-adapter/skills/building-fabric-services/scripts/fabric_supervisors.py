@@ -5,6 +5,7 @@ removed without touching what the operator turned off; release pruning (LC-15). 
 from __future__ import annotations
 
 import http.client
+import ipaddress
 import json
 import os
 import plistlib
@@ -468,6 +469,17 @@ def launchd_pid(label: str, domain: Optional[str] = None) -> Optional[int]:
 _loopback_host = _sp.loopback_host
 
 
+def _loopback_otherwise(host: Optional[str]) -> bool:
+    """A loopback address the kit's rule does not take: one with a zone (`::1%lo0`) or IPv4-mapped (`::ffff:127.0.0.1`).
+    urlopen reaches loopback through either, so it is refused unread, as Node refuses it (0.84.0 seam reading)."""
+    try:
+        address = ipaddress.ip_address((host or "").split("%", 1)[0])
+    except ValueError:
+        return False
+    mapped = getattr(address, "ipv4_mapped", None)
+    return bool(address.is_loopback or (mapped and mapped.is_loopback))
+
+
 class ForeignUserAnswer:
     """A refused listener (DEC-0154 HA-2), as `well_known_of` answers it: never a document, whatever keys a service's JSON
     carries. `reason` starts with `foreign-user` or `table-restricted` (the Node twin's class, FAA-259)."""
@@ -506,6 +518,8 @@ def _read_well_known(origin: str, timeout: float = 2.0,
             return None, None
         finally:
             conn.close()
+    if _loopback_otherwise(parts.hostname):
+        return None, None
     try:
         with urllib.request.urlopen(origin + "/.well-known/fabric-service", timeout=timeout) as response:
             return json.loads(response.read().decode()), None

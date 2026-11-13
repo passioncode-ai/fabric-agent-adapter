@@ -235,9 +235,11 @@ export class SlotKeeper {
     this.checkpoint.slot(capability, null);
     delete this.claimKeys[capability]; // a receipt from before the take-back may be dead
     this.probing.delete(capability);
-    if (this.slots[capability]?.state === 'moved') this.slots[capability] = { state: 'contested', renewedAt: 0 };
+    const state = this.slots[capability]?.state;
+    if (state === 'moved') this.slots[capability] = { state: 'contested', renewedAt: 0 };
     delete this.said['board.slot.moved'];
-    this.takenBack.add(capability); // board.slot.returned is said once the slot is held again (FAA-325)
+    // board.slot.returned is said once the slot is held again (FAA-325); a slot still held has nothing to say
+    if (state !== 'held') this.takenBack.add(capability);
   }
 
   // -- one capability's refusal (FAA-163) --

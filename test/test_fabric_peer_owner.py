@@ -447,7 +447,7 @@ class SelfContained(unittest.TestCase):
         self.assertIn("except ImportError:\n        _PROOF[0], proof = False, None", (SCRIPTS / "fabric_peer_owner.py").read_text())
         # sys.stdlib_module_names is 3.10's; on the kit's 3.9 floor the module's own list stands in.
         stdlib = set(getattr(sys, "stdlib_module_names", ())) or {
-            "ctypes", "http", "ipaddress", "json", "os", "select", "selectors", "socket", "struct", "subprocess", "sys", "threading", "time",
+            "ctypes", "http", "importlib", "ipaddress", "json", "os", "select", "selectors", "socket", "struct", "subprocess", "sys", "threading", "time",
             "typing"}
         self.assertTrue(names <= stdlib, names - stdlib)
 
@@ -544,6 +544,20 @@ class KitInstaller(unittest.TestCase):
         self.assertEqual(len(hosts), 4, hosts)
         with mock.patch.object(sup.urllib.request, "urlopen", side_effect=OSError("down")) as unchecked:
             sup._read_well_known("http://example.com:8080", timeout=0.5)  # not loopback: the plain way, as before
+        self.assertEqual(unchecked.call_count, 1)
+
+    def test_a_loopback_spelling_the_rule_does_not_take_is_never_read_unchecked(self):
+        """0.84.0 seam reading: [::1%lo0] (every Python) and an IPv4-mapped 127/8 address (Python 3.13+) reach a loopback
+        listener through urlopen; loopback_host does not take them, so they are refused unread, as Node refuses them."""
+        sup = importlib.import_module("fabric_supervisors")
+        with mock.patch.object(sup.urllib.request, "urlopen", side_effect=AssertionError("read unchecked")), \
+                mock.patch.object(sup._po, "CheckedHTTPConnection", side_effect=AssertionError("not a kit loopback")):
+            for origin in ("http://[::1%lo0]:8080", "http://[::ffff:127.0.0.1]:8080", "http://[::ffff:7f00:1]:8080",
+                           "http://[::ffff:127.9.8.7]:8080"):
+                with self.subTest(origin=origin):
+                    self.assertEqual(sup._read_well_known(origin, timeout=0.5), (None, None))
+        with mock.patch.object(sup.urllib.request, "urlopen", side_effect=OSError("down")) as unchecked:
+            sup._read_well_known("http://[::ffff:10.0.0.1]:8080", timeout=0.5)  # mapped, not loopback: the plain way
         self.assertEqual(unchecked.call_count, 1)
 
     def test_down_and_foreign_user_are_told_apart_at_every_loopback_spelling(self):
@@ -1166,6 +1180,16 @@ class AcceptedSocketProof(unittest.TestCase):
         self.assertEqual(sys.path, before)
         self.assertEqual(os.path.abspath(P._PROOF[0].__file__), str(SCRIPTS / "fabric_socket_proof.py"))
         self.assertIsNot(P._PROOF[0], foreign)
+
+    def test_the_kit_s_own_imported_copy_is_the_one_asked(self):
+        """0.84.0 seam reading: when the host already imported the fabric_socket_proof beside this file, that module
+        object is the one asked (one calibration, one patch point), never a second copy loaded by path."""
+        P._PROOF[0] = None
+        import fabric_socket_proof as own
+        restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED)
+        with mock.patch.object(P.sys, "platform", "darwin"), mock.patch.object(own, "own_listener", return_value=None):
+            P._proved("own_listener", 1, fallback=restricted)
+        self.assertIs(P._PROOF[0], own)
 
     def test_vendored_alone_the_table_answer_stands(self):
         """FAA-327: a fabric_peer_owner.py copied with no fabric_socket_proof beside it asks nothing and keeps the
