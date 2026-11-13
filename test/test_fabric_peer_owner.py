@@ -519,6 +519,33 @@ class KitInstaller(unittest.TestCase):
                 with self.subTest(origin=origin):
                     sup._read_well_known(origin, timeout=0.5)
 
+    def test_every_loopback_spelling_a_url_parser_reads_takes_the_checked_path(self):
+        """FAA-326: the supervisors read the kit's one loopback rule (fabric_socket_proof.loopback_host), so 127.1,
+        2130706433 and a name under .localhost, which Node reads as loopback, go on a checked connection too."""
+        sup = importlib.import_module("fabric_supervisors")
+        hosts = []
+
+        class Recorder:
+            def __init__(self, host, port, **kw):
+                hosts.append(host)
+
+            def request(self, *a, **kw):
+                raise OSError("not sent")
+
+            def close(self):
+                pass
+
+        with mock.patch.object(sup.urllib.request, "urlopen", side_effect=AssertionError("read unchecked")), \
+                mock.patch.object(sup._po, "CheckedHTTPConnection", Recorder):
+            for origin in ("http://127.1:8080", "http://2130706433:8080", "http://example.localhost:8080",
+                           "http://0x7f.1:8080"):
+                with self.subTest(origin=origin):
+                    self.assertEqual(sup._read_well_known(origin, timeout=0.5), (None, None))
+        self.assertEqual(len(hosts), 4, hosts)
+        with mock.patch.object(sup.urllib.request, "urlopen", side_effect=OSError("down")) as unchecked:
+            sup._read_well_known("http://example.com:8080", timeout=0.5)  # not loopback: the plain way, as before
+        self.assertEqual(unchecked.call_count, 1)
+
     def test_down_and_foreign_user_are_told_apart_at_every_loopback_spelling(self):
         """FAA-259: well_known_of answers None when nothing answers and a ForeignUserAnswer when another account's
         listener holds the port, as the Node wellKnownOf does; FAA-257: an origin spelled localhost, or another
@@ -1121,6 +1148,43 @@ class AcceptedSocketProof(unittest.TestCase):
         with mock.patch.object(P.sys, "platform", "darwin"):
             P._proved("own_listener", 1, fallback=P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED))
         self.assertEqual(getattr(P._PROOF[0], "__name__", None), "fabric_socket_proof")
+
+    def test_the_sibling_is_loaded_by_path_and_sys_path_is_unchanged(self):
+        """FAA-327: a forced restricted read loads fabric_socket_proof beside this file by its path: sys.path stays as
+        it was, and a module of the same name elsewhere (first in sys.modules or on sys.path) is never the one asked."""
+        import types
+        P._PROOF[0] = None
+        before = list(sys.path)
+        foreign = types.ModuleType("fabric_socket_proof")
+        foreign.__file__ = str(TEST / "elsewhere" / "fabric_socket_proof.py")
+        foreign.accepted = foreign.own_listener = mock.Mock(side_effect=AssertionError("a foreign module was asked"))
+        restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED)
+        with mock.patch.dict(sys.modules, {"fabric_socket_proof": foreign}), mock.patch.object(P.sys, "platform", "darwin"), \
+                mock.patch.object(P.sys, "path", list(sys.path)) as path:
+            P._proved("own_listener", 1, fallback=restricted)
+            self.assertEqual(path, before, "sys.path untouched")
+        self.assertEqual(sys.path, before)
+        self.assertEqual(os.path.abspath(P._PROOF[0].__file__), str(SCRIPTS / "fabric_socket_proof.py"))
+        self.assertIsNot(P._PROOF[0], foreign)
+
+    def test_vendored_alone_the_table_answer_stands(self):
+        """FAA-327: a fabric_peer_owner.py copied with no fabric_socket_proof beside it asks nothing and keeps the
+        restricted answer, sys.path untouched, as before."""
+        import importlib.util
+        import shutil
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            alone = os.path.join(tmp, "peer_owner_alone.py")
+            shutil.copy(SCRIPTS / "fabric_peer_owner.py", alone)
+            spec = importlib.util.spec_from_file_location("peer_owner_alone", alone)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            before = list(sys.path)
+            restricted = module.Owner(module.UNKNOWN, None, None, "netstat", module.TABLE_RESTRICTED)
+            with mock.patch.object(module.sys, "platform", "darwin"):
+                self.assertEqual(module._proved("own_listener", 1, fallback=restricted), restricted)
+            self.assertIs(module._PROOF[0], False)
+            self.assertEqual(sys.path, before)
 
     @unittest.skipUnless(sys.platform == "darwin", "this account's own processes, through libproc or lsof")
     def test_live_a_restricted_table_still_proves_this_process_s_own_server(self):

@@ -87,34 +87,54 @@ def template_step(folders: List[str]) -> Dict[str, object]:
                    "%d folder(s), %d error(s)" % (len(folders), len(errors)), errors)
 
 
-def _terms_file(named: Optional[str]) -> Path:
+# The one private-terms reader (FAA-328): test/validate.py, the repository's own check, reads the list with these
+# functions too, so the two never drift. They match as org-index's check_private.py does: case-insensitive, not inside a
+# run of ASCII letters and digits, longest term first. Callers report paths and lines only, never a term.
+def terms_file(named: Optional[str] = None) -> Path:
+    """The list: `named`, else `$PASSIONCODE_PRIVATE_TERMS`, else ~/.config/passioncode/private-terms.txt; `~` expanded."""
     named = named or os.environ.get(PRIVATE_TERMS_ENV)
     return Path(named).expanduser() if named else Path.home() / ".config/passioncode/private-terms.txt"
 
 
-def _files(root: Path) -> List[str]:
+def terms_pattern(lines: List[str]) -> "Optional[re.Pattern[str]]":
+    """One alternation of the list's terms (a line that is blank or starts with # is none), longest first; None when
+    the list holds no term."""
+    terms = sorted({t.strip() for t in lines if t.strip() and not t.strip().startswith("#")}, key=len, reverse=True)
+    if not terms:
+        return None
+    return re.compile(r"(?<![A-Za-z0-9])(?:" + "|".join(re.escape(t) for t in terms) + r")(?![A-Za-z0-9])", re.IGNORECASE)
+
+
+def term_lines(text: str, pattern: "re.Pattern[str]") -> List[int]:
+    """The 1-based numbers of the lines of `text` that hold a term."""
+    return [n for n, line in enumerate(text.splitlines(), 1) if pattern.search(line)]
+
+
+def listed_files(root: Path) -> List[str]:
+    """Every tracked file and every untracked one Git does not ignore, as check_private.py reads a work tree; outside a
+    work tree, or where git cannot run, every file but the usual generated folders, never nothing."""
     if (root / ".git").exists():
-        listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                                capture_output=True, check=False)
-        if listed.returncode == 0:
+        try:
+            listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                                    capture_output=True, check=False)
+        except OSError:
+            listed = None
+        if listed is not None and listed.returncode == 0:
             return sorted({rel for rel in listed.stdout.decode("utf-8", "replace").split("\0") if rel})
     return sorted(p.relative_to(root).as_posix() for p in root.rglob("*")
                   if p.is_file() and not SKIP.intersection(p.relative_to(root).parts))
 
 
 def private_terms_step(root: Path, named: Optional[str]) -> Dict[str, object]:
-    path = _terms_file(named)
+    path = terms_file(named)
     if not path.is_file():
         return _result("private-terms", "NOT_RUN", "no private-terms list on this machine (set %s): not a pass"
                        % PRIVATE_TERMS_ENV)
-    lines = path.read_text(encoding="utf-8").splitlines()
-    terms = sorted({t.strip() for t in lines if t.strip() and not t.strip().startswith("#")}, key=len, reverse=True)
-    if not terms:
+    pattern = terms_pattern(path.read_text(encoding="utf-8").splitlines())
+    if pattern is None:
         return _result("private-terms", "PASS", "the list holds no term")
-    pattern = re.compile(r"(?<![A-Za-z0-9])(?:" + "|".join(re.escape(t) for t in terms) + r")(?![A-Za-z0-9])",
-                         re.IGNORECASE)
     hits: List[str] = []
-    files = _files(root)
+    files = listed_files(root)
     for rel in files:
         try:
             data = (root / rel).read_bytes()
@@ -122,7 +142,7 @@ def private_terms_step(root: Path, named: Optional[str]) -> Dict[str, object]:
             continue
         if b"\0" in data[:8192]:
             continue
-        found = [str(n) for n, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1) if pattern.search(line)]
+        found = [str(n) for n in term_lines(data.decode("utf-8", "replace"), pattern)]
         if found:
             hits.append("%s: line%s %s" % (rel, "s" if len(found) > 1 else "", ", ".join(found)))
     return _result("private-terms", "FAIL" if hits else "PASS",

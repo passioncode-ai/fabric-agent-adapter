@@ -93,5 +93,62 @@ class Admit(unittest.TestCase):
         self.assertEqual(done.returncode, 2)
 
 
+#: FAA-328: the cases both private-terms readers answer the same way: (the list's lines, a file's text, the lines it hits).
+SHARED_CASES = (
+    (["# a comment", TERM, ""], "one\nsee %s here\n" % TERM.upper(), [2]),
+    ([TERM], "x%s\n%s-y\n%sz\n" % (TERM, TERM, TERM), [2]),  # not inside a run of ASCII letters and digits
+    (["# only a comment", " "], "%s\n" % TERM, []),
+    ([TERM, TERM + "-longer"], "a %s-longer b\n" % TERM, [1]),
+)
+
+
+class OneReader(unittest.TestCase):
+    """FAA-328: test/validate.py and admit.py read the private-terms list one way (admit.py's, which ships), expand `~`
+    in $PASSIONCODE_PRIVATE_TERMS and report paths and lines only, never a term."""
+
+    def setUp(self):
+        import importlib.util
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        loaded = []
+        for name, path in (("admit_shared", ADMIT), ("validate_shared", ROOT / "test/validate.py")):
+            spec = importlib.util.spec_from_file_location(name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            loaded.append(module)
+        self.admit, self.validate = loaded
+
+    def test_both_readers_answer_the_shared_cases(self):
+        for terms, text, lines in SHARED_CASES:
+            with self.subTest(terms=terms, text=text):
+                pattern = self.admit.terms_pattern(terms)
+                self.assertEqual(self.admit.term_lines(text, pattern) if pattern else [], lines)
+                pattern = self.validate.private_terms_pattern(terms)
+                self.assertEqual(self.validate.private_term_lines(text, pattern) if pattern else [], lines)
+
+    def test_the_validator_reads_with_the_shipped_reader(self):
+        self.assertIs(self.validate._ADMIT.terms_pattern, self.validate.private_terms_pattern)
+        self.assertIs(self.validate._ADMIT.term_lines, self.validate.private_term_lines)
+
+    def test_a_tilde_in_the_variable_is_this_home_and_only_paths_and_lines_are_said(self):
+        from unittest import mock
+        home = self.tmp / "home"
+        (home / "lists").mkdir(parents=True)
+        (home / "lists" / "terms.txt").write_text("%s\n" % TERM, encoding="utf-8")
+        root = self.tmp / "agent"
+        root.mkdir()
+        (root / "notes.md").write_text("one\nsee %s here\n" % TERM, encoding="utf-8")
+        env = {"PASSIONCODE_PRIVATE_TERMS": "~/lists/terms.txt", "HOME": str(home), "USERPROFILE": str(home)}
+        with mock.patch.dict(os.environ, env):
+            self.assertEqual(self.admit.terms_file(None), home / "lists" / "terms.txt")
+            self.assertEqual(self.validate.private_terms_file(), home / "lists" / "terms.txt")
+            step = self.admit.private_terms_step(root, None)
+            problems, ran = self.validate.private_term_problems(root, pending={})
+        self.assertEqual((step["verdict"], step["lines"]), ("FAIL", ["notes.md: line 2"]))
+        self.assertTrue(ran)
+        self.assertEqual(len(problems), 1)
+        self.assertTrue(problems[0].startswith("notes.md: line 2 "), problems[0])
+        self.assertNotIn(TERM, json.dumps([step, problems]).lower())
+
 if __name__ == "__main__":
     unittest.main()

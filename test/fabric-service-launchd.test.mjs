@@ -787,6 +787,21 @@ test('FAA-257: an origin spelled localhost is read on a checked connection too, 
   assert.equal(facade.wellKnownOf, wellKnownOf, 'the facade carries it, as the Python one carries well_known_of (FAA-259)');
 });
 
+test('FAA-326: a name under .localhost, 127.1 and 2130706433 are read on a checked connection, never fetched', async () => {
+  const { wellKnownOf } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
+  const fetched = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = async (...args) => { fetched.push(String(args[0])); throw new Error('unchecked'); };
+  try {
+    for (const origin of ['http://example.localhost:1', 'http://127.1:1', 'http://2130706433:1']) {
+      assert.equal(await wellKnownOf(origin), null, origin);
+    }
+  } finally {
+    globalThis.fetch = real;
+  }
+  assert.deepEqual(fetched, []);
+});
+
 test('a loopback origin with the default port is read on a checked connection, never fetched (0.79.0 seam reading)', async () => {
   const { wellKnownOf } = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs');
   const fetched = [];

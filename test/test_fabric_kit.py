@@ -48,7 +48,7 @@ LICENSE_EXPRESSION = json.loads((ROOT / "package.json").read_text(encoding="utf-
 SPDX = "SPDX-License-Identifier: " + LICENSE_EXPRESSION
 #: Kit modules whose line waits on another change of the same release, and only shrinks: fabric_peer_owner.py sits at
 #: MAX_LINES and is edited in the same wave, so its line replaces an existing blank or comment line when that lands.
-SPDX_PENDING = {"fabric_peer_owner.py"}
+SPDX_PENDING: set = set()
 
 
 def spdx_problem(path):

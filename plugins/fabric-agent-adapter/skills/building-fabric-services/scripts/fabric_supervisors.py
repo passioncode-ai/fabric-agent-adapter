@@ -5,7 +5,6 @@ removed without touching what the operator turned off; release pruning (LC-15). 
 from __future__ import annotations
 
 import http.client
-import ipaddress
 import json
 import os
 import plistlib
@@ -26,6 +25,7 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_peer_owner as _po  # noqa: E402 - the listener's owner (DEC-0154 HA-2)
+import fabric_socket_proof as _sp  # noqa: E402 - the one loopback host rule (FAA-326)
 from fabric_base import (
     DRAIN_SECONDS,
     SUPERVISOR_ENV,
@@ -463,16 +463,9 @@ def launchd_pid(label: str, domain: Optional[str] = None) -> Optional[int]:
     return None
 
 
-def _loopback_host(host: Optional[str]) -> bool:
-    """Whether `host` (urlsplit's hostname: lower-case, no brackets) names this machine: localhost, 127/8 or ::1."""
-    if not host:
-        return False
-    if host == "localhost":
-        return True
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return False
+#: Whether urlsplit's hostname names this machine: the kit's one loopback rule (FAA-326), so 127.1, 2130706433 and a
+#: name under .localhost, which the Node twin's `new URL` reads as loopback, take the checked path here too.
+_loopback_host = _sp.loopback_host
 
 
 class ForeignUserAnswer:
@@ -499,7 +492,7 @@ def _read_well_known(origin: str, timeout: float = 2.0,
     except ValueError:  # a port out of range
         port = None
     if parts.scheme == "http" and port and _loopback_host(parts.hostname):
-        # every loopback spelling (127.0.0.1, another 127/8 address, localhost, [::1]) goes on a checked connection,
+        # every loopback spelling (127/8 in any form, localhost or a name under it, [::1]) goes on a checked connection,
         # never the unchecked way (FAA-257)
         conn = _po.CheckedHTTPConnection(parts.hostname, port, timeout=timeout, vouch_pid=vouch_pid)
         try:
