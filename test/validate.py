@@ -1153,39 +1153,27 @@ PRIVATE_TERMS_PENDING: Dict[str, str] = {
 }
 
 
+def _load_admit():
+    """admit.py, the shipped private-terms reader (FAA-328): this check reads the list with its functions, never a copy."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "faa_admit", ROOT / "plugins/fabric-agent-adapter/skills/creating-fabric-agents/scripts/admit.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_ADMIT = _load_admit()
+private_terms_pattern = _ADMIT.terms_pattern  # case-insensitive, not inside a run of ASCII letters and digits
+private_term_lines = _ADMIT.term_lines
+
+
 def private_terms_file() -> Path:
-    import os
-    named = os.environ.get(PRIVATE_TERMS_ENV)
-    return Path(named).expanduser() if named else Path.home() / ".config/passioncode/private-terms.txt"  # as admit.py
-
-
-def private_terms_pattern(lines: List[str]) -> "Optional[re.Pattern[str]]":
-    """One alternation of the list's terms, longest first (check_private.py's load_terms); None for an empty list."""
-    terms = sorted({t.strip() for t in lines if t.strip() and not t.strip().startswith("#")}, key=len, reverse=True)
-    if not terms:
-        return None
-    return re.compile(r"(?<![A-Za-z0-9])(?:" + "|".join(re.escape(t) for t in terms) + r")(?![A-Za-z0-9])", re.IGNORECASE)
-
-
-def private_term_lines(text: str, pattern: "re.Pattern[str]") -> List[int]:
-    return [n for n, line in enumerate(text.splitlines(), 1) if pattern.search(line)]
+    return _ADMIT.terms_file(None)  # $PASSIONCODE_PRIVATE_TERMS with `~` expanded, else the default path
 
 
 def tracked_files(root: Path = ROOT) -> List[str]:
-    """Every tracked file and every untracked one Git does not ignore, as check_private.py reads a work tree; outside a
-    work tree (a copy without `.git`), every file but the usual generated folders, never nothing."""
-    import subprocess
-    if (root / ".git").exists():
-        try:
-            listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                                    capture_output=True, check=False)
-        except OSError:
-            listed = None
-        if listed is not None and listed.returncode == 0:
-            return sorted({rel for rel in listed.stdout.decode("utf-8", "replace").split("\0") if rel})
-    skip = {".git", "node_modules", "__pycache__", ".venv", "venv"}
-    return sorted(p.relative_to(root).as_posix() for p in root.rglob("*")
-                  if p.is_file() and not skip.intersection(p.relative_to(root).parts))
+    return _ADMIT.listed_files(root)
 
 
 def private_term_problems(root: Path = ROOT, terms: Optional[Path] = None,
