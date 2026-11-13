@@ -118,12 +118,14 @@ def js_string(value: Any) -> str:
     if value is False:
         return "false"
     if isinstance(value, float):
+        value = float.__float__(value)  # a subclass (numpy.float64) by the number it stores, never its repr (FAA-196 (22))
         if math.isnan(value):
             return "NaN"
         if math.isinf(value):
             return "Infinity" if value > 0 else "-Infinity"
         return js_number_string(value)
     if isinstance(value, int):
+        value = int.__int__(value)
         if abs(value) < 2 ** 53:
             return str(value)
         try:
