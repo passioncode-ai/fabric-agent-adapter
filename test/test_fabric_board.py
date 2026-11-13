@@ -435,6 +435,25 @@ class FailureTests(Conversation):
         self.assertEqual([e[0] for e in self.events].count("board.access.needed"), 1)  # once per episode
         self.assertTrue(waits[0] < waits[-1] <= 300)
 
+    def test_a_flapping_board_is_said_down_once_per_outage_window(self):
+        """FAA-187 (22): `board.down` was said again after every good tick that ended an outage, so a hub that flaps wrote
+        a row a tick; it is said once until the board has stayed up for DOWN_QUIET_SECONDS."""
+        r = self.responder()
+        r.step()
+        for _ in range(4):  # down, up, down, up within the window: one row
+            self.hub.down = True
+            self.board.advance(r.step())
+            self.hub.down = False
+            self.board.advance(r.step())
+        self.assertEqual(self.kinds().count("board.down"), 1)
+        self.assertEqual(r.state, "ready")
+        for _ in range(int(importlib.import_module("fabric_board_session").DOWN_QUIET_SECONDS // 20) + 2):  # up long enough: the outage window closes
+            self.board.advance(20)
+            r.step()
+        self.hub.down = True
+        self.board.advance(r.step())
+        self.assertEqual(self.kinds().count("board.down"), 2, "a later outage is said again")
+
     def test_fabric_down_backs_off_without_spinning_then_recovers(self):
         self.hub.withdraw()
         r = self.responder()
@@ -1408,6 +1427,39 @@ class MovedBackTwoCapabilitiesTests(Conversation):
         self.assertIsNotNone(r.session)
         self.assertEqual({c: s["holder"] for c, s in self.board.slots.items()}, {"video.render": mine, "video.cut": mine})
 
+    def test_a_move_back_is_said(self):
+        """FAA-194 (8): a move back left no event, so the feed ended on board.slot.moved's warning; it says the slot is
+        this service's again (board.slot.returned, info, the capability its subject)."""
+        r = self.responder()
+        r.step()
+        mine = self.board.slots["video.cut"]["holder"]
+        self.board.move("video.cut")
+        self.board.advance(20)
+        r.step()
+        self.board.move("video.cut", to=mine)
+        self.board.advance(20)
+        r.step()
+        back = [e for e in self.events if e[0] == "board.slot.returned"]
+        self.assertEqual(len(back), 1, self.kinds())
+        self.assertEqual(back[0][1], "info")
+        self.assertIn("video.cut", back[0][2])
+        self.assertIn("moved it back", back[0][2])
+
+    def test_moved_slots_share_one_status_read_a_tick(self):
+        """FAA-194 (5): each moved slot read its own com.status once a renewal; a tick now reads it once for all of them."""
+        r = self.responder()
+        r.step()
+        self.board.move("video.render")
+        self.board.move("video.cut")
+        self.board.advance(20)
+        r.step()
+        self.assertEqual({c: s["state"] for c, s in r.slots.items()}, {"video.render": "moved", "video.cut": "moved"})
+        for _ in range(3):
+            before = len(self.board.calls)
+            self.board.advance(20)
+            r.step()
+            self.assertEqual([t for t, _ in self.board.calls[before:]].count("com.status"), 1)
+
     def test_a_lost_probe_outlived_by_its_lease_no_longer_counts(self):
         """0.60.0 seam reading 5: a lost probe whose resend is postponed (here com.status names no generation) kept its
         send time past its lease, so one lost answer on the other, freshly renewed capability dropped the session."""
@@ -1534,6 +1586,21 @@ class MovedSlotTests(Conversation):
     def record(self):
         path = self.data / "board-checkpoint.json"
         return json.loads(path.read_text()).get("slots", {}) if path.exists() else {}
+
+    def test_a_notify_notice_carries_the_link_the_service_gives_for_its_kind(self):
+        """FAA-187 (21): a notify event names the page that resolves it (events-and-notifications.md); the responder
+        takes a link per kind from the service (`links=`), passed only to a notice that notifies, and only when given."""
+        r = self.responder(links={"board.slot.moved": "/#board"})
+        r.step()
+        self.board.move("video.render")
+        self.board.advance(20)
+        r.step()
+        (moved,) = self.moved()
+        self.assertEqual((moved[3]["notify"], moved[3]["link"]), (True, "/#board"))
+        self.assertTrue(all("link" not in e[3] for e in self.events if e[0] != "board.slot.moved"))
+        for bad in ({"board.slot.moved": "https://elsewhere.example/x"}, {"board.slot.moved": 7}, ["board.slot.moved"]):
+            with self.subTest(links=bad), self.assertRaises(fb.BoardError):
+                self.responder(links=bad)
 
     def test_the_generation_held_is_recorded_beside_the_checkpoint(self):
         r = self.responder()
@@ -2301,6 +2368,24 @@ class SelfCheckAndProbeTests(unittest.TestCase):
     def test_self_check_passes(self):
         self.assertEqual(fb.self_check(), [])
 
+    def test_self_check_catches_a_kit_whose_notices_are_lost(self):
+        """FAA-187 (23): the fixture's Responder records its notices: a kit that sends none (a fenced attempt says a
+        warning), sends one at a level the event log refuses, or sends one without its subject fails the self check."""
+        original = fb.Responder._emit
+        cases = {"silent": (lambda self, *a, **k: None, "fenced: no warning notice"),
+                 "warn": (lambda self, kind, level, text, **k: original(self, kind, "warn" if level == "warning" else level, text, **k),
+                          "at level 'warn'"),
+                 "no subject": (lambda self, kind, level, text, **k: self._emit_to(kind, level, text, notify=k.get("notify", False)),
+                                "without its subject")}
+        for name, (planted, said) in cases.items():
+            with self.subTest(name):
+                fb.Responder._emit = planted
+                try:
+                    problems = fb.self_check()
+                finally:
+                    fb.Responder._emit = original
+                self.assertTrue(any(said in p for p in problems), problems)
+
     def test_self_check_catches_a_kit_that_keeps_acting_after_fenced(self):
         original = fb.Responder._accept
         fb.Responder._accept = lambda self, entry: True  # planted defect: ignores the board's answer
@@ -2407,8 +2492,10 @@ class SampleWiringTests(unittest.TestCase):
         self.assertEqual(sorted(k for k in kinds if "`%s`" % k not in board_md), [])
 
     def test_every_board_notice_level_is_one_the_event_log_takes(self):
-        """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refuses, so a service with
-        emit=log.append (the reference service) never logged them. Every level both twins pass is one LEVELS holds."""
+        """0.56.0 product r30: the responder's notices went out at `warn`, which JsonlEventLog refused before FAA-276, so
+        a service with emit=log.append (the reference service) never logged them. Since FAA-276 the log stores `warn`
+        (the dashboard kit's chip for "a person is needed") as `warning`; the responder still passes the stored name, so
+        every level both twins pass is one LEVELS holds and nothing depends on the alias (FAA-277 (6))."""
         import re
         fabric_events = importlib.import_module("fabric_events")
         scripts = Path(importlib.import_module("fabric_board").__file__).parent
@@ -2504,12 +2591,27 @@ class SampleWiringTests(unittest.TestCase):
             # two blocking causes are two subjects, so a host shows the second within the first's cooldown
             subjects = [session._notice_subject({}, PROJECT, code) for code in ("no-epoch", "checkpoint")]
             self.assertEqual(subjects, [{"type": "episode", "id": "no-epoch"}, {"type": "episode", "id": "checkpoint"}])
+            # FAA-187 (26): a positional-only `subject` cannot take the keyword the responder passes, so such an emit is
+            # called without one (the notice goes); positional-or-keyword and keyword-only subjects take it
+            namespace: dict = {}
+            exec("def positional(kind, level, text, subject=None, /, **kw):\n    return kw\n", namespace)
+            self.assertFalse(session._takes_subject(namespace["positional"]))
+            self.assertTrue(session._takes_subject(lambda kind, level, text, subject=None: None))
+            self.assertTrue(session._takes_subject(lambda kind, level, text, *, subject=None: None))
         # The longest notice keeps its last instruction with the longest capability a Project accepts (128 characters).
         slots = (scripts / "fabric_board_slots.py").read_text(encoding="utf-8")
         start = slots.index('"The %s slot on this Project moved')
         import ast
         moved = ast.literal_eval("(" + slots[start:slots.index("% capability", start)] + ")")
         self.assertLessEqual(len(moved % ("c" * 128)), 500)
+        # FAA-187 (30): a notify banner shows plain text, so the notice carries no Markdown backticks, in both kits
+        self.assertNotIn("`", moved)
+        # FAA-194 (33): a reconnect brings accepted work back after a take-back, as a restart does
+        self.assertIn("at a restart or reconnect with accepted work waiting; neither alone does", moved)
+        node = (scripts / "fabric-board-slots.mjs").read_text(encoding="utf-8")
+        line = next(l for l in node.splitlines() if "moved to another session. This service" in l)
+        self.assertNotIn("\\`", line)
+        self.assertIn("at a restart or reconnect with accepted work waiting; neither alone does", line)
 
     def test_the_probe_passes_the_sample_with_its_board_on(self):
         """0.56.0 product r28, seam r28: registered with the board, the take-back tool the well-known lists is in the
@@ -2677,6 +2779,8 @@ class SampleWiringTests(unittest.TestCase):
             hub.board.advance(15)
             svc.board.step()  # the claim is fenced: com.status shows the move
             self.assertEqual(svc.board_moved(), ["sample.echo"])
+            moved = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.moved"]
+            self.assertEqual(moved[-1].get("link"), "/", "the notice links the page with Take back (FAA-187 (21))")
 
             def request(method, path, headers=None, body=None):
                 conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
@@ -2710,6 +2814,8 @@ class SampleWiringTests(unittest.TestCase):
             returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
             self.assertIn("on this service's page", returned[-1]["text"], "the page's take-back names the route in words (seam r7)")
             self.assertEqual({k: returned[-1]["data"]["value"][k] for k in ("by", "via")}, {"by": "operator", "via": "dashboard"})
+            # FAA-187 (31): the page records a machine id as its caller, as the tool does, never prose
+            self.assertEqual(returned[-1]["data"]["value"]["caller"], "dashboard:session")
             self.assertEqual(returned[-1]["subject"], {"type": "capability", "id": "sample.echo"}, "the moved slot's subject (product r35)")
             status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
             self.assertEqual((status, json.loads(said)), (200, {"capability": "sample.echo", "moved": False}),
@@ -2775,8 +2881,21 @@ class SampleWiringTests(unittest.TestCase):
                 answer = svc.board_take_back("sample.echo", {"by": "operator", "via": "relayed-instruction", "caller": "x" * 501})
             self.assertEqual(answer, {"capability": "sample.echo", "moved": False})
             last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
-            self.assertNotIn("data", last)
+            # FAA-187 (24): only the caller is dropped; by and via stay in data
+            self.assertEqual(last["data"]["value"], {"capability": "sample.echo", "by": "operator", "via": "relayed-instruction"})
             self.assertIn("through an agent they told", last["text"])
+            # FAA-187 (25), (28): a via that is no string names no route (and never raises after the take-back); an
+            # approval is an approver's act, an elicitation the operator's answer, each in its own words
+            for record, words in (({"by": "operator", "via": ["dashboard"]}, "The operator took the sample.echo slot back; "),
+                                  ({"by": "person:example", "via": "approval", "caller": "remote:x"},
+                                   "An approver took the sample.echo slot back with an approval they signed"),
+                                  ({"by": "operator", "via": "elicitation", "caller": "local:T1"},
+                                   "The operator took the sample.echo slot back answering this service's question")):
+                with mock.patch.object(svc.board, "take_back"), mock.patch.object(svc, "board_moved", return_value=["sample.echo"]):
+                    svc.board_take_back("sample.echo", record)
+                last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
+                self.assertTrue(last["text"].startswith(words), last["text"])
+                self.assertNotIn("person:example", last["text"], "the approver's id is a machine id: data only")
             again = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
                                        "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
             self.assertEqual(again["structuredContent"], {"capability": "sample.echo", "moved": False},
@@ -2843,6 +2962,31 @@ class SampleWiringTests(unittest.TestCase):
                 session.mcp_session = "x"
                 self.assertFalse(session.close())
                 self.assertIsNone(session.mcp_session)
+
+    def test_close_bounds_the_whole_delete(self):
+        """FAA-187 (12): `close(3.0)` bounded each socket operation, so a hub that trickled bytes held an idle stop past
+        3 s; the timeout now bounds the whole DELETE, which then reads as no release."""
+        class Grant:
+            origin = "http://127.0.0.1:1"
+            capabilities = []
+
+            def bearer(self):
+                return "b" * 43
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def trickle(*a, **k):
+            release.wait(5)  # a hub that answers a byte at a time, each within the socket's own timeout
+            return 200, {}, None
+        session = fb.BoardSession(Grant(), post=trickle)
+        session.mcp_session = "x"
+        started = time.monotonic()
+        self.assertFalse(session.close(0.3))
+        self.assertLess(time.monotonic() - started, 2.0, "the whole DELETE is bounded, never each read")
+        self.assertIsNone(session.mcp_session)
+        quick = fb.BoardSession(Grant(), post=lambda *a, **k: (200, {}, None))
+        quick.mcp_session = "x"
+        self.assertTrue(quick.close(0.3), "an answer inside the bound is a release")
 
     def test_take_back_reads_the_record_while_fabric_is_down(self):
         """0.56.0 seam r3: after a restart, before the session reconnects, the checkpoint record alone knows the move;

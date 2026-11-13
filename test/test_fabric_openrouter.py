@@ -148,6 +148,17 @@ class Rules(unittest.TestCase):
                 else:
                     self.assertEqual(make().base_url, want)
 
+    def test_attribution_reads_the_base_s_host_as_it_is_dialed(self):
+        """FAA-187 (19): a host IDNA maps to openrouter.ai (a zero-width space, a soft hyphen) is dialed there by urllib
+        and read there by Node's attribution; the Python client reads it as dialed too."""
+        setting = {"product": "example-agent", "title": "Example Agent", "categories": ["cloud-agent"]}
+        for base, attributed in CASES["baseUrls"]["attributed"]:
+            with self.subTest(base=base):
+                c = fo.Client(ceiling_usd=1.0, ledger=Ledger(), prices=CASES["prices"], environ={"OPENROUTER_API_KEY": KEY},
+                              base_url=base, now=lambda: NOW, attribution=setting)
+                headers = fu.attribution_headers(setting, {"url": c.base_url, "originated": True, "headers": {}})["headers"]
+                self.assertEqual(bool(headers), attributed)
+
     def test_a_base_url_ending_in_a_line_break_is_sent_without_it(self):
         # 0.56.0 seam r18: check_url trims the ends, so the base it passed must be the base composed and sent.
         for base in ("https://openrouter.ai/api/v1\n", "https://openrouter.ai/api/v1/ ", "https://openrouter.ai/api/v1/\r\n"):

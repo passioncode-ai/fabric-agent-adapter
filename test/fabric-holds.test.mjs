@@ -138,3 +138,42 @@ test('a lift needs the operator\'s decision and one size', () => {
     assert.throws(() => b.lift({ reason: 'daily-quota', jobs: 1.5, decision: decision(), now: NOW }), ServiceError);
   } finally { done(); }
 });
+
+// FAA-320: a book 0.81.0's Python twin wrote is read under both squashes; a new record under the ECMAScript one.
+const LEGACY = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/holds/legacy-squash-vectors.json'), 'utf8'));
+const camel = (args) => Object.fromEntries(Object.entries(args).map(([k, v]) => [k.replace(/_(.)/g, (_, c) => c.toUpperCase()), v]));
+
+test('a 0.81.0 Python hold book is read under both squashes, as in Python', () => {
+  for (const c of LEGACY.cases) {
+    const { b, done } = book(false);
+    try {
+      fs.writeFileSync(b.file, JSON.stringify(LEGACY.book));
+      const args = camel(c.args);
+      if (c.call === 'hold') {
+        const out = b.hold({ ...args, now: NOW });
+        assert.equal(out.hold.id, c.joins);
+        assert.equal(out.push, null);
+      } else if (c.call === 'release') {
+        const out = b.release({ ...args, now: NOW });
+        assert.equal(out === null ? null : out.id, c.closes);
+      } else if (c.call === 'admit') {
+        assert.equal(b.admit({ ...args, now: NOW }).lift, c.lift);
+      } else {
+        b.lift({ ...args, decision: decision(), now: NOW });
+        const lifted = JSON.parse(fs.readFileSync(b.file, 'utf8')).holds.filter((x) => x.closed === 'lifted').map((x) => x.id);
+        assert.deepEqual(lifted, c.lifts);
+      }
+    } finally { done(); }
+  }
+});
+
+test('a new hold record carries its squash', () => {
+  const { b, done } = book(false);
+  try {
+    fs.writeFileSync(b.file, JSON.stringify(LEGACY.book));
+    const out = b.hold({ caller: 'third\u001ccaller', work: 'render', reason: 'money', now: NOW });
+    assert.equal(out.hold.squash, 'ecmascript');
+    assert.equal(out.hold.caller, 'third\u001ccaller');
+    assert.notEqual(b.hold({ caller: 'third caller', work: 'render', reason: 'money', now: NOW }).push, null);
+  } finally { done(); }
+});

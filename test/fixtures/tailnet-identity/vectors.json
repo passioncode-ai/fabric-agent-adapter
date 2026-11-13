@@ -1,0 +1,2618 @@
+{
+ "about": "FAA-324: shared vectors for fabric_tailnet_identity.py and fabric-tailnet-identity.mjs. Logins are example addresses.",
+ "groups": {
+  "schema": "tailnet-groups/1",
+  "about": "Example: who may open example-agent's doors behind tailscale serve.",
+  "groups": {
+   "ops": [
+    "Ana@Example.com",
+    "bo@example.com"
+   ],
+   "viewers": [
+    "cy@example.com"
+   ],
+   "auditors": [
+    "dee@example.org"
+   ]
+  },
+  "rules": [
+   {
+    "group": "ops",
+    "door": "dashboard",
+    "capabilities": "*"
+   },
+   {
+    "group": "ops",
+    "door": "mcp",
+    "capabilities": [
+     "cve.scan",
+     "vitals.read"
+    ]
+   },
+   {
+    "group": "ops",
+    "door": "service",
+    "capabilities": "*"
+   },
+   {
+    "group": "viewers",
+    "door": "dashboard",
+    "capabilities": [
+     "vitals"
+    ]
+   },
+   {
+    "group": "viewers",
+    "door": "mcp",
+    "capabilities": [
+     "vitals.read"
+    ]
+   }
+  ]
+ },
+ "normalized": {
+  "groups": {
+   "auditors": [
+    "dee@example.org"
+   ],
+   "ops": [
+    "ana@example.com",
+    "bo@example.com"
+   ],
+   "viewers": [
+    "cy@example.com"
+   ]
+  },
+  "rules": [
+   {
+    "group": "ops",
+    "door": "dashboard",
+    "capabilities": "*"
+   },
+   {
+    "group": "ops",
+    "door": "mcp",
+    "capabilities": [
+     "cve.scan",
+     "vitals.read"
+    ]
+   },
+   {
+    "group": "ops",
+    "door": "service",
+    "capabilities": "*"
+   },
+   {
+    "group": "viewers",
+    "door": "dashboard",
+    "capabilities": [
+     "vitals"
+    ]
+   },
+   {
+    "group": "viewers",
+    "door": "mcp",
+    "capabilities": [
+     "vitals.read"
+    ]
+   }
+  ]
+ },
+ "reasons": {
+  "ok": "Allowed by a rule of a group this login belongs to.",
+  "bind-not-loopback": "The service does not listen on a loopback address only, so a Tailscale identity header could come from the network and is not believed.",
+  "not-loopback": "The request did not come from the local tailscale serve proxy (its peer is not a loopback address), so its Tailscale identity header is not believed.",
+  "groups-unreadable": "The tailnet groups file cannot be read, so every door stays closed until it can.",
+  "groups-invalid": "The tailnet groups file is not a valid tailnet-groups/1 or door-groups/1 document, so every door stays closed until it is fixed.",
+  "funnel-request": "The request came through Tailscale Funnel from the public internet, which carries no tailnet identity.",
+  "no-login": "The request carries no Tailscale-User-Login header, so the caller is not known.",
+  "tagged-node": "The request came through tailscale serve from a tailnet node with no user (a tagged node), which carries no login.",
+  "login-ambiguous": "The request carries more than one Tailscale-User-Login header.",
+  "login-malformed": "The Tailscale-User-Login header is not a login name.",
+  "unknown-login": "This login is in no group of the tailnet groups file.",
+  "not-allowed": "No group of this login has a rule that opens this door for this capability."
+ },
+ "vectors": [
+  {
+   "name": "dashboard opened, login compared case-insensitively",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ANA@example.COM"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "ana@example.com",
+    "name": null,
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "a wildcard rule opens any capability of its door",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "bo@example.com"
+    ]
+   ],
+   "door": "service",
+   "capability": "jobs.run",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "bo@example.com",
+    "name": null,
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "a listed capability on mcp",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "cy@example.com"
+    ]
+   ],
+   "door": "mcp",
+   "capability": "vitals.read",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "cy@example.com",
+    "name": null,
+    "groups": [
+     "viewers"
+    ]
+   }
+  },
+  {
+   "name": "a capability the group's rule does not list",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "cy@example.com"
+    ]
+   ],
+   "door": "mcp",
+   "capability": "cve.scan",
+   "expect": {
+    "code": "not-allowed",
+    "status": 403,
+    "login": "cy@example.com",
+    "name": null,
+    "groups": [
+     "viewers"
+    ]
+   }
+  },
+  {
+   "name": "a door the group has no rule for",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "cy@example.com"
+    ]
+   ],
+   "door": "service",
+   "capability": "jobs.run",
+   "expect": {
+    "code": "not-allowed",
+    "status": 403,
+    "login": "cy@example.com",
+    "name": null,
+    "groups": [
+     "viewers"
+    ]
+   }
+  },
+  {
+   "name": "a group with no rule at all",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "dee@example.org"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "not-allowed",
+    "status": 403,
+    "login": "dee@example.org",
+    "name": null,
+    "groups": [
+     "auditors"
+    ]
+   }
+  },
+  {
+   "name": "a login in no group",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "eve@example.net"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "unknown-login",
+    "status": 403,
+    "login": "eve@example.net",
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "no login header",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "no-login",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "an empty login header",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     ""
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "no-login",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a login header of spaces",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "   "
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "no-login",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "only the display name, no login",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Name",
+     "Ana"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "no-login",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "an underscore variant is not the header",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale_User_Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "no-login",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a login that is no login name",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "not-a-login"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "login-malformed",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a login with a trailing newline",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com\n"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "login-malformed",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a login in RFC 2047 encoding is not compared",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "=?utf-8?q?ana@example.com?="
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "login-malformed",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "two login headers",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ],
+    [
+     "tailscale-user-login",
+     "bo@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "login-ambiguous",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "spaces around the login are trimmed",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "  ana@example.com\t"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "ana@example.com",
+    "name": null,
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "a tagged node through serve: no login, a tailnet X-Forwarded-For",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "X-Forwarded-For",
+     "100.101.102.103"
+    ]
+   ],
+   "door": "mcp",
+   "capability": "vitals.read",
+   "expect": {
+    "code": "tagged-node",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a tagged node over IPv6",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "X-Forwarded-For",
+     "fd7a:115c:a1e0::1234"
+    ]
+   ],
+   "door": "mcp",
+   "capability": "vitals.read",
+   "expect": {
+    "code": "tagged-node",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "no login and a forwarded address outside the tailnet",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "X-Forwarded-For",
+     "192.0.2.10"
+    ]
+   ],
+   "door": "mcp",
+   "capability": "vitals.read",
+   "expect": {
+    "code": "no-login",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "Funnel traffic carries no identity, even with a forged login",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-Funnel-Request",
+     "?1"
+    ],
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "funnel-request",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a forged login from a tailnet peer",
+   "bound": "127.0.0.1",
+   "peer": "100.101.102.103",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a forged login from a LAN peer",
+   "bound": "127.0.0.1",
+   "peer": "192.168.1.20",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "no peer address",
+   "bound": "127.0.0.1",
+   "peer": null,
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a service bound to every address",
+   "bound": "0.0.0.0",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "bind-not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a service bound to every IPv6 address",
+   "bound": "::",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "bind-not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a service bound to a LAN address",
+   "bound": "192.168.1.5",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "bind-not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "a bind named by a host name",
+   "bound": "localhost",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "bind-not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   }
+  },
+  {
+   "name": "IPv6 loopback on both ends",
+   "bound": "::1",
+   "peer": "::1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "ana@example.com",
+    "name": null,
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "an IPv4-mapped loopback peer",
+   "bound": "127.0.0.1",
+   "peer": "::ffff:127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "ana@example.com",
+    "name": null,
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "the groups file cannot be read",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "groups-unreadable",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   },
+   "groupsProblem": "groups-unreadable"
+  },
+  {
+   "name": "the groups file is invalid",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "groups-invalid",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   },
+   "groupsProblem": "groups-invalid"
+  },
+  {
+   "name": "a broken groups file still names a forged header first",
+   "bound": "127.0.0.1",
+   "peer": "192.168.1.20",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "not-loopback",
+    "status": 403,
+    "login": null,
+    "name": null,
+    "groups": []
+   },
+   "groupsProblem": "groups-invalid"
+  },
+  {
+   "name": "the display name is read for display",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ],
+    [
+     "Tailscale-User-Name",
+     "Ana Example"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "ana@example.com",
+    "name": "Ana Example",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "an RFC 2047 display name is decoded",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ],
+    [
+     "Tailscale-User-Name",
+     "=?utf-8?q?Ana_P=C3=A9rez?="
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "ana@example.com",
+    "name": "Ana Pérez",
+    "groups": [
+     "ops"
+    ]
+   }
+  },
+  {
+   "name": "a display name with a control character is dropped",
+   "bound": "127.0.0.1",
+   "peer": "127.0.0.1",
+   "headers": [
+    [
+     "Tailscale-User-Login",
+     "ana@example.com"
+    ],
+    [
+     "Tailscale-User-Name",
+     "Ana\u0007"
+    ]
+   ],
+   "door": "dashboard",
+   "capability": "vitals",
+   "expect": {
+    "code": "ok",
+    "status": 200,
+    "login": "ana@example.com",
+    "name": null,
+    "groups": [
+     "ops"
+    ]
+   }
+  }
+ ],
+ "badGroups": [
+  {
+   "name": "not an object",
+   "doc": [],
+   "where": "document"
+  },
+  {
+   "name": "no version marker",
+   "doc": {
+    "groups": {},
+    "rules": []
+   },
+   "where": "schema"
+  },
+  {
+   "name": "another version",
+   "doc": {
+    "schema": "tailnet-groups/2",
+    "groups": {},
+    "rules": []
+   },
+   "where": "schema"
+  },
+  {
+   "name": "an unknown top-level key",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {},
+    "rules": [],
+    "extra": 1
+   },
+   "where": "document"
+  },
+  {
+   "name": "about not a string",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "about": 3,
+    "groups": {},
+    "rules": []
+   },
+   "where": "about"
+  },
+  {
+   "name": "groups not an object",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": [],
+    "rules": []
+   },
+   "where": "groups"
+  },
+  {
+   "name": "a group name out of pattern",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "Ops": []
+    },
+    "rules": []
+   },
+   "where": "groups"
+  },
+  {
+   "name": "members not a list",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": "ana@example.com"
+    },
+    "rules": []
+   },
+   "where": "groups.ops"
+  },
+  {
+   "name": "a member that is no login",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": [
+      "ana"
+     ]
+    },
+    "rules": []
+   },
+   "where": "groups.ops"
+  },
+  {
+   "name": "a member with spaces",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": [
+      " ana@example.com"
+     ]
+    },
+    "rules": []
+   },
+   "where": "groups.ops"
+  },
+  {
+   "name": "rules not a list",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {},
+    "rules": {}
+   },
+   "where": "rules"
+  },
+  {
+   "name": "a rule not an object",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     "ops"
+    ]
+   },
+   "where": "rules[0]"
+  },
+  {
+   "name": "a rule with an unknown key",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     {
+      "group": "ops",
+      "door": "mcp",
+      "capabilities": "*",
+      "allow": true
+     }
+    ]
+   },
+   "where": "rules[0]"
+  },
+  {
+   "name": "a rule naming no group of the file",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     {
+      "group": "admins",
+      "door": "mcp",
+      "capabilities": "*"
+     }
+    ]
+   },
+   "where": "rules[0].group"
+  },
+  {
+   "name": "a rule with an unknown door",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     {
+      "group": "ops",
+      "door": "a2a",
+      "capabilities": "*"
+     }
+    ]
+   },
+   "where": "rules[0].door"
+  },
+  {
+   "name": "capabilities empty",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     {
+      "group": "ops",
+      "door": "mcp",
+      "capabilities": []
+     }
+    ]
+   },
+   "where": "rules[0].capabilities"
+  },
+  {
+   "name": "capabilities a string other than *",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     {
+      "group": "ops",
+      "door": "mcp",
+      "capabilities": "all"
+     }
+    ]
+   },
+   "where": "rules[0].capabilities"
+  },
+  {
+   "name": "a capability out of pattern",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     {
+      "group": "ops",
+      "door": "mcp",
+      "capabilities": [
+       "Scan Now"
+      ]
+     }
+    ]
+   },
+   "where": "rules[0].capabilities"
+  }
+ ],
+ "goodGroups": [
+  {
+   "name": "nobody: no groups, no rules",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {},
+    "rules": []
+   }
+  },
+  {
+   "name": "a group with no members",
+   "doc": {
+    "schema": "tailnet-groups/1",
+    "groups": {
+     "ops": []
+    },
+    "rules": [
+     {
+      "group": "ops",
+      "door": "mcp",
+      "capabilities": "*"
+     }
+    ]
+   }
+  }
+ ],
+ "doorGroups": {
+  "about": "The agents base's door-groups/1 (thread d23eeb7a), read for one service: `*` opens every door, `dashboard` the dashboard, `mcp` every MCP tool, a tool name that capability at the MCP door and at the service's own door; a retired group opens nothing.",
+  "doc": {
+   "format": "door-groups/1",
+   "version": 3,
+   "generated_at": "2026-11-12T22:00:00Z",
+   "groups": {
+    "ops": {
+     "people": [
+      "ana@example.com",
+      "bo@example.com"
+     ],
+     "doors": {
+      "example-agent": [
+       "dashboard",
+       "mcp"
+      ],
+      "other-agent": [
+       "*"
+      ]
+     }
+    },
+    "viewers": {
+     "people": [
+      "cy@example.com"
+     ],
+     "doors": {
+      "example-agent": [
+       "dashboard"
+      ]
+     }
+    },
+    "callers": {
+     "people": [
+      "dee@example.org"
+     ],
+     "doors": {
+      "example-agent": [
+       "vitals.read",
+       "cve.scan"
+      ]
+     }
+    },
+    "admins": {
+     "people": [
+      "ed@example.com"
+     ],
+     "doors": {
+      "example-agent": [
+       "*"
+      ]
+     }
+    },
+    "elsewhere": {
+     "people": [
+      "fay@example.com"
+     ],
+     "doors": {
+      "other-agent": [
+       "dashboard"
+      ]
+     }
+    }
+   },
+   "retired": {
+    "old-ops": {
+     "at": "2026-11-01",
+     "why": "merged into ops"
+    }
+   }
+  },
+  "service": "example-agent",
+  "normalized": {
+   "groups": {
+    "admins": [
+     "ed@example.com"
+    ],
+    "callers": [
+     "dee@example.org"
+    ],
+    "elsewhere": [
+     "fay@example.com"
+    ],
+    "ops": [
+     "ana@example.com",
+     "bo@example.com"
+    ],
+    "viewers": [
+     "cy@example.com"
+    ]
+   },
+   "rules": [
+    {
+     "group": "admins",
+     "door": "dashboard",
+     "capabilities": "*"
+    },
+    {
+     "group": "admins",
+     "door": "mcp",
+     "capabilities": "*"
+    },
+    {
+     "group": "admins",
+     "door": "service",
+     "capabilities": "*"
+    },
+    {
+     "group": "callers",
+     "door": "mcp",
+     "capabilities": [
+      "cve.scan",
+      "vitals.read"
+     ]
+    },
+    {
+     "group": "callers",
+     "door": "service",
+     "capabilities": [
+      "cve.scan",
+      "vitals.read"
+     ]
+    },
+    {
+     "group": "ops",
+     "door": "dashboard",
+     "capabilities": "*"
+    },
+    {
+     "group": "ops",
+     "door": "mcp",
+     "capabilities": "*"
+    },
+    {
+     "group": "viewers",
+     "door": "dashboard",
+     "capabilities": "*"
+    }
+   ]
+  },
+  "vectors": [
+   {
+    "name": "ops opens the dashboard",
+    "login": "Ana@Example.com",
+    "door": "dashboard",
+    "capability": "home",
+    "code": "ok"
+   },
+   {
+    "name": "ops opens any MCP tool",
+    "login": "bo@example.com",
+    "door": "mcp",
+    "capability": "anything.at.all",
+    "code": "ok"
+   },
+   {
+    "name": "ops has no rule at the service's own door",
+    "login": "bo@example.com",
+    "door": "service",
+    "capability": "vitals.read",
+    "code": "not-allowed"
+   },
+   {
+    "name": "a viewer cannot reach MCP",
+    "login": "cy@example.com",
+    "door": "mcp",
+    "capability": "vitals.read",
+    "code": "not-allowed"
+   },
+   {
+    "name": "a caller opens a named tool through MCP",
+    "login": "dee@example.org",
+    "door": "mcp",
+    "capability": "vitals.read",
+    "code": "ok"
+   },
+   {
+    "name": "a caller opens a named tool at the service's own door",
+    "login": "dee@example.org",
+    "door": "service",
+    "capability": "cve.scan",
+    "code": "ok"
+   },
+   {
+    "name": "a caller cannot reach a tool it is not given",
+    "login": "dee@example.org",
+    "door": "mcp",
+    "capability": "secrets.read",
+    "code": "not-allowed"
+   },
+   {
+    "name": "a caller has no dashboard",
+    "login": "dee@example.org",
+    "door": "dashboard",
+    "capability": "home",
+    "code": "not-allowed"
+   },
+   {
+    "name": "admins open everything",
+    "login": "ed@example.com",
+    "door": "service",
+    "capability": "anything",
+    "code": "ok"
+   },
+   {
+    "name": "a group of another service opens nothing here",
+    "login": "fay@example.com",
+    "door": "dashboard",
+    "capability": "home",
+    "code": "not-allowed"
+   },
+   {
+    "name": "a login in no group",
+    "login": "zed@example.com",
+    "door": "dashboard",
+    "capability": "home",
+    "code": "unknown-login"
+   }
+  ]
+ },
+ "badDoorGroups": [
+  {
+   "name": "no service named",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": null,
+   "where": "service"
+  },
+  {
+   "name": "a service name that is no name",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "",
+   "where": "service"
+  },
+  {
+   "name": "another format",
+   "doc": {
+    "format": "door-groups/2",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "format"
+  },
+  {
+   "name": "an unknown member",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    },
+    "extra": 1
+   },
+   "service": "example-agent",
+   "where": "document"
+  },
+  {
+   "name": "a version that is no positive integer",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 0,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "version"
+  },
+  {
+   "name": "a version that is a boolean",
+   "doc": {
+    "format": "door-groups/1",
+    "version": true,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "version"
+  },
+  {
+   "name": "generated_at that is no string",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": 5,
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "generated_at"
+  },
+  {
+   "name": "groups that are no object",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": [],
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups"
+  },
+  {
+   "name": "a group name outside the grammar",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "Ops!": {
+      "people": [],
+      "doors": {}
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups"
+  },
+  {
+   "name": "a group without doors",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ]
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups.ops"
+  },
+  {
+   "name": "a group with another member",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      },
+      "rules": []
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups.ops"
+  },
+  {
+   "name": "a person who is no login",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com",
+       "not a login"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups.ops.people"
+  },
+  {
+   "name": "doors that are no object",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": [
+       "dashboard"
+      ]
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups.ops.doors"
+  },
+  {
+   "name": "a door list that is empty",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups.ops.doors.example-agent"
+  },
+  {
+   "name": "a capability outside the grammar",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "Bad Tool"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "groups.ops.doors.example-agent"
+  },
+  {
+   "name": "retired that is no object",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": []
+   },
+   "service": "example-agent",
+   "where": "retired"
+  },
+  {
+   "name": "a retired group still listed",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops"
+     },
+     "ops": {
+      "at": "2026-11-01",
+      "why": "x"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "retired.ops"
+  },
+  {
+   "name": "a retired entry with another member",
+   "doc": {
+    "format": "door-groups/1",
+    "version": 3,
+    "generated_at": "2026-11-12T22:00:00Z",
+    "groups": {
+     "ops": {
+      "people": [
+       "ana@example.com",
+       "bo@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard",
+        "mcp"
+       ],
+       "other-agent": [
+        "*"
+       ]
+      }
+     },
+     "viewers": {
+      "people": [
+       "cy@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "dashboard"
+       ]
+      }
+     },
+     "callers": {
+      "people": [
+       "dee@example.org"
+      ],
+      "doors": {
+       "example-agent": [
+        "vitals.read",
+        "cve.scan"
+       ]
+      }
+     },
+     "admins": {
+      "people": [
+       "ed@example.com"
+      ],
+      "doors": {
+       "example-agent": [
+        "*"
+       ]
+      }
+     },
+     "elsewhere": {
+      "people": [
+       "fay@example.com"
+      ],
+      "doors": {
+       "other-agent": [
+        "dashboard"
+       ]
+      }
+     }
+    },
+    "retired": {
+     "old-ops": {
+      "at": "2026-11-01",
+      "why": "merged into ops",
+      "by": "x"
+     }
+    }
+   },
+   "service": "example-agent",
+   "where": "retired.old-ops"
+  }
+ ]
+}

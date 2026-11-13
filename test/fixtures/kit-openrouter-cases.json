@@ -107,7 +107,7 @@
   }
  },
  "baseUrls": {
-  "about": "0.56.0 readings 27: the base URLs both twins answer the same way when the client is built. config: OpenRouterError kind config (a query or a fragment, read before check_url). Any other string: accepted, and the client's base URL is that string. A base whose path holds a space, a control or a character outside ASCII is left out: Python refuses it and Node sends it percent-encoded (FAA-187 (18)).",
+  "about": "0.56.0 readings 27: the base URLs both twins answer the same way when the client is built. config: OpenRouterError kind config (a query or a fragment, read before check_url). Any other string: accepted, and the client's base URL is that string. Since FAA-187 (18) one rule reads the base as both twins would send it, before check_url: a backslash anywhere, or a path (after the authority) holding anything but URL path characters and %XX escapes, or a dot segment (also escaped), is config, where Python refused some and Node sent them percent-encoded or rewritten. attributed (FAA-187 (19)): whether attribution reaches the base, its host read as both twins dial it (IDNA). A tab or a line break anywhere inside the base (its ends trimmed) is config too, where Node removed it and sent the rest (the 0.83.0 seam reading).",
   "cases": [
    ["https://openrouter.ai/api/v1\n", "https://openrouter.ai/api/v1"],
    ["https://openrouter.ai/api/v1/ ", "https://openrouter.ai/api/v1"],
@@ -125,7 +125,34 @@
    ["https://h.example:99999/v1?x", "config"],
    ["ftp://example.com/v1#f", "config"],
    ["?", "config"],
-   [" https://openrouter.ai/api/v1#x", "config"]
+   [" https://openrouter.ai/api/v1#x", "config"],
+   ["https://gw.example/café/v1", "config"],
+   ["https://gw.example/v1 x", "config"],
+   ["https://openrouter.ai/api/v1 /", "config"],
+   ["https://gw.example/v1\\", "config"],
+   ["https://gw.example\\v1", "config"],
+   ["https://gw.example/a/../v1", "config"],
+   ["https://gw.example/a/%2e%2E/v1", "config"],
+   ["https://gw.example/./v1", "config"],
+   ["https://openrouter.ai/api/v1\n/", "config"],
+   ["https://openrouter.ai/api/v1\t/", "config"],
+   ["https://gw.example/a%2Fb/v1", "https://gw.example/a%2Fb/v1"],
+   ["https://gw.example/v1;x=1/y", "https://gw.example/v1;x=1/y"],
+   ["https://gw.example:8443/api/v1/", "https://gw.example:8443/api/v1"],
+   ["https://openrouter\t.ai/api/v1", "config"],
+   ["https://open\nrouter.ai/api/v1", "config"],
+   ["ht\ttps://openrouter.ai/api/v1", "config"],
+   ["https:\t//openrouter.ai/api/v1", "config"],
+   ["https://openrouter.ai\t/api/v1", "config"],
+   ["https://openrouter.ai/api\r/v1", "config"]
+  ],
+  "attributed": [
+   ["https://openrouter.ai/api/v1", true],
+   ["https://openrouter.ai​/api/v1", true],
+   ["https://openrouter.ai­/api/v1", true],
+   ["https://OpenRouter.AI/api/v1", true],
+   ["https://gw.example/api/v1", false],
+   ["https://openrouter.ai:8443/api/v1", false]
   ]
  },
  "scenarios": [

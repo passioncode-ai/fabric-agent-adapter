@@ -71,6 +71,28 @@ class ScaffoldTests(unittest.TestCase):
                 self.assertEqual(check["gates"]["declarationShape"]["status"], "NOT_RUN")
                 self.assertFalse(check["readyForAdmission"])
 
+    def test_the_scaffold_keeps_what_running_the_kit_leaves_out_of_git(self):
+        """FAA-190 (36): a scaffold whose kit has run leaves `__pycache__/` and `*.pyc`, which the source check reads as
+        binary in Git mode; the scaffold names them in `.gitignore`, never removing a line the project wrote."""
+        for before, state in ((None, "created"), ("node_modules/\n", "appended"), ("dist", "appended"),
+                              ("__pycache__/\n*.pyc\n", "unchanged")):
+            with self.subTest(before=before), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                if before is not None:
+                    (root / ".gitignore").write_text(before, encoding="utf-8")
+                dry = scaffold_args("mcp")
+                dry.dry_run = True
+                self.assertEqual(ADAPTER.scaffold_project(root, dry)["gitignore"], state)
+                self.assertEqual((root / ".gitignore").exists(), before is not None, "a dry run writes nothing")
+                result = ADAPTER.scaffold_project(root, scaffold_args("mcp"))
+                self.assertEqual(result["gitignore"], state)
+                lines = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
+                self.assertIn("__pycache__/", lines)
+                self.assertIn("*.pyc", lines)
+                if before is not None:
+                    self.assertTrue((root / ".gitignore").read_text(encoding="utf-8").startswith(before.rstrip("\n")))
+                self.assertNotIn(".gitignore", result["created"])
+
     def test_refuses_collision_without_force(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

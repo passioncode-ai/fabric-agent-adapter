@@ -1,0 +1,90 @@
+{
+ "about": "FAA-273 item 9: one corpus of environment values the three copies of the env rule read alike (fabric_supervisors._secret_env_value, fabric-supervisors.mjs secretEnvValue, adapt_project._secret_env_value). `secret` is stated by hand; null marks a value the rule is known to read wrongly (the note names the row), where only the agreement is asserted.",
+ "cases": [
+  {
+   "value": "/Users/example/Library/Application Support/example-agent/releases/0.1.0",
+   "secret": false,
+   "note": "a release folder under Application Support (FAA-266)"
+  },
+  {
+   "value": "/opt/homebrew/bin:/usr/bin:/bin",
+   "secret": false,
+   "note": "a PATH"
+  },
+  {
+   "value": "production",
+   "secret": false,
+   "note": "a word"
+  },
+  {
+   "value": "http://127.0.0.1:47311",
+   "secret": false,
+   "note": "a loopback origin"
+  },
+  {
+   "value": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+   "secret": true,
+   "note": "a base64 key whose / splits it"
+  },
+  {
+   "value": "/wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+   "secret": true,
+   "note": "the same key after a /"
+  },
+  {
+   "value": "~/.config/example-agent/config.json",
+   "secret": false,
+   "note": "a home-relative path"
+  },
+  {
+   "value": "C:\\Users\\example\\AppData\\Local\\example-agent",
+   "secret": false,
+   "note": "a Windows path"
+  },
+  {
+   "value": "./src:./lib",
+   "secret": false,
+   "note": "a relative PYTHONPATH"
+  },
+  {
+   "value": "en_US.UTF-8",
+   "secret": false,
+   "note": "a locale"
+  },
+  {
+   "value": "1",
+   "secret": false,
+   "note": "a flag"
+  },
+  {
+   "value": "/usr/local/lib/python3.12/site-packages",
+   "secret": false,
+   "note": "a site-packages path"
+  },
+  {
+   "value": "Q2xhdWRlIGtleSBleGFtcGxlIDAxMjM0NTY3ODk=",
+   "secret": true,
+   "note": "a padded base64 value"
+  },
+  {
+   "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "secret": false,
+   "note": "a long run of one letter"
+  },
+  {
+   "value": "Zm9vYmFyYmF6cXV4cXV1eGNvcmdlZ3JhdWx0Z2FycGx5d2FsZG8",
+   "secret": true,
+   "note": "a long base64 run"
+  },
+  {
+   "value": "/Users/example/Library/Application Support/ExampleAgent/Releases/2026-11-07",
+   "secret": null,
+   "note": "FAA-273 item 8: a release path with no all-lower-case part is still refused; the three copies agree"
+  },
+  {
+   "value": "/opt/xyz/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789Ab",
+   "secret": null,
+   "note": "FAA-273 item 15: a base64 key as the last part of a real path still passes; the three copies agree"
+  }
+ ]
+}

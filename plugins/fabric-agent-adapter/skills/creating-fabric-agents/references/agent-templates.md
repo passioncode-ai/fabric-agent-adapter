@@ -42,3 +42,19 @@ has, 2 on a usage error; `--json` prints `{ok, folders: {<folder>: [{level, file
 `never_*` keys, `block`, `spend`, `checkedAgainst`) and names each as a warning with its canonical form; a missing
 `direction` or manifest `version` is a warning there and an error otherwise. Use it to migrate a folder, then fix the
 warnings: a template is done when the check passes without it.
+
+## The admission check
+
+```
+python3 <skill>/scripts/admit.py <project-root> [--service ID[.INSTANCE]] [--services-dir DIR] [--template FOLDER ...]
+                                 [--private-terms FILE] [--json]
+```
+
+One command for the checks a new agent passes before it runs (FAA-271): the source check
+(adapting-projects-to-fabric's `fabric_source_check.py check`), the probe (`check_service.py`, with `--service`), this
+template check, strict, on each `--template` folder, and the tracked files against the operator's private-terms list
+(`--private-terms`, else `$PASSIONCODE_PRIVATE_TERMS`, else `~/.config/passioncode/private-terms.txt`). Each step reads
+PASS, FAIL or NOT_RUN; a step with nothing to read (no service, no template, no list) is NOT_RUN, which is not a pass.
+It reads only and prints paths, lines and kinds, never a value or a term. Exit 0: no FAIL and the source check read
+every file; 1: a FAIL; 2: a usage error or a source check that could not run. Which role runs it, and when, is
+Observatory's to decide.

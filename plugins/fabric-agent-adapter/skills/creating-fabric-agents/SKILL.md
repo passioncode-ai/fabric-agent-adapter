@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.82.0"
+  version: "0.83.0"
   contract-version: "0.1.0"
   contract-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
 ---
@@ -70,10 +70,10 @@ board (or, with a grant, its scan tool over the source projects), and build from
 | **Which profile?** | `mcp` when Fabric owns planning and retries and the capability has a schema; `a2a` when the provider owns its task lifecycle end to end; `local-runner` when it is a terminal agent Fabric drives. When unsure, the sibling skill's profile-selection reference is the decision record |
 | **What effects?** | declare anything money-, deletion-, or publication-adjacent now; the host's floor and grants are designed against these declarations, and one discovered late invalidates the admission |
 | **Where does it run, for whom?** | this machine, the person's cloud or an organization's, and in which contexts (`personal`, `org:<id>`): one instance per context, its secrets, spend and journal never crossing into another. Record which capabilities need the person's machine and what they answer when it is off (references/where-agents-run.md) |
-| **Does it run around the clock?** | the uptime category, decided now: **A** when a capability must answer while the owner's machine is off or asleep (a schedule, a chat, callers outside the machine): the agent gets a cloud host from its first release, Heroku unless a reason names another (the person's or an organization's cloud, or PassionCode's for a paid agent), built as an online service (building-fabric-services, the remote placement) and started from the cloud Fabric-server template once that template's repository exists; **B** when nothing needs it then: a local service only, no cloud, reading an A agent's data through that agent's MCP or API. The README names the category (references/where-agents-run.md) |
+| **Does it run around the clock?** | the uptime category, decided now: **A** when a capability must answer while the owner's machine is off or asleep (a schedule, a chat, callers outside the machine): the agent gets a cloud host from its first release, Heroku unless a reason names another (the person's or an organization's cloud, or PassionCode's for a paid agent), built as an online service (building-fabric-services, the remote placement) and started from the cloud Fabric-server template once that template's repository exists; **B** when nothing needs it then: local only, no cloud (a local service, or a CLI or local runner when nothing calls it while the owner is away), reading an A agent's data through that agent's MCP or API. The README names the category (references/where-agents-run.md) |
 | **Whose data does it keep?** | the kind of its data, named in the README: **U** when it keeps data of people outside the owner's team (messages, support requests, reviews, customers' answers), which never enters the source, a copy of it or its tests: the source holds the schema and synthetic fixtures, and a copy starts with an empty store of its own; **O** when it keeps none (a tool or service for other agents, the owner's reports, runs and media). In doubt, U. Either way the data lives in `<agent>-data` (a kit service: the kit's folders; on a cloud host: a durable store), apart from the source, from the first commit (references/source-and-instance.md) |
 | **Who holds the copyright?** | the holder the agent's `LICENSE` names: a new private agent (built for its owner or for a client) gets a `LICENSE` naming that holder in its first commit, all rights reserved unless the owner gives other terms; a public product keeps its own licence (a PassionCode.ai repository: the organization's, step 2) |
-| **Which models?** | per lane (planning, replies, volume work, media): a primary, a fallback of another vendor, an open-vendor model where it reads what users send, the input kinds each reads, declared as classes in the profile (references/models-and-providers.md) |
+| **Which models?** | per lane (planning, replies, volume work, media): a primary, a fallback of another vendor, an open-vendor model where it reads what users send, the input kinds each reads, named as catalogue models in the profile, narrowed by classes on the spend policy or grant (references/models-and-providers.md) |
 | **Who pays?** | one key per agent and context with its own ceiling (USD 100 a month by default, more only where the operator names it), from the estate's key manager, read from the environment; checked before every call, the agent's own stop under the key's limit; a personal key never pays for an organization |
 | **How does it learn?** | decisions recorded with reasons, one trace per turn, every failure a planted fixture first, history replayed, learnings proposed and never self-approved (references/orchestration-and-learning.md) |
 | **Text for people?** | if it writes anything a person reads (a reply, a message, a post, a report, a UI string), its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in new output, from the first commit (the resilience reference, *Text for people*) |
@@ -147,7 +147,8 @@ them with `observatory_credentials` and runs under
 `python3 "$(project-observatory full-path)/tools/use_secret.py" run --vault-only <project> <NAME> -- <command>`
 (a long-running service: `use_secret.py serve`), with `OBSERVATORY_VAULT_ONLY=1` in its environment.
 Without it, the person's OS keychain or secret manager injects the key into the agent's environment
-at start. Either way: no `.env` of its own, no key file beside its data, no value in argv, code,
+at start. An uptime A agent's keys are its platform's secrets, set from Observatory or the person's secret manager,
+never a file in the deploy. Either way: no `.env` of its own, no key file beside its data, no value in argv, code,
 configuration or a commit. A workflow names the keys it needs in its checkpoint (`credentials`),
 never their values.
 

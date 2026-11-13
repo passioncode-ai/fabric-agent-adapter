@@ -499,3 +499,36 @@ class DescriptorHygiene(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EnvRuleCorpus(unittest.TestCase):
+    """FAA-273 item 9: the three copies of the env rule (Python and Node supervisors, adapt_project) read one corpus
+    alike (test/fixtures/kit-env-rule-cases.json); the Node twin's half is in fabric-service-supervisors.test.mjs."""
+
+    def test_the_three_copies_agree(self):
+        import importlib.util
+        import json
+        cases = json.loads((Path(__file__).resolve().parent / "fixtures" / "kit-env-rule-cases.json").read_text(encoding="utf-8"))
+        sup = load("fabric_supervisors")
+        path = Path(__file__).resolve().parent.parent / "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/adapt_project.py"
+        spec = importlib.util.spec_from_file_location("adapt_project_for_env_rule", path)
+        adapt = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adapt)
+        node = subprocess.run(
+            ["node", "--input-type=module", "-e",
+             "import { secretEnvValue } from %s; import fs from 'node:fs';"
+             "const c = JSON.parse(fs.readFileSync(0, 'utf8')).cases;"
+             "process.stdout.write(JSON.stringify(c.map((x) => secretEnvValue(x.value))));"
+             % json.dumps((Path(__file__).resolve().parent.parent / "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-supervisors.mjs").as_uri())],
+            input=json.dumps(cases), capture_output=True, text=True, timeout=60) if shutil.which("node") else None
+        verdicts = json.loads(node.stdout) if node is not None and node.returncode == 0 else None
+        if node is not None:
+            self.assertEqual(node.returncode, 0, node.stderr)
+        for i, case in enumerate(cases["cases"]):
+            with self.subTest(value=case["note"]):
+                ours = sup._secret_env_value(case["value"])
+                self.assertEqual(adapt._secret_env_value(case["value"]), ours)
+                if verdicts is not None:
+                    self.assertEqual(verdicts[i], ours)
+                if case["secret"] is not None:
+                    self.assertEqual(ours, case["secret"])

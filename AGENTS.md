@@ -7,6 +7,16 @@
    every major feature and release across PassionCode.ai as `RM-*` tracks with owner, phase and
    state. It is the entry point: a task here that serves a track names it, and the track's status
    is edited only in the roadmap.
+1a. **The course check, before every change** ([rules §0](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/rules.md#0-the-course-check-the-plan-and-the-north-star-before-every-change)):
+   the [North Star](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/north-star.md) metric and
+   gaps, and the [one plan in waves](https://github.com/passioncode-ai/fabric-workspace/blob/main/docs/plans/2026-11-11-unified/README.md).
+   Name the track, plan row or gap the change serves; work that serves none goes to the board first.
+1b. **The North Star sections this repository serves**: §5 (agents and their templates: a new agent starts from the
+   adapter's template with the contract built in; G21, closed in 0.81.0), §6 (exchanging work: the board kit and
+   working-with-fabric), §10 (deployment and continuity: the kit's supervisors and lifecycle), §11 (security and
+   isolation: the loopback peer owner, DEC-0154 and DEC-0155, and the tailnet identity at every door). When the
+   state changes against them, write fabric-workspace a board message naming the section and the evidence. The
+   architect's audit at each release: [docs/evidence/architect/](docs/evidence/architect/README.md).
 2. The PassionCode.ai knowledge base, `fabric-workspace/knowledge/` in your clone (org-index
    `scripts/clone_all.sh` makes it) or https://wiki.passioncode.ai/knowledge: at least its
    [README](https://github.com/passioncode-ai/fabric-workspace/blob/main/knowledge/README.md),

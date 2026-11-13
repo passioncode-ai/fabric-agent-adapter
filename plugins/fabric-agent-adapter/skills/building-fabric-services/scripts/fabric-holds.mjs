@@ -2,7 +2,9 @@
 // the contract's pause grammar (`quota-exhausted[ until <until>]: waiting <reason> since <since>[: <message>]`; the
 // pinned interop-job schema is closed, so `waiting {reason, since, until, message}` rides statusMessage, never a field
 // of the job), one push per hold, and the operator's scoped lift. The twin of fabric_holds.py, held to the same
-// vectors (test/fixtures/holds/waiting-vectors.json). Part of the Node service kit (layer L3, after fabric-interop).
+// vectors (test/fixtures/holds/waiting-vectors.json). A record written since 0.83.0 carries `squash: 'ecmascript'`; one
+// without it is matched under both squashes, as 0.81.0's Python twin squashed names with str.split() (FAA-320,
+// test/fixtures/holds/legacy-squash-vectors.json). Part of the Node service kit (layer L3, after fabric-interop).
 // Node 20+, no dependency.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -40,6 +42,17 @@ const reasonOk = (reason, what) => {
 // (FAA-316): Python's str.split() also takes U+001C to U+001F and U+0085 and not U+FEFF.
 const SPACES = /[\t\n\v\f\r \u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]+/g;
 const squash = (text) => String(text).replace(SPACES, ' ').replace(/^ | $/g, '');
+/** What a record written since 0.83.0 carries: its names were squashed with ECMAScript's whitespace (FAA-320). */
+export const SQUASH = 'ecmascript';
+// Python's str.isspace() class, the one 0.81.0's Python twin squashed a name with (`" ".join(text.split())`).
+const PY_SPACES = /[\t\n\v\f\r\u001c-\u001f \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/g;
+const legacySquash = (text) => String(text).replace(PY_SPACES, ' ').replace(/^ | $/g, '');
+// The stored forms `caller` matches in `record`: the ECMAScript squash, and for a record with no `squash` mark (written
+// before 0.83.0) also the squash 0.81.0's Python twin wrote (FAA-320). null matches only null.
+const names = (caller, record) => {
+  if (typeof caller !== 'string') return [caller];
+  return record.squash === SQUASH ? [squash(caller)] : [squash(caller), legacySquash(caller)];
+};
 
 /** A held job's statusMessage; the message is shortened, never refused, to fit 500 characters. */
 export function waitingMessage(reason, since, until = null, message = null) {
@@ -149,6 +162,7 @@ export class HoldBook {
 
   /** Hold `work` for `caller` by `reason`: {hold, statusMessage, push}; push only when this call opened the hold. */
   hold({ caller, work, reason, until = null, message = null, jobId = null, now = null }) {
+    const rawCaller = caller;
     caller = text(caller, 'caller');
     work = text(work, 'work');
     reasonOk(reason, 'hold');
@@ -158,10 +172,10 @@ export class HoldBook {
     }
     const data = this.load();
     HoldBook.expire(data, utcTime(at));
-    let hold = data.holds.find((h) => h.closed === null && h.reason === reason && h.caller === caller);
+    let hold = data.holds.find((h) => h.closed === null && h.reason === reason && names(rawCaller, h).includes(h.caller));
     const opened = hold === undefined;
     if (opened) {
-      hold = { id: newId(), reason, caller, work, since: at, until, jobs: [], closed: null };
+      hold = { id: newId(), reason, caller, work, since: at, until, jobs: [], closed: null, squash: SQUASH };
       data.holds.push(hold);
     }
     if (jobId !== null && !hold.jobs.includes(String(jobId))) hold.jobs.push(String(jobId));
@@ -176,7 +190,7 @@ export class HoldBook {
   release({ reason, caller, now = null }) {
     const at = this.now(now);
     const data = this.load();
-    const hold = data.holds.find((h) => h.closed === null && h.reason === reason && h.caller === caller);
+    const hold = data.holds.find((h) => h.closed === null && h.reason === reason && names(caller, h).includes(h.caller));
     if (!hold) return null;
     hold.closed = 'released';
     hold.closedAt = at;
@@ -211,12 +225,12 @@ export class HoldBook {
       throw new ServiceError('A raised limit needs its window\'s end (until): it falls back when the window ends.');
     }
     const record = { id: newId(), reason, caller: caller === null ? null : text(caller, 'caller'),
-      job: jobId === null ? null : String(jobId), from: at, until, [kind]: size, decision: { ...decision }, at };
+      job: jobId === null ? null : String(jobId), from: at, until, [kind]: size, decision: { ...decision }, at, squash: SQUASH };
     if (kind !== 'limit') record.left = size;
     const data = this.load();
     HoldBook.expire(data, utcTime(at));
     for (const hold of data.holds) {
-      if (hold.closed === null && hold.reason === reason && (record.caller === null || record.caller === hold.caller)
+      if (hold.closed === null && hold.reason === reason && (caller === null || names(caller, hold).includes(hold.caller))
         && (jobId === null || hold.jobs.includes(String(jobId)))) {
         hold.closed = 'lifted';
         hold.closedAt = at;
@@ -234,7 +248,7 @@ export class HoldBook {
 
   static matching(data, reason, caller, jobId, at, kind) {
     return data.lifts.filter((l) => l.reason === reason && kind in l && HoldBook.live(l, at)
-      && (l.caller === null || l.caller === caller) && (l.job === null || l.job === jobId));
+      && (l.caller === null || names(caller, l).includes(l.caller)) && (l.job === null || l.job === jobId));
   }
 
   /** Whether a lift lets work past the limit: {admitted: true, lift, left} spends one job or `costUsd`, else {admitted: false}. */

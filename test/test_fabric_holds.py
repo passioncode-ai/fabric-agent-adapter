@@ -186,3 +186,50 @@ class ScopedLift(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+LEGACY = json.loads((Path(__file__).resolve().parent / "fixtures/holds/legacy-squash-vectors.json").read_text(encoding="utf-8"))
+
+
+class LegacySquash(unittest.TestCase):
+    """FAA-320: a book 0.81.0's Python twin wrote is read under both squashes; a new record under the ECMAScript one."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def fresh(self):
+        path = Path(self.tmp.name) / "holds.json"
+        path.write_text(json.dumps(LEGACY["book"]), encoding="utf-8")
+        return holds.HoldBook(path)
+
+    def test_the_vectors(self):
+        for case in LEGACY["cases"]:
+            with self.subTest(case=case):
+                book, args = self.fresh(), dict(case["args"])
+                if case["call"] == "hold":
+                    out = book.hold(now=NOW, **args)
+                    self.assertEqual(out["hold"]["id"], case["joins"])
+                    self.assertIsNone(out["push"])
+                elif case["call"] == "release":
+                    out = book.release(now=NOW, **args)
+                    self.assertEqual(None if out is None else out["id"], case["closes"])
+                elif case["call"] == "admit":
+                    out = book.admit(now=NOW, **args)
+                    self.assertEqual(out.get("lift"), case["lift"])
+                else:
+                    book.lift(now=NOW, decision=decision(), **args)
+                    lifted = [h["id"] for h in json.loads(book.path.read_text())["holds"] if h.get("closed") == "lifted"]
+                    self.assertEqual(lifted, case["lifts"])
+
+    def test_a_new_record_carries_its_squash(self):
+        book = self.fresh()
+        out = book.hold(caller="third\u001ccaller", work="render", reason="money", now=NOW)
+        self.assertEqual(out["hold"]["squash"], "ecmascript")
+        self.assertEqual(out["hold"]["caller"], "third\u001ccaller")
+        self.assertIsNotNone(book.hold(caller="third caller", work="render", reason="money", now=NOW)["push"])
+
+    def test_the_legacy_class_is_pythons_whitespace(self):
+        spaces = [chr(c) for c in range(0x110000) if chr(c).isspace()]
+        self.assertTrue(all(holds._PY_SPACES.fullmatch(c) for c in spaces))
+        self.assertEqual(sum(1 for c in range(0x3001) if holds._PY_SPACES.fullmatch(chr(c))), len(spaces))

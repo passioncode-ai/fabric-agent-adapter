@@ -8,7 +8,8 @@
 //     `x-forwarded-proto` must say https or the request is refused.
 //
 //   node sample-remote-service.mjs --origin https://agent.example.com --port 8443 \
-//     --token-file token --session-key-file session.key [--tls-cert c.pem --tls-key k.pem]
+//     --token-file service.token --session-key-file session.key [--tls-cert c.pem --tls-key k.pem]
+// (service.token, as the Python sample names it: the source check reads a *.token file as a credential, FAA-190.)
 //
 // Secrets come from files (or from the platform as FABRIC_SERVICE_TOKEN / FABRIC_SESSION_KEY),
 // never from an argument vector.

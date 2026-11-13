@@ -2,7 +2,8 @@
 contract's schema reads it (`a2a_surface_findings`, `a2a_view`; `a2a_surface` builds one), and what a public card must
 not carry (`agent_card_findings`): no member about the running process, no secret, no `securitySchemes` entry naming
 the descriptor's token header, every Fabric extension `required: false` (or absent, which A2A reads as false), and interface URLs where the placement puts
-them. Serving a card, the A2A binding and a client are not here (FAA-10). Part of the service kit (layer L3).
+them. Serving a card, the A2A binding and a client are in fabric_a2a_server.py (FAA-10). Part of the service kit
+(layer L3).
 Standard library only."""
 from __future__ import annotations
 

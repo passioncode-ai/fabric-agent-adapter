@@ -2,7 +2,7 @@
 // schema reads it (a2aSurfaceFindings, a2aView; a2aSurface builds one), and what a public card must not carry
 // (agentCardFindings): no member about the running process, no secret, no securitySchemes entry naming the descriptor's
 // token header, every Fabric extension required: false (or absent, which A2A reads as false), and interface URLs where the placement puts them. Serving a
-// card, the A2A binding and a client are not here (FAA-10).
+// card, the A2A binding and a client are in fabric-a2a-server.mjs (FAA-10).
 // Part of the Node service kit (layer L3); the twin of fabric_a2a.py. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';
 import { isObject } from './fabric-jsvalue.mjs';

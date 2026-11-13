@@ -31,7 +31,7 @@ CREDENTIAL_PAIRS: Dict[str, tuple] = {
 }
 #: ECMAScript's \s, as a character class body.
 JS_SPACE = "\t\n\x0b\x0c\r \xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
-_NOT_LINE_END = "[^\n\r\u2028\u2029]"  # ECMAScript's `.` without the s flag
+NOT_LINE_END = "[^\n\r\u2028\u2029]"  # ECMAScript's `.` without the s flag
 JWT_SHAPE = re.compile(r"eyJ[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]{2,}\.[A-Za-z0-9_-]*")
 _URL_BASE64_RUN = re.compile(r"[A-Za-z0-9_-]*")
 
@@ -74,14 +74,17 @@ _PROVIDER_KEYS = (r"(?:sk-(?=[A-Za-z0-9_-]{0,255}?[0-9])(?:(?=[A-Za-z0-9_-]{0,25
 #: The contract's SECRET_VALUE at the pin (DEC-0151): `Bearer ` at a value's start in any case, or a provider key after a
 #: boundary. No case-insensitive flag; digits are ASCII. A match includes its boundary character: callers test, never
 #: read the matched text or its index.
-SECRET_VALUE = re.compile("(^[Bb][Ee][Aa][Rr][Ee][Rr][" + JS_SPACE + "]" + _NOT_LINE_END + "+|" + _KEY_BOUNDARY + _PROVIDER_KEYS + ")")
+SECRET_VALUE = re.compile("(^[Bb][Ee][Aa][Rr][Ee][Rr][" + JS_SPACE + "]" + NOT_LINE_END + "+|" + _KEY_BOUNDARY + _PROVIDER_KEYS + ")")
 _LONG_RUN = re.compile(r"[A-Za-z0-9+/=_-]{40,}")
-_BEARER_INSIDE = re.compile(r"(?<![A-Za-z0-9_])bearer[%s]+(?=[A-Za-z0-9._~+/-]*[0-9])[A-Za-z0-9._~+/-]{12,}=*" % JS_SPACE,
+BEARER_INSIDE = re.compile(r"(?<![A-Za-z0-9_])bearer[%s]+(?=[A-Za-z0-9._~+/-]*[0-9])[A-Za-z0-9._~+/-]{12,}=*" % JS_SPACE,
                             re.IGNORECASE | re.ASCII)
 _PATH_LIKE = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/]|[a-z][a-z0-9+.-]*://)", re.IGNORECASE | re.ASCII)
 _WORD_SPLIT = re.compile("[%s._-]+" % JS_SPACE)
 _ARGUMENT_SPLIT = re.compile("[%s=]" % JS_SPACE)
-_SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+#: The names the check and older readers wrote before these became public (FAA-190 (2), (12)): kept so a module from
+#: an earlier version beside this one still loads.
+_BEARER_INSIDE, _SCHEME, _NOT_LINE_END = BEARER_INSIDE, SCHEME, NOT_LINE_END
 #: WHATWG's special schemes that carry an authority with user information (file has none).
 _SPECIAL = ("ftp", "http", "https", "ws", "wss")
 
@@ -108,13 +111,17 @@ def credential_name(name: str) -> bool:
     return any(word in words and any(p in words for p in partners) for word, partners in CREDENTIAL_PAIRS.items())
 
 
-def _long_secret(value: str) -> bool:
+def long_secret(value: str) -> bool:
+    """A run of 40 or more base64 characters mixing upper case, lower case and digits (the Node twin's longSecret)."""
     return any(re.search(r"[a-z]", run) and re.search(r"[A-Z]", run) and re.search(r"[0-9]", run) for run in _LONG_RUN.findall(value))
+
+
+_long_secret = long_secret  # its name before FAA-190 (2)
 
 
 def secret_value(value: str) -> bool:
     """A JWT anywhere, a provider key or `Bearer …`, or a long base64 run mixing upper case, lower case and digits."""
-    return bool(has_jwt(value) or SECRET_VALUE.search(value) or _long_secret(value))
+    return bool(has_jwt(value) or SECRET_VALUE.search(value) or long_secret(value))
 
 
 def _path_like(piece: str) -> bool:
@@ -126,13 +133,13 @@ def _path_like(piece: str) -> bool:
 def secret_argument(value: str) -> bool:
     """The same for a launch argument or a server's command and URL: a long run is looked for between path separators,
     so a folder path holding a session id is not taken for a key."""
-    if has_jwt(value) or SECRET_VALUE.search(value) or _BEARER_INSIDE.search(value):
+    if has_jwt(value) or SECRET_VALUE.search(value) or BEARER_INSIDE.search(value):
         return True
     for piece in _ARGUMENT_SPLIT.split(value):
         if _path_like(piece):
-            if any(_long_secret(part) for part in re.split(r"[\\/]", piece)):
+            if any(long_secret(part) for part in re.split(r"[\\/]", piece)):
                 return True
-        elif _long_secret(piece):
+        elif long_secret(piece):
             return True
     return False
 
@@ -421,7 +428,7 @@ def _url_credential(value: str, hosts: bool) -> bool:
     # What WHATWG URL parsing does first: trim C0 controls and space from the ends (never other Unicode spaces, which it
     # refuses), then remove every tab, CR and LF.
     value = re.sub(r"[\t\n\r]", "", value.strip(_C0_OR_SPACE))
-    if not _SCHEME.match(value):
+    if not SCHEME.match(value):
         return False  # not an absolute URL (WHATWG URL parsing refuses it)
     if hosts and url_refused(value):
         return False  # `new URL` refuses its host or port, so the Node twin reads it as an argument only (FAA-309)
@@ -442,7 +449,25 @@ _REPOSITORY_AUTHORITY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
 #: boundary, so composed after a separator look-behind it would miss a key after `-`, `.` or `_`.
 _REPOSITORY_KEYS = r"sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}"
 _KEY_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))(?:%s)" % _REPOSITORY_KEYS)
-_JWT_AT_A_WORD = re.compile(r"(?:\A|(?<=[._-]))%s" % JWT_SHAPE.pattern)
+
+
+def jwt_at_a_word(text: str) -> bool:
+    """Whether JWT_SHAPE matches at a word's start: the text's start, or after a `.`, `_` or `-` (FAA-321). Read in one
+    pass, as jwt_spans: the look-behind expression backtracked from every such `eyJ` of a long run, quadratic in it.
+    Every `eyJ` of one run shares that run's end and a shorter first segment, so only a run's first `eyJ` at a word's
+    start is tried; an `eyJ` that is not at one is passed over, since a later one of its run may be."""
+    at = text.find("eyJ")
+    while at >= 0:
+        if at and text[at - 1] not in "._-":
+            at = text.find("eyJ", at + 1)
+            continue
+        one = _URL_BASE64_RUN.match(text, at + 3).end()
+        if one - at - 3 >= 2 and text[one:one + 1] == ".":
+            two = _URL_BASE64_RUN.match(text, one + 1).end()
+            if two - one - 1 >= 2 and text[two:two + 1] == ".":
+                return True
+        at = text.find("eyJ", one)
+    return False
 
 
 def repository_name(piece: str) -> bool:
@@ -450,7 +475,7 @@ def repository_name(piece: str) -> bool:
     key's or JWT's shape (`sk-`, `ghp_`, `xoxb-`, `AKIA`, `eyJ`) at its start or after a `.`, `_` or `-` (0.62.0
     readings 9 and 10), so a letters-only key is still a key while `task-pipeline-dashboard`, which holds an `sk-` shape
     inside a word, is a name."""
-    return bool(_REPOSITORY_NAME.match(piece)) and not _KEY_AT_A_WORD.search(piece) and not _JWT_AT_A_WORD.search(piece)
+    return bool(_REPOSITORY_NAME.match(piece)) and not _KEY_AT_A_WORD.search(piece) and not jwt_at_a_word(piece)
 
 
 def ascii_decoded(text: str) -> str:

@@ -164,8 +164,11 @@ class PackTests(unittest.TestCase):
         (self.root / ".env.example").unlink()
         for litter in (".git", "__pycache__"):
             (self.root / "bin" / litter).mkdir()
-            with self.assertRaisesRegex(fp.PackageError, "bin/%s" % litter):
+            with self.assertRaisesRegex(fp.PackageError, "bin/%s" % litter) as caught:
                 fp.pack(self.root)
+            # FAA-190 (26): a refusal never offers removing `.git` in place, which would carry an ignored instance
+            self.assertIn("pack a clean copy", str(caught.exception))
+            self.assertNotIn("remove these", str(caught.exception))
             (self.root / "bin" / litter).rmdir()
         os.symlink("/etc/hosts", self.root / "hosts")
         with self.assertRaisesRegex(fp.PackageError, "symlink"):
@@ -457,6 +460,50 @@ class PackTests(unittest.TestCase):
                 self.assertIn("\u0431\u044b\u0441\u0442\u0440\u043e", json.dumps(answer["package"], ensure_ascii=False))
             else:
                 self.assertIn("not a folder", answer["error"])
+
+
+class ManifestReadsAsTheTwinDoes(unittest.TestCase):
+    """FAA-194 (26), (27), (29), (36): the folder check reads a plugin or provider manifest as the Node twin and the
+    contract's checkPackageFolder do (test/fabric-package.test.mjs runs the same table): `{}` is a plugin manifest, an
+    invalid byte inside a string is replaced, a long integer literal is a number, and both kits share one nesting limit."""
+
+    @staticmethod
+    def cases():
+        deep = lambda n: "[" * n + "]" * n  # noqa: E731
+        plugin_ok = '{"name": "example", "version": "1.0.0", "x": %s}'
+        return [
+            # (name, package id and version or None, plugin.json bytes or None, provider bytes or None, problems)
+            ("an empty plugin manifest, no id or version", None, b"{}", None, []),
+            ("an invalid byte inside a description", ("example", "1.0.0"),
+             b'{"name": "example", "version": "1.0.0", "description": "a\xffb"}', None, []),
+            ("an invalid byte in the name", ("example", "1.0.0"), b'{"name": "ex\xffample", "version": "1.0.0"}', None,
+             ["plugin-manifest"]),
+            ("nested within the shared limit", ("example", "1.0.0"), (plugin_ok % deep(fp.MAX_NESTING - 1)).encode(), None, []),
+            ("nested past the shared limit", ("example", "1.0.0"), (plugin_ok % deep(fp.MAX_NESTING + 5)).encode(), None,
+             ["plugin-manifest"]),
+            ("nested a thousand deep", ("example", "1.0.0"), (plugin_ok % deep(1000)).encode(), None, ["plugin-manifest"]),
+            ("a 5000-digit integer in the provider manifest", None, None, ('{"n": %s}' % ("7" * 5000)).encode(), []),
+            ("NaN in the provider manifest", None, None, b'{"n": NaN}', ["provider-manifest"]),
+            ("a provider manifest past the shared limit", None, None, ('{"n": %s}' % deep(fp.MAX_NESTING + 5)).encode(),
+             ["provider-manifest"]),
+        ]
+
+    def test_the_table(self):
+        for name, ident, plugin, provider, want in self.cases():
+            with self.subTest(name):
+                files, listed = {}, []
+                if plugin is not None:
+                    files[fp.PLUGIN_MANIFEST] = plugin
+                if provider is not None:
+                    files["fabric-agent.json"] = provider
+                for path, data in files.items():
+                    listed.append({"path": path, "sha256": fp.sha256_of(data)})
+                pkg = {"files": listed}
+                if ident:
+                    pkg["id"], pkg["version"] = ident
+                if provider is not None:
+                    pkg["provider"] = "fabric-agent.json"
+                self.assertEqual([p["problem"] for p in fp.check_package_folder(pkg, files)], want)
 
 
 if __name__ == "__main__":

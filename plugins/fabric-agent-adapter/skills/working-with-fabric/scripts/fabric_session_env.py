@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.82.0"
+VERSION = "0.83.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -281,20 +281,24 @@ def read_small(path: Path, cap: int = READ_CAP) -> Optional[str]:
 
 
 def _windows_pid_alive(pid: int, kernel: Any = None, last_error: Any = None) -> Optional[bool]:
-    """pid_alive on Windows, where os.kill(pid, 0) would send CTRL_C_EVENT: OpenProcess with query access only. Refused
-    with ERROR_ACCESS_DENIED (5), another account's or an elevated process: None, as Node's process.kill(pid, 0)
-    answers EPERM there (FAA-304); refused otherwise, no process. `kernel` and `last_error` stand in for kernel32 and
+    """pid_alive on Windows, where os.kill(pid, 0) would send CTRL_C_EVENT: the check Node's process.kill(pid, 0) makes
+    (libuv's uv_kill), asking OpenProcess for the same access (terminate, query, synchronize; never the limited query an
+    elevated process of the same user grants, FAA-323). Refused with ERROR_ACCESS_DENIED (5), another account's or an
+    elevated process: None, as Node answers EPERM there (FAA-304); refused otherwise, no process; opened, running
+    while its exit code is STILL_ACTIVE and a zero wait times out. `kernel` and `last_error` stand in for kernel32 and
     ctypes.get_last_error in a test."""
     import ctypes
     if kernel is None:
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
         last_error = ctypes.get_last_error  # type: ignore[attr-defined]
-    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    handle = kernel.OpenProcess(0x0001 | 0x0400 | 0x00100000, False, pid)  # TERMINATE | QUERY_INFORMATION | SYNCHRONIZE
     if not handle:
         return None if last_error() == 5 else False  # ERROR_ACCESS_DENIED: not verified, never called running
     try:
         code = ctypes.c_ulong()
-        return bool(kernel.GetExitCodeProcess(handle, ctypes.byref(code))) and code.value == 259  # STILL_ACTIVE
+        if not kernel.GetExitCodeProcess(handle, ctypes.byref(code)) or code.value != 259:  # STILL_ACTIVE
+            return False
+        return kernel.WaitForSingleObject(handle, 0) != 0  # WAIT_OBJECT_0: ended, with exit code 259
     finally:
         kernel.CloseHandle(handle)
 
@@ -498,9 +502,71 @@ def kimi_registered(env: Optional[Dict[str, str]] = None) -> bool:
     return kimi_registration(env) is not None
 
 
+def _json_file(path: Path) -> Any:
+    """A small strict-JSON file's value, or None (absent, too large, not JSON: a JSONC comment included)."""
+    text = read_small(path, CONFIG_CAP)
+    try:
+        return json.loads(text) if text else None
+    except (ValueError, RecursionError):
+        return None
+
+
+def _member(value: Any, *names: str) -> Any:
+    for name in names:
+        value = value.get(name) if isinstance(value, dict) else None
+    return value
+
+
+def opencode_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
+    """OpenCode's `mcp.fabric` (FAA-233): the `command` array's first word of a local entry and the file that names it,
+    or None. The nearest `opencode.json` from cwd up to its checkout's root wins, then `$OPENCODE_CONFIG`, then
+    `$XDG_CONFIG_HOME/opencode/opencode.json` (default `~/.config`), as OpenCode merges them; an entry that turns it
+    off (`enabled: false`), a remote one, or a file that is not strict JSON (`.jsonc`) names none."""
+    env = os.environ if env is None else env
+    root = checkout_root(cwd, env)
+    folders = _ancestors(cwd)
+    files = [f / "opencode.json" for f in (folders[:folders.index(root) + 1] if root in folders else folders[:1])]
+    if env.get("OPENCODE_CONFIG"):
+        files.append(Path(env["OPENCODE_CONFIG"]))
+    files.append(Path(env.get("XDG_CONFIG_HOME") or str(_home(env) / ".config")) / "opencode" / "opencode.json")
+    for path in files:
+        entry = _member(_json_file(path), "mcp", "fabric")
+        if not isinstance(entry, dict):
+            continue
+        command = entry.get("command")
+        if entry.get("enabled") is False or entry.get("type") == "remote":
+            return None
+        if isinstance(command, list) and command and isinstance(command[0], str) and command[0]:
+            return {"command": command[0], "file": str(path)}
+    return None
+
+
+def pi_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
+    """Pi's `mcpServers.fabric` (FAA-233): its `command` and the file that names it, or None. The project's
+    `.pi/mcp.json` (Pi reads it in a project the person trusted) replaces the agent directory's
+    (`$PI_CODING_AGENT_DIR`, default `~/.pi/agent`) `mcp.json`; a project entry without `command` overrides only
+    `enabled`, so `enabled: false` there names none; a server with a `url` is remote and names none."""
+    env = os.environ if env is None else env
+    agent = Path(env.get("PI_CODING_AGENT_DIR") or str(_home(env) / ".pi" / "agent"))
+    found: Optional[Dict[str, Any]] = None
+    for path in (agent / "mcp.json", cwd / ".pi" / "mcp.json"):  # global first, then the project's replaces it
+        entry = _member(_json_file(path), "mcpServers", "fabric")
+        if not isinstance(entry, dict):
+            continue
+        if "command" in entry or "url" in entry or "type" in entry:
+            command = entry.get("command")
+            found = {"command": command, "file": str(path)} if isinstance(command, str) and command and "url" not in entry else None
+            if found is not None and entry.get("enabled") is False:
+                found = None
+        elif found is not None and entry.get("enabled") is False:
+            found = None
+    return found
+
+
 def registered_command(host: str, cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[str]:
     """The command the host runs as `fabric` (FAA-232, FAA-233): Claude Code's entry for this folder, Codex's
-    config.toml, Kimi Code's mcp.json; None when the host registers none, or registers it in a file read elsewhere."""
+    config.toml, Kimi Code's mcp.json, OpenCode's opencode.json, Pi's mcp.json; None when the host registers none, or
+    registers it in a file read elsewhere (Hermes' YAML, OpenClaw's)."""
     if host == "claude":
         entry = claude_registration(cwd, env)
         return entry["command"] if entry else None
@@ -508,6 +574,9 @@ def registered_command(host: str, cwd: Path, env: Optional[Dict[str, str]] = Non
         return codex_command(env)
     if host == "kimi":
         entry = kimi_registration(env)
+        return entry["command"] if entry else None
+    if host in ("opencode", "pi"):
+        entry = (opencode_registration if host == "opencode" else pi_registration)(cwd, env)
         return entry["command"] if entry else None
     return None
 
@@ -561,7 +630,9 @@ def checkout_root(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[P
 
 
 def _repository_key(url: str) -> str:
-    """One spelling of a remote: scheme, user, `.git` and case dropped; `git@host:a/b` is `host/a/b`."""
+    """One spelling of a remote: scheme, user, `.git` and case dropped; `git@host:a/b` is `host/a/b`. The kit's rule
+    (dashboard_kit and check_service_rules `same_repository`), copied because a session script imports no kit module;
+    test_fabric_session.RepositoryRule holds the three equal (FAA-200 (13))."""
     url = url.strip().lower()
     url = re.sub(r"^git@([^:]+):", r"\1/", url)
     url = re.sub(r"^[a-z+]+://", "", url)

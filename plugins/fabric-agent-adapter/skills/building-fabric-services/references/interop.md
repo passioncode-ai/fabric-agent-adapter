@@ -44,10 +44,12 @@ response = server.handle(json_rpc_message)          # POST /mcp body in, JSON re
 ```
 
 - A handler returns the value for `structuredContent`; for a job it returns
-  `ctx.start_job()`, and `on_job_started(job_id, ctx)` does or schedules the work.
+  `ctx.start_job()`, and `on_job_started(job_id, ctx)` does or schedules the work. An `InteropError` it raises (a
+  refused `approval_step`) fails the job just created with `tool-error` and answers the call as one (FAA-196 (28)).
 - `jobs.request_input(job_id, {"title_choice": fi.choice_request(...)}, "Two titles are ready.")`
   stops for a person. Fabric answers through `fabric.job.get` with `inputResponses`; the
-  server calls `on_input(job_id, answers, ctx)` with the answers that matched.
+  server calls `on_input(job_id, answers, ctx)` with the answers that matched; an `InteropError` it raises is answered
+  as a `tool-error`, as a handler's is (FAA-196 (27)). `steps=` is a JSON object or none (FAA-196 (26)).
 - `jobs.complete(job_id, fi.result_envelope(outcome=..., producer=..., ...))`,
   `jobs.fail(job_id, code, message, data=None)`, `jobs.cancel(job_id)`; a limit or an unseen effect has its own calls
   ([Limits and uncertain effects](#limits-and-uncertain-effects)). A terminal job never changes
@@ -335,6 +337,16 @@ server.add_tool(approve_tool, approve_reply, action=reply_action, target="reply_
   `authorize` accepted a delegation token, the token's caller must be the agent before it in the chain
   (`mandate-not-for-this-call` otherwise). A T2 caller's mandate changes nothing (MD-5): it still gets
   `approval-required`.
+- **A per-agent credential (FAA-135).** A service that authenticates its callers with its own per-agent credentials
+  (`surfaces.mcp.auth: own`) names the caller's agent id with `McpToolServer(identify_agent=)`, a function of
+  `(headers, tier)` read when no delegation token named a caller: that agent must then be the one before `agent_id` in
+  the chain, at the call, at a job's approval step and at an answer. `None` binds nothing, as before; an id the
+  registry refuses, an answer that is not a string, or a hook that raises binds `UNREADABLE_AGENT`, which no chain
+  holds, so every mandate is refused `mandate-not-for-this-call` (fail closed). `identify` (the identity recorded) and
+  `identify_agent` (the agent id a chain is bound with) are separate hooks: an identity is not always an agent id.
+  `identified_agent(value)` / `identifiedAgent(value)` reads a hook's answer that way; Node has no server class, so a
+  Node service passes `callerAgent: identifiedAgent(<its hook's answer>)` (or `UNREADABLE_AGENT` when its hook throws)
+  to `actionGate` and `jobStep` itself. Never a name the call carries.
 - A covered call is the operator's act: `ctx.record` is `{by: "operator", via: "mandate", task, chain, caller}` and
   `ctx.mandate` the mandate it took (its `instruction` stays in the audit record, never in events or a page). Outside
   it the answer is `operator-decision-required` with `data.detail` `outside-mandate: <action|capability|effect|spend|project>`

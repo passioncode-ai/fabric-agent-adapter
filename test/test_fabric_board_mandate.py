@@ -68,6 +68,103 @@ class BoardMandateTests(Conversation):
         self.assertFalse(outside["ok"])
         self.assertEqual(outside["data"]["detail"], "outside-mandate: capability")
 
+    def test_identify_agent_binds_the_senders_agent_id(self):
+        """FAA-135: identify_agent(sender) names the agent id of the request's sender the service authenticated (the
+        board's trusted principal); the mandate's chain must hold it before this agent. None binds nothing, as before;
+        an id the registry refuses, or a hook that raises, binds an id no chain holds (fail closed)."""
+        heard = []
+
+        def boom(sender):
+            raise RuntimeError("the agent registry is down")
+        cases = [(lambda sender: heard.append(sender) or "lead-agent", "ok"), (lambda sender: None, "ok"),
+                 (lambda sender: "other-agent", "mandate-not-for-this-call"),
+                 (lambda sender: "Lead Agent", "mandate-not-for-this-call"), (boom, "mandate-not-for-this-call")]
+        for hook, want in cases:
+            with self.subTest(want=want, hook=hook):
+                self.seen.clear()
+                self.tearDown()
+                self.setUp()
+                got, covered, _ = self.run_one(body(json.dumps(mandate())), identify_agent=hook)
+                self.assertIsNotNone(got)
+                self.assertEqual("ok" if covered.get("ok") else covered["data"]["detail"], want)
+        self.assertEqual(heard[0]["project"], OTHER_PROJECT)
+        self.assertEqual((heard[0]["principal"]["kind"], heard[0]["principal"]["provenance"]), ("agent", "trusted"))
+
+    def test_identify_agent_is_asked_only_when_a_mandate_travelled(self):
+        heard = []
+        got, covered, _ = self.run_one(body('{"frames": 24}'), identify_agent=lambda sender: heard.append(sender) or "lead-agent")
+        self.assertIsNone(got)
+        self.assertEqual(heard, [])
+
+    def test_identify_agent_must_be_callable(self):
+        with self.assertRaises(fb.BoardError):
+            self.responder(agent_id="example-agent", mandate_from={OTHER_PROJECT}, identify_agent="lead-agent")
+
+    def _resumed(self, tamper=None, read_back=None):
+        """FAA-196 (1): a first responder accepts the request and dies inside the work; a second one takes the slot over,
+        the request is transferred and the handler runs again from a fresh com.get (the resume path)."""
+        import threading
+        inside, never = threading.Event(), threading.Event()
+        self.addCleanup(never.set)
+
+        def first(request, ctx):
+            inside.set()
+            never.wait(10)
+            raise fb.Stopped()
+        self.outcome = first
+        self.rid = self.board.queue("video.render", text=body(json.dumps(mandate())))
+        args = dict(agent_id="example-agent", mandate_from={OTHER_PROJECT}, wall=lambda: WALL)
+        self.responder(spawn=lambda fn: threading.Thread(target=fn, daemon=True).start(), **args).step()
+        self.assertTrue(inside.wait(5))
+        self.hub.control({"op": "end-sessions"})
+        if tamper:
+            tamper(self.board.requests[self.rid])
+        self.seen.clear()
+        self.events.clear()
+        self.outcome = self._record
+        second = self.responder(**args)
+        if read_back:
+            call = second._call
+
+            def tampered(tool, arguments):
+                answer = call(tool, arguments)
+                if tool == "com.get":
+                    read_back(answer)
+                return answer
+            second._call = tampered
+        second.step()
+        self.assertEqual(self.board.requests[self.rid]["state"], "completed")
+        self.assertEqual(len(self.seen), 1, "the handler ran again on the resume path")
+        return self.seen[0]
+
+    def _record(self, request, ctx):
+        self.seen.append((ctx.mandate, ctx.mandate_covers({"capability": "video.render", "effect": "draft"}), None))
+        return {"state": "completed", "summary": "Rendered."}
+
+    def test_a_resumed_request_reads_its_mandate_as_the_first_path_does(self):
+        got, covered, _ = self._resumed()
+        self.assertEqual(got, mandate())
+        self.assertTrue(covered["ok"])
+        self.assertEqual([e for e in self.events if e[0] == "board.request.mandate_unread"], [])
+
+    def test_a_resumed_request_read_back_under_another_digest_carries_no_mandate(self):
+        """FAA-196 (1): the first path accepts only the message it claimed (its digest, its Project and capability); a
+        resume reads the body again, so a body read back under another digest or address is worked without its mandate,
+        said by its code alone."""
+        def other_digest(request):
+            request["message_digest"] = "sha256:" + "0" * 64
+        got, covered, _ = self._resumed(other_digest)
+        self.assertIsNone(got)
+        self.assertIsNone(covered)
+        said = [e for e in self.events if e[0] == "board.request.mandate_unread"]
+        self.assertEqual([e[3]["data"]["value"]["reason"] for e in said], ["digest-mismatch"])
+        self.tearDown()
+        self.setUp()
+        got, covered, _ = self._resumed(read_back=lambda answer: answer.update(request=dict(answer["request"], capability="video.cut")))
+        self.assertIsNone(got)
+        said = [e for e in self.events if e[0] == "board.request.mandate_unread"]
+        self.assertEqual([e[3]["data"]["value"]["reason"] for e in said], ["not-addressed"])
+
     def test_the_personal_board_takes_any_trusted_sender(self):
         got, covered, _ = self.run_one(body(json.dumps(mandate())), mandate_from="personal-board")
         self.assertTrue(covered["ok"])
@@ -89,6 +186,9 @@ class BoardMandateTests(Conversation):
         m = json.dumps(mandate())
         cases = {"two": (body(m, m), "mandate-blocks"),
                  "unreadable": (body('{"kind": "mandate/1", "task": '), "mandate-unreadable"),
+                 # FAA-196 (13): the kind written with a JSON escape is the same kind, so its broken block is said too
+                 "escaped": (body('{"kind": "mandate\\/1", "task": '), "mandate-unreadable"),
+                 "unicode": (body('{"kind": "mandate\\u002F1", "task": '), "mandate-unreadable"),
                  "nan": (body(m[:-1] + ', "x": NaN}'), "mandate-unreadable")}
         for name, (text, code) in cases.items():
             with self.subTest(name):
@@ -224,10 +324,10 @@ class BoardMandateTests(Conversation):
             request = fb.BoardRequest({"body": {"text": text}, "request": {"id": "r"},
                                        "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
             best = float("inf")
-            for _ in range(5):
-                start = time.perf_counter()
+            for _ in range(5):  # CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+                start = time.process_time()
                 link.read_mandate(request, link.PERSONAL_BOARD, "example-agent")
-                best = min(best, time.perf_counter() - start)
+                best = min(best, time.process_time() - start)
             return best
 
         for shape in ("unclosed", "nested"):  # nested: every inner opener closed by the same fence (unit reading 4)
@@ -380,34 +480,39 @@ class BoardMandateTests(Conversation):
         shared = [3]
         for _ in range(22):  # 23 objects, 2**22 paths: json.loads never shares, so it is no estimate (seam reading 22)
             shared = [shared, shared]
-        started = time.monotonic()
+        started = time.process_time()  # CPU time throughout: a bound a load average cannot break (FAA-196 (23))
         free = mandate(scope={"capabilities": ["video.render"], "effects": ["draft"]})
         self.assertTrue(fm.mandate_covers({"mandate": free, "tier": "T1", "now": AT, "self": "example-agent",
                                            "call": {"capability": "video.render", "effect": "draft", "spendUsd": shared}})["ok"])
         self.assertFalse(fm._json_data(shared))
         got = at_depth(0, shared)
         self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
-        self.assertLess(time.monotonic() - started, 1.0, "no ceiling, no walk; under one, a shared structure refused at once")
+        self.assertLess(time.process_time() - started, 1.0, "no ceiling, no walk; under one, a shared structure refused at once")
         with mock.patch.object(fm, "js_to_number", side_effect=RecursionError):  # the guard, on every Python (seam reading 22)
             got = at_depth(0, [3])
         self.assertEqual((got["data"]["detail"], "estimateUsd" in got["data"]), ("outside-mandate: spend", False))
-        started = time.monotonic()
+        started = time.process_time()
         self.assertTrue(math.isnan(jsv.js_to_number("1" * 20000 + "x")))  # the decimal pattern costs its length
-        self.assertLess(time.monotonic() - started, 0.5, "seconds on a backtracking pattern, a millisecond on this one")
+        self.assertLess(time.process_time() - started, 0.5, "seconds on a backtracking pattern, a millisecond on this one")
         long = "7" * 16000  # one string repeated: Number() of the list read without building the join (seam reading 24)
-        started = time.monotonic()
+        cases = (([long] * 16000, "ok"), ([[["100"]]], "outside-mandate: spend"), ([[None]], "ok"), ([[1, 2]], "ok"))
+        # FAA-196 (31): the reads are timed on their own run, outside tracemalloc, which slows every allocation; the
+        # memory is measured on a second run
+        started = time.process_time()
         self.assertEqual(detail_of(link, m, {"capability": "video.render", "effect": "draft", "spendUsd": 3, "project": "site-a"}), "ok")
+        for spend, want in cases:
+            got = at_depth(0, spend)
+            self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want)
+        self.assertLess(time.process_time() - started, 0.5)
         tracemalloc = importlib.import_module("tracemalloc")
         tracemalloc.start()
         try:
-            for spend, want in (([long] * 16000, "ok"), ([[["100"]]], "outside-mandate: spend"), ([[None]], "ok"), ([[1, 2]], "ok")):
-                got = at_depth(0, spend)
-                self.assertEqual("ok" if got.get("ok") else got["data"]["detail"], want)
+            for spend, _ in cases:
+                at_depth(0, spend)
             peak = tracemalloc.get_traced_memory()[1]
         finally:
             tracemalloc.stop()
         self.assertLess(peak, 8 * 1024 * 1024, "the join is never built (it would be 256 MB)")
-        self.assertLess(time.monotonic() - started, 0.5)
         for spend in ([[100, 100]], [True], [[True]], [{}]):  # Number(list): two items NaN, one read as String() reads it
             self.assertTrue(math.isnan(fm._spend_number(spend)), spend)
         self.assertEqual((fm._spend_number([]), fm._spend_number([[None]]), fm._spend_number(["7"])), (0.0, 0.0, 7.0))
@@ -546,6 +651,26 @@ class BoardMandateTests(Conversation):
             with self.subTest(kw=kw):
                 with self.assertRaises(fb.BoardError):
                     self.responder(**kw)
+
+
+
+class InstanceLockReleaseTests(unittest.TestCase):
+    """FAA-196 (11): `InstanceLock.release()` called from a `finally` must not replace the caller's own outcome: a close
+    that raises forgets the descriptor number (a retry never closes a number reused since) and the name still goes."""
+
+    def test_a_close_that_raises_forgets_the_number_and_still_drops_the_name(self):
+        lock_module = importlib.import_module("fabric_lock")
+        lock = lock_module.InstanceLock(__import__("pathlib").Path("/nonexistent-example"))
+        lock._fd, lock._name = 987654, "example-name"
+        dropped = []
+        with mock.patch.object(lock_module.os, "close", side_effect=OSError(5, "Input/output error")), \
+                mock.patch.object(lock_module, "_drop_lock_name", side_effect=dropped.append):
+            lock.release()  # never raises: the caller's own outcome stands
+        self.assertEqual((lock._fd, lock._name, dropped), (None, None, ["example-name"]))
+        with mock.patch.object(lock_module, "_drop_lock_name", side_effect=OSError(2, "gone")):
+            lock._name = "example-name"
+            lock.release()
+        self.assertIsNone(lock._name)
 
 
 if __name__ == "__main__":

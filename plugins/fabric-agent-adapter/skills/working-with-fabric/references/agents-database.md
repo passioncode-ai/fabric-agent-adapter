@@ -48,6 +48,16 @@ repository-relative path at a commit, an eval report). A decision without a numb
 | building-fabric-services | at each release | contribute the release's measured wins as success cases and its new technical decisions |
 | working-with-fabric | the retro after work | a lesson with a measured effect is also a success case: contribute it beside the lesson it records |
 
+## A template and the communication prompt
+
+For an agent that talks with people on a channel, the database's template and creating-fabric-agents' communication
+agent prompt (`references/communication-agent-template.md`) are read together, never as two templates (the database's
+own rule). Where they disagree, the template wins, in every part and not only the first-release ones: it is the merged
+practice of the agents of its kind. A part the prompt carries and the template lacks (a first-release part, a check, a
+pipeline step) is built too, unless the template rules it out, and goes back to the database as feedback on that
+template (`agents-db.contribute`); the completion report names each such part. Without a template for the kind, the
+prompt is the recipe.
+
 ## Recording the template
 
 An agent built from a template declares it: `provenance.template` with its id and version, so a later template

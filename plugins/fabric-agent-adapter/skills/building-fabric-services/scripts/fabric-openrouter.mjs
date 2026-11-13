@@ -86,6 +86,26 @@ function checkAttribution(projectId, taskRunId) {
   }
 }
 
+// Why a base URL is not sent the same by both twins, read from the URL as sent (its ends trimmed), or null: a backslash
+// anywhere (new URL reads it as a slash), and after a `//` authority a path holding anything but URL path characters
+// and %XX escapes (Python refused a space or a character outside ASCII where new URL percent-encoded it, and new URL
+// removes a tab or a line break) or a dot segment, escaped or not (new URL collapses it). The Python twin's
+// base_url_problem is the same rule (FAA-187 (18), kit-openrouter-cases.json).
+export function baseUrlProblem(base) {
+  const text = String(base).replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '');
+  if (text.includes('\\')) return 'the base URL holds a backslash';
+  if (/[\t\n\r]/.test(text)) return 'the base URL holds a tab or a line break'; // new URL removes them and sends the rest
+  const rest = text.slice(text.indexOf(':') + 1);
+  if (text.indexOf(':') < 0 || !rest.startsWith('//')) return null; // no authority as written: checkUrl reads it
+  const after = rest.slice(2);
+  const path = after.includes('/') ? after.slice(after.indexOf('/')) : '';
+  if (!/^(?:\/(?:[A-Za-z0-9._~!$&'()*+,;=:@-]|%[0-9A-Fa-f]{2})*)*$/.test(path)) {
+    return 'the base URL\'s path holds a character outside URL path characters and %XX escapes';
+  }
+  if (path.split('/').slice(1).some((seg) => ['.', '..'].includes(seg.replace(/%2e/gi, '.')))) return 'the base URL\'s path holds a dot segment';
+  return null;
+}
+
 export class Client {
   constructor({ ceilingUsd, ledger, prices, keyEnv = 'OPENROUTER_API_KEY', window = 'day', baseUrl = BASE_URL,
     attribution = null, projectId, unmeasuredCallUsd = null, deadlineS = 120, retries = 1, env = process.env,
@@ -108,13 +128,14 @@ export class Client {
     if (/[?#]/.test(baseUrl)) {
       throw new OpenRouterError('the base URL holds no query or fragment', { kind: 'config' });
     }
+    const problem = baseUrlProblem(baseUrl);
+    if (problem) throw new OpenRouterError(`${problem} (both kits would not send it alike)`, { kind: 'config' });
     http.checkUrl(baseUrl);
     checkAttribution(projectId, undefined);
     Object.assign(this, { ceilingUsd, ledger, keyEnv, window, attribution, projectId, unmeasuredCallUsd, deadlineS, retries });
     this.prices = Object.fromEntries(Object.entries(prices ?? {}).map(([k, v]) => [k, { ...v }]));
-    // The base URL as checkUrl read it: `new URL` removes tabs and line breaks anywhere and trims C0 controls and
-    // spaces from its ends, so `.../v1/ ` and `.../v1\n/` are composed as `.../v1/chat/completions`, as `new URL`
-    // composed them in 0.55.0 (0.56.0 product r20, unit r22, seam r22; the Python twin refuses what urllib cannot send).
+    // The base URL as checkUrl read it: its ends trimmed of C0 controls and spaces, so `.../v1/ ` is composed as
+    // `.../v1/chat/completions` (0.56.0 product r20); a tab or line break inside is refused above since FAA-187 (18).
     this.baseUrl = baseUrl.replace(/[\t\n\r]/g, '').replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/\/+$/, '');
     this.env = env;
     this.transport = transport;

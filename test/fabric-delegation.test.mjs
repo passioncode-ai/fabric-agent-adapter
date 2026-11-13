@@ -118,9 +118,22 @@ test('JwksCache follows DL-15: ten minutes, an unknown kid re-read at most once 
   // 0.56.0 unit r13, seam r14: the forms Python's urlsplit reads as loopback (or 3.13+ counts as one) are refused here too.
   for (const bad of ['http://[::1%3A80]/j', 'http://[::1]%2Eevil.example/j', 'http://[::1]x/j', 'http://[::ffff:127.0.0.1]/j',
     'https://hub.example:99999/j', 'http://127.0.0.1:65536/j', 'https://:443/j', 'https://', 'https://[1.2.3.4]/j']) assert.throws(() => new d.JwksCache(bad));
+  // FAA-187 (14): a host new URL refuses for its structure is refused, as the Python twin now refuses it.
+  for (const bad of ['https://a127.0.0.1/j', 'https://09/j', 'https://\u00df127.0.0.1/j', 'https://a\u200cb.example/j']) assert.throws(() => new d.JwksCache(bad), bad);
+  // FAA-187 (15): one loopback rule with fabric-http, over the source list the Python suite reads too.
+  const shared = JSON.parse(fs.readFileSync(new URL('./fixtures/peer-owner/socket-proof-cases.json', import.meta.url), 'utf8'));
+  for (const [url, loopback] of shared.loopbackUrls) {
+    if (loopback) new d.JwksCache(url);
+    else assert.throws(() => new d.JwksCache(url), url);
+  }
   const file = path.join(tempDir('jwks-'), 'jwks.json');
   fs.writeFileSync(file, JSON.stringify(V.jwks));
   assert.deepEqual(await new d.JwksCache(file).get('estate-new'), V.jwks);
+  // FAA-194 (39): NaN and Infinity are no JSON; the Python twin refuses them as JSON.parse does.
+  for (const constant of ['NaN', 'Infinity', '-Infinity']) {
+    fs.writeFileSync(file, `${JSON.stringify(V.jwks).slice(0, -1)}, "x": ${constant}}`);
+    assert.equal(await new d.JwksCache(file).get('estate-new'), null, constant);
+  }
 });
 
 test('the gate refuses in the DL-19 shape and never echoes the token', async () => {

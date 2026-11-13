@@ -58,7 +58,8 @@ _DASHES = re.compile(r"[\u2012\u2014\u2015\u2e3a\u2e3b\ufe58]|--|(?<=[^\W\d_])[ 
 _CITATION = re.compile(r"\[KB:([A-Za-z0-9][A-Za-z0-9._-]{0,63})\]")
 _WORD = re.compile(r"\w+", re.UNICODE)
 _URL = re.compile(r"https?://\S+")
-_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")  # a message id
+_ENTRY_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")  # a knowledge id: exactly what _CITATION can name
 # What a reply may carry only when the entries it cites carry it (D6): a link, an address, a phone number, an amount,
 # a number. The customer's message never counts: an instruction hidden in it is exactly what this refuses.
 # A bare host is a link only when its last label is a top-level domain people write in prose: every two-letter
@@ -154,8 +155,10 @@ class Knowledge:
     def __init__(self, entries: List[Mapping[str, Any]]):
         self.entries: Dict[str, Dict[str, Any]] = {}
         for entry in entries:
-            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not _ID.fullmatch(entry["id"]):
-                raise RecipeError("every knowledge entry has an id of letters, digits, '.', '_', ':' or '-'")
+            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or not _ENTRY_ID.fullmatch(entry["id"]):
+                # the citation's own grammar (FAA-264): an id with a colon or over 64 characters could never be cited
+                raise RecipeError("every knowledge entry has an id a citation can name: letters, digits, '.', '_' or "
+                                  "'-', up to 64 (map one that has a colon)")
             if not isinstance(entry.get("answer"), str) or not entry["answer"].strip():
                 raise RecipeError("knowledge entry %s has no answer" % entry["id"])
             if "question" in entry and not isinstance(entry["question"], str):
@@ -452,10 +455,52 @@ def prune(state_dir: Path, keep_days: int, *, now: Optional[datetime] = None) ->
     return removed
 
 
+def check_policy(policy: Mapping[str, Any]) -> Dict[str, List[str]]:
+    """Categories only a person handles (refunds, account recovery, legal), each a list of words or phrases; a message
+    that holds one is routed to a person before the lookup and the model, so a refund is never a knowledge gap."""
+    checked: Dict[str, List[str]] = {}
+    for category, phrases in dict(policy).items():
+        if not isinstance(category, str) or not _ENTRY_ID.fullmatch(category):
+            raise RecipeError("a policy category is a short id (letters, digits, '.', '_' or '-')")
+        if not isinstance(phrases, list) or not phrases or not all(isinstance(p, str) and p.strip() for p in phrases):
+            raise RecipeError("policy %s lists the words that route a message to a person" % category)
+        checked[category] = [p.strip().lower() for p in phrases]
+    return checked
+
+
+def policy_route(policy: Mapping[str, List[str]], text: str) -> Optional[str]:
+    """The first category whose phrase the message holds (whole words, any case), or None."""
+    lowered = " %s " % " ".join(_WORD.findall(text.lower()))
+    for category, phrases in policy.items():
+        if any(" %s " % " ".join(_WORD.findall(p)) in lowered for p in phrases):
+            return category
+    return None
+
+
+_REDACT = (
+    (re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"), "[email]"),
+    (re.compile(r"(?<!\w)(?:\d[ -]?){13,19}(?!\w)"), "[card]"),
+    (re.compile(r"(?<![\w+])\+?\d[\d ()-]{6,}\d(?!\w)"), "[number]"),
+    (re.compile(r"[A-Za-z0-9+/=_-]{32,}"), "[secret]"),
+)
+
+
+def redact(text: str) -> str:
+    """The customer's text as the outbox keeps it: an address, a card or phone number, and a long key-shaped run
+    replaced by a marker, so a person reading the queue never reads a code or a key the customer pasted."""
+    for pattern, marker in _REDACT:
+        text = pattern.sub(marker, text)
+    return text
+
+
 class SupportAgent:
     def __init__(self, *, knowledge: Union[Knowledge, "KnowledgeSource"], client: Any, model: str, fallback: str, state_dir: Path,
                  max_tokens: int = 600, max_chars: int = 1200, lookup_limit: int = 3,
-                 on_handoff: Optional[Callable[[Dict[str, Any]], None]] = None):
+                 on_handoff: Optional[Callable[[Dict[str, Any]], None]] = None,
+                 policy: Optional[Mapping[str, Any]] = None):
+        if fabric_openrouter.vendor(model) and fabric_openrouter.vendor(model) == fabric_openrouter.vendor(fallback):
+            raise RecipeError("the fallback is a model of another vendor than %s (refused at load, FAA-116)" % model)
+        self.policy = check_policy(policy or {})
         self.knowledge, self.client = knowledge, client
         self.model, self.fallback = model, fallback
         self.state_dir = Path(state_dir)
@@ -492,6 +537,8 @@ class SupportAgent:
         # The outbox keeps the customer's own text until it is pruned: see `prune` and the README's retention note.
         fabric_paths.ensure_private_dir(self.state_dir)
         kept = {k: v for k, v in decision.items() if k != "draft"}  # a person reads the question and the reasons
+        if isinstance(kept.get("question"), str):
+            kept["question"] = redact(kept["question"])  # what a person reads carries no code, key, card or address
         line = json.dumps(kept, ensure_ascii=False, separators=(",", ":")) + "\n"
         _append_line(self.state_dir / "handoffs.jsonl", line.encode("utf-8"))
 
@@ -509,6 +556,9 @@ class SupportAgent:
         rewrites the draft once with the refusal's reasons: a pass is a reply with `repaired: true`, and a repair that
         does not end in a reply (a second refusal, a model `HANDOFF`, no knowledge on the retry; not a `model:*`
         outage) a hand-off with `fallback: true` (the channel-agent standard's 4.4 and 13.2, FAA-197)."""
+        if getattr(self._local, "in_handoff", False):  # first, so a bad input from on_handoff is a ReentryError too
+            raise ReentryError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
+                              "this call returns")
         if not isinstance(message_id, str) or not _ID.fullmatch(message_id):
             raise RecipeError("message id: letters, digits, '.', '_', ':' or '-', up to 128")
         if not isinstance(text, str) or not text.strip():
@@ -518,9 +568,6 @@ class SupportAgent:
                               "decision or the on_handoff copy (a repeat returns no draft, and a fallback had its repair)")
         if repair is not None and repair.get("messageId") == message_id:
             raise RecipeError("repair= runs under a new message id: the refused one returns its stored decision")
-        if getattr(self._local, "in_handoff", False):
-            raise ReentryError("answer() was called from on_handoff: queue the hand-off and call answer() again after "
-                              "this call returns")
         text = re.sub("[\ud800-\udfff]", "\ufffd", text)  # a lone surrogate (bytes a terminal could not decode) is kept, not fatal
         with self._lock:  # one decision per message id, in this process; the service's instance lock covers others
             done = self._log.get(message_id)
@@ -540,6 +587,9 @@ class SupportAgent:
     def _decide(self, message_id: str, text: str, task_run_id: Optional[str],
                 repair: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         base = {"messageId": message_id, "citations": [], "costUsd": None}
+        routed = policy_route(self.policy, text)
+        if routed is not None:  # a person's category goes to a person before any lookup or model call (FAA-116)
+            return dict(base, action="handoff", reasons=["policy:" + routed])
         knowledge = self.knowledge.current() if isinstance(self.knowledge, KnowledgeSource) else self.knowledge
         entries = knowledge.lookup(text, self.lookup_limit)
         if not entries:
@@ -571,9 +621,10 @@ class SupportAgent:
 def from_config(config_path: Path, *, on_handoff: Optional[Callable[[Dict[str, Any]], None]] = None,
                 **overrides: Any) -> SupportAgent:
     """An agent from a config file (see config.example.json): paths are relative to the config's folder. `on_handoff`
-    takes each hand-off in place of the outbox. Other keywords go to the model client (`transport`, `deadline_s`,
-    `retries`), except those the config already sets (`ceiling_usd`, `window`, `ledger`, `prices`, `key_env`,
-    `project_id`)."""
+    takes each hand-off in place of the outbox. Other keywords go to the model client as they are: the eleven the
+    config does not set (`base_url`, `attribution`, `unmeasured_call_usd`, `deadline_s`, `retries`, `environ`,
+    `transport`, `sleep`, `clock`, `now`, `rand`); the six it always sets (`ceiling_usd`, `window`, `ledger`, `prices`,
+    `key_env`, `project_id`) are not keywords here. `policy` in the config routes a person's categories first."""
     config = json.loads(Path(config_path).read_text(encoding="utf-8"))
     home = Path(config_path).resolve().parent
     state = (home / config.get("stateDir", "state")).resolve()
@@ -593,7 +644,8 @@ def from_config(config_path: Path, *, on_handoff: Optional[Callable[[Dict[str, A
         knowledge = Knowledge.load(home / config["knowledge"])
     return SupportAgent(knowledge=knowledge, client=client, model=config["model"],
                         fallback=config["fallback"], state_dir=state, max_tokens=int(config.get("maxTokens", 600)),
-                        max_chars=int(config.get("maxChars", 1200)), on_handoff=on_handoff)
+                        max_chars=int(config.get("maxChars", 1200)), on_handoff=on_handoff,
+                        policy=config.get("policy"))
 
 
 def main(argv: Optional[List[str]] = None) -> int:

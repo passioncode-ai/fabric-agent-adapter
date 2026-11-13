@@ -451,6 +451,20 @@ def _declared_effect(args: argparse.Namespace) -> Tuple[str, str]:
     return effect, idempotency
 
 
+#: What running the kit leaves in a scaffold, which the source check reads as binary in Git mode (FAA-190 item 36).
+GITIGNORE_LINES = ("__pycache__/", "*.pyc")
+
+
+def _gitignore(root: Path, write: bool) -> str:
+    """`.gitignore` holds GITIGNORE_LINES, created or with the missing lines appended (nothing else changes)."""
+    path = root / ".gitignore"
+    text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else None
+    missing = "".join(line + "\n" for line in GITIGNORE_LINES if line not in (text or "").splitlines())
+    if missing and write:
+        path.write_text((text or "") + ("\n" if text and not text.endswith("\n") else "") + missing, encoding="utf-8")
+    return "unchanged" if not missing else "created" if text is None else "appended"
+
+
 def scaffold_project(root: Path, args: argparse.Namespace) -> Dict[str, Any]:
     if not root.is_dir():
         raise AdaptationError("project path is not a directory: %s" % root)
@@ -472,6 +486,7 @@ def scaffold_project(root: Path, args: argparse.Namespace) -> Dict[str, Any]:
             "wouldReplace": sorted(collisions),
             "needsForce": bool(collisions) and not args.force,
             "diffs": diffs,
+            "gitignore": _gitignore(root, write=False),
         }
     if collisions and not args.force:
         raise AdaptationError("refusing to overwrite existing paths: %s" % ", ".join(collisions))
@@ -484,6 +499,7 @@ def scaffold_project(root: Path, args: argparse.Namespace) -> Dict[str, Any]:
         "profile": args.profile,
         "created": sorted(generated),
         "replaced": sorted(collisions),
+        "gitignore": _gitignore(root, write=True),
         "next": "Replace all placeholders, implement the adapter, then run check with the pinned contract checkout.",
     }
 

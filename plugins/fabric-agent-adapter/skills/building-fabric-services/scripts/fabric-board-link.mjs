@@ -6,7 +6,7 @@ import path from 'node:path';
 import { HubError, MCP_PROTOCOL_VERSION, postMcp, toolAnswer } from './fabric-hub.mjs';
 import { atomicWrite, ensurePrivateDir } from './fabric-service.mjs';
 import { BoardError, RESPOND_TOOLS, isObj, refusalProblems } from './fabric-board-shapes.mjs';
-import { UNREADABLE_PROJECT, mandateSpend } from './fabric-interop-rules.mjs'; // FAA-139
+import { UNREADABLE_AGENT, UNREADABLE_PROJECT, identifiedAgent, mandateSpend } from './fabric-interop-rules.mjs'; // FAA-139, FAA-135
 import { isAgentId, mandateCovers } from './fabric-mandate.mjs';
 import { formatRfc3339 } from './fabric-time.mjs';
 
@@ -26,9 +26,9 @@ export class BoardSession {
     return run;
   }
 
-  async #send(body, method = 'POST', timeout = null) {
+  async #send(body, method = 'POST', timeout = null, deadline = 0) {
     try {
-      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout > 0 ? timeout : this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined });
+      return await this.post(this.grant.origin, body, this.grant.bearer(), { session: this.mcpSession, timeout: timeout > 0 ? timeout : this.timeout, method, protocolVersion: this.mcpSession ? this.protocolVersion : undefined, ...(deadline > 0 ? { deadline } : {}) });
     } catch (e) {
       // FAA-252: another OS account's process holds the port; nothing was sent
       if (e instanceof HubError && e.code === 'foreign-user') throw new BoardError('foreign-user', 'The hub\'s port is held by another OS account\'s process; nothing was sent.', true);
@@ -71,13 +71,13 @@ export class BoardSession {
     });
   }
 
-  /** Sends the DELETE (waiting `timeout` ms at most); true when Fabric answered it with a 2xx, so the slots are free now (FAA-163). A 404 (already gone) is false: a move made before it ended is read at the next com.status, so the slot records stay. */
+  /** Sends the DELETE (waiting `timeout` ms at most for the whole of it, FAA-187 (12)); true when Fabric answered it with a 2xx, so the slots are free now (FAA-163). A 404 (already gone) is false: a move made before it ended is read at the next com.status, so the slot records stay. */
   close(timeout = null) {
     return this.#serial(async () => {
       if (!this.mcpSession) return false;
       let status = 0;
       try {
-        const answer = await this.#send({}, 'DELETE', timeout);
+        const answer = await this.#send({}, 'DELETE', timeout, timeout > 0 ? timeout : 0); // the whole DELETE (FAA-187 (12))
         status = Number.isInteger(answer?.status) ? answer.status : 0; // an answer it cannot read is no release, as in Python
       } catch {
         // best effort: the lease lapses in 60 s anyway
@@ -92,7 +92,7 @@ export class BoardSession {
 export class Checkpoint {
   constructor(file) {
     this.file = file;
-    this.slots = {}; // the responder's own record of each slot it held: {project, generation, moved?} (FAA-155)
+    this.slots = Object.create(null); // the responder's own record of each slot it held: {project, generation, moved?} (FAA-155); no prototype, so a capability named `constructor` reads as any other (FAA-196 (24))
     this.entries = this.#load();
   }
   #load() {
@@ -111,7 +111,7 @@ export class Checkpoint {
     }
     if (!isObj(doc) || doc.version !== 1 || !isObj(doc.requests)) throw new BoardError('checkpoint', `The board checkpoint ${this.file} is not one this kit writes.`);
     // a record that is not an object is ignored, as a file without one is
-    this.slots = isObj(doc.slots) ? Object.fromEntries(Object.entries(doc.slots).filter(([, v]) => isObj(v))) : {};
+    this.slots = Object.assign(Object.create(null), isObj(doc.slots) ? Object.fromEntries(Object.entries(doc.slots).filter(([, v]) => isObj(v))) : {});
     return doc.requests;
   }
   #write(entries, slots = this.slots) {
@@ -137,7 +137,8 @@ export class Checkpoint {
   }
   /** Writes the record of a slot this responder held (null forgets it); nothing is written when it is unchanged. */
   slot(capability, record) {
-    const { [capability]: _old, ...slots } = this.slots;
+    const slots = Object.assign(Object.create(null), this.slots);
+    delete slots[capability];
     if (record !== null) slots[capability] = JSON.parse(JSON.stringify(record));
     if (JSON.stringify(sortDeep(slots)) === JSON.stringify(sortDeep(this.slots))) return;
     this.#write(this.entries, slots);
@@ -239,7 +240,7 @@ export function readMandate(request, mandateFrom, agentId) {
     try {
       value = JSON.parse(block);
     } catch {
-      if (block.includes('mandate/1')) return { mandate: null, unread: 'mandate-unreadable' };
+      if (/mandate(?:\/|\\\/|\\u002[fF])1/.test(block)) return { mandate: null, unread: 'mandate-unreadable' }; // the kind as written, its slash JSON-escaped too (FAA-196 (13))
       continue;
     }
     if (isObj(value) && value.kind === 'mandate/1') {
@@ -263,7 +264,7 @@ export function readMandate(request, mandateFrom, agentId) {
  * absent (an inherited, non-enumerable, getter or Proxy member included); the rest of the call is never touched. A
  * getter whose value changes is answered on its one read.
  */
-export function covers(mandate, call, agentId, wall, caller = null) {
+export function covers(mandate, call, agentId, wall, caller = null, callerAgent = null) {
   if (mandate == null || agentId == null) return null;
   if (call !== null && typeof call === 'object' && !Array.isArray(call)) {
     const read = {};
@@ -284,8 +285,50 @@ export function covers(mandate, call, agentId, wall, caller = null) {
   } catch { // finite but outside the dates a clock can name
     now = '';
   }
-  const answer = mandateCovers({ mandate, tier: 'T1', now, self: agentId, call });
+  const inputs = { mandate, tier: 'T1', now, self: agentId, call };
+  if (callerAgent !== null && callerAgent !== undefined) inputs.callerAgent = callerAgent; // FAA-135
+  const answer = mandateCovers(inputs);
   return answer.recordAs ? { ok: true, recordAs: { ...answer.recordAs, caller } } : answer;
+}
+
+/**
+ * A responder's `links` (FAA-187 (21)): the page on the service that resolves each notify kind, such as
+ * `{'board.slot.moved': '/#board'}`, passed to a notice that notifies as its `link`. A path on the service, as makeEvent
+ * takes one; null is none. A service that gives links has an emit that takes `link`.
+ */
+export function noticeLinks(links) {
+  if (links === null || links === undefined) return Object.create(null);
+  if (!isObj(links) || !Object.entries(links).every(([, v]) => typeof v === 'string' && v.startsWith('/') && !v.startsWith('//'))) {
+    throw new BoardError('invalid_arguments', 'links maps an event kind to a path on this service, such as /#board.');
+  }
+  return Object.assign(Object.create(null), links);
+}
+
+/**
+ * Why a message read back with com.get is not the request a claim took (the first path refuses it, a resume reads no
+ * mandate from it, FAA-196 (1)): `digest-mismatch` (another digest than the claim's), `not-addressed` (not this
+ * request, capability and Project), else null.
+ */
+export function readBackProblem(message, entry, project) {
+  if (!isObj(message) || message.digest !== entry.digest) return 'digest-mismatch';
+  const req = message.request;
+  if (!isObj(req) || req.id !== entry.request || req.capability !== entry.capability || req.target !== project) return 'not-addressed';
+  return null;
+}
+
+/**
+ * FAA-135: the agent id the service's identifyAgent(sender) names for a request's sender (the board's verified
+ * `{project, principal}`), read as identifiedAgent reads a hook's answer: null or undefined is none, an agent id is that
+ * id, anything else, or a hook that throws, is UNREADABLE_AGENT, which no chain holds. Asked only when a mandate
+ * travelled (`mandate` not null).
+ */
+export function senderAgent(identifyAgent, sender, mandate = true) {
+  if (identifyAgent == null || mandate == null) return null;
+  try {
+    return identifiedAgent(identifyAgent(sender));
+  } catch {
+    return UNREADABLE_AGENT; // the service's own hook: fail closed
+  }
 }
 
 /** The responder's opt-in, checked: answers `mandateFrom` as the responder keeps it (a Set or the string). */

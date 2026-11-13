@@ -115,6 +115,18 @@ test('a URL-mode request on a raw local address is refused at requestInput; the 
   assert.equal(store.requestInput(id, { approve: link }).status, 'input_required');
 });
 
+// FAA-196 (26): a `steps` that is not a plain object is refused with InteropError in both kits; null is no steps.
+test('requestInput refuses steps that are no object; the job stays working', () => {
+  const store = new i.JobStore(temp());
+  const id = store.create('example.draft', {}).job.id;
+  const request = i.choiceRequest('Publish?', 'choice', [['yes', 'Yes']]);
+  for (const steps of [['approve'], 'approve', 7, true, 0, false, '']) {
+    assert.throws(() => store.requestInput(id, { approve: request }, null, { steps }), i.InteropError, JSON.stringify(steps));
+  }
+  assert.equal(store.get(id).status, 'working');
+  assert.equal(store.requestInput(id, { approve: request }, null, { steps: null }).status, 'input_required');
+});
+
 // MCP 2026-07-28 standard headers: the Node twin agrees with fabric_interop.py.
 test('mcpHeaderProblem refuses a declared request without Mcp-Method/Mcp-Name and any mismatch; matching headers pass', () => {
   const call = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'sample.echo', arguments: {} } };
@@ -224,6 +236,30 @@ test('requestMeta carries the mandate in _meta, copied, and never one FAC-SEM-14
   const widened = structuredClone(mandate);
   widened.chain[1].scope = { actions: ['approve-reply'], effects: ['publish'] };
   for (const bad of ['yes', [], widened]) assert.throws(() => i.requestMeta(PARENT, { mandate: bad }), i.InteropError);
+});
+
+// FAA-135: a Node service reads its own per-agent credential and passes identifiedAgent(its hook's answer) as
+// callerAgent; the twin of test_interop's identify_agent tests.
+test('identifiedAgent reads a hook\'s answer, and the chain is bound with it at actionGate and jobStep', () => {
+  assert.equal(i.identifiedAgent(null), null);
+  assert.equal(i.identifiedAgent(undefined), null);
+  assert.equal(i.identifiedAgent('example-lead'), 'example-lead');
+  assert.equal(i.identifiedAgent('example-lead.prod'), 'example-lead.prod');
+  for (const bad of ['', 'Example', 'agent:remote', 7, true, ['example-lead'], { id: 'example-lead' }, new String('example-lead')]) {
+    assert.equal(i.identifiedAgent(bad), i.UNREADABLE_AGENT, String(bad));
+  }
+  const gate = (callerAgent) => i.actionGate({ action: RELAYED, tier: 'T0', caller: 'local:T0', meta: { mandate: leadMandate() },
+    target: 'reply-7', now: NOW, self: 'example-agent', effect: 'reply', callerAgent: i.identifiedAgent(callerAgent) });
+  assert.equal(gate('example-lead').ok, true);
+  assert.equal(gate(null).ok, true, 'no per-agent credential: the chain\'s end alone binds it, as before');
+  for (const other of ['example-other', 'Not An Agent', 42]) {
+    assert.deepEqual(refusalError(gate(other).refusal).error.data, { detail: 'mandate-not-for-this-call' }, String(other));
+  }
+  const step = (callerAgent) => i.jobStep({ mandate: leadMandate(), tier: 'T0', now: NOW, self: 'example-agent', capability: 'reviews.approve',
+    key: 'approve-reply', effect: 'reply', callerAgent: i.identifiedAgent(callerAgent) });
+  assert.equal(step('example-lead').covered, true);
+  assert.equal(step('example-other').detail, 'mandate-not-for-this-call');
+  assert.equal(step(7).detail, 'mandate-not-for-this-call');
 });
 
 test('actionGate reads a mandate only for a service that names its agent id, and names what it does not cover', () => {

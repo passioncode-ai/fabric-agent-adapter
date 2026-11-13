@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.82.0"
+  version: "0.83.0"
   contract-version: "0.1.0"
   contract-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
 ---
@@ -186,7 +186,12 @@ default and a committed `*.example`; a key into the secret store, named only. Ru
 A value already committed stays in Git history: say so; a fresh history is the owner's act (no history rewrite, no
 force-push). Then lay down the source manifest, `fabric.source.json` (DEC-0149): `scripts/adapt_project.py source
 <project-root> --dry-run` proposes it, the author narrows `include` and names each key and store as a slot, and the
-check reads the source under it (the reference, *The source manifest*).
+check reads the source under it (the reference, *The source manifest*). An existing agent keeps its data where it is
+until its owner moves it: of the reference's data home, apply what 4c asks (no instance value in the source); the
+data home and the per-release transfer audit are for an agent built new, and an existing one adopts them only when
+its owner asks. An existing agent that answers people (support, sales, reviews) is compared, part by part, with
+creating-fabric-agents' communication agent template and `references/agents-that-answer-people.md`: each part it
+lacks is a finding in the report.
 
 ### 5. Make probes safe and meaningful
 

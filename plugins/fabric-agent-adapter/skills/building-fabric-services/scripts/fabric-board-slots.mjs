@@ -131,7 +131,7 @@ export class SlotKeeper {
     delete this.confirmed[capability];
     delete this.claimKeys[capability]; // the move returned that claim to the queue: its receipt is dead
     if (!('moved' in held)) { // once, even across restarts
-      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it; accepted work stays \`accepted\` (work begun is the new holder's). The operator brings it back by take-back (once the other session lets it go, or at a restart with accepted work waiting; a restart alone does not) or, where Fabric offers it, a move back here. Else ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
+      this.emit('board.slot.moved', 'warning', `The ${capability} slot on this Project moved to another session. This service stopped answering it; accepted work stays accepted (work begun is the new holder's). The operator brings it back by take-back (once the other session lets it go, or at a restart or reconnect with accepted work waiting; neither alone does) or, where Fabric can, a move back here. Else ask its maintainer.`, { notify: true, episode: capability, capability, generation: now, held: held.generation });
       this.note(capability, { ...held, moved: now }); // said again at the next start if it cannot be written
     }
     return true;
@@ -143,14 +143,21 @@ export class SlotKeeper {
    * com.claim asks whether the slot is its own. A claim that lands makes it held again and starts what it handed out; a
    * lease_expired one (the move reached this session but its lease lapsed) enrolls again; a fenced one is another
    * session's, recorded so the same generation is not asked about twice. Never an enroll or a replace on a slot another
-   * session holds: a slot moved off stays off unless it is handed back.
+   * session holds: a slot moved off stays off unless it is handed back. `shared` holds the tick's one com.status read,
+   * shared by every moved slot (FAA-194 (5)).
    */
-  async movedBack(capability) {
+  async movedBack(capability, shared = null) {
     if (this.current || this.stopping) return; // a claim now could hand out a second request, or start work while the responder stops
     const held = this.checkpoint.slots[capability] ?? {};
     if (held.project !== this.project || !isInt(held.moved, 1)) return;
     if (this.slots[capability]) this.slots[capability].renewedAt = this.now();
-    const now = ((await this.status()).responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
+    let status;
+    if (shared && 'status' in shared) status = shared.status;
+    else {
+      status = await this.status();
+      if (shared) shared.status = status;
+    }
+    const now = (status.responders ?? []).find((r) => isObj(r) && r.capability === capability)?.generation;
     if (!isInt(now, 1) || now <= held.moved) return;
     if (!this.probing.has(capability) || !this.claimKeys[capability]) { // a fresh key: one from before the move may hold a dead receipt
       this.claimKeys[capability] = this.key('claim');
@@ -201,14 +208,17 @@ export class SlotKeeper {
   }
 
   /** The slot is this session's again at `generation`: held, its record rewritten without the move (FAA-165). */
-  back(capability, held, generation) {
-    return this.locked(() => {
+  async back(capability, held, generation) {
+    const back = await this.locked(() => {
       if (!sameRecord(this.checkpoint.slots[capability], held)) return false; // a takeBack forgot it; its own next tick enrolls
       this.slots[capability] = { state: 'held', generation, renewedAt: -Infinity }; // no lease yet
       this.heldAt(capability, generation);
       delete this.said['board.slot.moved']; // a later move is said again
       return true;
     });
+    // FAA-194 (8): the feed no longer ends on the move's warning
+    if (back) this.emit('board.slot.returned', 'info', `The ${capability} slot on this Project is this service's again: the operator moved it back here, and it answers it from now on.`, { capability, generation });
+    return back;
   }
 
   /**

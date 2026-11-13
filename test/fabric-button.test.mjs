@@ -44,7 +44,7 @@ test('the button reads a credential as the contract does (DEC-0151, FAA-314)', (
   for (const value of ['SK-' + 'a1B2'.repeat(6), 'xsk-' + 'a1B2'.repeat(6), 'GHP_' + 'a'.repeat(24)]) assert.equal(fb.secretValue(value), false, value);
   assert.equal(fb.secretValue('Bearer abc'), true);
   assert.equal(fb.secretValue('x ghp_' + 'a'.repeat(24)), true);
-  assert.ok(SOURCE.startsWith('/* fabric-dashboard-kit@1.1.7 '), 'the kit that carries the change is 1.1.7');
+  assert.ok(/^\/\* fabric-dashboard-kit@1\.1\.([7-9]|[1-9][0-9]) /.test(SOURCE), 'the kit that carries the change is 1.1.7 or later');
 });
 
 // FAA-313 follow-up: the button reads a JWT in one pass, with the answers its JWT_SHAPE gives; the expression
@@ -106,7 +106,7 @@ test('the host cookie (FB-6) and the menu items (FB-4)', () => {
   assert.throws(() => fb.menuItems({ service: 'Example Agent' }), TypeError, 'a bad id never becomes a link');
 });
 
-// FAA-119: the strings a person reads, as checked with Copylot (en-US 239ff62c-e0af-4b8b-96e1-0c45c5eca02a,
+// FAA-119: the strings a person reads, as checked with the copy checker (en-US 239ff62c-e0af-4b8b-96e1-0c45c5eca02a,
 // ru-RU be37143c-aff1-4502-b9d0-f8b1be56bbf3, voice PassionCode.ai site voice v2).
 const RU = {
   chat: 'Чат с Fabric о сервисе {name}', session: 'Открыть сессию в проекте {name}', open: 'Открыть Fabric',

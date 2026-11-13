@@ -323,5 +323,78 @@ class Probe(unittest.TestCase):
         self.assertIn("over the 2 MiB cap", result["evidence"])
 
 
+class LiveSampleService(unittest.TestCase):
+    """FAA-250 (2): a declaration fetched through the probe's real HTTP path. The sample's code serves it in its well-known
+    answer (the sample itself stays as it is), registered with no manifest, so CA-1 reads the fetched answer, and the probe
+    runs as a person runs it."""
+
+    def setUp(self):
+        import contextlib
+        import io
+        import socket
+        import threading
+        sample = load("sample_service")
+        self.temp = tempfile.TemporaryDirectory()
+        base = Path(self.temp.name)
+        self.services = base / "services"
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        common = ["--port", str(port), "--data-dir", str(base / "data")]
+        test = self
+        self.declaration = None
+
+        class ChannelAgentService(sample.Service):
+            def well_known(self):
+                wk = super().well_known()
+                if test.declaration is not None:
+                    wk.setdefault("extensions", {})[KEY] = test.declaration
+                return wk
+
+        self.svc = ChannelAgentService(sample.build_parser().parse_args(["serve"] + common))
+        self.svc.start()
+        self.server = sample.make_server(self.svc)
+        self.thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
+        self.thread.start()
+        with contextlib.redirect_stdout(io.StringIO()):  # register prints the descriptor's path
+            registered = sample.register(sample.build_parser().parse_args(["register"] + common + ["--services-dir", str(self.services)]))
+        self.assertEqual(registered, 0)
+        path = self.services / "sample.default.json"
+        descriptor = json.loads(path.read_text(encoding="utf-8"))
+        descriptor.pop("fabricManifest", None)  # no manifest: the probe reads the declaration from the fetched answer
+        path.write_text(json.dumps(descriptor), encoding="utf-8")
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.svc.lock.release()
+        self.temp.cleanup()
+
+    def rule(self):
+        import subprocess
+        out = subprocess.run([sys.executable, "-B", str(SCRIPTS / "check_service.py"), "sample", "--services-dir",
+                              str(self.services), "--json"], capture_output=True, text=True)
+        return {r["rule"]: r for r in json.loads(out.stdout)["results"]}["channel-agent.declaration"]
+
+    def test_a_declaration_in_the_well_known_answer_is_read_through_http(self):
+        self.declaration = valid_declaration()
+        result = self.rule()
+        self.assertEqual(result["verdict"], "PASS", result["evidence"])
+        self.assertIn("the well-known answer's extensions", result["evidence"])
+
+    def test_a_declaration_with_findings_fails_through_http(self):
+        self.declaration = valid_declaration()
+        self.declaration["standard"] = "channel-agent-standard/0"
+        result = self.rule()
+        self.assertIn(result["verdict"], ("FAIL", "NOT_RUN"), result["evidence"])  # NOT_RUN when read as not declared (D3)
+        self.assertIn("FAC-SEM-162", result["evidence"])
+        self.assertIn("the well-known answer's extensions", result["evidence"])
+
+    def test_no_declaration_is_not_run(self):
+        result = self.rule()
+        self.assertEqual(result["verdict"], "NOT_RUN", result["evidence"])
+        self.assertIn("not a channel agent", result["evidence"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -51,7 +51,9 @@ def make_event(event_id: Any, at: str, kind: str, level: str, text: str, *, subj
                link: Optional[str] = None, notify: bool = False, trace_id: Optional[str] = None,
                span_id: Optional[str] = None, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """One activity event: one sentence a person reads, never a machine id. `level` is one of `LEVELS`; `warn`, the
-    dashboard chip's name, is stored as `warning`. `data` (DEC-0070) adds machine-readable
+    dashboard kit's chip for "a person is needed" (`.fd-s-warn`), is stored as `warning`, the feed's name for the same
+    level, so a reader that draws chips shows a stored `warning` as the `warn` chip (FAA-276, FAA-277 (6)). `data`
+    (DEC-0070) adds machine-readable
     fields beside the sentence, `{schema, value}`, never a secret: it is refused here, so no feed carries one.
 
     An event about traced work carries its trace as a pair, `trace_id` and `span_id`

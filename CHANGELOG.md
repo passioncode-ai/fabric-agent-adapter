@@ -1,5 +1,113 @@
 # Changelog
 
+## 0.83.0 (2026-11-13)
+
+Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
+
+### Added
+
+- **The accepted-socket proof** (FAA-292, FAA-272): a new L0 kit module, `fabric_socket_proof` /
+  `fabric-socket-proof.mjs`, finds the server end of a connection, or a listener on exactly 127.0.0.1, among this OS
+  account's own processes (DEC-0155 RT-2; Python reads libproc, calibrated on a pair of its own, with an lsof fallback;
+  Node reads `lsof -F pun`). `fabric_peer_owner` asks it on a restricted macOS table before the RT-3 vouch, and stands
+  alone without it. `PEER_OWNER_VERSION` is `1.3.1+kit.7`.
+- **Operations digests** (FAA-206 part 2): `fabric_ops_digest` and `fabric-ops-digest.mjs` fold a service's own counts
+  into `ops.digest.hourly@1` and `ops.digest.daily@1` (DEC-0153), held to the contract's reference folds and its
+  fixtures (FAC-SEM-166, FAC-SEM-167); they keep the hour the service stops in for the next run, never fill hours
+  across a sleep, and catch up missed days. `ops_digest_extension` writes the descriptor's OD-9 declaration. New
+  `references/ops-digest.md`.
+- **A2A serving and calling** (FAA-10): `fabric_a2a_server` and `fabric-a2a-server.mjs` build the Agent Card from the
+  service's capabilities, check it before serving it, and map the A2A 1.0 JSON-RPC binding (`SendMessage`,
+  `SendStreamingMessage` as server-sent events, `GetTask`, `CancelTask`) onto the interop job store. `A2AClient` reaches
+  only origins on the operator's list, with its key from the environment. `check_service_a2a.py` holds the probe rows.
+  New `references/a2a.md`. The interop test against Hermes waits on a reachable endpoint.
+- **A data-agent recipe** (FAA-66): `recipes/data-agent/`, numbers computed by code from a read-only source and answered
+  with a truth envelope where missing is never zero (built from the agents database's `data-room` template).
+- **The support recipe** (FAA-116, FAA-182, FAA-264): a person's categories are routed first, a same-vendor fallback is
+  refused at load, the outbox is redacted, knowledge ids must be citable, and `support-agent.mjs` is `check_reply`'s
+  Node twin (31 shared cases).
+- **`FABRIC_DATA_HOME`** puts a service's data folder on a durable volume, both `fabric_paths` twins (FAA-192).
+- Guidance: the data-home base and a second context's home, the uptime A and B rows, model classes on the spend policy
+  or grant, a template takes precedence over the communication prompt (FAA-277), adapting step 4c scoped to an
+  existing agent; building `SKILL.md` names the board responder's mandate opt-in, the LaunchDaemon refusing `purge`, and
+  Apple's Python on macOS 27.2.
+- **`admit.py`** (FAA-271): `creating-fabric-agents/scripts/admit.py` chains the source check, the probe, the strict
+  template check and the private-terms list into one admission check.
+- **`test/validate.py --private-terms`** (FAA-243): tracked files are checked against the operator's local list of
+  private terms (`$PASSIONCODE_PRIVATE_TERMS`, else `~/.config/passioncode/private-terms.txt`), printing paths and lines
+  only; it exits 2 when the list is absent, and the release checklist runs it before a push.
+- **A person's identity at every door behind `tailscale serve`** (FAA-324, board request `087f41ef`): new L0 kit module
+  `fabric_tailnet_identity` / `fabric-tailnet-identity.mjs`. Each door (dashboard, MCP, the service's own door) reads
+  `Tailscale-User-Login`, believed only when the service listens on loopback and the peer is loopback (the local
+  `tailscale serve`, which strips and sets the identity headers); a request without a login, a tagged node's, a Funnel
+  request's or one from another peer is refused with a stable code, HTTP 403 and a sentence, never a silent pass.
+  Groups come from a `tailnet-groups/1` file (its JSON Schema beside the module) or from the agents base's
+  `door-groups/1`, read for one service; the file is read again on change without a restart, and every door is closed
+  while it is unreadable or invalid. `references/surfaces-and-auth.md` shows the wiring.
+- **`identify_agent` / `identifyAgent`** (FAA-135): a per-agent credential's agent id is bound into the mandate chain
+  (`McpToolServer`, `identifiedAgent`) and through the board responder.
+
+### Changed
+
+- `pid_listens` takes an `owner` (this account by default, a uid, or None), and the LaunchDaemon check reads that one
+  lsof reader (FAA-286); a vouch is taken only for a connection that reached 127.0.0.1 (FAA-273).
+- One loopback host rule (`loopback_host` / `loopbackHost`) for `fabric_http` and `fabric_delegation`; Python's
+  `check_url` and `JwksCache` refuse a host `new URL` refuses and one Python's IDNA codec cannot write, up front. One
+  base URL rule for both OpenRouter clients: a tab or line break, a non-ASCII path, a backslash or a dot segment is a
+  `config` error in both (Node used to rewrite and send it), and attribution reads the host as dialed (FAA-187).
+- Hold records written before 0.83.0 are matched under both whitespace squashes; new records carry
+  `squash: "ecmascript"` (FAA-320). The connections reader finds URL schemes in linear time (FAA-322). A delegation key
+  set holding NaN or Infinity is refused (FAA-194). The adapter scaffold names `__pycache__/` and `*.pyc` in
+  `.gitignore` (FAA-190).
+- `AGENTS.md` carries item 1a, the course check before every change (fabric-workspace `knowledge/rules.md` §0).
+- Private terms in `CHANGELOG.md` and `docs/backlog.md` are replaced by neutral words; ids and findings stay (FAA-243).
+- `fabric_secrets.repository_name` reads a JWT at a word's start in one pass, both twins (FAA-321). Neutral words replace
+  private terms in the docs and the dashboard kit, which moves to 1.1.8 (FAA-243; only comments changed, so moving a
+  copy from 1.1.7 is optional).
+- The source check reads `fabric_secrets` by public names, refuses a detector of another version with exit 2, and has
+  its command line in `fabric_source_check_cli.py` (FAA-190). `register_remote` warns before it writes its token;
+  validators refuse a non-string id or instance; the services folder keeps only JSON objects; refusals name relative
+  paths and the remedy (FAA-200). The package folder check reads manifests as the contract does, and pack's refusal
+  offers a clean copy (FAA-194, FAA-190).
+- `providers_dir()` follows Fabric's `registryDirs` rule; the Windows CI job runs the provider tests and measures the
+  owner check without failing on it (FAA-189, FAA-256). The probe is tested over real HTTP with a channel-agent
+  declaration (FAA-250).
+- Board and interop (FAA-187, FAA-194, FAA-196): a move back of a responder slot is said (`board.slot.returned`), moved
+  slots share one `com.status` read a tick, the moved notice names a reconnect beside a restart and carries no Markdown
+  backticks, `board.down` is said once per outage window, a notify notice carries the link the service gives for its
+  kind, a board leave's timeout bounds the whole request, a resumed request reads its mandate only from the message
+  its claim took, `InstanceLock.release` never raises, an `InteropError` from `on_input` is a tool-error answer and a
+  refused start fails the job it created; the board fixture fails a kit whose notices are lost.
+- `pid_alive` on Windows asks OpenProcess for the access libuv asks for, so the twins agree on an elevated process
+  (FAA-323).
+- working-with-fabric: `bash_paths` reads comments, continuations, here-documents and quoted operators as bash does
+  (FAA-187); a dispatched run that sees only `fabric_whoami` is named as a Fabric before 0.3.20 with its remedy
+  (FAA-296); `status` and the session start read OpenCode's and Pi's `fabric` command (FAA-233); the native Codex probe
+  runs the hook untrusted too (FAA-201); the preamble names the operator's relay from his own Project as the exception
+  to board messages being data (FAA-196).
+
+- `test/validate.py` fails a shipped `.mjs` or `.js` script that calls a built-in newer than Node 18, the floor in
+  `package.json` engines (`String.prototype.isWellFormed` reached this release's candidate and only the floors job saw it).
+
+- What the 0.83.0 seam reading found, fixed before the release: `check_service_a2a.py` and `check_service.py` say one
+  verdict for `a2a.card` (an unreadable `surfaces.a2a`, and a remote card that answers 401 or 403, are NOT_RUN,
+  DEC-0122 item 2); a tab or a line break anywhere inside an OpenRouter base URL is a `config` error in both clients
+  (Node removed it and sent the rest); `validate.py --private-terms` expands `~` in `$PASSIONCODE_PRIVATE_TERMS` as
+  `admit.py` does. New rows FAA-325 to FAA-328. `AGENTS.md` names the North Star sections this repository serves
+  (item 1b) and the architect's audit lives in `docs/evidence/architect/`.
+
+### Upgrading
+
+- A set `FABRIC_SERVICES_DIR` no longer moves the providers folder, as in Fabric's own `registryDirs`; set
+  `FABRIC_PROVIDERS_DIR` to keep a custom location (FAA-189).
+- The Node OpenRouter client refuses a base URL holding a tab or line break, a non-ASCII path, a backslash or a dot
+  segment (kind `config`), which it used to rewrite and send (FAA-187).
+- `check_service_a2a.py` is a command of its own: run it beside `check_service.py` for a service that serves A2A, with
+  `--key-env` naming the interface's own key (FAA-10).
+- A service behind `tailscale serve` can check a person at each door with `fabric_tailnet_identity`: listen on
+  127.0.0.1 only, give it the groups file's path (and, for the agents base's `door-groups/1`, the service's id), and
+  send its refusal at every door (FAA-324).
+
 ## 0.82.0 (2026-11-12)
 
 Wave 4 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`). Kit modules
@@ -1013,7 +1121,7 @@ on the Linux jobs (`python`, `floors`), so 0.69.1 is the first npm release carry
 ### Fixed
 
 - working-with-fabric: a run Fabric started on a board request closes its workflow only once the request is settled
-  (FAA-213, passioncode-vesta's finding on the board; Fabric agrees). On an error the run cannot get past (a refused
+  (FAA-213, a board project's finding; Fabric agrees). On an error the run cannot get past (a refused
   claim, a missing key, a tool that fails twice) `references/on-demand-session.md` closed the workflow while the
   request could still be `queued` or `claimed`, and Fabric's next dispatch then failed at the take-back on every cycle
   (Fabric's main at `a6f0ffda`, before 0.3.16).
@@ -2094,7 +2202,7 @@ command's POSIX paths through Windows path rules. 0.53.1 is 0.53.0 with this fix
 ### Fixed
 
 - The hooks now name this release to Fabric: 0.51.1 still said 0.51.0, and `test/validate.py` now checks it.
-  Copylot check `4028969a-aa35-48f9-9300-331da036fb1d`: no findings.
+  Text check `4028969a-aa35-48f9-9300-331da036fb1d`: no findings.
 
 ## 0.51.1 (2026-10-26)
 
@@ -2213,7 +2321,7 @@ release carrying everything listed under 0.51.0 below.
   its four strings were English only, so a Russian dashboard could not mount it without editing a vendored file that
   `dashboard_kit.py install` then refuses as changed. The message now uses a colon. The button reads the page's `lang`
   and shows Russian on a Russian page, English otherwise; `data-label-chat`, `data-label-session` (with `{name}`),
-  `data-label-open` and `data-label-absent` set a page's own words. The strings were checked with Copylot in the
+  `data-label-open` and `data-label-absent` set a page's own words. The strings were checked with the text checker in the
   PassionCode.ai site voice (en-US report `239ff62c-e0af-4b8b-96e1-0c45c5eca02a`, ru-RU report
   `be37143c-aff1-4502-b9d0-f8b1be56bbf3`, no findings). A test fails on U+2014 in any kit asset, and the WebKit test
   opens a Russian page and a page with its own words. The button's accessible name follows the page too (*Открыть Fabric*, or

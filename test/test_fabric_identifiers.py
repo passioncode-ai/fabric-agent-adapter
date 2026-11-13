@@ -59,7 +59,7 @@ class Writers(unittest.TestCase):
         manifest = temp / "fabric-agent.json"
         manifest.write_text(json.dumps({"provider": {"id": "https://agents.example/providers/example-agent"}, "capabilities": []}))
         entry = {"protocol": "fabric-provider/0.1", "id": "example-agent", "providerId": "HTTPS://Agents.Example/providers/%65xample-agent",
-                 "name": "Example Agent", "manifest": str(manifest), "run": {"mcp": {"url": "http://127.0.0.1:47201/mcp"}},
+                 "name": "Example Agent", "manifest": manifest.as_posix(), "run": {"mcp": {"url": "http://127.0.0.1:47201/mcp"}},
                  "installedAt": "2026-10-13T08:00:00Z", "installedBy": "test"}
         path = fp.write_provider_entry(entry, temp / "providers", temp / "services")
         self.assertEqual(json.loads(path.read_text())["providerId"], "https://agents.example/providers/example-agent")

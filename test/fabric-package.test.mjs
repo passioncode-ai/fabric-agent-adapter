@@ -174,6 +174,8 @@ test('pack refuses what must not ship', (t) => {
   for (const junk of ['.git', '__pycache__']) {
     fs.mkdirSync(path.join(root, 'bin', junk));
     assert.throws(() => k.pack(root), new RegExp(`bin/${junk.replace('.', '\\.')}`));
+    // FAA-190 (26): a refusal never offers removing `.git` in place, which would carry an ignored instance
+    assert.throws(() => k.pack(root), (e) => e.message.includes('pack a clean copy') && !e.message.includes('remove these'));
     fs.rmdirSync(path.join(root, 'bin', junk));
   }
   fs.symlinkSync('/etc/hosts', path.join(root, 'hosts'));
@@ -472,4 +474,32 @@ test('FAA-91: a folder swapped for a link while its files are read, and swapped 
   }
   assert.equal(opened, 1, 'refused at the first file read through the swapped folder, before the swap is undone');
   assert.equal(fs.readFileSync(path.join(root, 'sub', 'a.txt'), 'utf8'), 'inside\n');
+});
+
+// FAA-194 (26), (27), (29), (36): the folder check reads a plugin or provider manifest as the Python twin and the
+// contract's checkPackageFolder do (test_fabric_package.py ManifestReadsAsTheTwinDoes runs the same table).
+test('the folder check reads a manifest as the Python twin does (FAA-194)', () => {
+  const deep = (n) => '['.repeat(n) + ']'.repeat(n);
+  const pluginOk = (inner) => `{"name": "example", "version": "1.0.0", "x": ${inner}}`;
+  const bytes = (text) => Buffer.from(text, 'latin1');
+  const cases = [
+    ['an empty plugin manifest, no id or version', null, Buffer.from('{}'), null, []],
+    ['an invalid byte inside a description', ['example', '1.0.0'], bytes('{"name": "example", "version": "1.0.0", "description": "a\xffb"}'), null, []],
+    ['an invalid byte in the name', ['example', '1.0.0'], bytes('{"name": "ex\xffample", "version": "1.0.0"}'), null, ['plugin-manifest']],
+    ['nested within the shared limit', ['example', '1.0.0'], Buffer.from(pluginOk(deep(k.MAX_NESTING - 1))), null, []],
+    ['nested past the shared limit', ['example', '1.0.0'], Buffer.from(pluginOk(deep(k.MAX_NESTING + 5))), null, ['plugin-manifest']],
+    ['nested a thousand deep', ['example', '1.0.0'], Buffer.from(pluginOk(deep(1000))), null, ['plugin-manifest']],
+    ['a 5000-digit integer in the provider manifest', null, null, Buffer.from(`{"n": ${'7'.repeat(5000)}}`), []],
+    ['NaN in the provider manifest', null, null, Buffer.from('{"n": NaN}'), ['provider-manifest']],
+    ['a provider manifest past the shared limit', null, null, Buffer.from(`{"n": ${deep(k.MAX_NESTING + 5)}}`), ['provider-manifest']],
+  ];
+  for (const [name, ident, plugin, provider, want] of cases) {
+    const files = new Map();
+    if (plugin) files.set(k.PLUGIN_MANIFEST, plugin);
+    if (provider) files.set('fabric-agent.json', provider);
+    const pkg = { files: [...files].map(([p, data]) => ({ path: p, sha256: k.sha256Of(data) })) };
+    if (ident) [pkg.id, pkg.version] = ident;
+    if (provider) pkg.provider = 'fabric-agent.json';
+    assert.deepEqual(k.checkPackageFolder(pkg, files).map((p) => p.problem), want, name);
+  }
 });

@@ -24,7 +24,8 @@ PARTS = (
     ' not covered, handed off, small talk, limit, error), the hand-off reason and category, the latency, the '
     'knowledge revision the answer used, and whether the channel accepted the reply. Conversation text stays inside'
     ' the agent, redacted, for at most 30 days. Check: a test that a turn without a trace id, or with an outcome '
-    'outside the list, is refused.',
+    'outside the list, is refused, and a test that conversation text past 30 days is gone and that what is kept '
+    'carries no address, number or key.',
     'The agent publishes one `support.quality_daily` per closed UTC day and channel** (A5) on its events feed '
     '(`/fabric/v1/events`; building-fabric-services, `references/events-and-notifications.md`): counts and codes '
     'only, the judge model and rubric version, and `notMeasured` naming every family not computed that day. A '
@@ -38,13 +39,18 @@ PARTS = (
     '`calibrationChecks` beside it (DEC-0144), goes in only once every reader of the feed it knows of has adopted '
     "DEC-0144: the producer then re-publishes its copy from DEC-0144's bytes (CT-188), and leaves the calibration "
     'out when the judge or the rubric changed after the labelled week. A reader validates against its own pinned '
-    "copy, never one fetched by `$id`: the bytes under the unchanged `$id` widened. Check: the producer's day "
+    "copy, never one fetched by `$id`: the bytes under the unchanged `$id` widened. At the contract repin to DEC-0144 "
+    "(FAA-176), a producer that pinned its own copy keeps its URI in `data.schema` and re-publishes that URI's bytes "
+    "from DEC-0144's: since the `$id` did not change and the bytes only widened, every day the older copy accepted "
+    "still validates, so a reader needs no window of two URIs (this page's rule, not the contract's words). Check: "
+    "the producer's day "
     "passes `make_event` and validates against the producer's pinned copy of the schema; a planted day that writes "
     '0 for a family not computed fails; and a test runs every `notMeasured` name the producer can emit through the '
     "published name pattern, iterating the producer's own list.",
     'A table of lanes** (P4): classifier, writer, fallback writer, checker, research, judge. The checker is another'
     ' vendor than the writer; the judge is another vendor than both, at temperature 0, on an open-vendor model '
-    "where it reads what people wrote. Declare them as classes in the profile, where each lane's fallback is "
+    "where it reads what people wrote. Name each lane's catalogue models in the profile, narrowed by the classes the "
+    "spend policy or grant holds (`modelClasses`), where each lane's fallback is "
     'another vendor than its primary ([models and providers](models-and-providers.md)); per turn the router picks '
     'the checker against the model that actually drafted, a fallback writer included ([resilience and '
     'autonomy](resilience-and-autonomy.md#model-answers-are-untrusted-until-accepted), item 3). A lane that reads '
@@ -82,7 +88,8 @@ PARTS = (
     "out of the judge's sample. Check: the daily report counts a hand-off under hand-offs, and the judge's sample "
     'builder leaves templated replies out.',
     'Hand-offs are counted by cause** (P3): `policy`, `inability` and `infrastructure` apart, so the largest number'
-    ' names what to fix. A hold after a checker or model outage, or at the research time cap, is `infrastructure`; '
+    ' names what to fix. A hold after a checker or model outage, or at the research time cap, is `infrastructure` '
+    "(this page's reading of P3, not the sources' words); "
     'only a hold after a refusal on the material is `inability`. Check: a checker outage produces `infrastructure` '
     'hand-offs and holds, never `inability`.',
     'A commitments ledger** (P3): every "I will pass this on and come back" is a row with an owner and a due date; '
@@ -96,7 +103,8 @@ PARTS = (
     'Every abstention and every inability, a hold on the material included, becomes a gap in a queue** (P7), '
     'restated without personal data and grouped by meaning. When a gap closes, the client asks again and rewrites '
     'the held answer only once the new answer is confident. Check: a closed gap whose new answer comes back with '
-    '`answer: false` leaves the hold in place, and a hold after a checker outage opens no gap.',
+    '`answer: false` leaves the hold in place, and a hold after a checker outage opens no gap (this page\'s reading '
+    "of P7, not the sources' words).",
     'A reader that starts accepting a new event kind re-reads its feed once** (P6), from before its cursor: a '
     'reader that only moves forward has already passed the first events of that kind. The re-read reaches back only'
     " as far as the producer's feed keeps (at least 7 days or 1000 events, building-fabric-services "
@@ -131,7 +139,8 @@ EXPECTED = (
     "instructions, takes numbers and account state from tools, and re-reads the conversation's live tail before "
     'sending',
     'on a refusal repairs once, then runs one research turn, then holds honestly, and the hold comes back by itself'
-    ' when the gap closes',
+    ' when the gap closes; a money refusal (an amount or a price) is never researched, and the research turn has a'
+    ' hard time cap whose hold counts as infrastructure',
     "counts hand-offs by cause (policy, inability, infrastructure), never as answers, keeps them out of the judge's"
     ' sample, and keeps a commitments ledger',
     "reads the knowledge service's answer flag with no threshold of its own, queues every abstention and every "
@@ -171,13 +180,15 @@ RECIPE_PARAGRAPH = (
     "bounds its retries (one repair is the practices') and passes any further hand-off to the person's channel. A "
     'copy of `support_agent.py` made before 0.55.0 takes no `on_handoff` in `from_config` and hangs on such a call '
     '(`grep -c ReentryError support_agent.py` prints 0 for it; `fabric_kit.py status` covers the kit modules only): '
-    'copy it again. The recipe also lacks three parts of such an agent: the Lookup (shared words, best three) is a '
+    'copy it again. The recipe also lacks two parts of such an agent: the Lookup (shared words, best three) is a '
     "relevance rule of its own, where the agent reads the knowledge service's per-item `answer` flag and puts small "
-    'closed rule sets into the prompt whole; `from_config` accepts a same-vendor fallback, refused only per call as '
-    '`model:config`; and the decision does not record which model answered, so fallback recoveries are not counted. '
-    'The recipe hands off nothing for `policy`: the calling service routes the categories a person must handle '
-    "(refunds, unbans, account recovery) before it calls the recipe, or a model's `HANDOFF` on them is counted as a "
-    'false knowledge gap. Count its hand-offs by cause: a failed check is a refusal for the agent to repair, research'
+    'closed rule sets into the prompt whole; and the decision does not record which model answered, so fallback '
+    "recoveries are not counted. A fallback of the writer's own vendor is refused when the agent is built "
+    "(`RecipeError`), not per call. **A person's categories come first** (since 0.83.0): `policy` (a config key, or "
+    '`policy=` on `SupportAgent`) maps each category a person must handle to the words that name it '
+    '(`{"refund": ["refund", "money back"], "recovery": ["recover my account"]}`); a message holding one is a '
+    'hand-off `policy:<category>` before any lookup or model call, so a refund is never a false knowledge gap. Count '
+    '`policy:*` as `policy`, never `inability`. Count its hand-offs by cause: a failed check is a refusal for the agent to repair, research'
     ' and hold, and only a hold on the material counts as `inability` (a hold after an outage or at the research time'
     ' cap is `infrastructure`); `unsupported:amount` is a money reason, never researched, and so is '
     '`unsupported:number` unless the refused `draft` shows the number is not a price; `no-knowledge` and '
@@ -189,15 +200,17 @@ RECIPE_PARAGRAPH = (
     'checks are code only), the false-state gates, numbers and account state from tools, the live-tail re-read, the '
     'commitments ledger and the gap queue.')
 RECIPE_RETENTION = (
-    "Every handoff row in `handoffs.jsonl` holds the customer's own message, which can carry an email address, a "
-    "phone number or a card number. It stays until it is pruned. Choose a retention the product's privacy policy "
-    "states, at most 30 days for an agent that answers people (the standard's A1). A1 also asks for the text "
-    'redacted: the outbox keeps it as written, and `prune` takes any `--keep-days`, so such an agent passes an '
-    '`on_handoff` that redacts what it stores, which replaces the outbox, and keeps 30 days or fewer. A refused '
-    '`draft`, which can echo what the customer wrote, reaches the returned decision and an `on_handoff` the agent '
-    'passes, never a file: neither `decisions.jsonl` nor the default outbox stores it. A capability handler returns '
-    "the decision without it: a kit job's result is written to the job's file (`fabric_interop`'s job store), so pass"
-    ' `draft` only to the repair step. Prune on a schedule:')
+    "Every handoff row in `handoffs.jsonl` holds the customer's message as `question`, redacted since 0.83.0: "
+    '`redact()` replaces an email address, a card number, a phone number or other long digit run, and a long '
+    'key-shaped run with a marker (`[email]`, `[card]`, `[number]`, `[secret]`) before the row is written (the '
+    "standard's A4 and A9). The rest stays until it is pruned. Choose a retention the product's privacy policy "
+    "states, at most 30 days for an agent that answers people (the standard's A1). An agent that passes its own "
+    '`on_handoff` replaces the outbox and keeps its own store: it redacts what it stores (`support_agent.redact` is '
+    'there to call) and prunes that store itself, since `prune` covers only `handoffs.jsonl` and `decisions.jsonl`. '
+    'A refused `draft`, which can echo what the customer wrote, reaches the returned decision and an `on_handoff` the '
+    'agent passes, never a file: neither `decisions.jsonl` nor the default outbox stores it. A capability handler '
+    "returns the decision without it: a kit job's result is written to the job's file (`fabric_interop`'s job store), "
+    'so pass `draft` only to the repair step. Prune on a schedule:')
 CHANGELOG_ENTRY = (
     '- **creating-fabric-agents: agents that answer people** (FAA-162, board request `1ad39d4e`). A new reference, '
     '`references/agents-that-answer-people.md`, lists what an agent that answers people (a support chat, mail, '
@@ -340,7 +353,8 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
                       "at most 30",
                       "only a hold on the material counts as `inability`", "at the first refusal", "`on_handoff=`",
                       "per-item `answer` flag", "under a new message id",
-                      "same-vendor fallback", "`model:payment`", "an `on_handoff` that redacts what it stores",
+                      "A fallback of the writer's own vendor is refused when the agent is built", "`model:payment`",
+                      "it redacts what it stores", "`policy:<category>` before any lookup or model call",
                       "neither `decisions.jsonl` nor the default outbox stores it", "a repeat of the id returns the stored decision"):
             self.assertIn(words, recipe, words)
         self.assertIn("recipes/support-agent/", flat(REFERENCE))

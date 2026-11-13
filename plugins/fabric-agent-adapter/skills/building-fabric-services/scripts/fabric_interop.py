@@ -17,7 +17,6 @@ Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016,
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import math
@@ -98,6 +97,14 @@ from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     pause_message,
     intent_digest,
     repeated_key_decision,
+    NAMED_METHODS,
+    UNREADABLE_AGENT,
+    identified_agent,
+    HEADER_MISMATCH,
+    encode_header_value,
+    decode_header_value,
+    mcp_header_problem,
+    mcp_request_headers,
 )
 
 # --- C3.1 capabilities as tools --------------------------------------------------
@@ -399,6 +406,8 @@ class JobStore:
         A step is kept as the gate reads it (kept_step), so a job's start and its answer agree."""
         if not isinstance(input_requests, dict) or not input_requests:  # a JSON object of requests, first (readings 38, 39)
             raise InteropError("input_required needs a JSON object of at least one input request.")
+        if steps is not None and not isinstance(steps, dict):  # a JSON object or none, in both kits (FAA-196 (26))
+            raise InteropError("steps maps an input request's key to its approval step: a JSON object, or none.")
         kept: Dict[str, Dict[str, Any]] = {}
         for key, step in (steps or {}).items():  # the value checked is the value kept (seam reading 34)
             kept[key] = kept_step(step) if key in input_requests and isinstance(step, dict) else {}
@@ -493,7 +502,8 @@ class CallContext:
     def __init__(self, server: "McpToolServer", tool: str, arguments: Any, traceparent: str,
                  delegation: Optional[Dict[str, Any]] = None, *, tier: Optional[str] = None, caller: Optional[str] = None,
                  meta: Optional[Dict[str, Any]] = None, record: Any = None, decision: Optional[Dict[str, Any]] = None,
-                 input_records: Optional[Dict[str, Any]] = None, mandate: Optional[Dict[str, Any]] = None):
+                 input_records: Optional[Dict[str, Any]] = None, mandate: Optional[Dict[str, Any]] = None,
+                 caller_agent: Optional[str] = None):
         self.server = server
         self.tool = tool
         self.arguments = arguments
@@ -503,12 +513,19 @@ class CallContext:
         self.tier, self.caller, self.meta = tier, caller, {} if meta is None else meta
         self.record, self.decision, self.input_records = record, decision, input_records
         self.mandate = mandate
+        # FAA-135: the caller's agent id the service authenticated (the delegation's caller, else identify_agent's).
+        delegated = (delegation or {}).get("caller")
+        self.caller_agent = caller_agent if caller_agent is not None else (delegated if isinstance(delegated, str) and delegated else None)
 
     def start_job(self, poll_interval_ms: Optional[int] = None) -> Dict[str, Any]:
         if self.server.jobs is None:
             raise InteropError("This server has no job store.")
         handle = self.server.jobs.create(self.tool, self.arguments, self.traceparent, poll_interval_ms, self.delegation)
-        self.server.job_started(handle["job"]["id"], self)
+        try:
+            self.server.job_started(handle["job"]["id"], self)
+        except InteropError as exc:  # a refused start: the job it created ends with it, never left working (FAA-196 (28))
+            self.server.jobs.fail(handle["job"]["id"], "tool-error", str(exc)[:_MAX_ERROR_MESSAGE] or "The job's start was refused.")
+            raise
         return handle
 
     def approval_step(self, job_id: str, key: str, request: Dict[str, Any], *, effect: str, spend_usd: Any = None,
@@ -527,7 +544,7 @@ class CallContext:
         stored = self.server.jobs.private(job_id).get("capability")
         capability = stored if isinstance(stored, str) else self.tool
         if self.server.agent_id is not None:
-            caller = (self.delegation or {}).get("caller")
+            caller = self.caller_agent
             carried = self.meta.get("mandate")
             if carried is None and "mandate" in self.meta:
                 carried = {}  # a null mandate is present and unreadable, as the answer reads it; never "none" (FAA-178)
@@ -548,84 +565,6 @@ OnInput = Callable[[str, Dict[str, Any], CallContext], None]
 JOB_REQUEST_SCHEMA = {"type": "object", "required": ["id"], "additionalProperties": False, "properties": {
     "id": {"type": "string", "minLength": 1, "maxLength": 128},
     "inputResponses": {"type": "object"}}}
-
-
-NAMED_METHODS = {"tools/call": "name", "prompts/get": "name", "resources/read": "uri"}
-HEADER_MISMATCH = -32020  # the code the official 2026-07-28 server SDK answers a header/body mismatch with
-
-
-_SENTINEL = ("=?base64?", "?=")
-
-
-def encode_header_value(value: str) -> str:
-    """A body value as an HTTP header value, by MCP 2026-07-28 Streamable HTTP "Value Encoding": as
-    it is when it is printable ASCII without leading or trailing whitespace, otherwise — and for a
-    plain value that itself looks like the sentinel — `=?base64?<base64 of its UTF-8>?=`."""
-    plain = (all(0x20 <= ord(c) <= 0x7E for c in value) and value == value.strip(" ")
-             and not (value.startswith(_SENTINEL[0]) and value.endswith(_SENTINEL[1])))
-    if plain:
-        return value
-    return _SENTINEL[0] + base64.b64encode(value.encode("utf-8")).decode("ascii") + _SENTINEL[1]
-
-
-def decode_header_value(value: str) -> Optional[str]:
-    """The body value a header carries, decoding the Base64 sentinel; None for a header value with
-    invalid characters or a sentinel that is not valid Base64 of UTF-8 (a server rejects both)."""
-    if value.startswith(_SENTINEL[0]) and value.endswith(_SENTINEL[1]) and len(value) >= len(_SENTINEL[0]) + len(_SENTINEL[1]):
-        try:
-            return base64.b64decode(value[len(_SENTINEL[0]):-len(_SENTINEL[1])], validate=True).decode("utf-8")
-        except ValueError:  # binascii.Error and UnicodeDecodeError are both ValueErrors
-            return None
-    if any(not (0x20 <= ord(c) <= 0x7E or c == "\t") for c in value):
-        return None
-    return value
-
-
-def mcp_header_problem(message: Any, headers: Any) -> Optional[str]:
-    """MCP 2026-07-28 Streamable HTTP mirrors the body in `Mcp-Method` (every request and
-    notification) and `Mcp-Name` (`params.name` or `params.uri` of tools/call, prompts/get,
-    resources/read). A server MUST reject a mismatch; a request that declares 2026-07-28 must
-    carry them. Earlier revisions may omit them, but what they send must still agree.
-    `headers` is any case-insensitive mapping with `.get` (http.server's message, a dict)."""
-    if not isinstance(message, dict) or headers is None:
-        return None
-    def header(name: str) -> Optional[str]:
-        value = headers.get(name) if hasattr(headers, "get") else None
-        if value is None and isinstance(headers, dict):
-            value = next((v for k, v in headers.items() if k.lower() == name.lower()), None)
-        if isinstance(value, (list, tuple)):
-            value = value[0] if value else None
-        return None if value is None else str(value)
-    declared = header("MCP-Protocol-Version") == MCP_REVISION
-    method = message.get("method")
-    sent = header("Mcp-Method")
-    if sent is None and declared:
-        return "the body names method %s but the required Mcp-Method header is absent" % method
-    if sent is not None and sent != method:
-        return "Mcp-Method %s disagrees with the body's method %s" % (sent, method)
-    field = NAMED_METHODS.get(str(method))
-    if field:
-        params = message.get("params")
-        value = params.get(field) if isinstance(params, dict) else None
-        named = header("Mcp-Name")
-        if named is None and declared:
-            return "the body carries params.%s but the required Mcp-Name header is absent" % field
-        if named is not None:
-            decoded = decode_header_value(named)
-            if decoded is None:
-                return "Mcp-Name is malformed: invalid characters or a broken =?base64?…?= value"
-            if decoded != str(value):
-                return "Mcp-Name disagrees with the body's params.%s" % field
-    return None
-
-
-def mcp_request_headers(method: str, params: Dict[str, Any]) -> Dict[str, str]:
-    """The standard headers a 2026-07-28 client sends with one request."""
-    out = {"MCP-Protocol-Version": MCP_REVISION, "Mcp-Method": method}
-    field = NAMED_METHODS.get(method)
-    if field and params.get(field) is not None:
-        out["Mcp-Name"] = encode_header_value(str(params[field]))
-    return out
 
 
 _UNREADABLE = object()  # what a service's spend or project function answers when it raised
@@ -649,7 +588,8 @@ class McpToolServer:
                  approve: Optional[Callable[[str, Dict[str, Any], Any, str], Optional[Dict[str, Any]]]] = None,
                  elicited: Optional[Callable[[str, Dict[str, Any], Optional[str]], bool]] = None,
                  input_actions: bool = False, clock: Callable[[], float] = time.time,
-                 on_fault: Optional[Callable[[str, str], None]] = None, agent_id: Optional[str] = None):
+                 on_fault: Optional[Callable[[str, str], None]] = None, agent_id: Optional[str] = None,
+                 identify_agent: Optional[Callable[[Any, str], Optional[str]]] = None):
         # authorize(tool, headers, tier=) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
         # gated by the job's own capability, and answered only for the principal and caller that started it.
@@ -663,12 +603,14 @@ class McpToolServer:
         # (MJ-1), which the caller reads as operator-decision-required naming it in data.detail.
         # DEC-0125: agent_id is this service's own agent id; with it the server reads a call's _meta.mandate for a
         # relayed action added with its effect (the chain must end in agent_id, and in the delegation's caller before
-        # it when authorize accepted a token); without it a mandate is not read, as before.
+        # it when authorize accepted a token); without it a mandate is not read, as before. FAA-135:
+        # identify_agent(headers, tier) names the agent id of a per-agent credential the service authenticated, read
+        # when no delegation named a caller: the chain must hold it before agent_id (identified_agent reads its answer).
         if agent_id is not None and not is_agent_id(agent_id):
             raise InteropError("agent_id is this service's agent id (a lower-case id, optionally .instance; DEC-0125).")
         self.agent_id = agent_id
         self._authorize = authorize
-        self._identify, self._approve, self._elicited = identify, approve, elicited
+        self._identify, self._approve, self._elicited, self._identify_agent = identify, approve, elicited, identify_agent
         self.input_actions, self._clock, self._on_fault = input_actions is True, clock, on_fault
         self.actions: Dict[str, Dict[str, Any]] = {}
         self.info = {"name": name, "version": version}
@@ -739,6 +681,20 @@ class McpToolServer:
             authenticated = self._identify(headers, tier)
         return action_caller(tier, authenticated)
 
+    def _caller_agent(self, headers: Any, tier: str, verdict: Optional[Dict[str, Any]]) -> Optional[str]:
+        """FAA-135: the caller's agent id a mandate's chain is bound with: the delegation's caller when authorize accepted
+        a token, else what identify_agent names (identified_agent; a hook that raises names UNREADABLE_AGENT), else
+        None. Read only on a server with agent_id; never a name the call carries."""
+        delegated = (verdict or {}).get("caller")
+        if self.agent_id is None or (isinstance(delegated, str) and delegated):
+            return delegated if self.agent_id is not None else None
+        if self._identify_agent is None:
+            return None
+        try:
+            return identified_agent(self._identify_agent(headers, tier))
+        except Exception:  # noqa: BLE001 - the service's own hook: an id no chain holds, so a mandate is refused
+            return UNREADABLE_AGENT
+
     def _gate_action(self, action: Dict[str, Any], name: str, arguments: Dict[str, Any], target: Any, url: Any,
                      headers: Any, tier: str, meta: Dict[str, Any], caller: Optional[str],
                      mandate: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -766,13 +722,12 @@ class McpToolServer:
         return action_gate(action, tier=tier, caller=caller, meta=meta, target=target, elicited=elicited, approval=approval,
                            action_digest=digest, human_step_url=url, now=format_rfc3339(self._clock() * 1000), **(mandate or {}))
 
-    def _mandate_inputs(self, entry: Dict[str, Any], arguments: Dict[str, Any], verdict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _mandate_inputs(self, entry: Dict[str, Any], arguments: Dict[str, Any], caller_agent: Optional[str]) -> Dict[str, Any]:
         """DEC-0125: what action_gate reads a mandate with, empty on a server without agent_id. The caller's agent id is
-        the delegation's caller when authorize accepted a token, never a name the call carries."""
+        _caller_agent's (the delegation's caller, else identify_agent's, FAA-135), never a name the call carries."""
         if self.agent_id is None:
             return {}
         spend, project = (self._read(entry.get(k), arguments) for k in ("spend", "project"))
-        caller_agent = (verdict or {}).get("caller")
         # The estimate is read as a double, as the contract does: an int past the float range is infinite, and an
         # estimate that is not a finite number reads as none, which a mandate's ceiling refuses (fail closed).
         number = _real_number(spend)  # by what it stores; a bool, a mock or not a number is none (seam reading 18)
@@ -799,7 +754,7 @@ class McpToolServer:
             return _UNREADABLE
 
     def _gate_inputs(self, arguments: Dict[str, Any], headers: Any, tier: str, meta: Dict[str, Any],
-                     caller: Optional[str], verdict: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                     caller: Optional[str], agent: Optional[str] = None) -> Dict[str, Any]:
         """D8: each input request an answer would take is an action (id its key, tool fabric.job.get, gate relayed),
         one decision per call; the first refusal refuses the call and nothing is applied. DEC-0125: on a server with
         agent_id, a step approval_step kept is read under the call's `_meta.mandate` too (C3.3)."""
@@ -818,7 +773,6 @@ class McpToolServer:
                 # A kept step's mandate is read as approval_step read it, under the job's own capability, which must
                 # be a capability name (MJ-1); the action itself stays fabric.job.get, so it is a readable action.
                 capability = private.get("capability")
-                agent = (verdict or {}).get("caller")
                 mandate = {"self_id": self.agent_id, "effect": step.get("effect"), "spend_usd": step.get("spendUsd"),
                            "project": step.get("project"), "caller_agent": agent if isinstance(agent, str) and agent else None,
                            "mandate_capability": capability if isinstance(capability, str) else None}
@@ -921,13 +875,13 @@ class McpToolServer:
                 if not verdict.get("ok"):
                     import fabric_delegation as _fd  # noqa: E402 - only a gated server needs it
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
-            caller, inputs = self._caller(headers, tier, verdict), None
+            caller, agent, inputs = self._caller(headers, tier, verdict), self._caller_agent(headers, tier, verdict), None
             responses = arguments.get("inputResponses")
             if name == "fabric.job.get" and responses is not None and not isinstance(responses, dict):  # seam r37: never a crash
                 return self._error(rid, -32602, "fabric.job.get takes inputResponses as a JSON object (interop C3.3).")
             if name == "fabric.job.get" and self.input_actions and isinstance(responses, dict) and responses:
                 try:
-                    inputs = self._gate_inputs(arguments, headers, tier, meta, caller, verdict)
+                    inputs = self._gate_inputs(arguments, headers, tier, meta, caller, agent)
                 except UnknownJob:
                     return {"jsonrpc": "2.0", "id": rid, "result": unknown_job_result(str(arguments.get("id", "")), traceparent=span)}
                 if not inputs["ok"] and "invalid" in inputs:
@@ -937,7 +891,8 @@ class McpToolServer:
                     self._fault(stored if isinstance(stored, str) else name, inputs)  # as the start heard it (FAA-179)
                     import fabric_delegation as _fd  # noqa: E402 - DL-19
                     return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(inputs["refusal"], traceparent=span)}
-            context = {"tier": tier, "caller": caller, "meta": meta, "input_records": inputs["records"] if inputs else None}
+            context = {"tier": tier, "caller": caller, "meta": meta, "input_records": inputs["records"] if inputs else None,
+                       "caller_agent": agent}
             return {"jsonrpc": "2.0", "id": rid, "result": self._job_call(name, arguments, span, verdict, context)}
         handler = self.handlers.get(name)
         if handler is None:
@@ -950,9 +905,10 @@ class McpToolServer:
                 return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(verdict, traceparent=span)}
             delegation = verdict
         caller, gated, entry = self._caller(headers, tier, delegation), {"record": None, "decision": None}, self.actions.get(name)
+        agent = self._caller_agent(headers, tier, delegation)
         if entry is not None:  # DEC-0121: after the authorize gate, before the handler
             gated = self._gate_action(entry["action"], name, arguments, self._target(entry["target"], arguments), entry["url"],
-                                      headers, tier, meta, caller, self._mandate_inputs(entry, arguments, delegation))
+                                      headers, tier, meta, caller, self._mandate_inputs(entry, arguments, agent))
             if not gated["ok"] and "invalid" in gated:
                 return self._error(rid, -32602, gated["invalid"])
             if not gated["ok"]:
@@ -960,7 +916,7 @@ class McpToolServer:
                 import fabric_delegation as _fd  # noqa: E402 - DL-19
                 return {"jsonrpc": "2.0", "id": rid, "result": _fd.refusal_tool_result(gated["refusal"], traceparent=span)}
         context = CallContext(self, name, arguments, span, delegation, tier=tier, caller=caller, meta=meta,
-                              record=gated["record"], decision=gated["decision"], mandate=gated.get("mandate"))
+                              record=gated["record"], decision=gated["decision"], mandate=gated.get("mandate"), caller_agent=agent)
         try:
             structured = handler(arguments, context)
         except InteropError as exc:
@@ -990,7 +946,10 @@ class McpToolServer:
                 matched = self.jobs.answer(job_id, responses)
                 if matched and self._on_input:
                     private = self.jobs.private(job_id)
-                    self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span, delegation, **context))
+                    try:
+                        self._on_input(job_id, matched, CallContext(self, private["capability"], private["input"], job_span, delegation, **context))
+                    except InteropError as exc:  # answered as the handler path answers one (FAA-196 (27))
+                        return tool_result({"error": {"code": "tool-error", "message": str(exc)}}, is_error=True, traceparent=job_span)
             return tool_result({"job": self.jobs.get(job_id)}, traceparent=job_span)
         except UnknownJob:
             return unknown_job_result(job_id, traceparent=span)

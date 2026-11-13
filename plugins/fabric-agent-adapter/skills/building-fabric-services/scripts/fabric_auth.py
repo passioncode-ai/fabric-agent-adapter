@@ -40,6 +40,7 @@ from fabric_descriptor import (
     names_repository,
     source_refusal,
     validate_descriptor,
+    warn_no_source,
     write_descriptor,
 )
 
@@ -399,7 +400,7 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
     if source is None:  # a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
         try:
             installed = json.loads(descriptor_path(service_id, instance, root).read_text(encoding="utf-8")).get("source")
-        except (OSError, ValueError, AttributeError):
+        except (OSError, ValueError, AttributeError, RecursionError):  # nested thousands deep (FAA-200 (10))
             installed = None
         # Only one the kit accepts: a hand-edited source never blocks a rotation; it is dropped with the warning.
         base = set(validate_descriptor(descriptor))
@@ -415,9 +416,12 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
     refusal = source_refusal(descriptor, root)  # before the token is written: a refused install leaves nothing (FAA-198)
     if refusal:
         raise ServiceError(refusal)
+    warned = not names_repository(descriptor)
+    if warned:  # before the token: under warnings as errors neither file changes (FAA-200 (1))
+        warn_no_source(descriptor, 2)  # the warning names the installer's call
     ensure_private_dir(token_file.parent)
     atomic_write(token_file, token.strip().encode(), 0o600)
-    return write_descriptor(descriptor, root, _stacklevel=3)  # the warning names the installer's call
+    return write_descriptor(descriptor, root, _warned=warned)
 
 
 def cookie_value(cookie_header: Optional[str], name: str = SESSION_COOKIE) -> Optional[str]:

@@ -9,7 +9,7 @@ import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabri
 import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
-import { CheckedAgent, LSOF, ListenerRefused, PS, SERVER_NOT_OWN, TABLE_RESTRICTED, UNKNOWN, parseLsofListeners, parsePsUid,
+import { CheckedAgent, ListenerRefused, PS, SERVER_NOT_OWN, TABLE_RESTRICTED, UNKNOWN, parsePsUid, pidListens,
   runProgram, serverEnd } from './fabric-peer-owner.mjs';
 import http from 'node:http';
 import net from 'node:net';
@@ -60,7 +60,7 @@ function noMarkerArgument(argv) {
 // An environment value: read path-aware (secretArgument) only when it reads as a path (it starts as one, has at least two
 // separators and a lower-case word between them), so a release folder under Application Support is no key (FAA-266) while
 // a base64 key whose `/` splits it stays one; any other value keeps the strict secretValue.
-const secretEnvValue = (value) => {
+export const secretEnvValue = (value) => {
   const pieces = value.split(/[\\/]/);
   const path = /^(?:[/~.]|[A-Za-z]:[\\/])/.test(value) && pieces.length >= 3 && pieces.some((x) => /^[a-z][a-z0-9_-]{2,}$/.test(x));
   return path ? secretArgument(value) : secretValue(value);
@@ -609,16 +609,9 @@ function loopbackWellKnown(port, agent, host = '127.0.0.1') {
 }
 
 // Whether launchd's job `pid` listens on exactly 127.0.0.1:<port>, never the wildcard, asked of the process itself (`lsof -p`),
-// which a restricted socket table does not hide. Only for a LaunchDaemon root bootstrapped, whose pid launchd named.
-async function jobListens(pid, port, run = runProgram, platform = process.platform) {
-  if (platform !== 'darwin' || !Number.isInteger(pid) || pid <= 1) return false;
-  try {
-    const out = await run(LSOF, ['-nP', '-a', '-p', String(pid), '-i4TCP', '-sTCP:LISTEN', '-Fn']);
-    return parseLsofListeners(out).some(([host, p]) => host === '127.0.0.1' && p === port); // exact bind, as RT-3
-  } catch {
-    return false;
-  }
-}
+// which a restricted socket table does not hide. Only for a LaunchDaemon root bootstrapped, whose pid launchd named. The
+// peer owner's one lsof reader, the uid left to the caller, which checks the job's UserName itself (FAA-286 item 1).
+const jobListens = (pid, port, run = runProgram, platform = process.platform) => pidListens(pid, port, { run, platform, owner: null });
 
 // The uid account `name` has on this machine (`id -u`), or null when it has none.
 function accountUid(name, run) {

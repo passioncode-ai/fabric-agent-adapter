@@ -3,6 +3,7 @@ data. Part of the board connector (FAA-65, layer L4), below the responder in fab
 names. Standard library only, Python 3.9+."""
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import re
@@ -98,17 +99,29 @@ class BoardSession:
         return value
 
     def close(self, timeout: Optional[float] = None) -> bool:
-        """Sends the DELETE (waiting `timeout` seconds at most when above 0, else the session's); True when Fabric answered it with a
+        """Sends the DELETE (waiting `timeout` seconds at most for the whole of it when above 0, FAA-187 (12), else the
+        session's per read); True when Fabric answered it with a
         2xx, so the slots are free now. False otherwise, a 404 (the session was already gone) included: a move made
         before it ended may be read only at the next com.status, so the slot records stay; the lease lapses in 60 s."""
         with self._lock:
             if self.mcp_session is None:
                 return False
+            got: List[Any] = []
+
+            def send() -> None:
+                try:
+                    got.append(self._send({}, method="DELETE", timeout=timeout))
+                except Exception:  # noqa: BLE001 - any failure is no release, as the Node twin's catch reads it
+                    pass
             try:
-                answer = self._send({}, method="DELETE", timeout=timeout)
+                if timeout is not None and timeout > 0:  # the whole DELETE, not each socket read (FAA-187 (12))
+                    worker = threading.Thread(target=send, name="board-leave", daemon=True)
+                    worker.start()
+                    worker.join(timeout)
+                else:
+                    send()
+                answer = got[0] if got else None
                 status = answer[0] if isinstance(answer, (tuple, list)) and answer and isinstance(answer[0], int) else 0
-            except Exception:  # noqa: BLE001 - any failure is no release, as the Node twin's catch reads it
-                status = 0
             finally:
                 self.mcp_session = None  # an answer it cannot read is no release, as the Node twin reads it
             return 200 <= status < 300
@@ -263,6 +276,10 @@ def _bounded_int(literal: str) -> int:
     return int(literal)
 
 
+#: `mandate/1` as a block may write it: its slash plain or JSON-escaped (`\\/`, `\\u002f`).
+_KIND_WRITTEN = re.compile(r"mandate(?:/|\\/|\\u002[fF])1")
+
+
 def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """The mandate a request carries, read only when the service opted in (`agent_id` and `mandate_from` set), the board
     verified the sender (`provenance: trusted`) and its Project is one `mandate_from` names (or `PERSONAL_BOARD`): a T1
@@ -285,7 +302,7 @@ def read_mandate(request: "BoardRequest", mandate_from: Any, agent_id: Optional[
         try:
             value = json.loads(block, parse_constant=_no_constant, parse_int=_bounded_int)
         except (ValueError, RecursionError):
-            if "mandate/1" in block:
+            if _KIND_WRITTEN.search(block):  # the kind as written, a JSON escape of its slash included (FAA-196 (13))
                 return None, "mandate-unreadable"
             continue
         if isinstance(value, dict) and value.get("kind") == "mandate/1":
@@ -300,9 +317,10 @@ CALL_MEMBERS = ("capability", "action", "effect", "spendUsd", "project")  # what
 
 
 def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str], wall: Callable[[], float],
-           caller: Any = None) -> Optional[Dict[str, Any]]:
-    """`mandate_covers` for a call under a board request's mandate, its sender placed as T1 and no caller agent id (the
-    board names a Project's principal, not an agent the chain can bind; the chain's end alone binds it, MD-3). A covered
+           caller: Any = None, caller_agent: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """`mandate_covers` for a call under a board request's mandate, its sender placed as T1. The caller's agent id is
+    `caller_agent`, what the service's identify_agent hook named for the sender (`sender_agent`, FAA-135); without one
+    the chain's end alone binds it (the board names a Project's principal, MD-3). A covered
     answer's `recordAs` names `caller`, the sender Project the board verified (MD-3 records the caller, as the action
     path does). None when no mandate travelled: the handler asks the operator as it would without one. The call's
     `spendUsd` and `project` are read failing closed, as the kit's other mandate readers read them (FAA-139): a spend
@@ -334,10 +352,52 @@ def covers(mandate: Optional[Dict[str, Any]], call: Any, agent_id: Optional[str]
             now = _format_rfc3339(clock * 1000) if math.isfinite(clock) else ""
         except (OverflowError, ValueError):  # finite but outside the dates a clock can name
             now = ""
-    answer = _mandate.mandate_covers({"mandate": mandate, "tier": "T1", "now": now, "self": agent_id, "call": call})
+    inputs = {"mandate": mandate, "tier": "T1", "now": now, "self": agent_id, "call": call}
+    if caller_agent is not None:
+        inputs["callerAgent"] = caller_agent
+    answer = _mandate.mandate_covers(inputs)
     if "recordAs" in answer:
         answer = {"ok": True, "recordAs": dict(answer["recordAs"], caller=caller)}
     return answer
+
+
+def notice_links(links: Any) -> Dict[str, str]:
+    """A responder's `links` (FAA-187 (21)): the page on the service that resolves each notify kind, such as
+    `{"board.slot.moved": "/#board"}`, passed to a notice that notifies as its `link` (events-and-notifications.md).
+    A path on the service, as make_event takes one; None is none. A service that gives links has an emit that takes
+    `link` (JsonlEventLog.append does)."""
+    if links is None:
+        return {}
+    if not isinstance(links, Mapping) or not all(isinstance(k, str) and isinstance(v, str) and v.startswith("/")
+                                                 and not v.startswith("//") for k, v in links.items()):
+        raise BoardError("invalid_arguments", "links maps an event kind to a path on this service, such as /#board.")
+    return dict(links)
+
+
+def read_back_problem(message: Any, entry: Dict[str, Any], project: str) -> Optional[str]:
+    """Why a message read back with com.get is not the request a claim took (the first path refuses it, a resume reads
+    no mandate from it, FAA-196 (1)): `digest-mismatch` (another digest than the claim's), `not-addressed` (not this
+    request, capability and Project), else None."""
+    if not isinstance(message, dict) or message.get("digest") != entry["digest"]:
+        return "digest-mismatch"
+    req = message.get("request")
+    if not isinstance(req, dict) or req.get("id") != entry["request"] or req.get("capability") != entry["capability"] \
+            or req.get("target") != project:
+        return "not-addressed"
+    return None
+
+
+def sender_agent(identify_agent: Optional[Callable[[Any], Optional[str]]], sender: Any, mandate: Any = True) -> Optional[str]:
+    """FAA-135: the agent id the service's identify_agent(sender) names for a request's sender (the board's verified
+    `{project, principal}`), read as the interop kit reads its own hook (`identified_agent`): None is none, an agent id
+    is that id, anything else, or a hook that raises, is an id no chain holds, so the mandate is refused. Asked only
+    when a mandate travelled (`mandate` not None)."""
+    if identify_agent is None or mandate is None:
+        return None
+    try:
+        return _rules.identified_agent(identify_agent(sender))
+    except Exception:  # noqa: BLE001 - the service's own hook: fail closed
+        return _rules.UNREADABLE_AGENT
 
 
 def mandate_options(agent_id: Any, mandate_from: Any) -> Any:
@@ -359,3 +419,31 @@ def mandate_options(agent_id: Any, mandate_from: Any) -> Any:
 def _fold(project: str) -> str:
     """A Project id as Fabric's board compares it: a uuid lower-cased, any other id as written (_hub._project)."""
     return project.lower() if _hub.UUID.fullmatch(project) else project
+
+
+def notice_subject(value: Dict[str, Any], project: str, episode: Optional[str] = None) -> Dict[str, str]:
+    """A notice's subject (`{type, id}`): its request, else its capability, else its episode (a cause such as a block's
+    code, so two causes are two episodes for a host, seam r31), else the Project."""
+    for kind, given in (("request", value.get("request")), ("capability", value.get("capability")), ("episode", episode)):
+        if isinstance(given, str) and 0 < len(given) <= 128:
+            return {"type": kind, "id": given}
+    return {"type": "project", "id": project}
+
+
+def takes_subject(emit: Callable[..., Any]) -> bool:
+    """Whether an emit's signature names a `subject` parameter, as JsonlEventLog.append does. Any other emit (one with
+    only **kwargs, which may forward them to a sink without it or set its own, or one whose signature cannot be read)
+    is called as 0.55.0 called it, without one (0.56.0 unit r33). A subject already bound into the emit, as with
+    functools.partial(log.append, subject=...), stands.
+
+    The signature is the emit's own, not a wrapped function's: a functools.wraps forwarder that sets its own subject
+    would otherwise be passed a second one (0.56.0 unit r34). Nothing here raises, so a notice never stops the
+    responder. A positional-only `subject` cannot take the keyword the responder passes, so it counts as none (FAA-187
+    (26)); the responder's own module imports both helpers under their old private names (moved here in 0.83.0).
+    """
+    try:
+        params = inspect.signature(emit, follow_wrapped=False).parameters.values()
+        return any(p.name == "subject" and p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+                   and (p.default is inspect.Parameter.empty or p.default is None) for p in params)
+    except Exception:  # noqa: BLE001 - an unreadable signature (or a default that raises) is called without one
+        return False

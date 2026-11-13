@@ -18,25 +18,34 @@ export function servicesDir(platform = process.platform) {
   return path.join(process.env.XDG_DATA_HOME || path.join(home, '.local/share'), 'passioncode-fabric/services');
 }
 
+// FABRIC_DATA_HOME (FAA-192): an absolute folder on a durable volume holds the data folder, <home>/<id>, on a host whose
+// own disk does not persist; logs and cache stay where the OS puts them. A relative value is refused.
+function durable(id, dirs) {
+  const value = process.env.FABRIC_DATA_HOME;
+  if (!value) return dirs;
+  if (!path.isAbsolute(value)) throw new ServiceError('FABRIC_DATA_HOME is an absolute folder on a durable volume.');
+  return { ...dirs, data: path.join(value, id) };
+}
+
 export function serviceDirs(id, platform = process.platform) {
   if (!ID.test(id)) throw new ServiceError(`Service id ${id} must match ${ID}.`);
   const home = os.homedir();
   if (platform === 'darwin') {
-    return {
+    return durable(id, {
       data: path.join(home, 'Library/Application Support', id),
       logs: path.join(home, 'Library/Logs', id),
       cache: path.join(home, 'Library/Caches', id),
-    };
+    });
   }
   if (platform === 'win32') {
     const data = path.join(localAppData(), id);
-    return { data, logs: path.join(data, 'Logs'), cache: path.join(data, 'Cache') };
+    return durable(id, { data, logs: path.join(data, 'Logs'), cache: path.join(data, 'Cache') });
   }
-  return {
+  return durable(id, {
     data: path.join(process.env.XDG_DATA_HOME || path.join(home, '.local/share'), id),
     logs: path.join(process.env.XDG_STATE_HOME || path.join(home, '.local/state'), id, 'logs'),
     cache: path.join(process.env.XDG_CACHE_HOME || path.join(home, '.cache'), id),
-  };
+  });
 }
 
 /**
@@ -50,6 +59,10 @@ export function instanceDirs(id, instance = 'default', platform = process.platfo
   const folder = `${id}.${instance}`;
   if (platform === 'win32') {
     const data = path.join(path.dirname(personal.data), folder);
+    if (process.env.FABRIC_DATA_HOME) { // logs and cache stay on the local disk, beside the default's
+      const local = path.join(path.dirname(path.dirname(personal.logs)), folder);
+      return { data, logs: path.join(local, 'Logs'), cache: path.join(local, 'Cache') };
+    }
     return { data, logs: path.join(data, 'Logs'), cache: path.join(data, 'Cache') };
   }
   if (platform === 'darwin') return Object.fromEntries(Object.entries(personal).map(([key, dir]) => [key, path.join(path.dirname(dir), folder)]));

@@ -30,8 +30,10 @@ model, FAC-SEM-112) and `openrouter-attribution.md` (FAC-SEM-098). The kit that 
   primary is closed (DEC-0083: declare `reads: ["user-content"]` on the profile; FAC-SEM-112 refuses a route without
   one). Closed vendors refuse or hedge on whole topics; the lane must still handle the worst message it receives.
 - **A judge is another vendor than the writer.** A model grading its own family rates its own habits.
-- **Declare classes, not names, in the agent's profile** (`modelClasses`): the policy and the binding narrow them, and
-  the host resolves the model. A hard-coded model name in code is a release to change it.
+- **Name catalogue models in the profile, and classes where the contract keeps them**: at the pin a model profile names
+  catalogue model ids per lane, and `modelClasses` lives on the project's spend policy or a grant, which narrow the
+  profile's models (building-fabric-services, `references/profiles.md`); the host resolves the model. A hard-coded model
+  name in code is a release to change it.
 
 ## A starting choice
 

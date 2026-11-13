@@ -46,6 +46,8 @@ from fabric_jsvalue import (  # noqa: E402 - the core (FAA-65)
 )
 from fabric_paths import atomic_write as _atomic_write  # noqa: E402 - the kit's private writer (FAA-85)
 import fabric_peer_owner as _po  # noqa: E402 - a loopback key set is read from this account's listener only (FAA-255)
+import fabric_secrets  # noqa: E402 - the WHATWG host reading (FAA-98, FAA-309)
+import fabric_socket_proof  # noqa: E402 - the one loopback host rule (FAA-187 (15))
 from fabric_mandate import effect_closure  # noqa: E402,F401 - defined once beside the mandate that reads it too (DEC-0125)
 
 REFUSAL_CODES = (
@@ -621,16 +623,10 @@ def action_digest(action: Any) -> str:
 
 # --- the estate's keys ----------------------------------------------------------------------------------------
 
-def _loopback(host: str) -> bool:
-    if host == "localhost":
-        return True
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    # A zone (`::1%eth0`) is no loopback: urllib decodes `%3A80` in it into another address (0.56.0 seam r13).
-    # Nor an IPv4-mapped address, which Python 3.13+ counts as loopback and 3.9 and Node do not (0.56.0 seam r14).
-    return address.is_loopback and not getattr(address, "scope_id", None) and not getattr(address, "ipv4_mapped", None)
+#: A key set source's loopback host, the kit's one rule (fabric_socket_proof.loopback_host), shared with fabric_http's
+#: check_url, so a source starts a service on both kits alike (FAA-187 (15); `127.1`, `2130706433`, a name under
+#: `.localhost`). A zone and an IPv4-mapped address stay refused, as before (0.56.0 seam r13, r14).
+_loopback = fabric_socket_proof.loopback_host
 
 
 # fabric_http._URL_ENDS (this module may not import fabric_http; test_fabric_delegation pins them equal).
@@ -663,7 +659,16 @@ def _source_authority_ok(parts: urllib.parse.SplitResult) -> bool:
         parts.port  # noqa: B018 - raises on a port above 65535
     except ValueError:
         return False
-    return bool(parts.hostname)
+    # A host `new URL` refuses for its structure (`a127.0.0.1`, `09`), or one Python's IDNA codec cannot write for
+    # http.client (U+180E), is refused here as check_url refuses it, never read and failed on every call (FAA-187 (14),
+    # (16)).
+    host = parts.hostname or ""
+    try:
+        if not host.isascii():
+            host.encode("idna")
+    except UnicodeError:
+        return False
+    return bool(host) and not fabric_secrets.url_refused(parts.geturl())
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -734,7 +739,7 @@ def _fetch(source: str) -> Any:
                     body += chunk
             if deadline["fired"] or time.monotonic() > deadline["end"]:
                 raise TimeoutError("the key set did not arrive within %s s" % JWKS_FETCH_SECONDS)
-            return json.loads(body[:65536])
+            return json.loads(body[:65536], parse_constant=_no_constant)  # NaN is no JSON, as JSON.parse reads it (FAA-194)
         except urllib.error.HTTPError as exc:
             exc.close()
             raise
@@ -745,7 +750,7 @@ def _fetch(source: str) -> Any:
         finally:
             if deadline["timer"] is not None:
                 deadline["timer"].cancel()
-    return json.loads(Path(source).expanduser().read_text())
+    return json.loads(Path(source).expanduser().read_text(), parse_constant=_no_constant)
 
 
 class JwksCache:
