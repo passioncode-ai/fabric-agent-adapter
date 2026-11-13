@@ -335,6 +335,26 @@ class AnAgentThatAnswersPeople(unittest.TestCase):
             self.assertIn(words, a5, words)
         self.assertIn("calibration carried only once its readers adopted DEC-0144", " ".join(scenario()["expected"]))
 
+    def test_the_intro_contents_and_checklist_head_are_pinned(self):
+        """FAA-182 (6): the intro paragraph and the Contents list were pinned by nothing, and text could sit between the
+        Checklist heading and its first item unseen."""
+        page = text(REFERENCE)
+        intro = " ".join(page.split("## Contents")[0].split())
+        for clause in ("**Load this when the agent you are building answers people**",
+                       "Every item below is a part of the agent, built and tested in its first release, not a later "
+                       "improvement.", "their numbers are that estate's, never a forecast.",
+                       "Read both sources before you design the reply pipeline.",
+                       "is one draft-and-check step of such an agent, not the agent"):
+            self.assertIn(clause, intro, clause)
+        headings = re.findall(r"^## (.+)$", page, flags=re.MULTILINE)
+        listed = re.findall(r"^- \[(.+?)\]\(#([a-z0-9-]+)\)$", page.split("## Contents")[1].split("\n## ")[0],
+                            flags=re.MULTILINE)
+        self.assertEqual([title for title, _ in listed], [h for h in headings if h != "Contents"], "every section, in order")
+        for title, anchor in listed:
+            self.assertEqual(anchor, re.sub(r"[^a-z0-9 -]", "", title.lower()).replace(" ", "-"), title)
+        head = page.split("## Checklist")[1].lstrip("\n").splitlines()[0]
+        self.assertTrue(head.startswith("- [ ] "), "the checklist's first line is its first item: %r" % head)
+
     def test_the_sources_are_addressed_by_commit(self):
         reference = flat(REFERENCE)
         for words in ("agent-stack/blob/28a0303c42038778e2650fc51096e589f4035239/", "support-quality.md",

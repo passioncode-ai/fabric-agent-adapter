@@ -272,8 +272,11 @@ export class JobStore {
   // job's private part (the format fabric_interop.py writes) so a service reads an answer's _meta.mandate for that step.
   // A step is kept as the gate reads it (keptStep), so a job's start and its answer agree.
   requestInput(jobId, inputRequests, statusMessage, { steps } = {}) {
+    // a plain object (its prototype Object's or none), as Python's dict: a Date, a boxed String or a class instance is
+    // not stored as what was checked (FAA-196 (29))
+    const plainObject = (value) => value !== null && typeof value === 'object' && [Object.prototype, null].includes(Object.getPrototypeOf(value));
     const entries = Object.entries(inputRequests ?? {});
-    if (!entries.length || Array.isArray(inputRequests) || typeof inputRequests !== 'object') throw new InteropError('input_required needs a JSON object of at least one input request.'); // a JSON object of requests, first (unit 38, 40)
+    if (!entries.length || !plainObject(inputRequests)) throw new InteropError('input_required needs a JSON object of at least one input request.'); // a JSON object of requests, first (unit 38, 40)
     if (steps !== null && steps !== undefined && (typeof steps !== 'object' || Array.isArray(steps))) { // FAA-196 (26)
       throw new InteropError('steps maps an input request\'s key to its approval step: a JSON object, or none.');
     }
@@ -282,7 +285,7 @@ export class JobStore {
       kept[key] = Object.hasOwn(inputRequests, key) && step !== null && step !== undefined ? keptStep(step) : {};
       if (!EFFECT_CLASSES.includes(kept[key].effect)) throw new InteropError(`Step ${key}: an input request's key with its effect class (DEC-0125).`);
     }
-    for (const [key, request] of entries) if (!KEY.test(key) || request === null || typeof request !== 'object' || Array.isArray(request) || request.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
+    for (const [key, request] of entries) if (!KEY.test(key) || !plainObject(request) || !Object.hasOwn(request, 'method') || request.method !== 'elicitation/create') throw new InteropError(`Input request ${key} must be a keyed elicitation/create request.`);
     const [finding] = inputRequestLinkFindings({ inputRequests }); // FAC-SEM-143 (D12)
     if (finding) throw new InteropError(`${finding.instancePath}: ${finding.message}`);
     return this.transition(jobId, 'input_required', { inputRequests, statusMessage }, { steps: kept });

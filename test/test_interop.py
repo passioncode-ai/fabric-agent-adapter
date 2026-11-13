@@ -1210,6 +1210,25 @@ class JobApprovalStepTests(unittest.TestCase):
                                   "chain": ["example-lead", "example-agent"], "source": SOURCE})
         self.assertEqual(self.jobs.get(job_id)["status"], "working")
 
+    def test_a_str_subclass_key_is_read_as_its_exact_str(self):
+        """FAA-196 (30): a (str, Enum) or str-subclass step key waited at the start (`outside-mandate: action`, since
+        job_step reads the action as an exact str) while the same mandate covered the answer; it reads as its str."""
+        import enum
+
+        class Step(str, enum.Enum):
+            APPROVE = "approve-reply"
+
+        class Key(str):
+            pass
+
+        for key in (Step.APPROVE, Key("approve-reply")):
+            with self.subTest(key=type(key).__name__):
+                self.start({"mandate": relayed_mandate()})
+                job_id, ctx = self.contexts[-1]
+                request = fi.choice_request("Publish the reply?", "choice", [("yes", "Yes"), ("no", "No")])
+                record = ctx.approval_step(job_id, key, request, effect="reply")
+                self.assertEqual(record and record["via"], "mandate", self.jobs.get(job_id).get("statusMessage"))
+
     def test_identify_agent_binds_the_steps_mandate_at_the_start_and_at_the_answer(self):
         """FAA-135: the agent id identify_agent names for the start call binds the chain at the job's own approval step;
         an answer's mandate is read with the agent id the answering call's credential names."""

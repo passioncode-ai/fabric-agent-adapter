@@ -46,6 +46,9 @@ def has_jwt(text):
     return False
 
 
+# Kept here, not imported: this gate runs alone in a dashboard's own checkout with no kit beside it, and its three copies
+# stay byte-identical (test_dashboard_links.py). It is broader than `fabric_secrets` on purpose (FAA-136, FAA-187 (4)): a
+# page link that only looks like a secret is refused, since a link is never a place for one.
 # The contract's SECRET_VALUE at the pin (DEC-0151): `Bearer ` at a value's start in any case, or a provider key with its
 # prefix in its canonical case after a boundary (the start, a character that is no ASCII letter or digit, or an escape);
 # an `sk-` key holds a digit and an upper-case letter with 16 or more characters, or a digit with 32 or more.

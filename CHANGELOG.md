@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.85.0 (2026-11-13)
+
+Wave 7 of the backlog sweep of 2026-11-12, part one. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
+
+### Fixed
+
+- **A number subclass is written as the number it stores** (FAA-196 (22)): `js_string`, and so `json_stringify`,
+  `key_of` and `fabric_http.json_bytes`, wrote an `int` or `float` subclass through its own `repr`, so
+  `json_bytes({'costUsd': numpy.float64(0.25)})` put `np.float64(0.25)` on the wire; it now writes `0.25`.
+- **The core `mandate_covers` reads a call as the board path does** (FAA-196 (21)): the five members the contract reads,
+  each once as `call[name]`, so a caller's `__getitem__` override or `defaultdict` default answers on both paths alike,
+  never the dict's storage on one of them.
+- **`approval_step` reads a `(str, Enum)` or `str`-subclass key as its exact `str`** (FAA-196 (30)): such a key waited
+  at the start (`outside-mandate: action`) under a mandate that covered the same step's answer.
+- **Node's `JobStore.requestInput` takes plain objects only** (FAA-196 (29)): a request or a requests container that is
+  a `Date`, a boxed `String`, a class instance or one whose `method` is inherited is refused with `InteropError`, as
+  Python refuses what is no dict; before, it was stored as something other than what was checked.
+
+### Changed
+
+- `operator_mandate` / `operatorMandate` say that a relayed mandate takes the relay's expiry as `expires_at` /
+  `expiresAt` (DEC-0126 OA-3), since a day after a relayed `at` may already have passed (FAA-196 (14)); the default is
+  unchanged.
+- `check_dashboard_link.py` says why it keeps its own secret rule rather than importing `fabric_secrets`: it runs alone
+  in a dashboard's checkout, and it is broader on purpose (FAA-187 (4)).
+- The answering-agents reference's intro, its Contents list (every section, in order, each anchor its heading's) and
+  the Checklist's first line are pinned by `test_answering_agents_prose` (FAA-182 (6)).
+- `docs/evidence/measurements/2026-11-13-faa-256-owner-check-windows.md` records the Node owner check on Windows: a
+  median of about 0.31 s per new loopback connection on each side (FAA-256), and that Fabric's hub keeps idle
+  connections for Node's default 5 s, above the kit client's 2 s.
+
 ## 0.84.1 (2026-11-13)
 
 0.84.0 was tagged and not published: its release run failed one Node 18 test on the hosted floor runner.

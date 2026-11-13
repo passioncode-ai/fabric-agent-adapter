@@ -19,7 +19,9 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.82.0 | wave 4: FAA-311 (SA-6), FAA-312, 313, 315, 318, FAA-304, 306, 309, 314, 316, 317, FAA-303, FAA-308, FAA-292's decision, and the seven findings of its blind seam reading; rows FAA-320 to FAA-323 | PR #283, merge `4a3c5659`, tag `v0.82.0`, release run 43302458275 success, npm `latest` 0.82.0 |
 | 0.83.0 | wave 5 (the triage of all 64 open rows, `docs/evidence/specs/2026-11-12-wave5-triage.json`): new kit modules `fabric_socket_proof` (FAA-292, 272), `fabric_tailnet_identity` (FAA-324, board request `087f41ef`, reading the agents base's `door-groups/1`), `fabric_ops_digest` (FAA-206), `fabric_a2a_server` (FAA-10), `fabric_interop_rules` (FAA-135); FAA-320 to 323, FAA-321, FAA-250, FAA-66, FAA-260, FAA-296 and parts of 17 more; the Node 18 floor check; the seam reading's three breaks fixed; `AGENTS.md` 1a and 1b; the architect's scan | PR #284, merge `6f18283b`, tag `v0.83.0`; its release run 43350367412 failed one Windows test (`an in-place rewrite is seen`), nothing published |
 | 0.83.1 | 0.83.0 shipped; a same-size rewrite of the tailnet groups file within one timestamp tick is seen (racy-clean reread, both twins) | PR #285, merge `254dc076`, tag `v0.83.1`, release run 43355019349 success, npm `latest` 0.83.1; board request `087f41ef` completed (answer `01cf9b04`) |
-| 0.84.0 | wave 6: FAA-325 to FAA-328, FAA-192 items 1 and 15 (the operator's decisions of 2026-11-13: the cloud template not named; an SPDX line in every kit module and the dashboard kit, 1.1.9); the blind seam reading's two breaks fixed (the peer owner's install closure keeps `fabric_socket_proof`; zoned and IPv4-mapped loopback never read unchecked), `PEER_OWNER_VERSION` `1.3.1+kit.8` | PR, merge and tag `v0.84.0` on `agent/faa-0.84.0`; the release run and npm in the next cut of this file |
+| 0.84.0 | wave 6: FAA-325 to FAA-328, FAA-192 items 1 and 15 (the operator's decisions of 2026-11-13: the cloud template not named; an SPDX line in every kit module and the dashboard kit, 1.1.9); the blind seam reading's two breaks fixed (the peer owner's install closure keeps `fabric_socket_proof`; zoned and IPv4-mapped loopback never read unchecked), `PEER_OWNER_VERSION` `1.3.1+kit.8` | PR #286, merge `aabab103`, tag `v0.84.0`; its release run 43421488665 failed one Node 18 timing test (`floors`), nothing published |
+| 0.84.1 | 0.84.0 shipped; the board mandate's linear-time test compares 256 KiB with 1 MiB and repeats each read until 50 ms of CPU time (Windows' 15.6 ms ticks), both twins | PR #287, merge `ba493e73`, tag `v0.84.1`, release run 43426718391 success, npm `latest` 0.84.1, GitHub release `v0.84.1` |
+| 0.85.0 | wave 7, part one: FAA-196 (14), (21), (22) reachable part, (29), (30); FAA-187 (4); FAA-182 and FAA-277 done; FAA-243 and FAA-256 done (the Windows owner check measured) | PR, merge and tag `v0.85.0` on `agent/faa-0.85.0`; the release run in the next cut of this file |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -29,13 +31,13 @@ Recorded for the operator; later builder briefs name the rule.
 
 ## Next task
 
-1. Read 0.84.0's release run and npm (`npm view @passioncode-ai/fabric-agent-adapter version` reads 0.84.0); a red
-   platform job means the next patch, as for 0.79.1, 0.80.2 and 0.83.1.
-2. Wave 7: a fresh triage of the 59 rows not done (`docs/backlog.md`), item by item against the code at 0.84.0, into
-   `docs/evidence/specs/2026-11-13-wave7-triage.json` in the wave 5 triage's shape; the session's sub-agents hit the
-   account's weekly limit on 2026-11-13 (it resets 2026-11-18 22:00 Europe/Warsaw), so the triage and the builders run
-   in one session or after the reset. Left doable by the wave 5 triage: FAA-187, 189, 190, 192 (5, 19, 20, 25, 26, 28,
-   30), 194, 196, 200, 182, 233, 256, 264, 271, 273, 116, 243.
+1. Read 0.85.0's release run and npm; a red platform job means the next patch, as for 0.79.1, 0.80.2, 0.83.1 and 0.84.1.
+2. Wave 7, part two, row by row: what is left is in each row's status line. The large rows: FAA-190
+   (104 items, about 90 open), FAA-200 (57, about 45), FAA-194 (40, about 30), FAA-273 ((5), (8), (10), (11) the
+   cache half, (15), (17), (21), (22); `fabric_peer_owner.py` sits at 1000 lines, so (11) needs room made first),
+   FAA-192 ((5), (19), (20), (21), (25), (26), (28), (30)), FAA-187 ((3), (10)). Sub-agents of this account hit their
+   weekly limit on 2026-11-13 and come back 2026-11-18 22:00 Europe/Warsaw: from then, one triage agent per large row
+   and two or three builders, as waves 5 and 6 ran.
 3. FAA-87: the operator signs in to npm in the browser (`npm login --auth-type=web`; `npm whoami` answered E401 on
    2026-11-13); then `npm trust github @passioncode-ai/fabric-agent-adapter --file release.yml --repo
    passioncode-ai/fabric-agent-adapter --allow-publish --yes`, drop `NODE_AUTH_TOKEN` from `release.yml` and delete the
@@ -43,8 +45,8 @@ Recorded for the operator; later builder briefs name the rule.
 4. The three hosts the operator offered (2026-11-13): a Hermes A2A endpoint (FAA-10's live test), a Windows machine
    with Claude Code (FAA-183), a headless Mac with root for one LaunchDaemon install (FAA-286 (4)); each waits for how
    to reach it.
-5. Seam reading of 0.84.0, not blocking, on the board as data only: the take-back mark lives in memory (`board.md`
-   says "in the same process"); file a row if a consumer needs it across a restart.
+5. FAA-116 builds the rest of an answering agent: it goes through the agent architect first (the operator's rule of
+   2026-11-12), `python3 ~/DATA/fabric-agents-database/tools/audit.py consult "<the need>"`.
 
 ## Waits
 

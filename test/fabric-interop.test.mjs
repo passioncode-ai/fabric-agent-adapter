@@ -127,6 +127,25 @@ test('requestInput refuses steps that are no object; the job stays working', () 
   assert.equal(store.requestInput(id, { approve: request }, null, { steps: null }).status, 'input_required');
 });
 
+// FAA-196 (29): a request or a container that is no plain object (a boxed String, a Date, a class instance, a method
+// inherited) is refused as Python refuses what is no dict; the stored request is the one checked.
+test('requestInput takes plain objects only, each request with its own method', () => {
+  const store = new i.JobStore(temp());
+  const id = store.create('example.draft', {}).job.id;
+  const request = i.choiceRequest('Publish?', 'choice', [['yes', 'Yes']]);
+  class Request { constructor() { Object.assign(this, request); } }
+  const boxed = Object.assign(new String('x'), { method: 'elicitation/create', params: request.params });
+  const dated = Object.assign(new Date(0), { method: 'elicitation/create', params: request.params });
+  const inherited = Object.assign(Object.create({ method: 'elicitation/create' }), { params: request.params });
+  for (const bad of [boxed, dated, new Request(), inherited]) {
+    assert.throws(() => store.requestInput(id, { approve: bad }), i.InteropError, String(bad?.constructor?.name));
+  }
+  const container = Object.assign(new Date(0), { approve: request });
+  assert.throws(() => store.requestInput(id, container), i.InteropError, 'the requests container');
+  assert.equal(store.get(id).status, 'working');
+  assert.equal(store.requestInput(id, Object.assign(Object.create(null), { approve: request })).status, 'input_required');
+});
+
 // MCP 2026-07-28 standard headers: the Node twin agrees with fabric_interop.py.
 test('mcpHeaderProblem refuses a declared request without Mcp-Method/Mcp-Name and any mismatch; matching headers pass', () => {
   const call = { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'sample.echo', arguments: {} } };

@@ -130,6 +130,25 @@ class Cases(unittest.TestCase):
                 self.assertEqual(got, case["expect"])
 
 
+class NumberSubclasses(unittest.TestCase):
+    def test_a_number_subclass_is_written_by_the_number_it_stores(self):
+        """FAA-196 (22): js_string wrote a float subclass by its repr, so json_bytes({'costUsd': numpy.float64(0.25)})
+        put `np.float64(0.25)` on the wire; an int or float subclass is written as the number it stores."""
+        class Money(float):
+            def __repr__(self):
+                return "Money(%s)" % float.__repr__(self)
+
+            __str__ = __repr__
+
+        class Count(int):
+            def __repr__(self):
+                return "Count(%s)" % int.__repr__(self)
+
+            __str__ = __repr__
+
+        self.assertEqual(fh.json_bytes({"costUsd": Money(0.25), "calls": Count(3)}), b'{"costUsd":0.25,"calls":3}')
+
+
 class Rules(unittest.TestCase):
     def test_no_secret_in_an_error(self):
         case = {"method": "GET", "url": "https://api.example/v1?api_key=sk-or-v1-SECRET",
