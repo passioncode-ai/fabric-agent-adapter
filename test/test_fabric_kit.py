@@ -6,6 +6,7 @@
 - No kit module grows past MAX_LINES; OVERSIZE names the ones still being split and only shrinks.
 - `fabric_kit.py install` copies a closure that runs in a clean interpreter with nothing else on its path, and
   `status` tells a current copy from an older release, an edited one, and a one-file copy that is missing modules.
+- Every kit module carries the package's SPDX licence line at its top, so a copy in any project keeps it (FAA-192 15).
 """
 import ast
 import json
@@ -39,6 +40,25 @@ KEEP_OWN = {
 }
 CORE_ALIASES = {"_js_string", "_show", "_same", "_double", "_number", "_json_equal", "_safe_integer", "_js_to_number",
                 "_json_stringify", "_b64url", "_sha256", "_utc_date_ms", "_days_from_civil", "_list", "_indexed"}
+
+
+#: FAA-192 item (15), the operator's decision of 2026-11-13: every kit module carries the package's licence as an SPDX
+#: line, right after the shebang or as its first line, so every copy `install` makes keeps it (a JSON data file cannot).
+LICENSE_EXPRESSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["license"]
+SPDX = "SPDX-License-Identifier: " + LICENSE_EXPRESSION
+#: Kit modules whose line waits on another change of the same release, and only shrinks: fabric_peer_owner.py sits at
+#: MAX_LINES and is edited in the same wave, so its line replaces an existing blank or comment line when that lands.
+SPDX_PENDING = {"fabric_peer_owner.py"}
+
+
+def spdx_problem(path):
+    """None when the file's licence line is where the kit puts it, else what is wrong."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    at = 1 if lines and lines[0].startswith("#!") else 0
+    want = ("# " if path.suffix == ".py" else "// ") + SPDX
+    if len(lines) <= at or lines[at] != want:
+        return "%s: line %d must be %r" % (path.name, at + 1, want)
+    return None
 
 
 def python_defs(path):
@@ -157,6 +177,46 @@ class Shape(unittest.TestCase):
                 continue
             with self.subTest(module=entry["file"]):
                 self.assertEqual(sorted(node_defs(SCRIPTS / entry["file"]) & core_js), [], "defined in the core")
+
+
+class Licence(unittest.TestCase):
+    def test_the_expression_is_the_packages(self):
+        self.assertEqual(LICENSE_EXPRESSION, "AGPL-3.0-only OR LicenseRef-PassionCode-Commercial")
+
+    def test_every_kit_module_carries_its_spdx_line(self):
+        for entry in KIT["python"] + KIT["node"]:
+            with self.subTest(module=entry["file"]):
+                problem = spdx_problem(SCRIPTS / entry["file"])
+                if entry["file"] in SPDX_PENDING:
+                    self.assertIsNotNone(problem, "it carries its line now: take it out of SPDX_PENDING")
+                else:
+                    self.assertIsNone(problem)
+        self.assertEqual(SPDX_PENDING - {e["file"] for e in KIT["python"] + KIT["node"]}, set(), "a pending file left the kit")
+
+    def test_an_installed_copy_keeps_its_spdx_line(self):
+        for lang, suffix in (("py", ".py"), ("node", ".mjs")):
+            with tempfile.TemporaryDirectory() as tmp:
+                run = subprocess.run([sys.executable, str(SCRIPTS / "fabric_kit.py"), "install", tmp, "--lang", lang, "--all"],
+                                     capture_output=True, text=True)
+                self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+                copied = sorted(Path(tmp).iterdir())
+                code = [f for f in copied if f.suffix == suffix]
+                self.assertEqual(len(code), len(KIT["python" if lang == "py" else "node"]))
+                for f in code:
+                    with self.subTest(lang=lang, file=f.name):
+                        if f.name not in SPDX_PENDING:
+                            self.assertIsNone(spdx_problem(f))
+                # the schemas the kit ships beside a module are JSON data and carry no comment (kit-modules.md)
+                self.assertEqual(sorted(f.suffix for f in copied if f not in code), [".json"] * (len(copied) - len(code)))
+
+
+    def test_the_reference_says_copies_keep_it(self):
+        reference = " ".join((SCRIPTS.parent / "references/kit-modules.md").read_text(encoding="utf-8").split())
+        for words in ("Every module carries the package's licence as its own SPDX line, `" + SPDX + "`",
+                      "so every copy `install` makes keeps it",
+                      "The schemas the kit ships beside a module (`*.schema.json`) are JSON data and cannot carry a comment",
+                      "`test_an_installed_copy_keeps_its_spdx_line`"):
+            self.assertIn(words, reference, words)
 
 
 class Install(unittest.TestCase):
