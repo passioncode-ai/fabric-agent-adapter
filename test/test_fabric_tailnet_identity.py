@@ -62,6 +62,40 @@ class Vectors(unittest.TestCase):
             with self.subTest(case["name"]):
                 ti.load_groups(case["doc"])
 
+    def test_the_bases_door_groups_file_is_read_for_one_service(self):
+        dg = FIXTURE["doorGroups"]
+        self.assertEqual(ti.load_groups(dg["doc"], service=dg["service"]), dict(dg["normalized"], schema="door-groups/1"))
+
+    def test_door_groups_vectors(self):
+        dg = FIXTURE["doorGroups"]
+        groups = ti.load_groups(dg["doc"], service=dg["service"])
+        for v in dg["vectors"]:
+            with self.subTest(v["name"]):
+                got = ti.decide(groups=groups, bound="127.0.0.1", peer="127.0.0.1", headers=[(L, v["login"])],
+                                door=v["door"], capability=v["capability"])
+                self.assertEqual(got["code"], v["code"])
+
+    def test_bad_door_groups_files_are_invalid_and_name_the_field(self):
+        for case in FIXTURE["badDoorGroups"]:
+            with self.subTest(case["name"]):
+                with self.assertRaises(ti.GroupsError) as caught:
+                    ti.load_groups(case["doc"], service=case["service"])
+                self.assertEqual(caught.exception.code, "groups-invalid")
+                self.assertEqual(caught.exception.where, case["where"])
+
+    def test_the_service_reads_the_bases_file_through_tailnet_identity(self):
+        dg = FIXTURE["doorGroups"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "door-groups.json"
+            path.write_text(json.dumps(dg["doc"]), encoding="utf-8")
+            lines = []
+            got = ti.TailnetIdentity(path, service=dg["service"], log=lines.append).decide(
+                bound="127.0.0.1", peer="127.0.0.1", headers=[(L, "dee@example.org")], door="mcp", capability="cve.scan")
+            self.assertEqual(got["code"], "ok")
+            closed = ti.TailnetIdentity(path, log=lines.append).decide(
+                bound="127.0.0.1", peer="127.0.0.1", headers=[(L, "dee@example.org")], door="mcp", capability="cve.scan")
+            self.assertEqual(closed["code"], "groups-invalid")
+
     def test_the_door_and_capability_are_the_services_own_arguments(self):
         groups = ti.load_groups(FIXTURE["groups"])
         with self.assertRaises(ValueError):

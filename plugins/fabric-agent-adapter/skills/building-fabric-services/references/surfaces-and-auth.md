@@ -152,7 +152,20 @@ access kept in a file the organization writes rather than a generated perimeter 
   ```
 
   A door is `dashboard`, `mcp` or `service`; a capability is the name the service asks for there (a page, a tool, an
-  action), or `"*"` for all of them. Logins are compared as ASCII names lowercased whole after trimming spaces and
+  action), or `"*"` for all of them. The module also reads the agents base's `door-groups/1` file, written once for
+  every service of a machine, for the service it is given (`TailnetIdentity(path, service="example-agent")`, Node
+  `{service}`):
+
+  ```json
+  {"format": "door-groups/1", "version": 3, "generated_at": "2026-11-12T22:00:00Z",
+   "groups": {"ops": {"people": ["ana@example.com"], "doors": {"example-agent": ["dashboard", "mcp"]}},
+              "callers": {"people": ["dee@example.org"], "doors": {"example-agent": ["vitals.read"]}}},
+   "retired": {"old-ops": {"at": "2026-11-01", "why": "merged into ops"}}}
+  ```
+
+  For that service `*` opens every door, `dashboard` the dashboard, `mcp` every MCP tool, and a tool name that tool at
+  the MCP door and at the service's own door; a group with no entry for the service, and a retired group, open
+  nothing, and without a service every door stays closed (`groups-invalid` at `service`). Logins are compared as ASCII names lowercased whole after trimming spaces and
   tabs, with no other folding; a non-ASCII login (serve RFC 2047-encodes one) is refused as malformed.
 - **Wiring.** Make one `TailnetIdentity(path)` at start and ask it at each door: in Python
   `decision = identity.decide_request(self, door="mcp", capability=tool)` in an `http.server` handler, then

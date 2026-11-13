@@ -20,6 +20,36 @@ test('the groups file normalizes', () => {
   assert.deepEqual(ti.loadGroups(FIXTURE.groups), { schema: 'tailnet-groups/1', ...FIXTURE.normalized });
 });
 
+test('the base\'s door-groups/1 file is read for one service', () => {
+  const dg = FIXTURE.doorGroups;
+  assert.deepEqual(ti.loadGroups(dg.doc, { service: dg.service }), { schema: 'door-groups/1', ...dg.normalized });
+  const groups = ti.loadGroups(dg.doc, { service: dg.service });
+  for (const v of dg.vectors) {
+    const got = ti.decide({ groups, bound: '127.0.0.1', peer: '127.0.0.1', headers: [[L, v.login]], door: v.door,
+      capability: v.capability });
+    assert.equal(got.code, v.code, v.name);
+  }
+  for (const c of FIXTURE.badDoorGroups) {
+    assert.throws(() => ti.loadGroups(c.doc, { service: c.service ?? undefined }),
+      (err) => err instanceof ti.GroupsError && err.code === 'groups-invalid' && err.where === c.where, c.name);
+  }
+});
+
+test('the service reads the base\'s file through TailnetIdentity', () => {
+  const dg = FIXTURE.doorGroups;
+  const dir = mkdtempSync(join(tmpdir(), 'door-groups-'));
+  try {
+    const path = join(dir, 'door-groups.json');
+    writeFileSync(path, JSON.stringify(dg.doc));
+    const ask = (identity) => identity.decide({ bound: '127.0.0.1', peer: '127.0.0.1', headers: [[L, 'dee@example.org']],
+      door: 'mcp', capability: 'cve.scan' }).code;
+    assert.equal(ask(new ti.TailnetIdentity(path, { service: dg.service, log: () => {} })), 'ok');
+    assert.equal(ask(new ti.TailnetIdentity(path, { log: () => {} })), 'groups-invalid');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('every vector', () => {
   for (const v of FIXTURE.vectors) {
     const got = ti.decide({ groups: groupsFor(v), bound: v.bound, peer: v.peer, headers: v.headers, door: v.door,

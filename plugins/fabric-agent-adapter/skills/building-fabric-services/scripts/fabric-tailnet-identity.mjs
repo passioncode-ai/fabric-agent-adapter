@@ -23,6 +23,7 @@ import { BlockList, isIP } from 'node:net';
 import { performance } from 'node:perf_hooks';
 
 export const GROUPS_SCHEMA = 'tailnet-groups/1';
+export const DOOR_GROUPS = 'door-groups/1'; // the agents base's format (thread d23eeb7a), read for one service
 export const DOORS = Object.freeze(['dashboard', 'mcp', 'service']);
 export const LOGIN_HEADER = 'tailscale-user-login';
 export const NAME_HEADER = 'tailscale-user-name';
@@ -57,7 +58,7 @@ export const REASONS = Object.freeze({
   'not-loopback': 'The request did not come from the local tailscale serve proxy (its peer is not a loopback '
     + 'address), so its Tailscale identity header is not believed.',
   'groups-unreadable': 'The tailnet groups file cannot be read, so every door stays closed until it can.',
-  'groups-invalid': 'The tailnet groups file is not a valid tailnet-groups/1 document, so every door stays closed '
+  'groups-invalid': 'The tailnet groups file is not a valid tailnet-groups/1 or door-groups/1 document, so every door stays closed '
     + 'until it is fixed.',
   'funnel-request': 'The request came through Tailscale Funnel from the public internet, which carries no tailnet '
     + 'identity.',
@@ -86,8 +87,12 @@ const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArr
 const sortedUnique = (items) => [...new Set(items)].sort();
 
 /** Check a parsed `tailnet-groups/1` document; answer it normalized or throw GroupsError groups-invalid. */
-export function loadGroups(doc) {
+export function loadGroups(doc, { service } = {}) {
   if (!isPlainObject(doc)) throw invalid('document');
+  if (Object.hasOwn(doc, 'format') && !Object.hasOwn(doc, 'schema')) {
+    if (doc.format !== DOOR_GROUPS) throw invalid('format');
+    return loadDoorGroups(doc, service);
+  }
   if (doc.schema !== GROUPS_SCHEMA) throw invalid('schema');
   if (Object.keys(doc).some((k) => !['schema', 'about', 'groups', 'rules'].includes(k))) throw invalid('document');
   if ('about' in doc && (typeof doc.about !== 'string' || [...doc.about].length > 1000)) throw invalid('about');
@@ -115,6 +120,61 @@ export function loadGroups(doc) {
     return { group: rule.group, door: rule.door, capabilities: caps === '*' ? '*' : sortedUnique(caps) };
   });
   return { schema: GROUPS_SCHEMA, groups: out, rules: norm };
+}
+
+/** `door-groups/1` (the agents base): {format, version, generated_at?, groups: {name: {people, doors: {service:
+ * [capability]}}}, retired?: {name: {at, why}}}. For `service`: `*` opens every door, `dashboard` the dashboard, `mcp`
+ * every MCP tool, any other name that capability at the MCP door and at the service's own door; a group with no entry
+ * for the service, and a retired group, open nothing. Without a service every door stays closed. */
+function loadDoorGroups(doc, service) {
+  if (typeof service !== 'string' || !service) throw invalid('service');
+  if (Object.keys(doc).some((k) => !['format', 'version', 'generated_at', 'groups', 'retired'].includes(k))) {
+    throw invalid('document');
+  }
+  if (!Number.isInteger(doc.version) || doc.version < 1) throw invalid('version');
+  if (doc.generated_at != null && (typeof doc.generated_at !== 'string' || [...doc.generated_at].length > 64)) {
+    throw invalid('generated_at');
+  }
+  const { groups } = doc;
+  if (!isPlainObject(groups) || !Object.keys(groups).every((n) => NAME.test(n))) throw invalid('groups');
+  const retired = Object.hasOwn(doc, 'retired') ? doc.retired : {};
+  if (!isPlainObject(retired) || !Object.keys(retired).every((n) => NAME.test(n))) throw invalid('retired');
+  for (const name of Object.keys(retired).sort()) {
+    const entry = retired[name];
+    if (Object.hasOwn(groups, name)) throw invalid(`retired.${name}`);
+    if (!isPlainObject(entry) || Object.keys(entry).some((k) => k !== 'at' && k !== 'why')
+        || !Object.values(entry).every((v) => v === null || (typeof v === 'string' && [...v].length <= 1000))) {
+      throw invalid(`retired.${name}`);
+    }
+  }
+  const people = {};
+  const rules = [];
+  for (const name of Object.keys(groups).sort()) {
+    const group = groups[name];
+    if (!isPlainObject(group) || Object.keys(group).sort().join(',') !== 'doors,people') throw invalid(`groups.${name}`);
+    const members = group.people;
+    if (!Array.isArray(members) || !members.every((m) => typeof m === 'string' && LOGIN.test(m))) {
+      throw invalid(`groups.${name}.people`);
+    }
+    const { doors } = group;
+    if (!isPlainObject(doors) || !Object.keys(doors).every((k) => k.length > 0)) throw invalid(`groups.${name}.doors`);
+    for (const key of Object.keys(doors).sort()) {
+      const caps = doors[key];
+      if (!Array.isArray(caps) || !caps.length || !caps.every((c) => typeof c === 'string' && (c === '*' || NAME.test(c)))) {
+        throw invalid(`groups.${name}.doors.${key}`);
+      }
+    }
+    people[name] = sortedUnique(members.map((m) => m.toLowerCase()));
+    const caps = new Set(Object.hasOwn(doors, service) ? doors[service] : []);
+    const tools = sortedUnique([...caps].filter((c) => !['*', 'dashboard', 'mcp'].includes(c)));
+    const opened = {
+      dashboard: caps.has('*') || caps.has('dashboard') ? '*' : null,
+      mcp: caps.has('*') || caps.has('mcp') ? '*' : (tools.length ? tools : null),
+      service: caps.has('*') ? '*' : (tools.length ? tools : null),
+    };
+    for (const door of DOORS) if (opened[door]) rules.push({ group: name, door, capabilities: opened[door] });
+  }
+  return { schema: DOOR_GROUPS, groups: people, rules };
 }
 
 /** Every value of one header, case-insensitively: a web Headers, an object whose values may be arrays (Node's
@@ -272,11 +332,12 @@ function readBounded(path) {
  * file on every request (one stat), a positive value at most that often; `log` takes one line per change of the file's
  * state (default stderr); `clock` gives monotonic milliseconds (a test replaces it). */
 export class TailnetIdentity {
-  constructor(path, { recheckSeconds = 0, log, clock = () => performance.now() } = {}) {
+  constructor(path, { recheckSeconds = 0, log, clock = () => performance.now(), service } = {}) {
     if (typeof recheckSeconds !== 'number' || !(recheckSeconds >= 0)) {
       throw new TypeError('recheckSeconds is a number of seconds, 0 or more');
     }
     this.path = String(path);
+    this.service = service; // the service's id: the entry a door-groups/1 file is read for
     this.recheckSeconds = recheckSeconds;
     this.log = log ?? ((line) => process.stderr.write(`${line}\n`));
     this.clock = clock;
@@ -318,7 +379,7 @@ export class TailnetIdentity {
       return invalid('json');
     }
     try {
-      return loadGroups(doc);
+      return loadGroups(doc, { service: this.service });
     } catch (err) {
       if (err instanceof GroupsError) return err;
       throw err;

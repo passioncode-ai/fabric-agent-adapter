@@ -64,7 +64,7 @@
    "data": [
     "tailnet-groups.schema.json"
    ],
-   "sha256": "8ea7c76a51db7eaddcc3d174522ace10f8b266a86a1d80d3e17177708c328f0d"
+   "sha256": "4e3a691e2ff6a3582e31c9797b5b99632353e5b39c32d2bad19d5147c93a7265"
   },
   {
    "module": "fabric_crypto",
@@ -652,7 +652,7 @@
    "data": [
     "tailnet-groups.schema.json"
    ],
-   "sha256": "ba85705f17074da450bc2edeb51fed70ef241f719c2c8609d6f18e88981af22e"
+   "sha256": "ff71ad157f7e8902bc9ac2e4a5cd81507b9c37ca134f22a226e68420ef76c353"
   },
   {
    "module": "fabric-crypto",
@@ -7185,7 +7185,7 @@
    "fabric_socket_proof.py": "4d5844346b19a15c1e38c152656ccf11662ea1d43ccefec5dfa2546ff1c446e3",
    "fabric_peer_owner.py": "d8675452f24b47ddefbe5625c72c250e0228723ec6f860b2ca0b1855fd1e08d7",
    "fabric_tailnet.py": "c60416539be0199182f7969c24a37b14d0db50c8ea5e3e04cea43babfb483407",
-   "fabric_tailnet_identity.py": "8ea7c76a51db7eaddcc3d174522ace10f8b266a86a1d80d3e17177708c328f0d",
+   "fabric_tailnet_identity.py": "4e3a691e2ff6a3582e31c9797b5b99632353e5b39c32d2bad19d5147c93a7265",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
    "fabric_base.py": "d8c67f345e30332cce3664af77b0e6e07cd477b78c961ac009e9efee1be7e1b2",
    "fabric_platform.py": "a9350dff55ef0fb3a23cdb4d0320a15868b15a8deb10d2eb74d72c58740c284b",
@@ -7236,7 +7236,7 @@
    "fabric-socket-proof.mjs": "d980de8ac5bb78b249db15462454a414b4687f45af71b82004f69359b56dc630",
    "fabric-peer-owner.mjs": "732b0cbda4a9c2d61eb0eba1d7126743b326e356e628de5f88dbbbad2990c8d1",
    "fabric-tailnet.mjs": "aff3591552448bc042af306cd8a9e5cb9102c6b62d6dc05d53db35e35c51e347",
-   "fabric-tailnet-identity.mjs": "ba85705f17074da450bc2edeb51fed70ef241f719c2c8609d6f18e88981af22e",
+   "fabric-tailnet-identity.mjs": "ff71ad157f7e8902bc9ac2e4a5cd81507b9c37ca134f22a226e68420ef76c353",
    "fabric-crypto.mjs": "038e03689701e3c9721a1e7f8e0a4d02a52d6a5d1661b0dc84035edc3ebbfcf6",
    "fabric-base.mjs": "1a804bfc3ec5d2479ffc39d3c8d67b056b72af836e1b88102881f9ff632f1901",
    "fabric-platform.mjs": "a8119d95ebba4d589a9e401f5d6fc8dda62d59d44e4c1ff811d97fac3771ac0c",

@@ -31,6 +31,11 @@ organization writes (`tailnet-groups/1`, its JSON Schema `tailnet-groups.schema.
      "groups": {"ops": ["ana@example.com"]},
      "rules": [{"group": "ops", "door": "dashboard", "capabilities": "*"}]}
 
+The agents base's `door-groups/1` file is read as well, for one service (`service=`, the service's id): its
+groups name `people` and, per service, the doors and tools they open (`*` every door, `dashboard`, `mcp` every MCP
+tool, or a tool name, opened at the MCP door and at the service's own door); a retired group opens nothing, and
+without a service every door stays closed.
+
 Logins are compared as ASCII email-style names lowercased whole (local part and domain alike), after trimming the
 spaces and tabs HTTP allows around a header value; nothing else is changed (no dot or `+tag` folding, no IDN
 mapping), and a login that is not plain ASCII (serve RFC 2047-encodes a non-ASCII one) is refused as malformed.
@@ -52,6 +57,7 @@ import time
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
 GROUPS_SCHEMA = "tailnet-groups/1"
+DOOR_GROUPS = "door-groups/1"  # the agents base's format (thread d23eeb7a), read for one service
 DOORS = ("dashboard", "mcp", "service")
 LOGIN_HEADER = "tailscale-user-login"
 NAME_HEADER = "tailscale-user-name"
@@ -80,7 +86,7 @@ REASONS: Dict[str, str] = {
     "not-loopback": "The request did not come from the local tailscale serve proxy (its peer is not a loopback "
                     "address), so its Tailscale identity header is not believed.",
     "groups-unreadable": "The tailnet groups file cannot be read, so every door stays closed until it can.",
-    "groups-invalid": "The tailnet groups file is not a valid tailnet-groups/1 document, so every door stays closed "
+    "groups-invalid": "The tailnet groups file is not a valid tailnet-groups/1 or door-groups/1 document, so every door stays closed "
                       "until it is fixed.",
     "funnel-request": "The request came through Tailscale Funnel from the public internet, which carries no tailnet "
                       "identity.",
@@ -110,11 +116,16 @@ def _invalid(where: str) -> GroupsError:
     return GroupsError("groups-invalid", where)
 
 
-def load_groups(doc: Any) -> Dict[str, Any]:
-    """Check a parsed `tailnet-groups/1` document; answer it normalized (logins lowercased and sorted, each group's
-    members once) or raise GroupsError `groups-invalid` naming the field."""
+def load_groups(doc: Any, service: Optional[str] = None) -> Dict[str, Any]:
+    """Check a parsed `tailnet-groups/1` or `door-groups/1` document; answer it normalized (logins lowercased and
+    sorted, each group's members once, the rules) or raise GroupsError `groups-invalid` naming the field. A
+    `door-groups/1` file is read for one `service` (its id): without one every door stays closed."""
     if not isinstance(doc, dict):
         raise _invalid("document")
+    if "format" in doc and "schema" not in doc:
+        if doc["format"] != DOOR_GROUPS:
+            raise _invalid("format")
+        return _load_door_groups(doc, service)
     if doc.get("schema") != GROUPS_SCHEMA:
         raise _invalid("schema")
     if set(doc) - {"schema", "about", "groups", "rules"}:
@@ -224,6 +235,62 @@ def _display_name(values: List[str]) -> Optional[str]:
     return text
 
 
+def _load_door_groups(doc: Dict[str, Any], service: Optional[str]) -> Dict[str, Any]:
+    """`door-groups/1` (the agents base): {format, version, generated_at?, groups: {name: {people, doors: {service:
+    [capability]}}}, retired?: {name: {at, why}}}. For `service`: `*` opens every door, `dashboard` the dashboard,
+    `mcp` every MCP tool, any other name that capability at the MCP door and at the service's own door; a group with
+    no entry for the service, and a retired group, open nothing."""
+    if not isinstance(service, str) or not service:
+        raise _invalid("service")
+    if set(doc) - {"format", "version", "generated_at", "groups", "retired"}:
+        raise _invalid("document")
+    version = doc.get("version")
+    if isinstance(version, float) and version.is_integer():  # JSON's 3.0 is JavaScript's 3, as the Node twin reads it
+        version = int(version)
+    if not isinstance(version, int) or isinstance(version, bool) or version < 1:
+        raise _invalid("version")
+    if doc.get("generated_at") is not None and (not isinstance(doc["generated_at"], str) or len(doc["generated_at"]) > 64):
+        raise _invalid("generated_at")
+    groups = doc.get("groups")
+    if not isinstance(groups, dict) or not all(isinstance(n, str) and _NAME.match(n) for n in groups):
+        raise _invalid("groups")
+    retired = doc.get("retired", {})
+    if not isinstance(retired, dict) or not all(isinstance(n, str) and _NAME.match(n) for n in retired):
+        raise _invalid("retired")
+    for name in sorted(retired):
+        entry = retired[name]
+        if name in groups:
+            raise _invalid("retired.%s" % name)
+        if not isinstance(entry, dict) or set(entry) - {"at", "why"} or not all(
+                v is None or (isinstance(v, str) and len(v) <= 1000) for v in entry.values()):
+            raise _invalid("retired.%s" % name)
+    people: Dict[str, List[str]] = {}
+    rules: List[Dict[str, Any]] = []
+    for name in sorted(groups):
+        group = groups[name]
+        if not isinstance(group, dict) or set(group) != {"people", "doors"}:
+            raise _invalid("groups.%s" % name)
+        members = group["people"]
+        if not isinstance(members, list) or not all(isinstance(m, str) and _LOGIN.match(m) for m in members):
+            raise _invalid("groups.%s.people" % name)
+        doors = group["doors"]
+        if not isinstance(doors, dict) or not all(isinstance(k, str) and k for k in doors):
+            raise _invalid("groups.%s.doors" % name)
+        for key in sorted(doors):
+            caps = doors[key]
+            if not isinstance(caps, list) or not caps or not all(
+                    isinstance(c, str) and (c == "*" or _NAME.match(c)) for c in caps):
+                raise _invalid("groups.%s.doors.%s" % (name, key))
+        people[name] = sorted({m.lower() for m in members})
+        caps = set(doors.get(service) or [])
+        tools = sorted(caps - {"*", "dashboard", "mcp"})
+        opened = {"dashboard": "*" if caps & {"*", "dashboard"} else None,
+                  "mcp": "*" if caps & {"*", "mcp"} else (tools or None),
+                  "service": "*" if "*" in caps else (tools or None)}
+        rules.extend({"group": name, "door": door, "capabilities": opened[door]} for door in DOORS if opened[door])
+    return {"schema": DOOR_GROUPS, "groups": people, "rules": rules}
+
+
 def _decision(code: str, door: str, capability: str, login: Optional[str] = None, name: Optional[str] = None,
               groups: Optional[List[str]] = None) -> Dict[str, Any]:
     return {"allowed": code == "ok", "status": 200 if code == "ok" else REFUSALS[code], "code": code,
@@ -305,10 +372,12 @@ class TailnetIdentity:
     the file's state (default stderr); `clock` gives monotonic seconds (a test replaces it)."""
 
     def __init__(self, path: Union[str, "os.PathLike[str]"], *, recheck_seconds: float = 0.0,
-                 log: Optional[Callable[[str], None]] = None, clock: Callable[[], float] = time.monotonic) -> None:
+                 log: Optional[Callable[[str], None]] = None, clock: Callable[[], float] = time.monotonic,
+                 service: Optional[str] = None) -> None:
         if not isinstance(recheck_seconds, (int, float)) or recheck_seconds < 0:
             raise ValueError("recheck_seconds is a number of seconds, 0 or more")
         self.path = os.fspath(path)
+        self.service = service  # the service's id: the entry a door-groups/1 file is read for
         self.recheck_seconds = float(recheck_seconds)
         self._log = log or _stderr
         self._clock = clock
@@ -348,7 +417,7 @@ class TailnetIdentity:
         except ValueError:
             return _invalid("json")
         try:
-            return load_groups(doc)
+            return load_groups(doc, self.service)
         except GroupsError as exc:
             return exc
 
