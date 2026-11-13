@@ -158,6 +158,34 @@ test('an in-place rewrite is seen', () => {
   } finally { f.done(); }
 });
 
+test('a same-size rewrite within one timestamp tick is seen', () => {
+  // Windows' runner left every stat field as it was for a rewrite of the same size (0.83.0's release run): the stat is
+  // pinned here, mtime now, so only the content can tell
+  const f = reloadFixture();
+  try {
+    const id = f.identity();
+    writeFileSync(f.path, JSON.stringify(FIXTURE.groups));
+    id.stat = () => { id.mtimeNs = BigInt(Date.now()) * 1000000n; return '1:2:3:4:5'; };
+    assert.equal(f.ask(id), 'ok');
+    const changed = clone(FIXTURE.groups);
+    changed.groups.ops = ['bo@example.com', 'zed@example.com'];
+    writeFileSync(f.path, JSON.stringify(changed));
+    assert.equal(f.ask(id), 'unknown-login');
+  } finally { f.done(); }
+});
+
+test('an old unchanged stat is not read again', () => {
+  const f = reloadFixture();
+  try {
+    const id = f.identity();
+    writeFileSync(f.path, JSON.stringify(FIXTURE.groups));
+    id.stat = () => { id.mtimeNs = 0n; return '1:2:3:0:5'; };
+    assert.equal(f.ask(id), 'ok');
+    writeFileSync(f.path, 'not json');
+    assert.equal(f.ask(id), 'ok');
+  } finally { f.done(); }
+});
+
 test('an invalid file closes every door and its content is never logged', () => {
   const f = reloadFixture();
   try {

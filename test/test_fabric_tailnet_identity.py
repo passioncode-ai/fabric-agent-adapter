@@ -180,6 +180,29 @@ class Reload(unittest.TestCase):
         self.path.write_text(json.dumps(changed), encoding="utf-8")
         self.assertEqual(self.ask(identity)["code"], "unknown-login")
 
+    def test_a_same_size_rewrite_within_one_timestamp_tick_is_seen(self):
+        # Windows' runner left every stat field as it was for a rewrite of the same size (0.83.0's release run): the
+        # stat is pinned here, mtime now, so only the content can tell
+        import time as clock
+        identity = self.identity()
+        self.path.write_text(json.dumps(FIXTURE["groups"]), encoding="utf-8")
+        pinned = (1, 2, 3, clock.time_ns(), 4)
+        identity._stat = lambda: pinned
+        self.assertEqual(self.ask(identity)["code"], "ok")
+        changed = json.loads(json.dumps(FIXTURE["groups"]))
+        changed["groups"]["ops"] = ["bo@example.com", "zed@example.com"]  # "zed" for "Ana": the same size
+        self.path.write_text(json.dumps(changed), encoding="utf-8")
+        self.assertEqual(self.ask(identity)["code"], "unknown-login")
+
+    def test_an_old_unchanged_stat_is_not_read_again(self):
+        identity = self.identity()
+        self.path.write_text(json.dumps(FIXTURE["groups"]), encoding="utf-8")
+        pinned = (1, 2, 3, 0, 4)  # mtime long ago: the stat alone decides
+        identity._stat = lambda: pinned
+        self.assertEqual(self.ask(identity)["code"], "ok")
+        self.path.write_text("not json", encoding="utf-8")
+        self.assertEqual(self.ask(identity)["code"], "ok")
+
     def test_an_invalid_file_closes_every_door_and_its_content_is_never_logged(self):
         identity = self.identity()
         self.write(FIXTURE["groups"])

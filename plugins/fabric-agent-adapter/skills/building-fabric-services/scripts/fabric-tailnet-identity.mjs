@@ -18,6 +18,7 @@
 // the file again when its inode, size, mtime or ctime change, and while it is unreadable or invalid every door refuses;
 // the reason is logged once per change, naming the field, never the file's content. Every refusal is 403 with a code.
 
+import { createHash } from 'node:crypto';
 import { closeSync, fstatSync, openSync, readSync, statSync } from 'node:fs';
 import { BlockList, isIP } from 'node:net';
 import { performance } from 'node:perf_hooks';
@@ -331,6 +332,10 @@ function readBounded(path) {
 /** The groups file at `path`, read again when it changes, and the decision at a door. `recheckSeconds` 0 looks at the
  * file on every request (one stat), a positive value at most that often; `log` takes one line per change of the file's
  * state (default stderr); `clock` gives monotonic milliseconds (a test replaces it). */
+// A file whose stat is unchanged but whose mtime is this close to now may have been rewritten within one timestamp tick
+// (same size, coarse clock): its content is read and compared (git's racy-clean rule).
+const RACY_NS = 2000000000n;
+
 export class TailnetIdentity {
   constructor(path, { recheckSeconds = 0, log, clock = () => performance.now(), service } = {}) {
     if (typeof recheckSeconds !== 'number' || !(recheckSeconds >= 0)) {
@@ -351,6 +356,7 @@ export class TailnetIdentity {
     try {
       const st = statSync(this.path, { bigint: true });
       if (!st.isFile()) return 'error:not-a-file';
+      this.mtimeNs = st.mtimeNs;
       return [st.dev, st.ino, st.size, st.mtimeNs, st.ctimeNs].join(':');
     } catch (err) {
       return `error:${err?.code ?? 'unknown'}`;
@@ -362,8 +368,10 @@ export class TailnetIdentity {
     try {
       data = readBounded(this.path);
     } catch (err) {
+      this.digest = null;
       return new GroupsError('groups-unreadable', err?.code ?? 'unknown');
     }
+    this.digest = createHash('sha256').update(data).digest('hex');
     if (data.length > MAX_GROUPS_BYTES) return invalid('size');
     let text;
     try {
@@ -394,6 +402,9 @@ export class TailnetIdentity {
     }
     this.checked = now;
     const signature = this.stat();
+    if (signature === this.signature && !signature.startsWith('error:') && this.rewrittenInPlace()) {
+      this.signature = undefined;
+    }
     if (signature !== this.signature) {
       this.signature = signature;
       this.groups = signature.startsWith('error:')
@@ -401,6 +412,19 @@ export class TailnetIdentity {
       this.report(signature);
     }
     return this.groups;
+  }
+
+  /** Whether a file whose stat did not change holds other bytes: asked only while its mtime is within RACY_NS of now,
+   * since a rewrite of the same size within one timestamp tick leaves every stat field as it was (git's racy-clean
+   * rule). */
+  rewrittenInPlace() {
+    const age = BigInt(Date.now()) * 1000000n - this.mtimeNs;
+    if (age >= RACY_NS || age <= -RACY_NS) return false;
+    try {
+      return createHash('sha256').update(readBounded(this.path)).digest('hex') !== this.digest;
+    } catch {
+      return true; // read it again the usual way, which names the error
+    }
   }
 
   report(signature) {

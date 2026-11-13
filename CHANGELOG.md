@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.83.1 (2026-11-13)
+
+0.83.0 was tagged and not published: its release run failed one Windows test of the tailnet identity module.
+
+### Fixed
+
+- **A same-size rewrite of the groups file within one timestamp tick is seen** (FAA-324): `TailnetIdentity` read the
+  file again only when its inode, size, mtime or ctime changed, and Windows' runner left all of them as they were for
+  an in-place rewrite of the same size. While the file's mtime is under two seconds old, an unchanged stat now reads
+  its bytes and compares their SHA-256 (git's racy-clean rule), in both twins; an older unchanged stat is not read.
+
 ## 0.83.0 (2026-11-13)
 
 Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
