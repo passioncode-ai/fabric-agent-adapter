@@ -1156,7 +1156,7 @@ PRIVATE_TERMS_PENDING: Dict[str, str] = {
 def private_terms_file() -> Path:
     import os
     named = os.environ.get(PRIVATE_TERMS_ENV)
-    return Path(named) if named else Path.home() / ".config/passioncode/private-terms.txt"
+    return Path(named).expanduser() if named else Path.home() / ".config/passioncode/private-terms.txt"  # as admit.py
 
 
 def private_terms_pattern(lines: List[str]) -> "Optional[re.Pattern[str]]":

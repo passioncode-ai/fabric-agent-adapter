@@ -81,8 +81,8 @@ client.get(peer["url"], answer["task"]["id"]); client.cancel(peer["url"], answer
 
 ## The probe
 
-`check_service_a2a.py <origin> [--key-env NAME] [--probe-text TEXT]` reads `surfaces.a2a`, the card, the interface and
-the binding's refusals (`a2a.surface`, `a2a.card`, `a2a.interface`, `a2a.task-not-found`, `a2a.cancel-not-found`,
+`check_service_a2a.py <origin> [--remote] [--key-env NAME] [--probe-text TEXT]` reads `surfaces.a2a`, the card,
+the interface and the binding's refusals (`a2a.surface`, `a2a.card`, `a2a.interface`, `a2a.task-not-found`, `a2a.cancel-not-found`,
 `a2a.method-not-found`); `a2a.task-states` runs only with a message the service names as safe to send, since any
 message may start real work. An interface that answers 401 without `--key-env` makes the binding rows NOT_RUN.
 
@@ -94,5 +94,5 @@ interface's own key. Run both for a service that serves A2A.
 
 - The interop test against a live Hermes A2A endpoint (`a2a_discover`, `a2a_call`): it waits for a Hermes A2A endpoint
   reachable on this machine (FAA-10).
-- The sample service serving both MCP and A2A, and `check_service.py` running these rows: the integrator wires them.
+- The sample service serving both MCP and A2A.
 - The REST and gRPC bindings, push notifications and `ListTasks`.

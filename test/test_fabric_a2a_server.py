@@ -15,6 +15,7 @@ from test_fabric_service import load
 srv = load("fabric_a2a_server")
 probe = load("check_service_a2a")
 interop = load("fabric_interop")
+rules = load("check_service_rules")
 ORIGIN = "http://127.0.0.1:47000"
 CAPS = [{"name": "notes.draft", "description": "Drafts a note.", "examples": ["Draft a note about Monday."]}]
 
@@ -183,7 +184,7 @@ class Client(unittest.TestCase):
 
 
 class Probe(unittest.TestCase):
-    """check_service_a2a's rows against a binding the test serves (the integrator wires them into check_service.py)."""
+    """check_service_a2a's rows against a binding the test serves; a command of its own beside check_service.py (D5)."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -207,6 +208,22 @@ class Probe(unittest.TestCase):
 
     def verdicts(self, rows):
         return {rule: verdict for rule, verdict, _ in rows}
+
+    def test_a_gated_remote_card_and_an_unreadable_surface_are_not_run_as_check_service_says(self):
+        gated = lambda status: (lambda method, url, headers, body: (status, None))
+        for status in (401, 403):
+            rows = probe.a2a_rules(self.wk, ORIGIN, fetch=gated(status), remote=True)
+            self.assertEqual(self.verdicts(rows)["a2a.card"], "NOT_RUN", rows)
+            self.assertEqual(rules.a2a_card_verdict(self.wk, status, b"", remote=True, origin=ORIGIN,
+                                                    descriptor_header="Authorization")[0], "NOT_RUN")
+            self.assertIn("DEC-0122 item 2", dict((r, e) for r, _, e in rows)["a2a.card"])
+        local = probe.a2a_rules(self.wk, ORIGIN, fetch=gated(401), remote=False)
+        self.assertEqual(self.verdicts(local)["a2a.card"], "FAIL")
+        bad = {"surfaces": {"a2a": {"path": "no-slash"}}}
+        rows = probe.a2a_rules(bad, ORIGIN, fetch=self.fetch)
+        self.assertEqual(self.verdicts(rows), {"a2a.surface": "NOT_RUN"})
+        self.assertEqual(rules.a2a_card_verdict(bad, 0, b"", remote=False, origin=ORIGIN, descriptor_header="x")[0],
+                         "NOT_RUN")
 
     def test_a_conforming_service_passes_and_task_states_wait_for_a_probe_message(self):
         rows = probe.a2a_rules(self.wk, ORIGIN, fetch=self.fetch, headers={"X-Example-Key": "key-a"})

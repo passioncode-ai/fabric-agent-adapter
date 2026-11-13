@@ -577,7 +577,7 @@
     "fabric_time",
     "fabric_usage"
    ],
-   "sha256": "6b6ca612b99cc82d8d9be0f1aadc48fb798f50a33f06849f9f974d0041148325"
+   "sha256": "f957f5f9aaf669abbce3fb23817b378dc3be20228047d5ee12f9b14bffd8678d"
   },
   {
    "module": "fabric_a2a_server",
@@ -1155,7 +1155,7 @@
     "fabric-time",
     "fabric-usage"
    ],
-   "sha256": "c6d3c34d6acd10946729b8ffa9f8baaeb71e4101d8d896764975b1b5571c05bf"
+   "sha256": "087ce5c78bb691398cd128256a429ea49e76f6783b8d4c7696dd18cf26b3ed9e"
   },
   {
    "module": "fabric-a2a-server",
@@ -7229,7 +7229,7 @@
    "fabric_board_fixture.py": "4178b0b23b4dec6375cd041cef209ed2f3e5279ec60c57e578765ecd81705504",
    "fabric_board.py": "f86c40b8291f8c818f6924910f4022b013d5fd107abaf8825dd0aa6c5e418638",
    "fabric_http.py": "a90c3a16274aecad02159d69a6ad8ac0c5e1fe396a91e69d20582d960749356e",
-   "fabric_openrouter.py": "6b6ca612b99cc82d8d9be0f1aadc48fb798f50a33f06849f9f974d0041148325",
+   "fabric_openrouter.py": "f957f5f9aaf669abbce3fb23817b378dc3be20228047d5ee12f9b14bffd8678d",
    "fabric_a2a_server.py": "a592fb3483d2385361178bf5a2eed020c4bab9cf108185fb5b03c1d37b603ae5",
    "fabric-jsvalue.mjs": "dfbdb8c41584972c9389750a41719374a1cfc5652ed438dd1623025190b0106e",
    "fabric-time.mjs": "3ff932069038a720df1c68c6492976906737b2e67e5c12d9c81c418597f661de",
@@ -7280,7 +7280,7 @@
    "fabric-board-fixture.mjs": "e52d514ddd7677d67ce7a1938567b1b62027897b239bea9898b05181c6e3e31b",
    "fabric-board.mjs": "15fbb4441fcf7d2f285375b75de64ad6cffea129c515084c110245376b07775f",
    "fabric-http.mjs": "bf155de55a0b0231d803582d6cd9c45299806fa276a48312d0d62c52a798ff4b",
-   "fabric-openrouter.mjs": "c6d3c34d6acd10946729b8ffa9f8baaeb71e4101d8d896764975b1b5571c05bf",
+   "fabric-openrouter.mjs": "087ce5c78bb691398cd128256a429ea49e76f6783b8d4c7696dd18cf26b3ed9e",
    "fabric-a2a-server.mjs": "1f50953ecee924c66bdc61977cc66a791f2126aa7f833aa3f9a1df204cd71d46",
    "fabric-package.schema.json": "2ba799f576fad0f608029223c4ccccd122152f1c5dbfa8ce8b31cd63ac92ad44",
    "share-registration.schema.json": "34b3997eeaf936ebc861342a23045634a7c18c19f01d7ed4198310d81989f5b0",

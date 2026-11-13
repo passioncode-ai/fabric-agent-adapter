@@ -94,6 +94,7 @@ function checkAttribution(projectId, taskRunId) {
 export function baseUrlProblem(base) {
   const text = String(base).replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '');
   if (text.includes('\\')) return 'the base URL holds a backslash';
+  if (/[\t\n\r]/.test(text)) return 'the base URL holds a tab or a line break'; // new URL removes them and sends the rest
   const rest = text.slice(text.indexOf(':') + 1);
   if (text.indexOf(':') < 0 || !rest.startsWith('//')) return null; // no authority as written: checkUrl reads it
   const after = rest.slice(2);

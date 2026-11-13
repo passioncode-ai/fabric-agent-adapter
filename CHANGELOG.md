@@ -62,7 +62,8 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
 - `AGENTS.md` carries item 1a, the course check before every change (fabric-workspace `knowledge/rules.md` §0).
 - Private terms in `CHANGELOG.md` and `docs/backlog.md` are replaced by neutral words; ids and findings stay (FAA-243).
 - `fabric_secrets.repository_name` reads a JWT at a word's start in one pass, both twins (FAA-321). Neutral words replace
-  private terms in the docs and the dashboard kit, which moves to 1.1.8 (FAA-243).
+  private terms in the docs and the dashboard kit, which moves to 1.1.8 (FAA-243; only comments changed, so moving a
+  copy from 1.1.7 is optional).
 - The source check reads `fabric_secrets` by public names, refuses a detector of another version with exit 2, and has
   its command line in `fabric_source_check_cli.py` (FAA-190). `register_remote` warns before it writes its token;
   validators refuse a non-string id or instance; the services folder keeps only JSON objects; refusals name relative
@@ -87,6 +88,13 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
 
 - `test/validate.py` fails a shipped `.mjs` or `.js` script that calls a built-in newer than Node 18, the floor in
   `package.json` engines (`String.prototype.isWellFormed` reached this release's candidate and only the floors job saw it).
+
+- What the 0.83.0 seam reading found, fixed before the release: `check_service_a2a.py` and `check_service.py` say one
+  verdict for `a2a.card` (an unreadable `surfaces.a2a`, and a remote card that answers 401 or 403, are NOT_RUN,
+  DEC-0122 item 2); a tab or a line break anywhere inside an OpenRouter base URL is a `config` error in both clients
+  (Node removed it and sent the rest); `validate.py --private-terms` expands `~` in `$PASSIONCODE_PRIVATE_TERMS` as
+  `admit.py` does. New rows FAA-325 to FAA-328. `AGENTS.md` names the North Star sections this repository serves
+  (item 1b) and the architect's audit lives in `docs/evidence/architect/`.
 
 ### Upgrading
 

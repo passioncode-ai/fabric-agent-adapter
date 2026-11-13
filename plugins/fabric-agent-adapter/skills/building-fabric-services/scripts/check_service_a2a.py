@@ -13,8 +13,10 @@ outside. `a2a_rules(wk, origin, ...)` returns (rule, verdict, evidence) rows, ve
   (or refuses with -32002 when it has already ended); NOT_RUN without one, since a message may start real work.
 
 An interface that answers HTTP 401 makes the binding rules NOT_RUN with the reason: it takes its own key, never the
-descriptor's token (DEC-0122 item 3); give the key through `--key-env` under `use_secret.py run`. The integrator wires
-these rows into check_service.py. Standard library only.
+descriptor's token (DEC-0122 item 3); give the key through `--key-env` under `use_secret.py run`. It is a command of
+its own beside check_service.py, whose `a2a.card` never calls the card's interfaces (D5); the two say one verdict for the
+card: an unreadable `surfaces.a2a`, and a remote card that answers 401 or 403, are NOT_RUN, never a failure (DEC-0122
+item 2). Standard library only.
 """
 from __future__ import annotations
 
@@ -61,13 +63,17 @@ def a2a_rules(wk: Any, origin: str, *, fetch: Fetch = http_fetch, headers: Optio
     view = a2a_view(wk)
     if not view["declared"]:
         return [("a2a.surface", "NOT_RUN", "the service declares no surfaces.a2a")]
-    if not view["valid"]:
-        return [("a2a.surface", "FAIL", "; ".join(f["message"] for f in view["findings"]))]
+    if not view["valid"]:  # as check_service_rules.a2a_card_verdict: a host does not know where the card is
+        return [("a2a.surface", "NOT_RUN", "surfaces.a2a is not readable (well-known.a2a): "
+                 + "; ".join(f["message"] for f in view["findings"]))]
     rows.append(("a2a.surface", "PASS", "surfaces.a2a at %s" % view["path"]))
     try:
         status, card = fetch("GET", origin.rstrip("/") + view["path"], {"Accept": "application/json"}, None)
     except (HttpError, OSError) as exc:
         return rows + [("a2a.card", "FAIL", "the card did not answer: %s" % exc)]
+    if remote and status in (401, 403):
+        return rows + [("a2a.card", "NOT_RUN", "HTTP %d: a card that is not open, gated by the service's own credentials "
+                        "or an identity proxy; a refusal is not nonconformance (DEC-0122 item 2)" % status)]
     if status != 200 or not isinstance(card, dict):
         return rows + [("a2a.card", "FAIL", "the card answered HTTP %d%s" % (status, "" if isinstance(card, dict) else ", not a JSON object"))]
     findings = agent_card_findings(card, origin=None if remote else origin.rstrip("/"), remote=remote,

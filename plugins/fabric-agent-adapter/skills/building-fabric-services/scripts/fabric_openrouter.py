@@ -98,6 +98,8 @@ def base_url_problem(base: str) -> Optional[str]:
     text = base.strip("".join(map(chr, range(0x21))))
     if "\\" in text:
         return "the base URL holds a backslash"
+    if any(c in text for c in "\t\n\r"):  # Node's URL parser removes them anywhere and sends the rest
+        return "the base URL holds a tab or a line break"
     rest = text.partition(":")[2]
     if not rest.startswith("//"):
         return None  # no authority as written: check_url reads it
