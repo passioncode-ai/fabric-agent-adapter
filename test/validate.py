@@ -67,6 +67,7 @@ STDLIB_IMPORTS = {
     "ntpath", "posixpath",  # the lock name the Node kit holds, computed for either system (FAA-21)
     "ipaddress", "math", "struct",  # the delegation verifier: a loopback key-set URL, Ed25519 and claim checks (DEC-0039)
     "tomllib", "shlex",  # install-host-hooks reads Kimi Code's config.toml back and quotes the hook's path (FAA-12a)
+    "enum",  # a (str, Enum) approval step key reads as its str (FAA-196 (30))
     "collections", "queue",  # native bridge mappings and isolated no-model host probes (FAA-48)
     "inspect", "functools",  # the board responder reads whether a service's emit takes a subject (0.56.0 seam r31)
     "unicodedata",  # the page-link port maps a host that is not ASCII as UTS 46 does (DEC-0123, FAA-132)
