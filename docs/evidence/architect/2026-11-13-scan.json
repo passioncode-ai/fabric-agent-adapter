@@ -1,0 +1,121 @@
+{
+ "src": "2740eb5571bb",
+ "commit": "9297a999",
+ "libraries": [],
+ "ranking": [
+  {
+   "template": "host-operations",
+   "score": 2.669,
+   "library_hits": [],
+   "text_similarity": 0.267
+  },
+  {
+   "template": "web-quality",
+   "score": 2.642,
+   "library_hits": [],
+   "text_similarity": 0.264
+  },
+  {
+   "template": "data-room",
+   "score": 2.146,
+   "library_hits": [],
+   "text_similarity": 0.215
+  },
+  {
+   "template": "media-production",
+   "score": 2.125,
+   "library_hits": [],
+   "text_similarity": 0.212
+  },
+  {
+   "template": "delivery-gateway",
+   "score": 1.927,
+   "library_hits": [],
+   "text_similarity": 0.193
+  },
+  {
+   "template": "content-brand",
+   "score": 1.896,
+   "library_hits": [],
+   "text_similarity": 0.19
+  },
+  {
+   "template": "org-administrator",
+   "score": 1.851,
+   "library_hits": [],
+   "text_similarity": 0.185
+  },
+  {
+   "template": "growth-analytics",
+   "score": 1.79,
+   "library_hits": [],
+   "text_similarity": 0.179
+  },
+  {
+   "template": "marketing-analyst",
+   "score": 1.778,
+   "library_hits": [],
+   "text_similarity": 0.178
+  },
+  {
+   "template": "assessment",
+   "score": 1.757,
+   "library_hits": [],
+   "text_similarity": 0.176
+  },
+  {
+   "template": "research",
+   "score": 1.665,
+   "library_hits": [],
+   "text_similarity": 0.167
+  },
+  {
+   "template": "product-bot",
+   "score": 1.655,
+   "library_hits": [],
+   "text_similarity": 0.166
+  },
+  {
+   "template": "deal-desk",
+   "score": 1.65,
+   "library_hits": [],
+   "text_similarity": 0.165
+  },
+  {
+   "template": "chat-assistant",
+   "score": 1.605,
+   "library_hits": [],
+   "text_similarity": 0.161
+  },
+  {
+   "template": "support-answerer",
+   "score": 1.585,
+   "library_hits": [],
+   "text_similarity": 0.159
+  },
+  {
+   "template": "store-publisher",
+   "score": 1.581,
+   "library_hits": [],
+   "text_similarity": 0.158
+  },
+  {
+   "template": "search-traffic",
+   "score": 1.521,
+   "library_hits": [],
+   "text_similarity": 0.152
+  },
+  {
+   "template": "listening",
+   "score": 1.472,
+   "library_hits": [],
+   "text_similarity": 0.147
+  },
+  {
+   "template": "sales-leads",
+   "score": 1.472,
+   "library_hits": [],
+   "text_similarity": 0.147
+  }
+ ]
+}

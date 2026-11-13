@@ -85,6 +85,9 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
   runs the hook untrusted too (FAA-201); the preamble names the operator's relay from his own Project as the exception
   to board messages being data (FAA-196).
 
+- `test/validate.py` fails a shipped `.mjs` or `.js` script that calls a built-in newer than Node 18, the floor in
+  `package.json` engines (`String.prototype.isWellFormed` reached this release's candidate and only the floors job saw it).
+
 ### Upgrading
 
 - A set `FABRIC_SERVICES_DIR` no longer moves the providers folder, as in Fabric's own `registryDirs`; set

@@ -902,6 +902,32 @@ class ShippedPatternTests(unittest.TestCase):
         self.assertEqual(validate.shipped_pattern_problems(), [])
 
 
+class NodeFloor(unittest.TestCase):
+    KIT = "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/x.mjs"
+
+    def test_a_built_in_after_node_18_fails_in_a_shipped_script(self):
+        for call in ("d.isWellFormed()", "s.toWellFormed()", "a.toSorted()", "Object.groupBy(a, f)",
+                     "Promise.withResolvers()", "Array.fromAsync(it)"):
+            with self.subTest(call=call):
+                tmp, root = _tree({self.KIT: "const x = 1;\nif (%s) {}\n" % call})
+                with tmp:
+                    problems = validate.node_floor_problems(root)
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn("%s:2 calls" % self.KIT, problems[0])
+
+    def test_a_test_or_a_python_file_is_not_shipped_node(self):
+        tmp, root = _tree({"test/x.test.mjs": "d.isWellFormed()\n", "plugins/fabric-agent-adapter/x.py": "d.isWellFormed()\n"})
+        with tmp:
+            self.assertEqual(validate.node_floor_problems(root), [])
+
+    def test_validate_repo_runs_the_check(self):
+        import inspect
+        self.assertIn("node_floor_problems()", inspect.getsource(validate.validate_repo))
+
+    def test_the_real_tree_passes(self):
+        self.assertEqual(validate.node_floor_problems(), [])
+
+
 class HttpsLegendTests(unittest.TestCase):
     """FAA-212: a shipped script that writes an example scheme in angle brackets carries the legend that says how to
     read it, since a module vendored on its own leaves `references/kit-modules.md` behind."""

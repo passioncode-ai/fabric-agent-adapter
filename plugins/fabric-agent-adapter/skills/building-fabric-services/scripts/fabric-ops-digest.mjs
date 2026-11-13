@@ -424,10 +424,12 @@ export function outcomeOf(word, mapping = {}) {
   return OUTCOMES.includes(mapped) ? mapped : 'unknown';
 }
 
+// String.prototype.isWellFormed is Node 20; the kit's floor is Node 18 (package.json engines).
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
 function dirProblem(d) {
   if (typeof d !== 'string' || !d || d.length > 256) return 'dir is 1 to 256 characters';
   if (d.startsWith('/') || d.startsWith('~') || d.endsWith('/') || d.includes('//') || d.includes('\\') || d.includes(':')) return 'dir is relative to the data folder: forward slashes, no leading / or ~, no drive or :, no trailing /';
-  if ([...d].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f) || !d.isWellFormed()) return 'dir holds no control character and no lone surrogate';
+  if ([...d].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f) || LONE_SURROGATE.test(d)) return 'dir holds no control character and no lone surrogate';
   if (d.split('/').some((seg) => seg === '.' || seg === '..' || !seg.replace(/[. ]+$/, ''))) return 'dir has no ., .. or empty segment';
   if (hasHomePath(d) || hasHomePath(d.replaceAll('./', '/'))) return 'dir holds a home folder';
   if (secretValue(d)) return 'dir is shaped like a credential (a run of 40 letters, digits and / mixing cases and a digit counts; a space or a dot inside a segment breaks it)';

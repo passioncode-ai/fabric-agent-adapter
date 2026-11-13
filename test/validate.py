@@ -856,6 +856,25 @@ def shipped_pattern_problems(root: Path = ROOT) -> List[str]:
     return problems
 
 
+# The floor is Node 18 (package.json engines, validate.yml's floors job): a shipped script calls no built-in that
+# arrived later. 0.83.0's candidate called String.prototype.isWellFormed (Node 20) and only the floors job saw it.
+NODE_AFTER_FLOOR = re.compile(r"\.(?:isWellFormed|toWellFormed|toSorted|toReversed|toSpliced)\(|"
+                              r"\b(?:Object|Map)\.groupBy\(|\bPromise\.withResolvers\(|\bArray\.fromAsync\(")
+
+
+def node_floor_problems(root: Path = ROOT) -> List[str]:
+    """No shipped .mjs or .js script calls a built-in newer than Node 18."""
+    problems: List[str] = []
+    for rel, text in shipped_text_files(root):
+        if not rel.endswith((".mjs", ".js")):
+            continue
+        for lineno, line in enumerate(text.splitlines(), 1):
+            found = NODE_AFTER_FLOOR.search(line)
+            if found:
+                problems.append("%s:%d calls %s, which Node 18 (the floor in package.json engines) does not have"
+                                % (rel, lineno, found.group(0).strip(".(")))
+    return problems
+
 # FAA-212: a module vendored on its own leaves references/kit-modules.md behind, so a shipped script that writes an
 # example scheme in angle brackets carries the legend itself.
 HTTPS_EXAMPLE = "<https>"
@@ -1114,6 +1133,7 @@ def validate_repo() -> List[str]:
     errors.extend(dollar_anchor_problems())
     errors.extend(credential_url_problems())
     errors.extend(shipped_pattern_problems())
+    errors.extend(node_floor_problems())
     errors.extend(https_legend_problems())
     errors.extend(shipped_template_problems())
     errors.extend(private_term_problems()[0])
