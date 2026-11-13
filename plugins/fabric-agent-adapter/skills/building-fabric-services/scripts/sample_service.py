@@ -218,7 +218,8 @@ class Service:
             if not fs.feed_data_problems(data):  # data the feed refuses never undoes the answer
                 extra = {"data": data}
                 break
-        self.log.append("board.slot.returned", "info", "%s took the %s slot back%s; the service enrolls once the "
+        # Its own kind (FAA-325): the slot is still away; the kit says board.slot.returned once it is held again.
+        self.log.append("board.slot.taken_back", "info", "%s took the %s slot back%s; the service enrolls once the "
                         "other session lets it go." % (who, capability, how),
                         subject={"type": "capability", "id": capability}, **extra)
         return {"capability": capability, "moved": False}

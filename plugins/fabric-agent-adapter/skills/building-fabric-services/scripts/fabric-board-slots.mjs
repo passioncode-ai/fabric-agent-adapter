@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The board responder's slot records (FAA-155, FAA-163): the generation it holds each slot at, a move to another
 // session and its take-back, and a capability whose enroll was refused, retried on its own. Part of the board
 // connector (FAA-65, layer L4); Responder (fabric-board-session.mjs) extends SlotKeeper.
@@ -27,6 +28,9 @@ export class SlotKeeper {
     this.confirmed[capability] = generation;
     delete this.said[`board.slot.refused:${capability}`]; // held again: a later refusal is said again
     delete this.said[`board.slot.contested:${capability}`]; // and a later contest, by enroll or replace
+    if (this.takenBack.delete(capability)) { // FAA-325: held again after the operator's take-back, said once
+      this.emit('board.slot.returned', 'info', `The ${capability} slot on this Project is this service's again: the operator took it back, and it answers it from now on.`, { capability, generation });
+    }
   }
 
   /** The slot record, best effort: one that cannot be written now is written at the next receipt. */
@@ -212,6 +216,7 @@ export class SlotKeeper {
     const back = await this.locked(() => {
       if (!sameRecord(this.checkpoint.slots[capability], held)) return false; // a takeBack forgot it; its own next tick enrolls
       this.slots[capability] = { state: 'held', generation, renewedAt: -Infinity }; // no lease yet
+      this.takenBack.delete(capability); // said below as a move back, once
       this.heldAt(capability, generation);
       delete this.said['board.slot.moved']; // a later move is said again
       return true;
@@ -230,8 +235,11 @@ export class SlotKeeper {
     this.checkpoint.slot(capability, null);
     delete this.claimKeys[capability]; // a receipt from before the take-back may be dead
     this.probing.delete(capability);
-    if (this.slots[capability]?.state === 'moved') this.slots[capability] = { state: 'contested', renewedAt: 0 };
+    const state = this.slots[capability]?.state;
+    if (state === 'moved') this.slots[capability] = { state: 'contested', renewedAt: 0 };
     delete this.said['board.slot.moved'];
+    // board.slot.returned is said once the slot is held again (FAA-325); a slot still held has nothing to say
+    if (state !== 'held') this.takenBack.add(capability);
   }
 
   // -- one capability's refusal (FAA-163) --

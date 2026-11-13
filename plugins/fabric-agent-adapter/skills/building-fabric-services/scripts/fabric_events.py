@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """A service's events (DEC-0029): making them, paging them and the JSONL event log. Part of the service kit
 (FAA-65, layer L3)."""
 from __future__ import annotations

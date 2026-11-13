@@ -1,26 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.3.1+kit.7: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
+    peer_owner 1.3.1+kit.8: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
     `observatory/engine/peer_owner.py`, vendored at f86f0622, read against 2180235c for 1.2.0 and a69c6fee for 1.3.1),
-    the kit's `fabric_peer_owner` (layer L0; DEC-0154 HA-2, FAA-226, FAA-258). 1.3.1's proof from this account's own
-    sockets (DEC-0155 RT-2) is the kit's `fabric_socket_proof`, asked when it sits beside this file (FAA-292); without
-    it this file stands alone, as before. The kit's differences: NamedTuples (a service may load a kit file by path);
-    the Python 3.9 floor; `classify` / `classify_sid` ask for this process's uid or SID first (a client running as root
-    owns root's listener); on Linux `server_end` reads an accepted connection's own row and, for one not accept()ed yet
-    (uid 0, inode 0), the listener on its local address (CT-254), several rows of one owner are that owner, a row
-    printed twice counts once, and a `/proc` question that finds no row or several reads once more. On macOS (FAA-267,
-    FAA-273): the sysctl calibration also requires a child's listener, read under one deadline with `selectors`; a
-    number is ASCII digits only; a caller may vouch for a listener with a pid it started (`pid_listens`,
-    `CheckedHTTPConnection(vouch_pid=...)`, RT-3, the fallback after RT-2). DEC-0155 (FAA-312): a netstat that fails or
-    is empty, a table with no row of another uid (sysctl) or process (netstat) and a missing connection row read as
-    `table-restricted` (RT-1); a restricted table's listener is this account's only on exactly 127.0.0.1 (RT-4); no
-    proof is taken from a set-uid reader. `main` is the CLI, `listener <port>` (FAA-315). /proc carries a socket's
-    creator, so a listener root created and handed to another account (socket activation) reads as root's. Tests:
-    `test/test_fabric_peer_owner.py`; the Node twin is `fabric-peer-owner.mjs`.
+    kit layer L0 (DEC-0154 HA-2, FAA-226, FAA-258). 1.3.1's proof from this account's own sockets (DEC-0155 RT-2) is the
+    kit's `fabric_socket_proof`, asked when it sits beside this file (FAA-292, FAA-327); else this file
+    stands alone. Kit differences: NamedTuples (a service may load a kit file by path); the Python 3.9 floor; `classify`
+    / `classify_sid` ask for this process's uid or SID first (a client running as root owns root's listener); on Linux
+    `server_end` reads an accepted connection's own row and, for one not accept()ed yet (uid 0, inode 0), the listener
+    on its local address (CT-254), several rows of one owner are that owner, a row printed twice counts once, and a
+    `/proc` question that finds no row or several reads once more. On macOS (FAA-267, FAA-273): the sysctl calibration
+    also requires a child's listener, read under one deadline with `selectors`; a number is ASCII digits only; a caller
+    may vouch for a listener with a pid it started (`pid_listens`, `CheckedHTTPConnection(vouch_pid=...)`, RT-3, after
+    RT-2). DEC-0155 (FAA-312): a netstat that fails or is empty, a table with no row of another uid (sysctl) or process
+    (netstat) and a missing connection row read as `table-restricted` (RT-1); a restricted table's listener is this
+    account's only on exactly 127.0.0.1 (RT-4); no proof is taken from a set-uid reader. `main` is the CLI, `listener
+    <port>` (FAA-315). /proc carries a socket's creator, so a listener root created and handed to another account
+    (socket activation) reads as root's. Tests: `test/test_fabric_peer_owner.py`; Node twin: `fabric-peer-owner.mjs`.
 
-WHY. Loopback is one per machine, not one per OS account. On a host with several accounts, every account's processes
-reach every service any account listens with on 127.0.0.1, and a loopback socket proves nothing about who is on the
-other end. This module answers that question from the host's socket table, read without privileges:
+WHY. Loopback is one per machine, not per OS account: every account's processes reach every 127.0.0.1 service, and a
+loopback socket proves nothing about the other end. This module reads the host's socket table, without privileges:
 
     listener(port) -> Owner       who listens on 127.0.0.1:<port> (also 0.0.0.0, ::1, ::)
     server_end(sock) -> Owner     for a client's connected socket: who accepted it
@@ -65,13 +64,13 @@ answer; two live rows with the same addresses are `unknown` (`several-rows`), ne
   cannot be opened (another account's, usually) is `unknown`, never `another-account`. `Owner.uid` is None there.
 - Anything else: `unknown`, reason `unsupported-platform`.
 
-`LOCAL_PEERCRED`, `getpeereid` and `SO_PEERCRED` answer this for Unix-domain sockets only, hence a socket table. It
-never reads a byte from the socket it is asked about, never resolves a name, never sends anything, never needs a
-privilege, and reports the process names `netstat` prints only as far as the pid behind them.
+`LOCAL_PEERCRED`, `getpeereid` and `SO_PEERCRED` cover Unix-domain sockets only, hence a socket table. It never reads
+from the asked socket, resolves a name, sends anything or needs a privilege; of `netstat`'s names, only the pid.
 """
 from __future__ import annotations
 
 import http.client
+import importlib.util
 import ipaddress
 import json
 import os
@@ -83,8 +82,7 @@ import threading
 import time
 from typing import NamedTuple, Optional, Tuple
 
-# This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.3.1+kit.7"  # Observatory's 1.3.1 line with the kit's differences above
+PEER_OWNER_VERSION = "1.3.1+kit.8"  # this file's own, for projects that copy it: 1.3.1 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
@@ -93,8 +91,7 @@ UNKNOWN = "unknown"
 NONE = "none"
 KINDS = (THIS_ACCOUNT, ANOTHER_ACCOUNT, SYSTEM, UNKNOWN, NONE)
 
-#: The most table bytes one read accepts: 1 MB held about 1,200 sockets at `pcblist_n`'s 860 bytes each, which a busy
-#: developer machine passes; 4 MiB holds about 6,800 at 616 bytes measured on macOS 26 (FAA-260).
+#: The most table bytes one read accepts: about 6,800 sockets at 616 bytes each, measured on macOS 26 (FAA-260).
 MAX_TABLE_BYTES = 4 * 1024 * 1024
 #: Every subprocess this module starts is stopped after this many seconds.
 TIMEOUT_SECONDS = 2.0
@@ -105,8 +102,7 @@ NETSTAT = "/usr/sbin/netstat"
 PS = "/bin/ps"
 LSOF = "/usr/sbin/lsof"
 
-#: The reason a socket table hides other processes' sockets from this one (FAA-267: macOS 27.2 shows an ad-hoc-signed
-#: interpreter, such as a Homebrew Python, only its own sockets through sysctl and nothing through netstat).
+#: Why a table hides other processes' sockets (FAA-267: macOS 27.2 shows an ad-hoc-signed Python only its own).
 TABLE_RESTRICTED = "table-restricted"
 #: A macOS table that lists sockets but not the reader's own connection (DEC-0155 RT-1, FAA-312).
 NO_ROW_RESTRICTED = TABLE_RESTRICTED + ": no row for this connection"
@@ -117,8 +113,7 @@ SERVER_UNVERIFIED = "server-unverified"
 SERVER_NOT_THIS_WORKSPACE = "server-not-this-workspace"
 
 
-# The fields carry real types, not postponed strings: a NamedTuple's generated __new__ resolves its annotations in a
-# namespace without builtins, where `int | None` as a string is unresolvable (and a TypeError on Python 3.9).
+# Real types, not postponed strings: a NamedTuple's __new__ cannot resolve `int | None` as a string (3.9: TypeError).
 _OwnerFields = NamedTuple("_OwnerFields", [("kind", str), ("uid", Optional[int]), ("pid", Optional[int]),
                                            ("method", str), ("reason", Optional[str])])
 _OwnerFields.__new__.__defaults__ = (None, None, "none", None)
@@ -229,8 +224,7 @@ def parse_netstat(text: str) -> list[Row]:
     leading = at - sum(1 for w in names[:at] if w == "Address")
     trailing = len(names) - at - 1
     if not any(line.split()[:1] and line.split()[0].startswith("tcp") for line in lines[header + 1:]):
-        # The caller's own connection is in any table it can see: a header and no tcp row is the restricted table
-        # (FAA-273 item 3), not `no-row`.
+        # A header and no tcp row is the restricted table, not `no-row`: the caller's own row is in any table (FAA-273)
         raise TableUnreadable(f"{TABLE_RESTRICTED}: netstat printed only its header to this process")
     rows: list[Row] = []
     for line in lines[header + 1:]:
@@ -532,8 +526,7 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
         except (TableUnreadable, OSError, struct.error, ValueError):
             return False
     finally:
-        # One deadline for the whole check: a child that gave no port is killed at once, and one that did gets what is
-        # left of the deadline to exit on its closed stdin before it is killed.
+        # One deadline: a child that gave no port is killed at once; one that did has the rest to exit on a closed stdin
         try:
             child.stdin.close()
             if port is None:
@@ -790,9 +783,8 @@ def _owner_of(local: tuple[str, int], remote: tuple[str, int], server: bool = Fa
     if len(found) > 1:
         return Owner(UNKNOWN, None, None, how, "several-rows")
     if how == "proc" and server and found[0].uid is None:
-        # Linux: a connection not accept()ed yet (uid 0, inode 0) belongs to the listener on its local address (exact, else
-        # the wildcard) and dies with it; an accepted one's own row carries the accepting process's uid (sock_graft), so a
-        # listener swapped after another account accepted cannot pass (CT-254). An orphaned server row reads so too.
+        # Linux: an unaccepted connection (uid 0, inode 0) or an orphaned server row is the listener's on its local address
+        # (exact, else wildcard); an accepted row holds the acceptor's uid (sock_graft): no listener swap passes (CT-254).
         return _one_owner(_listeners_of(rows, found[0].local), how, "not-accepted")
     if how == "proc" and found[0].uid is None:
         # A client's socket with inode 0 has already closed (0.74.0 unit reading 4): never another socket's owner.
@@ -830,10 +822,18 @@ def _proved(ask: str, *args, fallback: Owner, **kwargs) -> Owner:
     if fallback.kind != UNKNOWN or not (fallback.reason or "").startswith(TABLE_RESTRICTED) or sys.platform != "darwin":
         return fallback
     try:
-        if _PROOF[0] is None:
-            sys.path.append(os.path.dirname(os.path.abspath(__file__)))  # beside this file, as the kit's modules load
-            import fabric_socket_proof
-            _PROOF[0] = fabric_socket_proof
+        if _PROOF[0] is None:  # the file beside this one; sys.path stays the host's (FAA-327); alone, the table stands
+            here = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fabric_socket_proof.py"))
+            if not os.path.isfile(here):
+                raise ImportError(here)
+            try:  # the host's imported copy if it is that file (one calibration); the statement keeps it in the closure
+                import fabric_socket_proof as module
+            except ImportError:
+                module = None
+            if os.path.realpath(getattr(module, "__file__", None) or "-") != here:  # else that file, by its path
+                spec = importlib.util.spec_from_file_location("fabric_socket_proof", here)
+                spec.loader.exec_module(module := importlib.util.module_from_spec(spec))
+            _PROOF[0] = module
         proof = getattr(_PROOF[0], ask)(*args, **kwargs) if _PROOF[0] else None
     except ImportError:
         _PROOF[0], proof = False, None
@@ -973,11 +973,11 @@ class CheckedHTTPConnection(http.client.HTTPConnection):
 
 def own_connection(port: int, *, expect_pid: Optional[int] = None, timeout: float = 10.0,
                    host: str = "127.0.0.1", vouch_pid: Optional[int] = None) -> CheckedHTTPConnection:
-    """A `CheckedHTTPConnection` to `host:port`, connected, whose server end is this account's (and, with `expect_pid`,
-    that process's), checked on the very connection the caller sends on and on every reconnect; no proxy is consulted.
-    ListenerRefused, the connection closed: `server-not-own` (another account's or the system's process accepted it),
-    `server-unverified` (its owner could not be told: fail closed), `server-not-this-workspace` (not the pid expected).
-    `vouch_pid`, as on `CheckedHTTPConnection` and the Node twin's `checkedSocket`: a pid the caller started (FAA-267)."""
+    """A `CheckedHTTPConnection` to `host:port`, connected, whose server end is this account's (with `expect_pid`, that
+    process's), checked on the connection the caller sends on and on every reconnect; no proxy is consulted.
+    ListenerRefused, closed: `server-not-own` (another account's or the system's process), `server-unverified` (owner
+    not told: fail closed), `server-not-this-workspace` (not the pid expected). `vouch_pid`: a pid the caller started
+    (FAA-267), as on `CheckedHTTPConnection` and the Node twin's `checkedSocket`."""
     conn = CheckedHTTPConnection(host, port, expect_pid=expect_pid, timeout=timeout, vouch_pid=vouch_pid)
     conn.connect()
     return conn

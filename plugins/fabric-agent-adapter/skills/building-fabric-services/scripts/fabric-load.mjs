@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The call queue and the load report of DEC-0104 (contract src/agent-network.ts, FAC-SEM-131 to FAC-SEM-133), as the
 // contract's reference answers them: a node that hosts a job-backed agent queues its jobs per (agentRef, context) with
 // these and reports its load as service-load/1 under extensions/load/0.1. Part of the Node service kit (FAA-289, layer

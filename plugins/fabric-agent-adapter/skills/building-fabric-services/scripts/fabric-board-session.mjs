@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The board responder (DEC-0078, FAA-12b): the work context a handler sees and the responder loop. The session, the
 // checkpoint and the request live in fabric-board-link.mjs and are re-exported here.
 // Part of the Node board connector (FAA-65, layer L4); the twin of fabric_board_session.py. Node 20+, no dependency.
@@ -124,6 +125,7 @@ export class Responder extends SlotKeeper {
     /** The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS. */
     this.holdDelay = POLL_SECONDS;
     this.onHold = new Set();
+    this.takenBack = new Set(); // capabilities the operator took back, not yet held again (FAA-325)
     /** One fenced call at a time, and the entry edits beside them (FAA-77, finding 36). */
     this.fenceQueue = Promise.resolve();
     this.toResume = []; // transferred requests waiting until nothing runs (finding 39)

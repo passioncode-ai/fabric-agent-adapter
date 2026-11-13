@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Supervisors (DEC-0032, LC-14): systemd user units, Task Scheduler tasks and launchd plists, installed and removed without touching what the operator turned off; release pruning (LC-11, LC-15).
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_supervisors.py. Node 20+, no dependency.
 import fs from 'node:fs';
@@ -11,6 +12,7 @@ import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
 import { CheckedAgent, ListenerRefused, PS, SERVER_NOT_OWN, TABLE_RESTRICTED, UNKNOWN, parsePsUid, pidListens,
   runProgram, serverEnd } from './fabric-peer-owner.mjs';
+import { loopbackHost } from './fabric-socket-proof.mjs';
 import http from 'node:http';
 import net from 'node:net';
 
@@ -560,20 +562,30 @@ export class ForeignUserAnswer {
 // The well-known answer at a loopback origin, read only on a connection whose server end is this OS account's process
 // (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, a ForeignUserAnswer when the listener is another
 // account's or its owner cannot be told.
-// Every loopback spelling (127.0.0.1, another 127/8 address, localhost, [::1]) goes on a checked connection, never the
+// Every loopback spelling (127/8 in any form, localhost or a name under it, [::1]) goes on a checked connection, never the
 // unchecked way (FAA-257): the host, without brackets, and the port, or null.
 function loopbackOrigin(origin) {
   let url;
   try { url = new URL(String(origin)); } catch { return null; }
   const host = url.hostname.replace(/^\[|\]$/g, '');
-  const loop = host === 'localhost' || host === '::1' || (net.isIPv4(host) && host.startsWith('127.'));
-  if (url.protocol !== 'http:' || !loop) return null;
+  // the kit's one loopback rule (FAA-326): a name under .localhost too, as the Python twin reads it
+  if (url.protocol !== 'http:' || !loopbackHost(host)) return null;
   // new URL drops a default port: http://127.0.0.1:80 has port '', read as 80 as Python's urlsplit reads it (0.79.0 seam)
   return { host, port: Number(url.port || 80) };
 }
 
+// An IPv4-mapped 127/8 origin (`new URL` writes it ::ffff:7f00:1): loopback the kit's rule does not take, which fetch would
+// reach unchecked, so it is refused unread, as the Python twin refuses it (0.84.0 seam reading).
+function mappedLoopback(origin) {
+  let host;
+  try { host = new URL(String(origin)).hostname; } catch { return false; }
+  const m = /^\[::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}\]$/i.exec(host);
+  return !!m && parseInt(m[1], 16) >> 8 === 127;
+}
+
 export async function wellKnownOf(origin, { vouchPid = null, ask = undefined } = {}) {
   const m = loopbackOrigin(origin);
+  if (!m && mappedLoopback(origin)) return null;
   if (!m) {
     try {
       const response = await fetch(`${origin}/.well-known/fabric-service`, { signal: AbortSignal.timeout(2000) });

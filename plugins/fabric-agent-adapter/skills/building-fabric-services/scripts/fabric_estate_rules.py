@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """`estate-record/1` (Fabric Agent Contract DEC-0055): the record's own rules, without a verifier.
 
 The contract's `src/estate-record-rules.ts` at the pin, ported answer for answer and held to the contract's own vectors

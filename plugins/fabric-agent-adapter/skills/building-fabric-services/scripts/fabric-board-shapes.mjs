@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The project board's wire (fabric-project-comms/0.1, DEC-0022, DEC-0073, DEC-0077): constants, refusal codes, the request digest, the closed shapes the kit reads back, evidence.
 // Part of the Node board connector (FAA-65, layer L4); the twin of fabric_board_shapes.py. Node 20+, no dependency.
 import crypto from 'node:crypto';

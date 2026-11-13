@@ -341,7 +341,9 @@ held and not transferred). The responder keeps that move instead of undoing it:
 - Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
   being read at the same time: the move is written under the responder's lock (Node: on the fence queue, after any fenced
   call in flight) and only while the record is unchanged (FAA-158). Never edit the
-  checkpoint's `slots` record by hand to undo a move. In the same board
+  checkpoint's `slots` record by hand to undo a move. Once the slot is held again after a take-back (an enroll or a
+  replace lands, in the same process), the kit says `board.slot.returned` (info, once per take-back; FAA-325), as it
+  does for a move back. In the same board
   session the next tick enrolls once the other session lets the slot go (a live holder is waited for) and takes the work
   left `lapsed` back with a transfer. A restart or reconnect before that, with accepted work waiting for the slot, takes it
   back at once by `com.responder_replace`, as a restart did before 0.53.0: the operator asked for the slot back, so the
@@ -354,7 +356,8 @@ held and not transferred). The responder keeps that move instead of undoing it:
   (`interop.well-known-capabilities`): an agent whose MCP client sets `_meta` calls it over `/mcp` with the operator's
   decision in `_meta.decision` (a call without one is `operator-decision-required`); Claude Code and Codex send
   arguments only, so until CT-125 they hand the operator the page as Fabric Dashboards' `open_link`. Either door records
-  the take-back as a `board.slot.returned` event (info, the capability as its subject) whose sentence says the route in
+  the take-back as a `board.slot.taken_back` event (info, the capability as its subject; the slot is still away, so never
+  `board.slot.returned`, which is the kit's and means held again, FAA-325) whose sentence says the route in
   words and whose `data` holds `by`, `via` and the `caller` (none when the feed refuses the caller), never the decision's words; a repeat after a lost answer is answered `{capability, moved: false}`. A service built on the kit declares it as an operator action, a button with its tool ([Every button has a
   tool](../SKILL.md), `fabric-actions/0.1`) with gate `relayed` (the operator's decision), never `none`, so a call
   without the operator's relayed decision is refused; on a server that reads mandates (`agent_id`) it also names its effect class, for example
@@ -394,7 +397,9 @@ checked by FAC-SEM-101 (no credential in data): `board.request.completed`, `boar
 `board.reconcile.needed`, `board.slot.contested`, `board.slot.moved`, `board.slot.refused`, `board.access.needed`, `board.blocked`,
 `board.down`, each notifying episode said once, and `board.outcome.invalid` (warning) when a handler's outcome fails
 its checks and is not sent, and `board.request.mandate_unread` (warning) when a request's mandate is not read (above). The operator's hold (below) adds `board.held`, `board.slot.held`,
-`board.slot.released` and `board.request.waiting`. The reference service adds `board.slot.returned` at a take-back.
+`board.slot.released` and `board.request.waiting`. A slot held again after a move back or a take-back is
+`board.slot.returned` (info). The reference service adds `board.slot.taken_back` at a take-back, when the operator asks
+for the slot (FAA-325).
 
 `check_service.py <id> [--board-kit <the service's fabric_board.py or fabric-board.mjs>]` rule **board.responder**:
 `NOT_RUN` when the well-known `protocols` names no `fabric-project-comms` revision; `FAIL` for a revision this kit does

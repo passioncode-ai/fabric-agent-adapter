@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Protocol revisions (DEC-0067) and an event's machine-readable data (DEC-0070, the feed-data protocols): parse,
 accept, negotiate and check them. Part of the service kit (FAA-65, layer L3)."""
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """JavaScript's view of JSON values, once for the whole kit (FAA-65, layer L0).
 
 The contract's answers are computed by TypeScript, so a kit that reads JSON the way Python does disagrees with them on

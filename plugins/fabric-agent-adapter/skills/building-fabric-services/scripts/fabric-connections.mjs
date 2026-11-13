@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // What an agent uses: fabric-connections/0.1, the extension keyed extensions/connections/0.1 (DEC-0096, FAC-SEM-127).
 // connectionsView reads a well-known document as the contract's connectionsView does (it never throws);
 // connectionsExtension builds the `extensions` entry a service declares, `state` from its own checks and its degraded[].

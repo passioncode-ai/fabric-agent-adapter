@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """An outbound HTTP client for a service: one deadline across every attempt, bounded retries with jittered backoff,
 `Retry-After` honoured up to a cap, a response size cap, and no secret in an error.
 

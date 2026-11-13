@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
-  version: "0.83.1"
+  version: "0.84.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "93e7db164c7829e2783b4b7705c4113bb5201131"
@@ -361,7 +361,7 @@ Whoever owns the repository, an agent with a page gets the dashboard rule block 
 (below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's choice, the organization
 publishes and lists nothing about it, of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep
-theirs), and the verified MCP quick start teaches anyone to drive it. The kit's files stay AGPL-3.0-only or the
+theirs, each service kit module in its own SPDX line), and the verified MCP quick start teaches anyone to drive it. The kit's files stay AGPL-3.0-only or the
 PassionCode commercial licence there, in an agent built for a client too.
 
 ## Online services: the remote placement

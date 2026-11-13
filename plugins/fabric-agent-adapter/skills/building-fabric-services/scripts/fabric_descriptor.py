@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """How a service is found (fabric-service/0.1): its descriptor, peers and app descriptors (DEC-0061, DEC-0069),
 build identity and the well-known document, the loopback HTTP server. Part of the service kit (FAA-65, layer L3)."""
 # Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
@@ -55,7 +56,7 @@ from fabric_usage import (
 DASHBOARD_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1"
 
 
-DASHBOARD_KIT = "fabric-dashboard-kit@1.1.8"
+DASHBOARD_KIT = "fabric-dashboard-kit@1.1.9"
 
 
 REFERENCE_THEMES = ("graphite", "fabric", "paper", "forest", "ocean", "ember", "contrast")

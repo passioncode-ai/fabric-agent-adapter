@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """fabric-package/1, the schema reading: the package schema bundled from the contract at the pin, read by a JSON Schema
 2020-12 subset with JavaScript's patterns, lengths in code points and the formats the contract uses, as
 fabric-package.mjs reads it. fabric_package checks, packs, signs and verifies on it and re-exports these names. Part of

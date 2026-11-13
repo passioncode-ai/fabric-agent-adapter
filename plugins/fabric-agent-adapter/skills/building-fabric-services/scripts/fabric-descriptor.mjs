@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // How a service is found (fabric-service/0.1): its descriptor, peers and app descriptors (DEC-0061, DEC-0069), build identity and the well-known document.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_descriptor.py. Node 20+, no dependency.
 import { spawnSync } from 'node:child_process';
@@ -18,7 +19,7 @@ import { ROUTES, isPlainObject } from './fabric-usage.mjs';
 // document's `extensions`. The kit is assets/dashboard-kit; its version is the one in kit.json.
 export const DASHBOARD_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/dashboard/0.1';
 
-export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.8';
+export const DASHBOARD_KIT = 'fabric-dashboard-kit@1.1.9';
 
 export const REFERENCE_THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 

@@ -1,4 +1,5 @@
-/* fabric-dashboard-kit@1.1.8 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
+/* fabric-dashboard-kit@1.1.9 · fabric-dashboard/0.1 (Fabric Agent Contract DEC-0036)
+   SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
    Load it same-origin with <script src="fabric-dashboard.js" defer></script>: no inline script, no
    eval, nothing from a CDN. It applies the host's appearance (ED-6, ED-8), folds navigation that
    does not fit into a More menu (ED-3), makes wide boxes keyboard-reachable (ED-4) and keeps
@@ -8,7 +9,7 @@
   'use strict';
 
   var KIT = 'fabric-dashboard-kit';
-  var VERSION = '1.1.8';
+  var VERSION = '1.1.9';
   /* fabric-dashboard-kit:theme-ids:begin */
   var THEMES = ['graphite', 'fabric', 'paper', 'forest', 'ocean', 'ember', 'contrast'];
 /* fabric-dashboard-kit:theme-ids:end */

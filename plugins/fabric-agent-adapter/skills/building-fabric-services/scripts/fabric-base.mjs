@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // What every module of the Node service kit shares: the protocol name, ServiceError, ids, nowIso and expand.
 // Part of the Node service kit (FAA-65, layer L1); the twin of fabric_base.py. Node 20+, no dependency.
 import os from 'node:os';

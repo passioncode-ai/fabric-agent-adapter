@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The project board connector, Python: the facade (fabric-project-comms/0.1).
 
 Since 0.40.0 (FAA-65) the connector is layered modules, lowest first: fabric_board_shapes (the wire), fabric_board_link

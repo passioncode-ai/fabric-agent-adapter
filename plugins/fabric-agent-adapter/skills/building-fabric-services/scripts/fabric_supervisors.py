@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Supervisors (DEC-0032, LC-14): launchd plists, systemd user units and Task Scheduler tasks, installed and
 removed without touching what the operator turned off; release pruning (LC-15). Part of the service kit
 (FAA-65, layer L3)."""
@@ -25,6 +26,7 @@ from pathlib import Path as _Path  # noqa: E402
 if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from any working directory (FAA-65)
     _sys.path.insert(0, str(_Path(__file__).resolve().parent))
 import fabric_peer_owner as _po  # noqa: E402 - the listener's owner (DEC-0154 HA-2)
+import fabric_socket_proof as _sp  # noqa: E402 - the one loopback host rule (FAA-326)
 from fabric_base import (
     DRAIN_SECONDS,
     SUPERVISOR_ENV,
@@ -462,16 +464,20 @@ def launchd_pid(label: str, domain: Optional[str] = None) -> Optional[int]:
     return None
 
 
-def _loopback_host(host: Optional[str]) -> bool:
-    """Whether `host` (urlsplit's hostname: lower-case, no brackets) names this machine: localhost, 127/8 or ::1."""
-    if not host:
-        return False
-    if host == "localhost":
-        return True
+#: Whether urlsplit's hostname names this machine: the kit's one loopback rule (FAA-326), so 127.1, 2130706433 and a
+#: name under .localhost, which the Node twin's `new URL` reads as loopback, take the checked path here too.
+_loopback_host = _sp.loopback_host
+
+
+def _loopback_otherwise(host: Optional[str]) -> bool:
+    """A loopback address the kit's rule does not take: one with a zone (`::1%lo0`) or IPv4-mapped (`::ffff:127.0.0.1`).
+    urlopen reaches loopback through either, so it is refused unread, as Node refuses it (0.84.0 seam reading)."""
     try:
-        return ipaddress.ip_address(host).is_loopback
+        address = ipaddress.ip_address((host or "").split("%", 1)[0])
     except ValueError:
         return False
+    mapped = getattr(address, "ipv4_mapped", None)
+    return bool(address.is_loopback or (mapped and mapped.is_loopback))
 
 
 class ForeignUserAnswer:
@@ -498,7 +504,7 @@ def _read_well_known(origin: str, timeout: float = 2.0,
     except ValueError:  # a port out of range
         port = None
     if parts.scheme == "http" and port and _loopback_host(parts.hostname):
-        # every loopback spelling (127.0.0.1, another 127/8 address, localhost, [::1]) goes on a checked connection,
+        # every loopback spelling (127/8 in any form, localhost or a name under it, [::1]) goes on a checked connection,
         # never the unchecked way (FAA-257)
         conn = _po.CheckedHTTPConnection(parts.hostname, port, timeout=timeout, vouch_pid=vouch_pid)
         try:
@@ -512,6 +518,8 @@ def _read_well_known(origin: str, timeout: float = 2.0,
             return None, None
         finally:
             conn.close()
+    if _loopback_otherwise(parts.hostname):
+        return None, None
     try:
         with urllib.request.urlopen(origin + "/.well-known/fabric-service", timeout=timeout) as response:
             return json.loads(response.read().decode()), None

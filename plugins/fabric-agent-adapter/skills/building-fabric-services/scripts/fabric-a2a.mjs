@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The reading side of an A2A Agent Card (DEC-0122): the well-known document's surfaces.a2a member, read as the contract's
 // schema reads it (a2aSurfaceFindings, a2aView; a2aSurface builds one), and what a public card must not carry
 // (agentCardFindings): no member about the running process, no secret, no securitySchemes entry naming the descriptor's

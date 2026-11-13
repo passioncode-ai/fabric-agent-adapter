@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Who may call a service: the descriptor token, the network guard,
 the operator's one-time login and its session, remote placement (DEC-0019) and the feed client's token header.
 Part of the service kit (FAA-65, layer L3)."""

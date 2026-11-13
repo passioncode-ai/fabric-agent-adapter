@@ -106,8 +106,8 @@ Every new agent is given an uptime category on its first day, and the README nam
   (the places above), and a paid agent stays in PassionCode's cloud (selling an agent, below). On a host with no
   Fabric hub it answers what reaches its own origin (its schedule, its chat, its API); a call Fabric admits needs a
   cloud hub, as running while the laptop is closed says. The agent is an online service (building-fabric-services, the remote placement), often
-  alongside its local instance, and starts from the cloud Fabric-server template once that template's repository
-  exists. Its data lives where the cloud reaches it, in a durable store (a database, an object store, the private
+  alongside its local instance, and starts from the cloud Fabric-server template, whose repository an agent reads from
+  the instance's settings or the estate's agent map; this public skill names no repository or address for it. Its data lives where the cloud reaches it, in a durable store (a database, an object store, the private
   `<agent>-data` repository), never the host's own folder, which a platform such as Heroku does not keep across a
   restart.
 - **B, local only.** Nothing needs it while the machine sleeps: no cloud, and a local service only when other
