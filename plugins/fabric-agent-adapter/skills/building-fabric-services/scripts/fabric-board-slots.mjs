@@ -27,6 +27,9 @@ export class SlotKeeper {
     this.confirmed[capability] = generation;
     delete this.said[`board.slot.refused:${capability}`]; // held again: a later refusal is said again
     delete this.said[`board.slot.contested:${capability}`]; // and a later contest, by enroll or replace
+    if (this.takenBack.delete(capability)) { // FAA-325: held again after the operator's take-back, said once
+      this.emit('board.slot.returned', 'info', `The ${capability} slot on this Project is this service's again: the operator took it back, and it answers it from now on.`, { capability, generation });
+    }
   }
 
   /** The slot record, best effort: one that cannot be written now is written at the next receipt. */
@@ -212,6 +215,7 @@ export class SlotKeeper {
     const back = await this.locked(() => {
       if (!sameRecord(this.checkpoint.slots[capability], held)) return false; // a takeBack forgot it; its own next tick enrolls
       this.slots[capability] = { state: 'held', generation, renewedAt: -Infinity }; // no lease yet
+      this.takenBack.delete(capability); // said below as a move back, once
       this.heldAt(capability, generation);
       delete this.said['board.slot.moved']; // a later move is said again
       return true;
@@ -232,6 +236,7 @@ export class SlotKeeper {
     this.probing.delete(capability);
     if (this.slots[capability]?.state === 'moved') this.slots[capability] = { state: 'contested', renewedAt: 0 };
     delete this.said['board.slot.moved'];
+    this.takenBack.add(capability); // board.slot.returned is said once the slot is held again (FAA-325)
   }
 
   // -- one capability's refusal (FAA-163) --

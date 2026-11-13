@@ -35,6 +35,10 @@ class SlotKeeper:
         self._confirmed[capability] = generation
         self._said.pop("board.slot.refused:" + capability, None)  # held again: a later refusal is said again
         self._said.pop("board.slot.contested:" + capability, None)  # and a later contest, by enroll or replace
+        if capability in self._taken_back:  # FAA-325: held again after the operator's take-back, said once
+            self._taken_back.discard(capability)
+            self._emit("board.slot.returned", "info", "The %s slot on this Project is this service's again: the operator "
+                       "took it back, and it answers it from now on." % capability, capability=capability, generation=generation)
 
     def _note(self, capability: str, record: Optional[Dict[str, Any]]) -> None:
         """The slot record, best effort: one that cannot be written now is written at the next receipt."""
@@ -206,6 +210,7 @@ class SlotKeeper:
             if self.checkpoint.slots.get(capability) != held:
                 return False  # take_back (an action thread) forgot the record meanwhile; its own next tick enrolls
             self.slots[capability] = {"state": "held", "generation": generation, "renewed_at": float("-inf")}  # no lease yet
+            self._taken_back.discard(capability)  # said below as a move back, once
             self._held_at(capability, generation)
             self._said.pop("board.slot.moved", None)  # a later move is said again
         self._emit("board.slot.returned", "info", "The %s slot on this Project is this service's again: the operator moved it "
@@ -223,6 +228,7 @@ class SlotKeeper:
             if (self.slots.get(capability) or {}).get("state") == "moved":
                 self.slots[capability] = {"state": "contested", "renewed_at": 0.0}
             self._said.pop("board.slot.moved", None)
+            self._taken_back.add(capability)  # board.slot.returned is said once the slot is held again (FAA-325)
 
     # -- one capability's refusal (FAA-163) ------------------------------------------------------------------------
     def _retry_later(self, capability: str, entries: List[Dict[str, Any]], exc: BoardError) -> None:

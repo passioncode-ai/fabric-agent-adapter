@@ -1445,6 +1445,31 @@ class MovedBackTwoCapabilitiesTests(Conversation):
         self.assertIn("video.cut", back[0][2])
         self.assertIn("moved it back", back[0][2])
 
+    def test_a_take_back_is_said_returned_only_once_the_slot_is_held(self):
+        """FAA-325: board.slot.returned is the kit's and means the slot is held again; after a take-back it is said once
+        the enroll lands, never at the take-back (the slot still away)."""
+        r = self.responder()
+        r.step()
+        self.board.move("video.cut")
+        self.board.advance(20)
+        r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "moved")
+        r.take_back("video.cut")
+        self.assertNotIn("board.slot.returned", self.kinds(), "the take-back alone does not hold the slot")
+        for _ in range(6):
+            self.board.advance(20)
+            r.wait_until = 0
+            r.step()
+        self.assertEqual(r.slots["video.cut"]["state"], "held")
+        back = [e for e in self.events if e[0] == "board.slot.returned"]
+        self.assertEqual(len(back), 1, self.kinds())
+        self.assertEqual(back[0][1], "info")
+        self.assertIn("took it back", back[0][2])
+        for _ in range(3):
+            self.board.advance(20)
+            r.step()
+        self.assertEqual(self.kinds().count("board.slot.returned"), 1, "said once per take-back")
+
     def test_moved_slots_share_one_status_read_a_tick(self):
         """FAA-194 (5): each moved slot read its own com.status once a renewal; a tick now reads it once for all of them."""
         r = self.responder()
@@ -2811,7 +2836,7 @@ class SampleWiringTests(unittest.TestCase):
             status, said, _ = request("POST", "/api/board/take-back", {**cookie, "X-Fabric-Request": "1"}, take)
             self.assertEqual(status, 200, said)
             self.assertEqual(svc.board_moved(), [])
-            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
+            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.taken_back"]
             self.assertIn("on this service's page", returned[-1]["text"], "the page's take-back names the route in words (seam r7)")
             self.assertEqual({k: returned[-1]["data"]["value"][k] for k in ("by", "via")}, {"by": "operator", "via": "dashboard"})
             # FAA-187 (31): the page records a machine id as its caller, as the tool does, never prose
@@ -2821,10 +2846,13 @@ class SampleWiringTests(unittest.TestCase):
             self.assertEqual((status, json.loads(said)), (200, {"capability": "sample.echo", "moved": False}),
                              "a retry after a lost answer is answered as the tool answers it (0.56.0 seam r6)")
             self.assertNotIn(b"data-take-back", request("GET", "/", cookie)[1])
+            kinds = lambda: [e["kind"] for e in svc.log.fetch(None, 100)]  # noqa: E731
+            self.assertNotIn("board.slot.returned", kinds(), "FAA-325: the take-back is not the slot held")
             hub.board.advance(61)  # the other session lets the slot go: the next tick enrolls
             svc.board.step()
             self.assertEqual(svc.board.slots["sample.echo"]["state"], "held")
-            self.assertIn("board.slot.returned", [e["kind"] for e in svc.log.fetch(None, 100)])
+            self.assertEqual(kinds().count("board.slot.returned"), 1, "FAA-325: the kit says returned once it is held")
+            self.assertEqual(kinds().count("board.slot.taken_back"), 1)
             svc.board.shutdown(0.1)
 
     def test_the_take_back_button_has_a_relayed_tool(self):
@@ -2869,7 +2897,7 @@ class SampleWiringTests(unittest.TestCase):
                                       "target": "sample.echo", "instruction": "Operator: take the slot back", "at": at}})
             self.assertFalse(done["isError"], done)
             self.assertEqual(svc.board_moved(), [])
-            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"]
+            returned = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.taken_back"]
             self.assertIn("through an agent they told", returned[-1]["text"], "the audit names the route in words")
             self.assertNotIn("relayed-instruction", returned[-1]["text"], "a token goes in data (product r35)")
             self.assertEqual(returned[-1]["data"]["value"]["via"], "relayed-instruction")
@@ -2880,7 +2908,7 @@ class SampleWiringTests(unittest.TestCase):
             with mock.patch.object(svc.board, "take_back"), mock.patch.object(svc, "board_moved", return_value=["sample.echo"]):
                 answer = svc.board_take_back("sample.echo", {"by": "operator", "via": "relayed-instruction", "caller": "x" * 501})
             self.assertEqual(answer, {"capability": "sample.echo", "moved": False})
-            last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
+            last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.taken_back"][-1]
             # FAA-187 (24): only the caller is dropped; by and via stay in data
             self.assertEqual(last["data"]["value"], {"capability": "sample.echo", "by": "operator", "via": "relayed-instruction"})
             self.assertIn("through an agent they told", last["text"])
@@ -2893,7 +2921,7 @@ class SampleWiringTests(unittest.TestCase):
                                    "The operator took the sample.echo slot back answering this service's question")):
                 with mock.patch.object(svc.board, "take_back"), mock.patch.object(svc, "board_moved", return_value=["sample.echo"]):
                     svc.board_take_back("sample.echo", record)
-                last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.returned"][-1]
+                last = [e for e in svc.log.fetch(None, 100) if e["kind"] == "board.slot.taken_back"][-1]
                 self.assertTrue(last["text"].startswith(words), last["text"])
                 self.assertNotIn("person:example", last["text"], "the approver's id is a machine id: data only")
             again = call({"decision": {"by": "operator", "via": "relayed-instruction", "action": "board.take-back",
@@ -3034,7 +3062,8 @@ class SampleWiringTests(unittest.TestCase):
             done = svc2.mcp.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": params}, {}, tier="T0")["result"]
             self.assertFalse(done["isError"], done)
             self.assertNotIn("sample.echo", json.loads((tmp / "data" / "board-checkpoint.json").read_text()).get("slots", {}))
-            self.assertIn("board.slot.returned", [e["kind"] for e in svc2.log.fetch(None, 100)])
+            self.assertIn("board.slot.taken_back", [e["kind"] for e in svc2.log.fetch(None, 100)])
+            self.assertNotIn("board.slot.returned", [e["kind"] for e in svc2.log.fetch(None, 100)], "FAA-325")
             svc2.board.hub.join_board = real
             hub.board.advance(61)
             for _ in range(4):

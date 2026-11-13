@@ -289,6 +289,25 @@ test('FAA-194 (8): a move back is said', async (t) => {
   assert.equal(h.events.filter((k) => k === 'board.slot.returned').length, 1, h.events.join(', '));
 });
 
+// FAA-325: board.slot.returned is the kit's and means the slot is held again; after a takeBack it is said once the
+// enroll lands, never at the takeBack itself (Node twin of test_a_take_back_is_said_returned_only_once_the_slot_is_held).
+test('FAA-325: a take-back is said returned only once the slot is held', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  const r = h.responder();
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.cut'].state, 'moved');
+  r.takeBack('video.cut');
+  assert.ok(!h.events.includes('board.slot.returned'), 'the take-back alone does not hold the slot');
+  for (let i = 0; i < 6; i += 1) { await h.advance(20); r.waitUntil = 0; await r.step(); }
+  assert.equal(r.slots['video.cut'].state, 'held');
+  assert.equal(h.events.filter((k) => k === 'board.slot.returned').length, 1, h.events.join(', '));
+  for (let i = 0; i < 3; i += 1) { await h.advance(20); await r.step(); }
+  assert.equal(h.events.filter((k) => k === 'board.slot.returned').length, 1, 'said once per take-back');
+});
+
 // FAA-194 (11): the Node twin of test_a_move_back_waits_while_other_work_runs: no move-back claim while work runs.
 test('FAA-194 (11): a move back waits while other work runs', async (t) => {
   const h = await fakeHub(t, ['video.render', 'video.cut']);

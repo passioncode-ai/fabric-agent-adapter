@@ -124,6 +124,7 @@ export class Responder extends SlotKeeper {
     /** The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS. */
     this.holdDelay = POLL_SECONDS;
     this.onHold = new Set();
+    this.takenBack = new Set(); // capabilities the operator took back, not yet held again (FAA-325)
     /** One fenced call at a time, and the entry edits beside them (FAA-77, finding 36). */
     this.fenceQueue = Promise.resolve();
     this.toResume = []; // transferred requests waiting until nothing runs (finding 39)

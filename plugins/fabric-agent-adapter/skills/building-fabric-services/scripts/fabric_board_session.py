@@ -156,6 +156,7 @@ class Responder(SlotKeeper):
         #: The first pause under an operator's hold (DEC-0079); it doubles to HOLD_RETRY_MAX_SECONDS.
         self.hold_delay = POLL_SECONDS
         self._on_hold: set = set()
+        self._taken_back: set = set()  # capabilities the operator took back, not yet held again (FAA-325)
         #: One fenced call at a time, and the entry edits beside them (FAA-77, finding 36).
         self._lock = threading.RLock()
         self._to_resume: List[str] = []  # transferred requests waiting until nothing runs (finding 39)
