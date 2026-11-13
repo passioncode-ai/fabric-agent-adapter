@@ -324,14 +324,21 @@ class BoardMandateTests(Conversation):
             request = fb.BoardRequest({"body": {"text": text}, "request": {"id": "r"},
                                        "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
             best = float("inf")
-            for _ in range(5):  # CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
-                start = time.process_time()
-                link.read_mandate(request, link.PERSONAL_BOARD, "example-agent")
-                best = min(best, time.process_time() - start)
+            for _ in range(3):  # CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+                # reads repeated until 50 ms of CPU time: Windows counts it in 15.6 ms ticks, so one short read measured 0
+                start, reads = time.process_time(), 0
+                while True:
+                    link.read_mandate(request, link.PERSONAL_BOARD, "example-agent")
+                    reads += 1
+                    used = time.process_time() - start
+                    if used >= 0.05 or reads >= 10000:
+                        break
+                best = min(best, used / reads)
             return best
 
         for shape in ("unclosed", "nested"):  # nested: every inner opener closed by the same fence (unit reading 4)
-            small, large = cost(65536, shape), cost(4 * 65536, shape)
+            # 256 KiB against 1 MiB, as the Node twin since 0.84.1: at 64 KiB one collection could decide the ratio
+            small, large = cost(4 * 65536, shape), cost(16 * 65536, shape)
             self.assertLess(large / max(small, 1e-6), 10, "%s: linear is about 4, quadratic about 16" % shape)
 
     def test_a_uuid_matches_in_any_case_and_any_other_id_as_written(self):
