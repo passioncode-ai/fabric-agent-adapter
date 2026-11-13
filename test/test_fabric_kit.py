@@ -46,8 +46,8 @@ CORE_ALIASES = {"_js_string", "_show", "_same", "_double", "_number", "_json_equ
 #: line, right after the shebang or as its first line, so every copy `install` makes keeps it (a JSON data file cannot).
 LICENSE_EXPRESSION = json.loads((ROOT / "package.json").read_text(encoding="utf-8"))["license"]
 SPDX = "SPDX-License-Identifier: " + LICENSE_EXPRESSION
-#: Kit modules whose line waits on another change of the same release, and only shrinks: fabric_peer_owner.py sits at
-#: MAX_LINES and is edited in the same wave, so its line replaces an existing blank or comment line when that lands.
+#: Kit modules whose line waits on another change of the same release; it only shrinks, and is empty since 0.84.0
+#: (fabric_peer_owner.py, at MAX_LINES, took its line in place of a header line its rewrap freed).
 SPDX_PENDING: set = set()
 
 

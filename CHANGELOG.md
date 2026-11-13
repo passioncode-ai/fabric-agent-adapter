@@ -4,6 +4,33 @@
 
 Wave 6 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
 
+### Changed
+
+- **Every service kit module carries the package's licence as an SPDX line** (FAA-192 item 15, the operator's decision
+  of 2026-11-13): `AGPL-3.0-only OR LicenseRef-PassionCode-Commercial`, right after a shebang or as the first line, so
+  every copy `fabric_kit.py install` makes keeps it, an agent whose own files are all rights reserved included; the
+  kit's JSON schemas cannot carry a comment. `kit.json`'s digests change for every module. The dashboard kit moves to
+  1.1.9 for the same line in its three copied files.
+- **creating-fabric-agents names where an agent reads the private cloud Fabric-server template's repository, never the
+  repository** (FAA-192 item 1, the operator's decision of 2026-11-13): the instance's settings or the estate's agent
+  map.
+- **`board.slot.returned` means one thing** (FAA-325): the reference service's take-back says `board.slot.taken_back`
+  (the slot still away), and the kit says `board.slot.returned` once the slot is held again, after a move back and now
+  also once an enroll or replace lands after the operator's take-back (once per take-back in the same process, both
+  twins).
+- The supervisors' well-known reader uses the kit's one loopback rule (`fabric_socket_proof.loopback_host` /
+  `loopbackHost`): `127.1`, `2130706433`, `0x7f.1` and names under `.localhost` go on the checked connection (FAA-326).
+- `fabric_peer_owner` loads `fabric_socket_proof` from beside it by its path and no longer adds the kit folder to the
+  host's `sys.path`; a copy vendored alone keeps the table's answer (FAA-327).
+- `test/validate.py` reads the private-terms list with the functions `admit.py` ships (`terms_file`, `terms_pattern`,
+  `term_lines`, `listed_files`), pinned to one case table; `admit.py`'s file listing no longer fails when `git` cannot
+  run (FAA-328).
+
+### Upgrading
+
+- A dashboard or feed that reads `board.slot.returned` as the operator's take-back request reads
+  `board.slot.taken_back` now (FAA-325).
+
 ## 0.83.1 (2026-11-13)
 
 0.83.0 was tagged and not published: its release run failed one Windows test of the tailnet identity module.
