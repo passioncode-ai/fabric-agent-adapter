@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Dates and times the way the contract reads them, once for the whole Node kit (FAA-65, layer L0); the twin of
 // fabric_time.py. NaN, never an exception, answers what cannot be read: callers compare it and get a finding.
 // Node 20+, no dependency; nothing here imports another kit module.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The project board's wire (fabric-project-comms/0.1, DEC-0022, DEC-0073, DEC-0077): constants, the refusal codes, the
 contract's request digest, the closed shapes the kit reads back (receipts, refusals, directory pages, messages) and
 evidence. Part of the board connector (FAA-65, layer L4)."""

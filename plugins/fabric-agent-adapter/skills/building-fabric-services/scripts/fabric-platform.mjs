@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Windows, where the kit needs it (DEC-0032): reading a file's ACL to refuse a token file others can read.
 // Part of the Node service kit (FAA-65, layer L1); the twin of fabric_platform.py. Node 20+, no dependency.
 import crypto from 'node:crypto';

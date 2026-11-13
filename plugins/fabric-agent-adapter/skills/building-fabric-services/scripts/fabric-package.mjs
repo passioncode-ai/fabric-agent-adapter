@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // fabric-package/1 (contract DEC-0050, DEC-0051, DEC-0071, DEC-0074; FAA-27a): pack an agent or a skill set as one folder
 // with fabric.package.json, sign it, and verify it. The twin of fabric_package.py; both write the same bytes.
 //

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """One instance per context (FAA-125, organization row N-11; contract DEC-0082, "One instance per context on a machine"):
 from a context, ``personal`` or ``org:<orgId>``, the service instance, its folders, descriptor and instance lock. Part of
 the service kit (layer L3, after fabric_descriptor); the twin of fabric-context.mjs. Standard library only.

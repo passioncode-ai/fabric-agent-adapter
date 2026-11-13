@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // A fixture conversation for the probe (check_service.py, rule board.responder): a scripted board a responder can run against without Fabric.
 // Part of the Node board connector (FAA-65, layer L4); the twin of fabric_board_fixture.py. Node 20+, no dependency.
 import fs from 'node:fs';

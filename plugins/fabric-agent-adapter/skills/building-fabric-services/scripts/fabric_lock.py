@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """One copy of a service, locked before any side effect (LC-01, DEC-0057): the instance lock, the supervisor marker
 in both its forms, and the wait budget under a supervisor. Part of the service kit (FAA-65, layer L3).
 

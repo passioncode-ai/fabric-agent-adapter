@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Work a service holds by its own limits, said to its caller and its operator (FAA-298). Part of the service kit
 (layer L3, after fabric_interop).
 

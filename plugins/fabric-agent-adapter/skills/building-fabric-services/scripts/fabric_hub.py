@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The Fabric hub's door, as a service agent reaches it (fabric-hub/0.1; Fabric ADR-0115 §1, ADR-0149 §4; FAA-12b).
 
 A service that answers a Project's requests on the board (`fabric-project-comms/0.1`) needs three things from Fabric's

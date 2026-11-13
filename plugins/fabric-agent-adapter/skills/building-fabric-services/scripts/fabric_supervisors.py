@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Supervisors (DEC-0032, LC-14): launchd plists, systemd user units and Task Scheduler tasks, installed and
 removed without touching what the operator turned off; release pruning (LC-15). Part of the service kit
 (FAA-65, layer L3)."""

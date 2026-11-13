@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Reference kit for the fabric-service/0.1 local service extension, Node: the facade (the twin of fabric_service.py).
 // Since 0.40.0 (FAA-65) the kit is a set of modules and this file re-exports everything it exported at 0.39.1, so
 // `import * as k from './fabric-service.mjs'` keeps working. Install it with `fabric_kit.py install <dir> --lang node`,

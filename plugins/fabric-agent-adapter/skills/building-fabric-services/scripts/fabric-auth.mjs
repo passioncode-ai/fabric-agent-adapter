@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Who may call a service: the descriptor token, the network guard, the operator's one-time login and session, remote placement (DEC-0019), the feed client's token header.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_auth.py. Node 20+, no dependency.
 import crypto from 'node:crypto';

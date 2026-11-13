@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The board link (DEC-0078, FAA-12b): the board session over the hub, the fsynced checkpoint and a claimed request as data.
 // Part of the Node board connector (FAA-65, layer L4), below the responder in fabric-board-session.mjs, which re-exports
 // these names; the twin of fabric_board_link.py. Node 18+, no dependency.

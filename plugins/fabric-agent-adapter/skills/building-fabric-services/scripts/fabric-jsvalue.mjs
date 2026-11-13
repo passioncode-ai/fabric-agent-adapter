@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // JavaScript's view of JSON values, once for the whole Node kit (FAA-65, layer L0); the twin of fabric_jsvalue.py.
 // The contract's answers are computed by TypeScript; every reader in the kit takes these helpers from here:
 // isObject, isString, objects (an array's object items), indexed (with their index as written), show (the

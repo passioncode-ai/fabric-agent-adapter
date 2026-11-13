@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Dates and times the way the contract reads them, once for the whole kit (FAA-65, layer L0).
 
 - ``parse_rfc3339_ms(text)``: strict RFC 3339 (a ``T``, an offset, a day that exists; no space, no leap second) as

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """fabric_socket_proof: this OS account's own TCP sockets, read from its own processes (layer L0; DEC-0155 RT-2,
 FAA-292; FAA-272).
 

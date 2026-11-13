@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Who is calling an agent that sits behind `tailscale serve`, and what that person may open (FAA-297). Standard
 library only; the Node twin is fabric-tailnet.mjs, and both answer test/fixtures/tailnet/vectors.json alike.
 

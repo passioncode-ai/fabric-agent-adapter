@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The board responder's slot records (FAA-155, FAA-163): the generation it holds each slot at, a move to another
 session and its take-back, and a capability whose enroll was refused, retried on its own. Part of the board connector
 (FAA-65, layer L4); `Responder` (fabric_board_session) is a `SlotKeeper`."""

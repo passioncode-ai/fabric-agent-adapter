@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // One copy of a service, locked before any side effect (LC-01, DEC-0057): the instance lock and the supervisor marker.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_lock.py. Node 20+ (22+ for the Linux lock), no dependency.
 //

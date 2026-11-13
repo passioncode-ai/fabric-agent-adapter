@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Protocol revisions (DEC-0067) and an event's machine-readable data (DEC-0070, the feed-data protocols).
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_protocols.py. Node 20+, no dependency.
 import { credentialName, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';

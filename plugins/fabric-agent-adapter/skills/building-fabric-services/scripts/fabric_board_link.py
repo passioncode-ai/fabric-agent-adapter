@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The board link (DEC-0078, FAA-12b): the board session over the hub, the fsynced checkpoint and a claimed request as
 data. Part of the board connector (FAA-65, layer L4), below the responder in fabric_board_session, which re-exports these
 names. Standard library only, Python 3.9+."""

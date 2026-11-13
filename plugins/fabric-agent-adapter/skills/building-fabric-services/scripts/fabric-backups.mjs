@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Settings backups (DEC-0025, FAC-SEM-035): canonical form, digest, write, list, check, restore.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_backups.py. Node 20+, no dependency.
 import crypto from 'node:crypto';

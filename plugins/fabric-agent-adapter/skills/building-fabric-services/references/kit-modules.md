@@ -11,6 +11,14 @@ A module's comments write an example URL with credentials with its scheme in ang
 can copy modules unchanged; the package's CHANGELOG, a record of released notes and no module, keeps its old
 examples as written.
 
+Every module carries the package's licence as its own SPDX line, `SPDX-License-Identifier: AGPL-3.0-only OR
+LicenseRef-PassionCode-Commercial`, right after the shebang or as its first line (since 0.84.0, FAA-192), so every
+copy `install` makes keeps it, in an agent whose own files are all rights reserved too: that agent's `LICENSE` covers
+its holder's files, the line covers the kit's. The line is part of the module's bytes and of its digest in
+`kit.json`, so a copy `status` calls `current` carries it. The schemas the kit ships beside a module (`*.schema.json`)
+are JSON data and cannot carry a comment; they come under the same licence with the module that reads them. Tests:
+`test_every_kit_module_carries_its_spdx_line`, `test_an_installed_copy_keeps_its_spdx_line`.
+
 ## Contents
 
 - [Install, status, build](#install-status-build)

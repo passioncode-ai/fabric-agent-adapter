@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Who is calling an agent that sits behind `tailscale serve`, and what that person may open (FAA-297). The twin of
 // fabric_tailnet.py; both answer test/fixtures/tailnet/vectors.json alike. No dependencies beyond node:crypto and
 // node:net.

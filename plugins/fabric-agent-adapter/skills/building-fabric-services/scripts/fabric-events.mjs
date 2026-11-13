@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // A service's events (DEC-0029): making them, paging them and the JSONL event log.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_events.py. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';

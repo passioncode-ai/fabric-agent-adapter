@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The Node kit's cryptography helpers, once (FAA-65, layer L1); the twin of fabric_crypto.py. Signature verification
 // itself is Node's (`crypto.verify`); what lives here is what the runtime does not refuse on its own: keys of small
 // order (DEC-0045) and P-256 points off the curve, plus sha256. Node 20+, no dependency.

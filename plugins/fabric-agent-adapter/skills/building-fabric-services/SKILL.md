@@ -361,7 +361,7 @@ Whoever owns the repository, an agent with a page gets the dashboard rule block 
 (below). org-index `scripts/check_format.py` reports 0 findings for it before it is called done. **An agent
 someone builds for themselves is not a PassionCode.ai repository:** its licence is its owner's choice, the organization
 publishes and lists nothing about it, of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep
-theirs), and the verified MCP quick start teaches anyone to drive it. The kit's files stay AGPL-3.0-only or the
+theirs, each service kit module in its own SPDX line), and the verified MCP quick start teaches anyone to drive it. The kit's files stay AGPL-3.0-only or the
 PassionCode commercial licence there, in an agent built for a client too.
 
 ## Online services: the remote placement

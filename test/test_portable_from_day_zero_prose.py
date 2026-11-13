@@ -10,6 +10,11 @@ import unittest
 from test_action_and_dashboard_prose import ROOT, flat, scenario_ids, section, text
 
 GRILL = "Step 0: the intake grill"
+# FAA-192 item (1), the operator's decision of 2026-11-13: the cloud Fabric-server template's repository is private,
+# so the public skill names no repository or address for it, only where an agent reads it.
+TEMPLATE_WHERE = ("started from the cloud Fabric-server template, whose repository an agent reads from the instance's "
+                  "settings or the estate's agent map, never from this skill")
+TEMPLATE_STALE = "once that template's repository exists"
 
 
 def one_row(skill_md: str, head: str) -> str:
@@ -35,7 +40,7 @@ class PortableFromDayZero(unittest.TestCase):
         uptime = one_row("creating-fabric-agents/SKILL.md", "**Does it run around the clock?**")
         for words in ("**A** when a capability must answer while the owner's machine is off or asleep",
                       "a cloud host from its first release, Heroku unless a reason names another",
-                      "the cloud Fabric-server template once that template's repository exists",
+                      TEMPLATE_WHERE,
                       "**B** when nothing needs it then: local only, no cloud",
                       "through that agent's MCP or API", "The README names the category"):
             self.assertIn(words, uptime, words)
@@ -131,11 +136,27 @@ class PortableFromDayZero(unittest.TestCase):
         # 0.59.0 seam and product r2: an existing project keeps what it has, as the CHANGELOG's Upgrading says
         self.assertIn("an existing one keeps what it has", flat("adapting-projects-to-fabric/SKILL.md"))
         self.assertIn("the kit files the adapter copies in keep their own licence (AGPL-3.0-only OR "
-                      "LicenseRef-PassionCode-Commercial)",
+                      "LicenseRef-PassionCode-Commercial), each service kit module in its own SPDX line",
                       " ".join(section("creating-fabric-agents", "Step 2: the project skeleton").split()))
         # 0.59.0 seam and product r3: scoped to a service built new, as the CHANGELOG says
-        self.assertIn("of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep theirs)",
+        self.assertIn("of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep theirs, "
+                      "each service kit module in its own SPDX line)",
                       flat("building-fabric-services/SKILL.md"))
+
+
+class TheCloudTemplateIsNotNamed(unittest.TestCase):
+    """FAA-192 item (1): the skill says where an agent reads the private template's repository, never names it."""
+
+    def test_the_skill_and_its_reference_say_where_it_is_read(self):
+        uptime = one_row("creating-fabric-agents/SKILL.md", "**Does it run around the clock?**")
+        self.assertIn(TEMPLATE_WHERE, uptime)
+        where = flat("creating-fabric-agents/references/where-agents-run.md")
+        self.assertIn("starts from the cloud Fabric-server template, whose repository an agent reads from the instance's "
+                      "settings or the estate's agent map; this public skill names no repository or address for it", where)
+        scenarios = (ROOT / "test/evals/creating-fabric-agents/scenarios.json").read_text(encoding="utf-8")
+        self.assertIn("reads its repository from the instance's settings or the estate's agent map", scenarios)
+        for name, body in (("SKILL.md", uptime), ("where-agents-run.md", where), ("scenarios.json", scenarios)):
+            self.assertNotIn(TEMPLATE_STALE, body, name)
 
 
 if __name__ == "__main__":

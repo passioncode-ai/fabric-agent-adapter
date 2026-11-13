@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The callee's side of fabric-delegation/0.1 (Fabric Agent Contract DEC-0039, Fabric ADR-0144): check a
 delegation token or an approval offline against the estate's published keys, and answer `ok` or one refusal
 code. A port of the contract's `src/delegation.ts` at the pinned revision; the shared vectors in

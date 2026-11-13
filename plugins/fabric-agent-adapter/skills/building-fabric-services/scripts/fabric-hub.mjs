@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The Fabric hub's door, as a service agent reaches it (fabric-hub/0.1; Fabric ADR-0115 §1, ADR-0149 §4; FAA-12b).
 // The twin of fabric_hub.py, same rules and the same answers; Node built-ins only.
 //

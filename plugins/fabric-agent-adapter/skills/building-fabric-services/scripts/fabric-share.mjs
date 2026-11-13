@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Share grants into an organization and their registrations (contract DEC-0086), the Node kit; the twin of
 // fabric_share.py, answer for answer (test/fixtures/contract/share-vectors.json). Node built-ins only.
 // FAC-SEM-117 (a share grant's id, window and agentRef, with parent), FAC-SEM-118 (a share-registration/1 document) and
