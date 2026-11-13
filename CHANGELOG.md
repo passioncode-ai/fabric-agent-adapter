@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.84.0 (2026-11-13)
+
+Wave 6 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
+
 ## 0.83.1 (2026-11-13)
 
 0.83.0 was tagged and not published: its release run failed one Windows test of the tailnet identity module.
