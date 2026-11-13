@@ -143,15 +143,11 @@ jobs:
           fi
 
   publish:
-    # Auth works two ways on purpose. NODE_AUTH_TOKEN comes from the NPM_TOKEN
-    # secret (a GRANULAR AUTOMATION token; a classic token is refused by 2FA).
-    # `id-token: write` is granted regardless, which is what npm trusted
-    # publishing (OIDC) needs, and it signs provenance.
-    # OPEN HUMAN STEP (FAA-73, decision D8): register this workflow file as the
-    # package's trusted publisher on npmjs.com (needs the operator's npmjs.com
-    # sign-in), then delete the NPM_TOKEN secret and the NODE_AUTH_TOKEN line
-    # below. Until then the standing token stays, because without it nothing
-    # publishes.
+    # npm trusted publishing (OIDC), no stored token (FAA-87, FAA-73 decision D8):
+    # this workflow file is the package's trusted publisher on npmjs.com since
+    # 2026-11-13 (`npm trust list @passioncode-ai/fabric-agent-adapter`: github,
+    # release.yml, passioncode-ai/fabric-agent-adapter, publish). `id-token: write`
+    # is what it needs, and it signs the provenance too.
     needs: release
     if: vars.PUBLISH_NPMJS == 'true'
     runs-on: ubuntu-latest
@@ -210,8 +206,6 @@ jobs:
 
       - name: npm publish
         if: steps.pub.outputs.skip == 'false'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -eu
           # The repository is public (since 2026-09-29), so every publish

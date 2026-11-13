@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.85.1 (2026-11-13)
+
+### Changed
+
+- **The release publishes to npm through trusted publishing alone** (FAA-87): `release.yml` is the package's trusted
+  publisher on npmjs.com since 2026-11-13, and its publish step no longer reads the `NPM_TOKEN` secret; the job's
+  `id-token: write` signs in and signs the provenance. No shipped code changes.
+
 ## 0.85.0 (2026-11-13)
 
 Wave 7 of the backlog sweep of 2026-11-12, part one. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
