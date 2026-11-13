@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.83.0 (2026-11-12)
+## 0.83.0 (2026-11-13)
 
 Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
 
@@ -36,6 +36,16 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
 - **`test/validate.py --private-terms`** (FAA-243): tracked files are checked against the operator's local list of
   private terms (`$PASSIONCODE_PRIVATE_TERMS`, else `~/.config/passioncode/private-terms.txt`), printing paths and lines
   only; it exits 2 when the list is absent, and the release checklist runs it before a push.
+- **A person's identity at every door behind `tailscale serve`** (FAA-324, board request `087f41ef`): new L0 kit module
+  `fabric_tailnet_identity` / `fabric-tailnet-identity.mjs`. Each door (dashboard, MCP, the service's own door) reads
+  `Tailscale-User-Login`, believed only when the service listens on loopback and the peer is loopback (the local
+  `tailscale serve`, which strips and sets the identity headers); a request without a login, a tagged node's, a Funnel
+  request's or one from another peer is refused with a stable code, HTTP 403 and a sentence, never a silent pass.
+  Groups come from a `tailnet-groups/1` file (its JSON Schema beside the module) or from the agents base's
+  `door-groups/1`, read for one service; the file is read again on change without a restart, and every door is closed
+  while it is unreadable or invalid. `references/surfaces-and-auth.md` shows the wiring.
+- **`identify_agent` / `identifyAgent`** (FAA-135): a per-agent credential's agent id is bound into the mandate chain
+  (`McpToolServer`, `identifiedAgent`) and through the board responder.
 
 ### Changed
 
@@ -61,6 +71,19 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
 - `providers_dir()` follows Fabric's `registryDirs` rule; the Windows CI job runs the provider tests and measures the
   owner check without failing on it (FAA-189, FAA-256). The probe is tested over real HTTP with a channel-agent
   declaration (FAA-250).
+- Board and interop (FAA-187, FAA-194, FAA-196): a move back of a responder slot is said (`board.slot.returned`), moved
+  slots share one `com.status` read a tick, the moved notice names a reconnect beside a restart and carries no Markdown
+  backticks, `board.down` is said once per outage window, a notify notice carries the link the service gives for its
+  kind, a board leave's timeout bounds the whole request, a resumed request reads its mandate only from the message
+  its claim took, `InstanceLock.release` never raises, an `InteropError` from `on_input` is a tool-error answer and a
+  refused start fails the job it created; the board fixture fails a kit whose notices are lost.
+- `pid_alive` on Windows asks OpenProcess for the access libuv asks for, so the twins agree on an elevated process
+  (FAA-323).
+- working-with-fabric: `bash_paths` reads comments, continuations, here-documents and quoted operators as bash does
+  (FAA-187); a dispatched run that sees only `fabric_whoami` is named as a Fabric before 0.3.20 with its remedy
+  (FAA-296); `status` and the session start read OpenCode's and Pi's `fabric` command (FAA-233); the native Codex probe
+  runs the hook untrusted too (FAA-201); the preamble names the operator's relay from his own Project as the exception
+  to board messages being data (FAA-196).
 
 ### Upgrading
 
@@ -70,6 +93,9 @@ Wave 5 of the backlog sweep of 2026-11-12. The contract pin stays at `93e7db16` 
   segment (kind `config`), which it used to rewrite and send (FAA-187).
 - `check_service_a2a.py` is a command of its own: run it beside `check_service.py` for a service that serves A2A, with
   `--key-env` naming the interface's own key (FAA-10).
+- A service behind `tailscale serve` can check a person at each door with `fabric_tailnet_identity`: listen on
+  127.0.0.1 only, give it the groups file's path (and, for the agents base's `door-groups/1`, the service's id), and
+  send its refusal at every door (FAA-324).
 
 ## 0.82.0 (2026-11-12)
 
