@@ -129,6 +129,28 @@ class Hostile(unittest.TestCase):
         self.assertEqual(fm.mandate_covers(base), {"ok": False, "code": "operator-decision-required",
                                                    "data": {"detail": "outside-mandate: capability"}})
 
+    def test_a_call_is_read_by_its_members_as_the_board_path_reads_it(self):
+        """FAA-196 (21): the core read a call through dict.get, so a direct caller's __getitem__ override or
+        defaultdict was read by its storage where the board path and the contract read call[name]."""
+        import collections
+        mandate = fm.operator_mandate("t", "run the research", SCOPE, "example-developer", at="2026-10-26T10:00:00Z")
+        handed = fm.hand_on(mandate, "example-researcher", "2026-10-26T10:05:00Z",
+                            {"capabilities": ["research.run"], "effects": ["charge"], "projects": ["example-site"], "perCallMaxUsd": 20})
+        ask = {"mandate": handed, "tier": "T0", "now": "2026-10-26T12:00:00Z", "self": "example-researcher",
+               "callerAgent": "example-developer"}
+
+        class Spoken(dict):
+            def __getitem__(self, name):
+                return "research.other" if name == "capability" else dict.__getitem__(self, name)
+
+        call = Spoken({"capability": "research.run", "effect": "charge", "spendUsd": 1, "project": "example-site"})
+        self.assertEqual(fm.mandate_covers(dict(ask, call=call))["data"], {"detail": "outside-mandate: capability"})
+        lazy = collections.defaultdict(lambda: "research.other", {"effect": "charge", "spendUsd": 1})
+        self.assertEqual(fm.mandate_covers(dict(ask, call=lazy))["data"], {"detail": "outside-mandate: capability"},
+                         "the default answers call[name], as on the board path")
+        self.assertTrue(fm.mandate_covers(dict(ask, call={"capability": "research.run", "effect": "charge", "spendUsd": 1,
+                                                          "project": "example-site"}))["ok"])
+
     def test_the_input_is_never_changed(self):
         before = js(POSITIVE)
         fm.hand_on(POSITIVE, "example-writer", "2026-10-26T10:06:00Z", {"capabilities": ["research.run"], "effects": ["draft"], "projects": ["example-site"]})

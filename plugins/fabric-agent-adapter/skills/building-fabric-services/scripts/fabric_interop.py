@@ -541,6 +541,7 @@ class CallContext:
         tool's own unless the handler created the job under another name with `server.jobs.create`."""
         if self.server.jobs is None:
             raise InteropError("This server has no job store.")
+        key = str.__str__(key) if isinstance(key, str) else key  # a (str, Enum) key reads as its str (FAA-196 (30))
         step: Dict[str, Any] = {"message": None}
         stored = self.server.jobs.private(job_id).get("capability")
         capability = stored if isinstance(stored, str) else self.tool
