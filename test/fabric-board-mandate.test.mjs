@@ -359,16 +359,23 @@ test('FAA-135: reading is linear in the body (0.61.0 readings 3)', () => {
     const request = new BoardRequest({ body: { text }, request: { id: 'r' },
       sender: { project: OTHER_PROJECT, principal: { provenance: 'trusted' } } }, 'video.render');
     let best = Infinity;
-    for (let k = 0; k < 5; k += 1) { // CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+    for (let k = 0; k < 3; k += 1) { // CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+      // reads repeated until 50 ms of CPU time: Windows counts it in 15.6 ms ticks, so one short read measured 0 (0.84.1)
       const start = process.cpuUsage();
-      readMandate(request, _PB, 'example-agent');
-      const used = process.cpuUsage(start);
-      best = Math.min(best, (used.user + used.system) / 1000);
+      let reads = 0;
+      let used = 0;
+      do {
+        readMandate(request, _PB, 'example-agent');
+        reads += 1;
+        const u = process.cpuUsage(start);
+        used = (u.user + u.system) / 1000;
+      } while (used < 50 && reads < 10000);
+      best = Math.min(best, used / reads);
     }
     return best;
   };
   for (const shape of ['unclosed', 'nested']) { // nested: every inner opener closed by the same fence (unit reading 4)
-    // 256 KiB against 1 MiB: at 64 KiB a run lasts under a millisecond and one collection decided the ratio (0.84.0's
+    // 256 KiB against 1 MiB: at 64 KiB one read lasts under a millisecond and one collection decided the ratio (0.84.0's
     // release run, Node 18); linear is still about 4 and quadratic about 16
     const small = cost(4 * 65536, shape);
     const large = cost(16 * 65536, shape);

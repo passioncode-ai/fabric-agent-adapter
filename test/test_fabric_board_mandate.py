@@ -324,10 +324,16 @@ class BoardMandateTests(Conversation):
             request = fb.BoardRequest({"body": {"text": text}, "request": {"id": "r"},
                                        "sender": {"project": OTHER_PROJECT, "principal": {"provenance": "trusted"}}}, "video.render")
             best = float("inf")
-            for _ in range(5):  # CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
-                start = time.process_time()
-                link.read_mandate(request, link.PERSONAL_BOARD, "example-agent")
-                best = min(best, time.process_time() - start)
+            for _ in range(3):  # CPU time, never the wall clock, so a loaded machine cannot break the ratio (FAA-196 (23))
+                # reads repeated until 50 ms of CPU time: Windows counts it in 15.6 ms ticks, so one short read measured 0
+                start, reads = time.process_time(), 0
+                while True:
+                    link.read_mandate(request, link.PERSONAL_BOARD, "example-agent")
+                    reads += 1
+                    used = time.process_time() - start
+                    if used >= 0.05 or reads >= 10000:
+                        break
+                best = min(best, used / reads)
             return best
 
         for shape in ("unclosed", "nested"):  # nested: every inner opener closed by the same fence (unit reading 4)

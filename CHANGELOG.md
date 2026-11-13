@@ -8,7 +8,8 @@
 
 - **The board mandate's linear-time test reads bodies large enough to time** (FAA-135): at 64 KiB a read lasted under a
   millisecond of CPU time, and one garbage collection made the 4x ratio read as 10x on Node 18; it now compares 256 KiB
-  with 1 MiB, where linear is still about 4 and quadratic about 16, in both twins' tests. No shipped code changes.
+  with 1 MiB, where linear is still about 4 and quadratic about 16, and repeats each read until 50 ms of CPU time
+  (Windows counts it in 15.6 ms ticks, and one short read measured 0), in both twins' tests. No shipped code changes.
 
 ## 0.84.0 (2026-11-13)
 
