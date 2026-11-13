@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Logs and stopping (LC-01, LC-12): a rotating log, a capped stdout log, the stop signal and the drain.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_logs.py. Node 20+, no dependency.
 import fs from 'node:fs';

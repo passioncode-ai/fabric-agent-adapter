@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """A fixture conversation for the probe (check_service.py, rule board.responder): a scripted board that a responder
 can be run against without Fabric. Part of the board connector (FAA-65, layer L4)."""
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The operator's mandate, `mandate/1` (DEC-0125, FAC-SEM-144): the operator's instruction for one task travels with
 the task, narrowed at each hand-over. Part of the service kit (layer L2); the twin of fabric-mandate.mjs.
 

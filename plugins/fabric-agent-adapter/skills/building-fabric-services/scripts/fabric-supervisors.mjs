@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Supervisors (DEC-0032, LC-14): systemd user units, Task Scheduler tasks and launchd plists, installed and removed without touching what the operator turned off; release pruning (LC-11, LC-15).
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_supervisors.py. Node 20+, no dependency.
 import fs from 'node:fs';

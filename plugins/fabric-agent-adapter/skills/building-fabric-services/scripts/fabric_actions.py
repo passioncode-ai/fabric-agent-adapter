@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Every action a person has, its agent tool and who decides it: `fabric-actions/0.1`, the extension keyed
 extensions/actions/0.1 (DEC-0121, FAC-SEM-142). Part of the service kit (layer L3); the twin of fabric-actions.mjs.
 

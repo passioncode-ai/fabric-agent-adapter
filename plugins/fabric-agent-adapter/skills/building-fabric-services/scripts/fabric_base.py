@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """What every module of the service kit shares (FAA-65, layer L1): the protocol name, ServiceError, the
 platform, ids and now_iso. Standard library only."""
 from __future__ import annotations

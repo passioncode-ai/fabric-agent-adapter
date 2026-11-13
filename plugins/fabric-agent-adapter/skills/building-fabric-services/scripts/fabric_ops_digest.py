@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """A service's operations digests (contract DEC-0153, `docs/specification/ops-digest.md` at the pin): every record of its
 operations log counted by operation and outcome in the hour it happened, one `ops.digest.hourly@1` line for each hour
 the service observed itself running in (an empty one included), and one `ops.digest.daily@1` line for each closed UTC

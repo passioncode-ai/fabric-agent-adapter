@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // What a service spends on models (DEC-0021, DEC-0065, DEC-0091): receipts, the ledger, the usage report and its rules (FAC-SEM-025), OpenRouter attribution (FAC-SEM-098), spending limits (DEC-0027).
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_usage.py. Node 20+, no dependency.
 import fs from 'node:fs';

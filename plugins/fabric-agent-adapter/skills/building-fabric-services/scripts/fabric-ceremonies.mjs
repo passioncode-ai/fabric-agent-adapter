@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The estate ceremonies' headless join (contract DEC-0084), the Node kit; the twin of fabric_ceremonies.py, answer for
 // answer (test/fixtures/contract/ceremony-vectors.json). Node built-ins only.
 // verifyEnrollToken (the hub's and the node's verifier of an enroll-token/1), enrollJoinInput (what the joining machine

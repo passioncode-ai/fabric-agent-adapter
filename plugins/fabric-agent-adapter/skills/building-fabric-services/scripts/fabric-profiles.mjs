@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Runner and model profiles in the kit (Fabric Agent Contract DEC-0046, Fabric ADR-0147). A port of the contract's
 // `src/profile-rules.ts` at the pin — resolveModelProfile and the FAC-SEM-058…060 checks — held to the contract's own
 // answers by test/fixtures/contract/profile-vectors.json; plus the doctor's runner and model checks (runners.md C2) and

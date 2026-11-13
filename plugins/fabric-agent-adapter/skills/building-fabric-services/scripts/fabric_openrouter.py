@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """OpenRouter chat completions for a service: its own key, a spend ceiling checked before every attempt, a usage
 receipt for every answered call, and a fallback model of another vendor.
 

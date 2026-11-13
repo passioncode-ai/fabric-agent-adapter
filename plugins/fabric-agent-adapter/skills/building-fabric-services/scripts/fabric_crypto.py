@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The kit's cryptography, once (FAA-65, layer L1): what the contract's verifiers need and nothing more.
 
 - ``ed25519_verify(public_key, message, signature)`` (RFC 8032) and ``is_small_order_key`` with

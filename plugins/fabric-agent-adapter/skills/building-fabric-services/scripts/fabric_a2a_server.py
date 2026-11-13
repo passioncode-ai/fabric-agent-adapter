@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The serving side and a bounded client of A2A 1.0 (FAA-10, DEC-0122): an Agent Card built from the service's
 capabilities (`agent_card`, every skill an A2A `AgentSkill`, checked by `fabric_a2a.agent_card_findings` before it is
 served), the JSON-RPC binding (`A2ABinding`: `SendMessage`, `SendStreamingMessage`, `GetTask`, `CancelTask`) mapped

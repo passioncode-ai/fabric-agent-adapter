@@ -136,10 +136,11 @@ class PortableFromDayZero(unittest.TestCase):
         # 0.59.0 seam and product r2: an existing project keeps what it has, as the CHANGELOG's Upgrading says
         self.assertIn("an existing one keeps what it has", flat("adapting-projects-to-fabric/SKILL.md"))
         self.assertIn("the kit files the adapter copies in keep their own licence (AGPL-3.0-only OR "
-                      "LicenseRef-PassionCode-Commercial)",
+                      "LicenseRef-PassionCode-Commercial), each service kit module in its own SPDX line",
                       " ".join(section("creating-fabric-agents", "Step 2: the project skeleton").split()))
         # 0.59.0 seam and product r3: scoped to a service built new, as the CHANGELOG says
-        self.assertIn("of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep theirs)",
+        self.assertIn("of these files one built new needs only a `LICENSE` naming its copyright holder (copied kit files keep theirs, "
+                      "each service kit module in its own SPDX line)",
                       flat("building-fabric-services/SKILL.md"))
 
 

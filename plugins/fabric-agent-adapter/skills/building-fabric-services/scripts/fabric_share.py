@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Share grants into an organization and their registrations (contract DEC-0086), the Python kit; the Node twin is
 fabric-share.mjs. Standard library only.
 

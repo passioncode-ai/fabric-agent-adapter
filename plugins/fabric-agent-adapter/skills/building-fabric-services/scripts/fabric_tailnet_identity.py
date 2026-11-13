@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """A person's identity at every door of a service published through `tailscale serve` (FAA-324). Standard library
 only; the Node twin is fabric-tailnet-identity.mjs, and both answer test/fixtures/tailnet-identity/vectors.json alike.
 

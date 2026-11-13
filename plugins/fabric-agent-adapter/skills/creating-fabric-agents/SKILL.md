@@ -139,7 +139,7 @@ lists them. An agent someone builds for themselves, or a private agent built for
 is its owner's choice and none of those files is required of it, but its first commit carries a `LICENSE` naming
 the copyright holder the grill recorded (all rights reserved unless the owner gives other terms); it covers the
 holder's own files, and the kit files the adapter copies in keep their own licence (AGPL-3.0-only OR
-LicenseRef-PassionCode-Commercial).
+LicenseRef-PassionCode-Commercial), each service kit module in its own SPDX line.
 
 **Every credential the agent uses is read by name, never held as a value**, from its first commit:
 the README's Configure section lists key NAMES. With Project Observatory installed, the agent finds

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Identifier equality (contract DEC-0076): two identifiers are the same when their normal forms are equal. A port of the
 // contract's src/identifiers.ts (types removed), held to its fixtures/vectors/identifiers.json; the twin of
 // fabric_identifiers.py. Nothing here throws.

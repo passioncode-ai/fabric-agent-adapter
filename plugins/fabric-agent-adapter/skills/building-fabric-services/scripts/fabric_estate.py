@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """`estate-record/1` (Fabric Agent Contract DEC-0055): verify an estate revision and check its rules.
 
 One revision of one person's estate: the passkeys that sign it, the machines with their device keys and hub-key

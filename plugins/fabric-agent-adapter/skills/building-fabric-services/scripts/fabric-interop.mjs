@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Reference kit for the fabric-interop/0.1 extension — Node.js 20+, no dependencies.
 // The Node twin of fabric_interop.py: the same rules and the same job file format, so a
 // job written by one kit is read by the other. The minimal MCP dispatcher is Python-only;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // A service's pages as Fabric Dashboards' open_link (Fabric Agent Contract DEC-0123, PL-1 to PL-4, FAC-SEM-143;
 // `src/page-link-rules.ts` at the pin): build and read the open_link, tell a raw local address, and the findings on a
 // link a document hands a person and on a URL-mode input request. The twin of fabric_page_links.py, held to the

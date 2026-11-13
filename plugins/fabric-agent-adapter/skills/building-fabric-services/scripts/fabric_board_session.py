@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """The board responder (DEC-0078, FAA-12b): the work context a handler sees and the responder loop (enroll, claim,
 accept the exact digest, effect, progress, complete; stop when fenced). The session, the checkpoint and the request live
 in fabric_board_link and are re-exported here. Part of the board connector (FAA-65, layer L4)."""

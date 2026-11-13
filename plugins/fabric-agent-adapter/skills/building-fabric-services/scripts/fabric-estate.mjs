@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // `estate-record/1` (Fabric Agent Contract DEC-0055): verify an estate revision and check its rules, the twin of
 // fabric_estate.py. The contract's src/estate-record-rules.ts, src/webauthn.ts and src/p256.ts at the pin, held to the
 // contract's own vectors (test/fixtures/contract/estate-vectors.json):

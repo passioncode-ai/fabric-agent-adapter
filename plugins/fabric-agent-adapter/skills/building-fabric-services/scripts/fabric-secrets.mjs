@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The contract's one credential detector (Fabric Agent Contract DEC-0044, `src/secret-shape.ts` at the pin): a name
 // that can only carry a credential, a value shaped like one, a launch argument that carries one, and a URL that does
 // (LC-21). A port held to the contract's own answers by test/fixtures/contract/profile-vectors.json. No dependencies.

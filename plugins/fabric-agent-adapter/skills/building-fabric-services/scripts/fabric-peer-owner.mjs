@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Which OS account owns each end of a loopback TCP connection (DEC-0154 HA-2, FAA-226, layer L0); the twin of
 // fabric_peer_owner.py, which is Project Observatory's peer_owner vendored by commit (its 1.3.1 line). Node 18+, no
 // dependency; the one kit module it may load is fabric-socket-proof.mjs beside it (DEC-0155 RT-2, FAA-292): on a

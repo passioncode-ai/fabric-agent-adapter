@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Reference kit for the fabric-interop/0.1 extension: how agents are called.
 
 Standard library only, Python 3.9+. It sits beside fabric_service.py and uses it for

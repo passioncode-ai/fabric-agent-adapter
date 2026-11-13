@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Settings backups (DEC-0025, FAC-SEM-035): the canonical form, the digest, writing, listing, checking and
 restoring them. Part of the service kit (FAA-65, layer L3)."""
 from __future__ import annotations

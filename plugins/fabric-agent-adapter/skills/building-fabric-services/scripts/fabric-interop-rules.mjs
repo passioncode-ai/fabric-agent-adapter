@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // fabric-interop/0.1, the rule layer: the extension's names and limits, its errors, the trace context (C3.4), a usage
 // object's reading (C3.2) and the job limits and uncertain effects (DEC-0087). Every function answers by a rule and
 // touches no file; fabric-interop.mjs builds the tools, the envelope and the job store on it and re-exports every public

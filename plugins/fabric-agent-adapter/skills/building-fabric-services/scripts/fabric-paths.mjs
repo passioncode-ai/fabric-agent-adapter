@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // Where a service's things live (fabric-service/0.1): the services directory, its data, config, logs and run dirs per OS, private dirs, atomic writes.
 // Part of the Node service kit (FAA-65, layer L1); the twin of fabric_paths.py. Node 20+, no dependency.
 import crypto from 'node:crypto';

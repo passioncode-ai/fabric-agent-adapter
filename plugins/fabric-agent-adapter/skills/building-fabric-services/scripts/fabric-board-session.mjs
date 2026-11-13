@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // The board responder (DEC-0078, FAA-12b): the work context a handler sees and the responder loop. The session, the
 // checkpoint and the request live in fabric-board-link.mjs and are re-exported here.
 // Part of the Node board connector (FAA-65, layer L4); the twin of fabric_board_session.py. Node 20+, no dependency.

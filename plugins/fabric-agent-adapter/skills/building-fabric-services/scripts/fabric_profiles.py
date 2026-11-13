@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """Runner and model profiles in the kit (Fabric Agent Contract DEC-0046, Fabric ADR-0147). A port of the contract's
 `src/profile-rules.ts` at the pin — `resolve_model_profile` and the FAC-SEM-058…060 checks — held to the contract's own
 answers by test/fixtures/contract/profile-vectors.json; plus what a service does with them: the doctor's runner and
