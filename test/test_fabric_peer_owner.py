@@ -519,6 +519,33 @@ class KitInstaller(unittest.TestCase):
                 with self.subTest(origin=origin):
                     sup._read_well_known(origin, timeout=0.5)
 
+    def test_every_loopback_spelling_a_url_parser_reads_takes_the_checked_path(self):
+        """FAA-326: the supervisors read the kit's one loopback rule (fabric_socket_proof.loopback_host), so 127.1,
+        2130706433 and a name under .localhost, which Node reads as loopback, go on a checked connection too."""
+        sup = importlib.import_module("fabric_supervisors")
+        hosts = []
+
+        class Recorder:
+            def __init__(self, host, port, **kw):
+                hosts.append(host)
+
+            def request(self, *a, **kw):
+                raise OSError("not sent")
+
+            def close(self):
+                pass
+
+        with mock.patch.object(sup.urllib.request, "urlopen", side_effect=AssertionError("read unchecked")), \
+                mock.patch.object(sup._po, "CheckedHTTPConnection", Recorder):
+            for origin in ("http://127.1:8080", "http://2130706433:8080", "http://example.localhost:8080",
+                           "http://0x7f.1:8080"):
+                with self.subTest(origin=origin):
+                    self.assertEqual(sup._read_well_known(origin, timeout=0.5), (None, None))
+        self.assertEqual(len(hosts), 4, hosts)
+        with mock.patch.object(sup.urllib.request, "urlopen", side_effect=OSError("down")) as unchecked:
+            sup._read_well_known("http://example.com:8080", timeout=0.5)  # not loopback: the plain way, as before
+        self.assertEqual(unchecked.call_count, 1)
+
     def test_down_and_foreign_user_are_told_apart_at_every_loopback_spelling(self):
         """FAA-259: well_known_of answers None when nothing answers and a ForeignUserAnswer when another account's
         listener holds the port, as the Node wellKnownOf does; FAA-257: an origin spelled localhost, or another

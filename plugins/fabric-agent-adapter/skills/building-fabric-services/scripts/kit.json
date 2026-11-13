@@ -391,9 +391,10 @@
     "fabric_lock",
     "fabric_paths",
     "fabric_peer_owner",
-    "fabric_secrets"
+    "fabric_secrets",
+    "fabric_socket_proof"
    ],
-   "sha256": "7fcfc4d24dc7bf30aa07e9db91931678bba2362fea3df54bd93d01f7c72c632d"
+   "sha256": "71c6b1ade929d9a84f2548d8f22e1fc7df77d0921dd5d9d9b4aa5736f554095b"
   },
   {
    "module": "fabric_service",
@@ -978,9 +979,10 @@
     "fabric-lock",
     "fabric-paths",
     "fabric-peer-owner",
-    "fabric-secrets"
+    "fabric-secrets",
+    "fabric-socket-proof"
    ],
-   "sha256": "0157e6a1f29c0e479b73e40e85f072640ac2f6ef4d51773751f6b504b31e92b4"
+   "sha256": "2f45bc243670c2d2e6ec86869a274f6a86d3b0f82972b9a908f966caa244e3c3"
   },
   {
    "module": "fabric-service",
@@ -7429,7 +7431,7 @@
    "fabric_events.py": "b28101f6fce505c98db6c4939bb416035ea8d85a9c83bc5a0721e93290ba0660",
    "fabric_logs.py": "86dc55bfafa2a57264722e2403510a249b95de0e4a722b2e4bc3948e3bd93da9",
    "fabric_ops_digest.py": "57421e684dd427b485ad2087a73abd005bde8f274a4360174489c647bb10b5e3",
-   "fabric_supervisors.py": "7fcfc4d24dc7bf30aa07e9db91931678bba2362fea3df54bd93d01f7c72c632d",
+   "fabric_supervisors.py": "71c6b1ade929d9a84f2548d8f22e1fc7df77d0921dd5d9d9b4aa5736f554095b",
    "fabric_service.py": "fb6bccc9f330df26a53287023da2ce4947f85e6b4fb2437db01c429ec809454d",
    "fabric_profiles.py": "26e21ec29c016000f8ca8053b7b489184854a73be1b7fdc0a18d12990203db9b",
    "fabric_interop_rules.py": "2cc2983ddaeaff35385b61283a37bf9ad4f31d5490a61a28e0c1789a7c166c2f",
@@ -7480,7 +7482,7 @@
    "fabric-events.mjs": "03d74df8b60a46bc487a4f6a520146fc923e8c833f61027ea14f60aae4e05c1b",
    "fabric-logs.mjs": "58467e5719c16e099d05bbedec47a95712506ab03c33f3cd4be1252e8498a946",
    "fabric-ops-digest.mjs": "f1c240491cefce334756cfe4a19bb2dee5e1881c493a822eb6ce5df1de9ba8ef",
-   "fabric-supervisors.mjs": "0157e6a1f29c0e479b73e40e85f072640ac2f6ef4d51773751f6b504b31e92b4",
+   "fabric-supervisors.mjs": "2f45bc243670c2d2e6ec86869a274f6a86d3b0f82972b9a908f966caa244e3c3",
    "fabric-service.mjs": "0d21b3f6f4a51b3ede576e748d481ab831fec570f629883b95f138c8823ab320",
    "fabric-profiles.mjs": "314376cf2deb87f235fb18b11d3b532e211f585b9af0a9302b5f4cc39971b532",
    "fabric-interop-rules.mjs": "21c90bda723c613c1f8c35fc1fb454a766f3eed49d0cedf6fc59dcc45357943d",

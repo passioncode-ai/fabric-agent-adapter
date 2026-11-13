@@ -11,6 +11,7 @@ import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
 import { URI } from './fabric-backups.mjs';
 import { CheckedAgent, ListenerRefused, PS, SERVER_NOT_OWN, TABLE_RESTRICTED, UNKNOWN, parsePsUid, pidListens,
   runProgram, serverEnd } from './fabric-peer-owner.mjs';
+import { loopbackHost } from './fabric-socket-proof.mjs';
 import http from 'node:http';
 import net from 'node:net';
 
@@ -560,14 +561,14 @@ export class ForeignUserAnswer {
 // The well-known answer at a loopback origin, read only on a connection whose server end is this OS account's process
 // (DEC-0154 HA-2): null when nothing answers or the answer is not JSON, a ForeignUserAnswer when the listener is another
 // account's or its owner cannot be told.
-// Every loopback spelling (127.0.0.1, another 127/8 address, localhost, [::1]) goes on a checked connection, never the
+// Every loopback spelling (127/8 in any form, localhost or a name under it, [::1]) goes on a checked connection, never the
 // unchecked way (FAA-257): the host, without brackets, and the port, or null.
 function loopbackOrigin(origin) {
   let url;
   try { url = new URL(String(origin)); } catch { return null; }
   const host = url.hostname.replace(/^\[|\]$/g, '');
-  const loop = host === 'localhost' || host === '::1' || (net.isIPv4(host) && host.startsWith('127.'));
-  if (url.protocol !== 'http:' || !loop) return null;
+  // the kit's one loopback rule (FAA-326): a name under .localhost too, as the Python twin reads it
+  if (url.protocol !== 'http:' || !loopbackHost(host)) return null;
   // new URL drops a default port: http://127.0.0.1:80 has port '', read as 80 as Python's urlsplit reads it (0.79.0 seam)
   return { host, port: Number(url.port || 80) };
 }
