@@ -331,7 +331,8 @@ class BoardMandateTests(Conversation):
             return best
 
         for shape in ("unclosed", "nested"):  # nested: every inner opener closed by the same fence (unit reading 4)
-            small, large = cost(65536, shape), cost(4 * 65536, shape)
+            # 256 KiB against 1 MiB, as the Node twin since 0.84.1: at 64 KiB one collection could decide the ratio
+            small, large = cost(4 * 65536, shape), cost(16 * 65536, shape)
             self.assertLess(large / max(small, 1e-6), 10, "%s: linear is about 4, quadratic about 16" % shape)
 
     def test_a_uuid_matches_in_any_case_and_any_other_id_as_written(self):

@@ -368,8 +368,10 @@ test('FAA-135: reading is linear in the body (0.61.0 readings 3)', () => {
     return best;
   };
   for (const shape of ['unclosed', 'nested']) { // nested: every inner opener closed by the same fence (unit reading 4)
-    const small = cost(65536, shape);
-    const large = cost(4 * 65536, shape);
+    // 256 KiB against 1 MiB: at 64 KiB a run lasts under a millisecond and one collection decided the ratio (0.84.0's
+    // release run, Node 18); linear is still about 4 and quadratic about 16
+    const small = cost(4 * 65536, shape);
+    const large = cost(16 * 65536, shape);
     assert.ok(large / Math.max(small, 0.001) < 10, `${shape}: linear is about 4, quadratic about 16 (${small} ms, ${large} ms)`);
   }
 });
