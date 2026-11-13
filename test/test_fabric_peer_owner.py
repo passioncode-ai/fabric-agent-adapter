@@ -1185,7 +1185,7 @@ class AcceptedSocketProof(unittest.TestCase):
         """0.84.0 seam reading: when the host already imported the fabric_socket_proof beside this file, that module
         object is the one asked (one calibration, one patch point), never a second copy loaded by path."""
         P._PROOF[0] = None
-        import fabric_socket_proof as own
+        own = importlib.import_module("fabric_socket_proof")
         restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED)
         with mock.patch.object(P.sys, "platform", "darwin"), mock.patch.object(own, "own_listener", return_value=None):
             P._proved("own_listener", 1, fallback=restricted)
