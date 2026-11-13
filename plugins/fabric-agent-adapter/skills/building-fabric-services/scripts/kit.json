@@ -319,7 +319,7 @@
     "fabric_secrets",
     "fabric_usage"
    ],
-   "sha256": "183bbb86e760c48af9cddb6511ec3aed329100a81e0733ad9811604cede095a9"
+   "sha256": "d105395c78b38ce7b9f5f7070e20a2edb1258cb0be5dec8c4f55078ced9c94b5"
   },
   {
    "module": "fabric_context",
@@ -905,7 +905,7 @@
     "fabric-secrets",
     "fabric-usage"
    ],
-   "sha256": "a0382229c5cc87d6aa8b0d1e70104f9058bd34f482028cc6f5555d2aabefcf68"
+   "sha256": "390752629e83ba47f74d6e518416b1e77289ee8f3c902bae0f5b85037031c96b"
   },
   {
    "module": "fabric-context",
@@ -7423,7 +7423,7 @@
    "fabric_lock.py": "0c53b3a6537d248be35ca7be6c8be0a5fc6858c6f6ef1f406467a2783d67cfd4",
    "fabric_usage.py": "0078e1f6a2b2a6fc627a45fa1c714080f95bdd92da130308e05e5c97f914a904",
    "fabric_backups.py": "0d9f775c9c7bb138cbb954a96d07521b1172717660337098c507d8e782f72530",
-   "fabric_descriptor.py": "183bbb86e760c48af9cddb6511ec3aed329100a81e0733ad9811604cede095a9",
+   "fabric_descriptor.py": "d105395c78b38ce7b9f5f7070e20a2edb1258cb0be5dec8c4f55078ced9c94b5",
    "fabric_context.py": "a44cb7969e9c4c49dd1aa6f457312cad106331d428cc73e08551c4ea1602f911",
    "fabric_auth.py": "f2302938884ca29e3ea56e3412621d13f8c73180ab00fab54b21ac189825a1ba",
    "fabric_events.py": "122360164fb2a36677c6ce21344d2dafd56e4b1e708ba6ea85398d06997e64cd",
@@ -7474,7 +7474,7 @@
    "fabric-lock.mjs": "0c607dcc62df293729237dd2da2659b1c6fd97d6283c69bc39ba86c9039c7f6e",
    "fabric-usage.mjs": "2be9fcabf208cd3ff4b9c488dca90cf2eaa1c82850b080a2083ddf3b622c7fb8",
    "fabric-backups.mjs": "0b1b76c1eff6139aa8e09b4dd0aa2bd614e095a4556ffe4d7c6e369bc29794d0",
-   "fabric-descriptor.mjs": "a0382229c5cc87d6aa8b0d1e70104f9058bd34f482028cc6f5555d2aabefcf68",
+   "fabric-descriptor.mjs": "390752629e83ba47f74d6e518416b1e77289ee8f3c902bae0f5b85037031c96b",
    "fabric-context.mjs": "7b485eb380a266507a6125880e0847bf1580a2ee39c5e2ae776a594598edef00",
    "fabric-auth.mjs": "83b4c0341c7fff8a73a93b60eced074f4916a34a22de516e54c7024210f20f2a",
    "fabric-events.mjs": "fb700ddf58f8140964643bc2d91d594526fbeb63517906acaa484ba30e8403cc",

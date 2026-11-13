@@ -1,4 +1,5 @@
-/* fabric-dashboard-kit@1.1.8 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+/* fabric-dashboard-kit@1.1.9 · Fabric's button (Fabric Agent Contract DEC-0040, FB-1…FB-8, FL-1…FL-6)
+   SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
    Load it same-origin, after fabric-dashboard.css, with the service it opens Fabric on:
      <script src="fabric-button.js" defer data-service="example-agent.default" data-service-name="Example Agent"
              data-project="project-a" data-project-name="Project A"></script>
@@ -11,7 +12,7 @@
 (function (root) {
   'use strict';
 
-  var VERSION = '1.1.8';
+  var VERSION = '1.1.9';
   var COOKIE = 'fabric_button';
   var GET_FABRIC = 'https://passioncode.ai/fabric';
   var ABSENT_AFTER_MS = 1500;

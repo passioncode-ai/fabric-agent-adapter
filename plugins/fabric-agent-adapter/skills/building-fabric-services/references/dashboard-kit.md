@@ -39,7 +39,7 @@ python3 <skill-dir>/scripts/dashboard_kit.py install <the directory your page's 
 ```
 
 It copies `fabric-dashboard.css` and `fabric-dashboard.js` (each starts with
-`fabric-dashboard-kit@<version>`). Serve both same-origin and link them; nothing is inline:
+`fabric-dashboard-kit@<version>`, then, since 1.1.9, the package's SPDX licence line, which a copy keeps: FAA-192). Serve both same-origin and link them; nothing is inline:
 
 ```html
 <html lang="en" data-fd-appearance="scheme theme">
