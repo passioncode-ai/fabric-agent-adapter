@@ -39,13 +39,15 @@ without a service every door stays closed.
 Logins are compared as ASCII email-style names lowercased whole (local part and domain alike), after trimming the
 spaces and tabs HTTP allows around a header value; nothing else is changed (no dot or `+tag` folding, no IDN
 mapping), and a login that is not plain ASCII (serve RFC 2047-encodes a non-ASCII one) is refused as malformed.
-`TailnetIdentity` reads the file again when its inode, size, mtime or ctime change, without a restart, and while it
+`TailnetIdentity` reads the file again when its inode, size, mtime or ctime change (and, while its mtime is under two
+seconds old, when its bytes do: a same-size rewrite within one timestamp tick), without a restart, and while it
 is unreadable or invalid every door refuses (`groups-unreadable`, `groups-invalid`); the reason is logged once per
 change, naming the field, never the file's content."""
 
 from __future__ import annotations
 
 import errno
+import hashlib
 import ipaddress
 import json
 import os
@@ -64,6 +66,9 @@ NAME_HEADER = "tailscale-user-name"
 FUNNEL_HEADER = "tailscale-funnel-request"
 #: The largest groups file read; a larger one is invalid.
 MAX_GROUPS_BYTES = 1048576
+# A file whose stat is unchanged but whose mtime is this close to now may have been rewritten within one timestamp tick
+# (same size, coarse clock): its content is read and compared (git's racy-clean rule).
+RACY_NS = 2_000_000_000
 
 #: The patterns as the JSON Schema writes them (ECMAScript); compiled below to end at the end of the string.
 LOGIN_PATTERN = "^[A-Za-z0-9._%+-]{1,128}@[A-Za-z0-9.-]{1,125}$"
@@ -383,6 +388,7 @@ class TailnetIdentity:
         self._clock = clock
         self._lock = threading.Lock()
         self._signature: Any = object()  # nothing read yet
+        self._digest: Optional[str] = None  # sha256 of the bytes last read
         self._groups: Union[Dict[str, Any], GroupsError] = GroupsError("groups-unreadable", "not read")
         self._checked: Optional[float] = None
         self._logged: Any = None
@@ -401,7 +407,9 @@ class TailnetIdentity:
             with open(self.path, "rb") as handle:
                 data = handle.read(MAX_GROUPS_BYTES + 1)
         except OSError as exc:
+            self._digest = None
             return GroupsError("groups-unreadable", _errno_name(exc))
+        self._digest = hashlib.sha256(data).hexdigest()
         if len(data) > MAX_GROUPS_BYTES:
             return _invalid("size")
         try:
@@ -429,12 +437,26 @@ class TailnetIdentity:
                 return self._groups
             self._checked = now
             signature = self._stat()
+            if signature == self._signature and signature[0] != "error" and self._rewritten_in_place(signature):
+                self._signature = object()
             if signature != self._signature:
                 self._signature = signature
                 self._groups = (GroupsError("groups-unreadable", signature[1])
                                 if signature[0] == "error" else self._read())
                 self._report(signature)
             return self._groups
+
+    def _rewritten_in_place(self, signature: Tuple[Any, ...]) -> bool:
+        """Whether a file whose stat did not change holds other bytes: asked only while its mtime is within RACY_NS of
+        now, since a rewrite of the same size within one timestamp tick leaves every stat field as it was."""
+        if abs(time.time_ns() - signature[3]) >= RACY_NS:
+            return False
+        try:
+            with open(self.path, "rb") as handle:
+                data = handle.read(MAX_GROUPS_BYTES + 1)
+        except OSError:
+            return True  # read it again the usual way, which names the error
+        return hashlib.sha256(data).hexdigest() != self._digest
 
     def _report(self, signature: Any) -> None:
         state = self._groups
