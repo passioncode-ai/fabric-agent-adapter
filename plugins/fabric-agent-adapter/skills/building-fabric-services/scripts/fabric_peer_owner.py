@@ -2,21 +2,21 @@
 
     peer_owner 1.3.1+kit.7: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
     `observatory/engine/peer_owner.py`, vendored at f86f0622, read against 2180235c for 1.2.0 and a69c6fee for 1.3.1),
-    the kit's `fabric_peer_owner` (layer L0; DEC-0154 HA-2, FAA-226, FAA-258). 1.3.1's proof from this account's own
-    sockets (DEC-0155 RT-2) is the kit's `fabric_socket_proof`, asked when it sits beside this file (FAA-292); without
-    it this file stands alone, as before. The kit's differences: NamedTuples (a service may load a kit file by path);
-    the Python 3.9 floor; `classify` / `classify_sid` ask for this process's uid or SID first (a client running as root
-    owns root's listener); on Linux `server_end` reads an accepted connection's own row and, for one not accept()ed yet
-    (uid 0, inode 0), the listener on its local address (CT-254), several rows of one owner are that owner, a row
-    printed twice counts once, and a `/proc` question that finds no row or several reads once more. On macOS (FAA-267,
-    FAA-273): the sysctl calibration also requires a child's listener, read under one deadline with `selectors`; a
-    number is ASCII digits only; a caller may vouch for a listener with a pid it started (`pid_listens`,
-    `CheckedHTTPConnection(vouch_pid=...)`, RT-3, the fallback after RT-2). DEC-0155 (FAA-312): a netstat that fails or
-    is empty, a table with no row of another uid (sysctl) or process (netstat) and a missing connection row read as
+    the kit's `fabric_peer_owner` (L0; DEC-0154 HA-2, FAA-226, FAA-258). 1.3.1's proof from this account's own sockets
+    (DEC-0155 RT-2) is the kit's `fabric_socket_proof`, loaded by its path when it sits beside this file (FAA-292,
+    FAA-327); else this file stands alone. Kit differences: NamedTuples (a service may load a kit file by path); the
+    Python 3.9 floor; `classify` / `classify_sid` ask for this process's uid or SID first (a client running as root owns
+    root's listener); on Linux `server_end` reads an accepted connection's own row and, for one not accept()ed yet (uid
+    0, inode 0), the listener on its local address (CT-254), several rows of one owner are that owner, a row printed
+    twice counts once, and a `/proc` question that finds no row or several reads once more. On macOS (FAA-267, FAA-273):
+    the sysctl calibration also requires a child's listener, read under one deadline with `selectors`; a number is ASCII
+    digits only; a caller may vouch for a listener with a pid it started (`pid_listens`,
+    `CheckedHTTPConnection(vouch_pid=...)`, RT-3, after RT-2). DEC-0155 (FAA-312): a netstat that fails or is empty, a
+    table with no row of another uid (sysctl) or process (netstat) and a missing connection row read as
     `table-restricted` (RT-1); a restricted table's listener is this account's only on exactly 127.0.0.1 (RT-4); no
     proof is taken from a set-uid reader. `main` is the CLI, `listener <port>` (FAA-315). /proc carries a socket's
     creator, so a listener root created and handed to another account (socket activation) reads as root's. Tests:
-    `test/test_fabric_peer_owner.py`; the Node twin is `fabric-peer-owner.mjs`.
+    `test/test_fabric_peer_owner.py`; Node twin: `fabric-peer-owner.mjs`.
 
 WHY. Loopback is one per machine, not one per OS account. On a host with several accounts, every account's processes
 reach every service any account listens with on 127.0.0.1, and a loopback socket proves nothing about who is on the
@@ -72,6 +72,7 @@ privilege, and reports the process names `netstat` prints only as far as the pid
 from __future__ import annotations
 
 import http.client
+import importlib.util
 import ipaddress
 import json
 import os
@@ -83,8 +84,7 @@ import threading
 import time
 from typing import NamedTuple, Optional, Tuple
 
-# This file's own version, for projects that copy it; not the engine's (that is configuration.VERSION).
-PEER_OWNER_VERSION = "1.3.1+kit.7"  # Observatory's 1.3.1 line with the kit's differences above
+PEER_OWNER_VERSION = "1.3.1+kit.7"  # this file's own, for projects that copy it: 1.3.1 with the kit's differences above
 
 THIS_ACCOUNT = "this-account"
 ANOTHER_ACCOUNT = "another-account"
@@ -93,8 +93,7 @@ UNKNOWN = "unknown"
 NONE = "none"
 KINDS = (THIS_ACCOUNT, ANOTHER_ACCOUNT, SYSTEM, UNKNOWN, NONE)
 
-#: The most table bytes one read accepts: 1 MB held about 1,200 sockets at `pcblist_n`'s 860 bytes each, which a busy
-#: developer machine passes; 4 MiB holds about 6,800 at 616 bytes measured on macOS 26 (FAA-260).
+#: The most table bytes one read accepts: about 6,800 sockets at 616 bytes each, measured on macOS 26 (FAA-260).
 MAX_TABLE_BYTES = 4 * 1024 * 1024
 #: Every subprocess this module starts is stopped after this many seconds.
 TIMEOUT_SECONDS = 2.0
@@ -105,8 +104,7 @@ NETSTAT = "/usr/sbin/netstat"
 PS = "/bin/ps"
 LSOF = "/usr/sbin/lsof"
 
-#: The reason a socket table hides other processes' sockets from this one (FAA-267: macOS 27.2 shows an ad-hoc-signed
-#: interpreter, such as a Homebrew Python, only its own sockets through sysctl and nothing through netstat).
+#: Why a table hides other processes' sockets (FAA-267: macOS 27.2 shows an ad-hoc-signed Python only its own).
 TABLE_RESTRICTED = "table-restricted"
 #: A macOS table that lists sockets but not the reader's own connection (DEC-0155 RT-1, FAA-312).
 NO_ROW_RESTRICTED = TABLE_RESTRICTED + ": no row for this connection"
@@ -117,8 +115,7 @@ SERVER_UNVERIFIED = "server-unverified"
 SERVER_NOT_THIS_WORKSPACE = "server-not-this-workspace"
 
 
-# The fields carry real types, not postponed strings: a NamedTuple's generated __new__ resolves its annotations in a
-# namespace without builtins, where `int | None` as a string is unresolvable (and a TypeError on Python 3.9).
+# Real types, not postponed strings: a NamedTuple's __new__ cannot resolve `int | None` as a string (3.9: TypeError).
 _OwnerFields = NamedTuple("_OwnerFields", [("kind", str), ("uid", Optional[int]), ("pid", Optional[int]),
                                            ("method", str), ("reason", Optional[str])])
 _OwnerFields.__new__.__defaults__ = (None, None, "none", None)
@@ -830,10 +827,13 @@ def _proved(ask: str, *args, fallback: Owner, **kwargs) -> Owner:
     if fallback.kind != UNKNOWN or not (fallback.reason or "").startswith(TABLE_RESTRICTED) or sys.platform != "darwin":
         return fallback
     try:
-        if _PROOF[0] is None:
-            sys.path.append(os.path.dirname(os.path.abspath(__file__)))  # beside this file, as the kit's modules load
-            import fabric_socket_proof
-            _PROOF[0] = fabric_socket_proof
+        if _PROOF[0] is None:  # the file beside this one, by its path: sys.path stays the host's (FAA-327)
+            here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fabric_socket_proof.py")
+            if not os.path.isfile(here):
+                raise ImportError(here)  # vendored alone: the table's answer stands
+            spec = importlib.util.spec_from_file_location("fabric_socket_proof", here)
+            spec.loader.exec_module(module := importlib.util.module_from_spec(spec))
+            _PROOF[0] = module
         proof = getattr(_PROOF[0], ask)(*args, **kwargs) if _PROOF[0] else None
     except ImportError:
         _PROOF[0], proof = False, None

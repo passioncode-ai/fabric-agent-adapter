@@ -44,10 +44,8 @@
    "module": "fabric_peer_owner",
    "file": "fabric_peer_owner.py",
    "layer": "L0",
-   "imports": [
-    "fabric_socket_proof"
-   ],
-   "sha256": "d8675452f24b47ddefbe5625c72c250e0228723ec6f860b2ca0b1855fd1e08d7"
+   "imports": [],
+   "sha256": "5139a9a41f136f228ecb18da10739b210bc4be25368e0712facb8c35f43f1eef"
   },
   {
    "module": "fabric_tailnet",
@@ -7401,7 +7399,7 @@
    "fabric_identifiers.py": "0fd814d521ac3aa39907458265870753046a73f48af3d8581ab864b93b211607",
    "fabric_secrets.py": "ff7ec3ddf0548933e2fd042d77d0574bbde04bd8352abe2c55c87a815e21890a",
    "fabric_socket_proof.py": "4d5844346b19a15c1e38c152656ccf11662ea1d43ccefec5dfa2546ff1c446e3",
-   "fabric_peer_owner.py": "d8675452f24b47ddefbe5625c72c250e0228723ec6f860b2ca0b1855fd1e08d7",
+   "fabric_peer_owner.py": "5139a9a41f136f228ecb18da10739b210bc4be25368e0712facb8c35f43f1eef",
    "fabric_tailnet.py": "c60416539be0199182f7969c24a37b14d0db50c8ea5e3e04cea43babfb483407",
    "fabric_tailnet_identity.py": "da04a19a9c16002a65c8422ec0699c428b9f4b2bb62a158d95cb6c83f5336e0d",
    "fabric_crypto.py": "9c34aee20dbe4d6742e4fdbaab68ceb934bbe7dbd3a904c0010824ace16cdeaa",
