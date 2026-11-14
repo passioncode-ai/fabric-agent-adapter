@@ -12,7 +12,7 @@
 
 import crypto from 'node:crypto';
 import { isSmallOrderKey, sha256 } from './fabric-crypto.mjs';
-import { isObject, jcs, show } from './fabric-jsvalue.mjs';
+import { isObject, isString, jcs, show } from './fabric-jsvalue.mjs';
 import { parseRfc3339Ms } from './fabric-time.mjs';
 
 export const ORG_MEMBERSHIP_TYPE = 'org-membership/1';
@@ -58,7 +58,6 @@ const ORIGIN = /^https:\/\/[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/;
 /** At most three fraction digits: every port compares the same instants, at millisecond precision (DEC-0085). */
 const MILLISECONDS = /:[0-9]{2}(?:\.[0-9]{1,3})?(?:[Zz]|[+-][0-9]{2}:[0-9]{2})$/;
 
-const isString = (value) => typeof value === 'string';
 const matches = (pattern, value) => isString(value) && pattern.test(value);
 const positive = (value) => Number.isSafeInteger(value) && value >= 1;
 const time = (value) => (isString(value) && MILLISECONDS.test(value) ? parseRfc3339Ms(value) : Number.NaN);

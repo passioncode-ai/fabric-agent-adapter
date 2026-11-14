@@ -737,7 +737,7 @@
     "fabric-jsvalue",
     "fabric-time"
    ],
-   "sha256": "0b7d8a99989dfa8350fdec5ee093b30d4824eef2e47efbeb7bdda3b8db015e3e"
+   "sha256": "da2751ecaa61f2e48061842eabb119c9dc0ac046c0e4c5436c858e0ed48f308e"
   },
   {
    "module": "fabric-mandate",
@@ -8239,7 +8239,7 @@
    "fabric-paths.mjs": "fe9a949b0a80f984b8d995d531f0282ce02ae22ee297b591691173179ebe14b4",
    "fabric-estate-rules.mjs": "7c212e4f2deb9ef8e0d814a8a6d415024ed1aecda58d9f8c5533ae8073b067a7",
    "fabric-estate.mjs": "ba19bad815ad9e2f7f22c6109ce20f9a9406f5d01893a7514facc21705a09511",
-   "fabric-levels.mjs": "0b7d8a99989dfa8350fdec5ee093b30d4824eef2e47efbeb7bdda3b8db015e3e",
+   "fabric-levels.mjs": "da2751ecaa61f2e48061842eabb119c9dc0ac046c0e4c5436c858e0ed48f308e",
    "fabric-mandate.mjs": "1e48d602e70da2880777260da22b8edcd4479ba45dbc8aa685d01770c5fbe5f3",
    "fabric-delegation.mjs": "0a7a6218fc2156f91c95a5828195df854437680ec7056fc82db5ee7e69e5d105",
    "fabric-share.mjs": "81ae5b83f38bcb3e8e0a1843337721b2a14ec9affa5216b402ab6e2985e5d5ec",
