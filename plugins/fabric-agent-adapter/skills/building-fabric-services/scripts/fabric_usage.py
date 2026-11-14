@@ -204,11 +204,31 @@ def _usage_cost(value: Any) -> float:
     return money if money is not None and math.isfinite(money) and money >= 0 else 0.0
 
 
-def _exceeds(a: float, b: float) -> bool:
-    return a - b > 0.000001 + 1e-9 * max(abs(a), abs(b))
+#: Half a unit of the sixth decimal place: the most one row's `costUsd` moves when rounded to 6 places (DEC-0163).
+ROW_ROUNDING_USD = 0.0000005
+
+
+def _allowance(a: float, b: float, rows: int) -> float:
+    """The rounding a cost sum may carry (DEC-0163, CT-295; the contract's `allowance`): 0.000001 and a relative 1e-9
+    of the larger side, plus half a millionth for each of the `rows` rows with a known cost summed on either side, so
+    rows rounded to 6 places one by one never fail the sum (FAA-310 (2))."""
+    return ROW_ROUNDING_USD * rows + 0.000001 + 1e-9 * max(abs(a), abs(b))
+
+
+def _exceeds(a: float, b: float, rows: int) -> bool:
+    """Whether `a` exceeds `b` by more than the allowance; a sum that overflows to an infinity exceeds a finite one."""
+    return (not math.isfinite(a) and math.isfinite(b)) or a - b > _allowance(a, b, rows)
+
+
+def _known_cost(value: Any) -> bool:
+    """A known cost: a finite, non-negative number, the rows the rounding allowance counts (DEC-0163)."""
+    money = _usage_money(value)
+    return money is not None and math.isfinite(money) and money >= 0
 
 
 def _usd(value: float) -> str:
+    if abs(value) >= 1e15:  # too large to scale by 1e6: shown as it is, so a finite cost never reads as Infinity
+        return _jsv.js_string(value)
     rounded = _round_usd(value)
     return str(int(rounded)) if rounded == int(rounded) else repr(rounded)
 
@@ -277,8 +297,11 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
             money = _usage_money(m.get("costUsd"))
             known += money if money is not None else 0.0
         day_cost = _usage_money(day.get("costUsd"))
-        # The contract's !close(day, known): Infinity or NaN is never close, so it is a finding.
-        if day_cost is not None and not abs(day_cost - known) <= 0.000001 + 1e-9 * max(abs(day_cost), abs(known)):
+        # The contract's !close(day, known, rows) (DEC-0163): within rounding both ways, the day's row and each model's
+        # known row counted; a value that is not a finite number is never close, so it is a finding.
+        counted = sum(1 for m in models if _known_cost(m.get("costUsd"))) + (1 if _known_cost(day.get("costUsd")) else 0)
+        if day_cost is not None and not (math.isfinite(day_cost) and math.isfinite(known)
+                                         and abs(day_cost - known) <= _allowance(day_cost, known, counted)):
             flag(at + "/costUsd", "the day's cost is not the sum of its models' known costs")
     # The window.
     if days:
@@ -315,7 +338,8 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
             findings.extend(_priced_row(project, at))
             runs: List[str] = []
             run_calls, run_cost, run_priced = 0, 0.0, 0
-            for r, run in enumerate(_usage_list(project.get("taskRuns"))):
+            task_runs = _usage_list(project.get("taskRuns"))
+            for r, run in enumerate(task_runs):
                 if isinstance(run.get("taskRunId"), str):
                     if run["taskRunId"] in runs:
                         flag("%s/taskRuns/%d/taskRunId" % (at, r), "each task run is one row within its project")
@@ -330,13 +354,17 @@ def usage_findings(report: Any) -> List[Dict[str, str]]:
                 flag(at + "/taskRuns", "a project's task runs hold more calls than the project (%d > %d)" % (run_calls, _usage_count(project.get("calls"))))
             elif run_priced > project_priced:
                 flag(at + "/taskRuns", "a project's task runs hold more priced calls than the project (%d > %d)" % (run_priced, project_priced))
-            elif known_cost and _exceeds(run_cost, _usage_cost(project.get("costUsd"))):
+            elif known_cost and _exceeds(run_cost, _usage_cost(project.get("costUsd")),
+                                         sum(1 for run in task_runs if _known_cost(run.get("costUsd"))) + 1):
                 flag(at + "/taskRuns", "a project's task runs cost more than the project (%s > %s)" % (_usd(run_cost), _usd(_usage_cost(project.get("costUsd")))))
         day_calls = sum(_usage_count(d.get("calls")) for d in days)
         if project_calls > day_calls:
             flag("/byProject", "the projects hold more calls than the days (%d > %d)" % (project_calls, day_calls))
-        day_cost_total = sum(_usage_cost(d.get("costUsd")) for d in days)
-        if _exceeds(project_cost, day_cost_total):
+        day_cost_total = 0.0
+        for d in days:  # in order, in doubles, as JavaScript's reduce adds
+            day_cost_total += _usage_cost(d.get("costUsd"))
+        summed = sum(1 for row in [x for x in value["byProject"] if isinstance(x, dict)] + days if _known_cost(row.get("costUsd")))
+        if _exceeds(project_cost, day_cost_total, summed):
             flag("/byProject", "the projects cost more than the days (%s > %s)" % (_usd(project_cost), _usd(day_cost_total)))
     return findings
 

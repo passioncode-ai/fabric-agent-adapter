@@ -48,7 +48,7 @@ class Attribution(unittest.TestCase):
 
 class UsageRules(unittest.TestCase):
     def test_fac_sem_025_answers_as_the_contract_does(self):
-        self.assertEqual((len(V["usage"]), len(V["usageText"])), (208, 8))
+        self.assertEqual((len(V["usage"]), len(V["usageText"])), (209, 8))
         # Each report as an object, and each as the JSON text both languages parse their own way: code, path and message.
         cases = [(c["name"], c["report"], c["findings"]) for c in V["usage"]]
         cases += [(c["name"], json.loads(c["text"]), c["findings"]) for c in V["usageText"]]

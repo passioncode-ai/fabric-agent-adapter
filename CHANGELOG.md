@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.87.0 (2026-11-14)
+
+The repin to Fabric Agent Contract `v0.1.0+2026-11-14` (`91c031c4`, FAA-331); `93e7db16` (`v0.1.0+2026-11-08.1`) stays
+supported for bundles issued under it.
+
+### Changed
+
+- **A usage report's cost sums hold within each row's rounding** (DEC-0163, FAA-310): `usage_findings` /
+  `usageFindings` and so the probe allow half a millionth for each row with a known cost summed (the task runs against
+  their project, the projects against the days, a day against its models), on top of 0.000001 and 1e-9 of the larger
+  side, so rows rounded to six places one by one never fail FAC-SEM-025; a sum that overflows to an infinity exceeds a
+  finite one, and a cost of 1e15 or more is shown as it is. Python now adds the days' costs in order, as JavaScript
+  does (`sum()` compensates on Python 3.12 and later). Held by the contract's fixture `service-usage-rounded-rows`.
+- **`activity-unit/1` is a known protocol** (DEC-0164): both `PROTOCOL_REVISIONS` registers carry it; the unit of work's
+  collector is Project Observatory's.
+- **The operator's word, by the contract's DEC-0156** (FAA-207): working-with-fabric's Step 5 and creating-fabric-agents'
+  practices follow OW-1 to OW-6: every step inside the task is the agent's within its grants, mandates and limits; no
+  command, button or card for the operator where a twin or another route reaches the step; on a risk one short message
+  naming it and the corrected way while the rest goes on (the step waits only in OW-3's three cases); only what
+  technically needs a person goes to them, a refusal by the agent's own tool or harness included; no limit widens; only
+  the operator's words carry a task.
+- The vendored contract vectors are regenerated on a clean tree of the new pin: `feed-protocols-vectors.json` and
+  `usage-attribution-vectors.json` change, and `load-vectors.json` and `source-vectors.json` only in their commit.
+
 ## 0.86.0 (2026-11-14)
 
 Wave 7 of the backlog sweep of 2026-11-12, part two (first cut): defects of FAA-200 re-measured on `main` at 0.85.1 and

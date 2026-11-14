@@ -941,6 +941,201 @@
       "findings": []
     },
     {
+      "name": "service-usage-rounded-rows",
+      "report": {
+        "protocol": "fabric-service/0.1",
+        "service": {
+          "id": "example-agent",
+          "instance": "default"
+        },
+        "generatedAt": "2026-10-04T16:00:00Z",
+        "currency": "USD",
+        "days": [
+          {
+            "date": "2026-10-03",
+            "calls": 10,
+            "unpricedCalls": 0,
+            "inputTokens": 1000,
+            "outputTokens": 100,
+            "costUsd": 2.925996,
+            "byModel": [
+              {
+                "provider": "local",
+                "model": "m-1",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-2",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-3",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-4",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-5",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-6",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-7",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-8",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-9",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              },
+              {
+                "provider": "local",
+                "model": "m-10",
+                "costBasis": "provider",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "inputTokens": 100,
+                "outputTokens": 10,
+                "costUsd": 0.2926
+              }
+            ]
+          }
+        ],
+        "byProject": [
+          {
+            "projectId": "urn:project:film",
+            "calls": 10,
+            "unpricedCalls": 0,
+            "costUsd": 2.925996,
+            "taskRuns": [
+              {
+                "taskRunId": "run-2026-10-03-01",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-02",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-03",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-04",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-05",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-06",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-07",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-08",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-09",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              },
+              {
+                "taskRunId": "run-2026-10-03-10",
+                "calls": 1,
+                "unpricedCalls": 0,
+                "costUsd": 0.2926
+              }
+            ]
+          }
+        ]
+      },
+      "findings": []
+    },
+    {
       "name": "service-usage-budgets",
       "report": {
         "protocol": "fabric-service/0.1",

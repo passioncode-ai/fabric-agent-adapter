@@ -97,9 +97,21 @@ const usageCount = (v) => (Number.isSafeInteger(v) && v >= 0 ? v : 0);
 
 const usageCost = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0);
 
-const exceeds = (a, b) => a - b > 0.000001 + 1e-9 * Math.max(Math.abs(a), Math.abs(b));
+/** Half a unit of the sixth decimal place: the most one row's `costUsd` moves when rounded to 6 places (DEC-0163). */
+export const ROW_ROUNDING_USD = 0.0000005;
 
-const usd = (v) => String(Math.round(v * 1e6) / 1e6);
+// The rounding a cost sum may carry (DEC-0163, CT-295; the contract's `allowance`): 0.000001 and a relative 1e-9 of the
+// larger side, plus half a millionth for each of the `rows` rows with a known cost summed on either side (FAA-310 (2)).
+const allowance = (a, b, rows) => ROW_ROUNDING_USD * rows + 0.000001 + 1e-9 * Math.max(Math.abs(a), Math.abs(b));
+
+// Whether `a` exceeds `b` by more than the allowance; a sum that overflows to an infinity exceeds a finite one.
+const exceeds = (a, b, rows) => (!Number.isFinite(a) && Number.isFinite(b)) || a - b > allowance(a, b, rows);
+
+// A known cost: a finite, non-negative number, the rows the rounding allowance counts (DEC-0163).
+const knownCost = (v) => usageCost(v) === v;
+
+// A value too large to scale by 1e6 is shown as it is, so a finite cost never reads as Infinity.
+const usd = (v) => String(Math.abs(v) >= 1e15 ? v : Math.round(v * 1e6) / 1e6);
 
 const usageList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'object' && x !== null && !Array.isArray(x)) : []);
 
@@ -143,8 +155,10 @@ export function usageFindings(report) {
       if (toNumber(day[field] ?? 0) !== sum) flag(`${at}/${field}`, `the day's ${field} is not the sum of its models (${show(day[field] ?? 0)} ≠ ${sum})`);
     }
     const known = models.map((m) => (typeof m.costUsd === 'number' ? m.costUsd : null)).filter((x) => x !== null).reduce((n, x) => n + x, 0);
-    // The contract's !close(day, known): Infinity or NaN is never close, so it is a finding.
-    if (typeof day.costUsd === 'number' && !(Math.abs(day.costUsd - known) <= 0.000001 + 1e-9 * Math.max(Math.abs(day.costUsd), Math.abs(known)))) flag(`${at}/costUsd`, "the day's cost is not the sum of its models' known costs");
+    // The contract's !close(day, known, rows) (DEC-0163): within rounding both ways, the day's row and each model's known
+    // row counted; a value that is not a finite number is never close, so it is a finding.
+    const counted = models.filter((m) => knownCost(m.costUsd)).length + (knownCost(day.costUsd) ? 1 : 0);
+    if (typeof day.costUsd === 'number' && !(Number.isFinite(day.costUsd) && Number.isFinite(known) && Math.abs(day.costUsd - known) <= allowance(day.costUsd, known, counted))) flag(`${at}/costUsd`, "the day's cost is not the sum of its models' known costs");
   });
   if (days.length) {
     const generated = strictTime(value.generatedAt);
@@ -176,7 +190,8 @@ export function usageFindings(report) {
       findings.push(...pricedRow(project, at));
       const runs = new Set();
       let runCalls = 0, runCost = 0, runPriced = 0;
-      usageList(project.taskRuns).forEach((run, r) => {
+      const taskRuns = usageList(project.taskRuns);
+      taskRuns.forEach((run, r) => {
         if (typeof run.taskRunId === 'string') {
           if (runs.has(run.taskRunId)) flag(`${at}/taskRuns/${r}/taskRunId`, 'each task run is one row within its project');
           runs.add(run.taskRunId);
@@ -189,12 +204,13 @@ export function usageFindings(report) {
       const projectPriced = Math.max(0, usageCount(project.calls) - usageCount(project.unpricedCalls));
       if (runCalls > usageCount(project.calls)) flag(`${at}/taskRuns`, `a project's task runs hold more calls than the project (${runCalls} > ${usageCount(project.calls)})`);
       else if (runPriced > projectPriced) flag(`${at}/taskRuns`, `a project's task runs hold more priced calls than the project (${runPriced} > ${projectPriced})`);
-      else if (usageCost(project.costUsd) === project.costUsd && exceeds(runCost, usageCost(project.costUsd))) flag(`${at}/taskRuns`, `a project's task runs cost more than the project (${usd(runCost)} > ${usd(usageCost(project.costUsd))})`);
+      else if (usageCost(project.costUsd) === project.costUsd && exceeds(runCost, usageCost(project.costUsd), taskRuns.filter((run) => knownCost(run.costUsd)).length + 1)) flag(`${at}/taskRuns`, `a project's task runs cost more than the project (${usd(runCost)} > ${usd(usageCost(project.costUsd))})`);
     });
     const dayCalls = days.reduce((n, d) => n + usageCount(d.calls), 0);
     if (projectCalls > dayCalls) flag('/byProject', `the projects hold more calls than the days (${projectCalls} > ${dayCalls})`);
     const dayCost = days.reduce((n, d) => n + usageCost(d.costUsd), 0);
-    if (exceeds(projectCost, dayCost)) flag('/byProject', `the projects cost more than the days (${usd(projectCost)} > ${usd(dayCost)})`);
+    const summed = [...value.byProject.filter((x) => typeof x === 'object' && x !== null && !Array.isArray(x)), ...days].filter((row) => knownCost(row.costUsd)).length;
+    if (exceeds(projectCost, dayCost, summed)) flag('/byProject', `the projects cost more than the days (${usd(projectCost)} > ${usd(dayCost)})`);
   }
   return findings;
 }
