@@ -269,8 +269,8 @@ def services_dir() -> Path:
 
 def same_repository(a: str, b: str) -> bool:
     def norm(u: str) -> str:
-        u = u.strip().lower()
-        u = re.sub(r"^git@([^:]+):", r"\1/", u)
+        u = re.split(r"[?#]", u.strip().lower(), maxsplit=1)[0]  # a query or fragment names no other repository (FAA-200 (8))
+        u = re.sub(r"^[^@/:]+@([^/:]+):", r"\1/", u)  # any user of an scp form, not only git@ (FAA-200 (13))
         u = re.sub(r"^[a-z+]+://", "", u)
         u = re.sub(r"^[^@/]+@", "", u)
         return re.sub(r"\.git$", "", u).rstrip("/")

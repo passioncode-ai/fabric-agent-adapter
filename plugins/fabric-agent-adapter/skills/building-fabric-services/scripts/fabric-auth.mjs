@@ -8,7 +8,7 @@ import { PROTOCOL, ServiceError, nowIso } from './fabric-base.mjs';
 import { tokenMatches, windowsTokenProblem } from './fabric-platform.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { isPlainObject } from './fabric-usage.mjs';
-import { descriptorPath, namesRepository, sourceRefusal, validateDescriptor, warnNoSource, writeDescriptor } from './fabric-descriptor.mjs';
+import { descriptorPath, namesRepository, readDescriptorJson, sourceRefusal, validateDescriptor, warnNoSource, writeDescriptor } from './fabric-descriptor.mjs';
 
 export const SESSION_COOKIE = 'fabric_session';
 
@@ -278,7 +278,8 @@ export function registerRemote({ id, instance = 'default', name, summary, origin
   };
   if (source == null) { // a rotation that names no source keeps the installed one (0.62.0 seam reading 1)
     let installed = null;
-    try { installed = JSON.parse(fs.readFileSync(descriptorPath(id, instance, dir), 'utf8'))?.source; } catch { /* none installed */ }
+    // bytes that are no UTF-8, or a leading byte-order mark, are no descriptor, as Python's strict read finds them (FAA-200 (51))
+    try { installed = readDescriptorJson(descriptorPath(id, instance, dir))?.source; } catch { /* none installed */ }
     // Only one the kit accepts: a hand-edited source never blocks a rotation; it is dropped with the warning.
     const base = new Set(validateDescriptor(d));
     if (namesRepository({ source: installed }) && validateDescriptor({ ...d, source: installed }).every((p) => base.has(p))) d.source = { ...installed };

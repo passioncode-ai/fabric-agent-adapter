@@ -103,6 +103,13 @@ import fabric_a2a as fa2  # noqa: E402 - DEC-0122
 import check_service_channel_agent as cac  # noqa: E402 - DEC-0150, FAA-197
 
 
+
+def _member(descriptor: Dict[str, Any], key: str) -> Dict[str, Any]:
+    """An object member of the descriptor, or {} when a hand-edited one holds another type: descriptor.valid names that,
+    and no later rule raises on it (FAA-200 (38))."""
+    value = descriptor.get(key)
+    return value if isinstance(value, dict) else {}
+
 class _PinnedHTTPS(http.client.HTTPSConnection):
     """HTTPS to the origin's name (SNI, certificate, Host) over a socket dialled elsewhere."""
 
@@ -220,7 +227,7 @@ class Probe:
             self.add("descriptor.source-repository", "NOT_RUN", "source is refused: %s" % added[0])
         else:
             self.add("descriptor.source-repository", "PASS", "names %s" % shown_repository(self.d["source"]["repository"]))
-        if (self.d.get("lifecycle") or {}).get("manager") == "person":
+        if _member(self.d, "lifecycle").get("manager") == "person":
             # DEC-0069: installed, never running — a reader checks the app is still there; liveness is the app's own file.
             present = fs.app_present(self.d)
             self.add("descriptor.app-installed", "PASS" if present else "FAIL",
@@ -378,7 +385,7 @@ class Probe:
     def read_token(self) -> None:
         if any(r["rule"] == "auth.token-file" for r in self.results):
             return
-        token_file = str((self.d.get("auth") or {}).get("tokenFile", ""))
+        token_file = str(_member(self.d, "auth").get("tokenFile", ""))
         try:
             self.token = fs.read_token(fs.expand(token_file))
             self.add("auth.token-file", "PASS", "%s is 0600 and owned by you" % token_file)
@@ -795,8 +802,8 @@ class Probe:
         if self.remote:
             self.add("lifecycle.platform", "NOT_RUN", "a remote placement is supervised by its platform; launchd, lock and state rules do not apply")
             return
-        life = self.d.get("lifecycle") or {}
-        data = fs.expand(str((self.d.get("paths") or {}).get("data", "~/")))
+        life = _member(self.d, "lifecycle")
+        data = fs.expand(str(_member(self.d, "paths").get("data", "~/")))
         inside = subprocess.run(["git", "-C", str(data), "rev-parse", "--show-toplevel"], capture_output=True, text=True) if data.is_dir() and shutil.which("git") else None
         self.state_rule(data, inside)
         self.lock_rule(data)
@@ -809,7 +816,7 @@ class Probe:
         except (OSError, ValueError) as exc:
             self.add("lifecycle.plist", "FAIL", "cannot read %s: %s" % (plist_path, exc))
             return
-        problems = plist_problems(plist, life.get("label"), self.token, system=in_launch_daemons(plist_path), commands=self.d.get("commands"))
+        problems = plist_problems(plist, life.get("label"), self.token, system=in_launch_daemons(plist_path), commands=_member(self.d, "commands"))
         self.add("lifecycle.plist", "FAIL" if problems else "PASS", "; ".join(problems) or "%s: RunAtLoad, KeepAlive, no secrets" % plist_path.name)
         marker = marker_problem(plist)
         self.add("lifecycle.supervisor-marker", "FAIL" if marker else "PASS",

@@ -223,6 +223,15 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("missing %s" % key)
     if problems:
         return problems
+    # FAA-200 (38): an object member is read as its type before it is indexed, so a hand-edited descriptor is named,
+    # never raised on (by this check and by every writer and probe that calls it).
+    for key in ("auth", "lifecycle", "paths", "commands"):
+        if key in descriptor and not isinstance(descriptor[key], dict):
+            problems.append("%s must be an object" % key)
+    if isinstance(descriptor.get("paths"), dict) and "logs" in descriptor["paths"] and not isinstance(descriptor["paths"]["logs"], list):
+        problems.append("paths.logs must be an array")
+    if problems:
+        return problems
     if descriptor["protocol"] != PROTOCOL:
         problems.append("protocol must be %s" % PROTOCOL)
     for key, pattern in (("id", _ID), ("instance", _INSTANCE)):  # a string before its pattern (FAA-200 (9), (36))
@@ -318,12 +327,19 @@ _PEER_ENDPOINT = re.compile(r"^https://(?P<host>([a-z0-9]([a-z0-9-]{0,61}[a-z0-9
 _SOURCE_URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9._~:/?#@!$&'()*+,;=-]|%[0-9A-Fa-f]{2})+\Z")
 # Brackets belong to an IP-literal host only (RFC 3986 3.2.2); the literal is set aside before the character check.
 _IP_LITERAL = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@\[\]]*@)?)\[[0-9A-Fa-f:.vV]+\]")
-_URI_AUTHORITY = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://(?:[^/?#@]*@)?(?P<host>\[[^\]]*\]|[^/?#:]*)(?::(?P<port>[^/?#]*))?")
+# A special scheme's authority starts after any run of slashes, none included, as `new URL` reads it, so
+# <https>:github.com:99999/o/r is read for its port too (FAA-200 (56)); any other scheme has one only after `//`.
+# A special scheme's repository is written with exactly two slashes: `new URL` also reads <https>:github.com/o/r and
+# <https>:////github.com/o/r, which no repository-match rule (the kit's three, Fabric's repoKey) joins to a checkout.
+_URI_AUTHORITY = re.compile(r"^(?:(?P<special>[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):(?P<slashes>/*)|[A-Za-z][A-Za-z0-9+.-]*://)"
+                            r"(?:[^/?#@]*@)?(?P<host>\[[^\]]*\]|[^/?#:]*)(?::(?P<port>[^/?#]*))?")
 # A special scheme (http, https, ws, wss, ftp) reads a user:password@ after any run of slashes, none included, as
 # `new URL` does: <https>:bot:pw@host carries the password too (0.56.0 seam r7).
-_URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#]*:[^/\\?#]*@"
+# The user part stops at its first colon: the same verdict (a colon, then an @, in the user information) read in linear
+# time, where a user part that may hold colons backtracked quadratically on a run of them (FAA-200 (44)).
+_URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#:]*:[^/\\?#]*@"
                            # any other scheme: a backslash belongs to the user information (seam r8)
-                           r"|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*:[^/?#]*@)")
+                           r"|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*://[^/?#:]*:[^/?#]*@)")
 
 
 _RESIDENCY = re.compile(r"^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])\Z", re.ASCII)
@@ -345,8 +361,48 @@ def _authority_ok(uri: str) -> bool:
     m = _URI_AUTHORITY.match(uri)
     if not m:
         return True
-    port = m.group("port")
-    return bool(m.group("host")) and (port is None or port == "" or (port.isdigit() and len(port) <= 5 and int(port) <= 65535))
+    port, host = m.group("port"), m.group("host")
+    if not host or not (port is None or port == "" or (port.isdigit() and len(port) <= 5 and int(port) <= 65535)):
+        return False
+    return not m.group("special") or (m.group("slashes") == "//" and _special_host_ok(host))
+
+
+def _ipv4_number(part: str) -> Optional[int]:
+    """The WHATWG URL standard's IPv4 number parser: decimal, 0x hexadecimal or 0-led octal; None on failure."""
+    radix = 10
+    if part[:2] in ("0x", "0X"):
+        part, radix = part[2:], 16
+    elif len(part) > 1 and part[0] == "0":
+        part, radix = part[1:], 8
+    if part == "":
+        return 0
+    digits = {10: "0123456789", 16: "0123456789abcdefABCDEF", 8: "01234567"}[radix]
+    return int(part, radix) if all(c in digits for c in part) else None
+
+
+def _special_host_ok(host: str) -> bool:
+    """FAA-200 (37): a special scheme's host as `new URL` would accept it, so Fabric's registry never drops the
+    descriptor as manifest-invalid. A host is written as it is, never percent-encoded (no repository host needs it,
+    and both twins refuse every `%` rather than mirror the decoding); a bracketed host is an IPv6 address; a host
+    whose last label is a number is a whole IPv4 address (each part up to 255, the last filling what is left)."""
+    if "%" in host:
+        return False
+    if host.startswith("["):
+        try:
+            ipaddress.IPv6Address(host[1:-1])
+        except ValueError:
+            return False
+        return host.endswith("]")
+    parts = host.split(".")
+    if len(parts) > 1 and parts[-1] == "":
+        parts = parts[:-1]
+    last = parts[-1]
+    if not ((last != "" and last.isdigit() and last.isascii()) or (last != "" and _ipv4_number(last) is not None)):
+        return True  # a domain: its code points are the source rule's, none of them one `new URL` forbids
+    numbers = [_ipv4_number(p) if p else None for p in parts]
+    if len(parts) > 4 or None in numbers:
+        return False
+    return all(n <= 255 for n in numbers[:-1]) and numbers[-1] < 256 ** (5 - len(numbers))
 
 
 def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
@@ -404,10 +460,11 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
                 problems.append("source.repository is a URI (RFC 3986), such as https://github.com/owner/name")
             elif _URI_PASSWORD.match(repository):  # before the host: user information is a credential, said as one
                 problems.append("source.repository carries no password: it names the repository, never a credential")
+            elif "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
+                # before the authority, whose two-slash rule would name `<https>:u@h/r` less usefully (0.86.0)
+                problems.append("source.repository with a user is a URL with an authority (https://user@host/path), never an scp form")
             elif not _authority_ok(repository):
                 problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
-            elif "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
-                problems.append("source.repository with a user is a URL with an authority (https://user@host/path), never an scp form")
             elif fabric_secrets.repository_credential(repository):  # its name is no key (0.62.0 seam reading 6)
                 problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one")
     if "peer" in descriptor:

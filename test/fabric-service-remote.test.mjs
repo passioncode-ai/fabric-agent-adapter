@@ -267,3 +267,47 @@ test('a mixed-case repository name with a digit is told the remedy (FAA-200 (19)
   const problems = k.validateDescriptor(remote({ source: { repository: `https://github.com/example/Agent${'Qx7a'.repeat(10)}` } }));
   assert.ok(problems.some((p) => p.includes("write the repository's name in lower case if it is one")), problems.join('; '));
 });
+
+test('a rotation reads an installed descriptor that is no UTF-8 as none, as the Python twin does (FAA-200 (51))', () => {
+  const dir = path.join(temp(), 'services');
+  k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 't'.repeat(40), dir,
+    source: { repository: 'https://github.com/example/agent' } });
+  const file = k.descriptorPath('example-agent', 'default', dir);
+  const text = fs.readFileSync(file, 'latin1').replace('"Example Agent"', '"Example \u00ffAgent"');
+  fs.writeFileSync(file, Buffer.from(text, 'latin1')); // one byte 0xff: no UTF-8
+  const emit = process.emitWarning;
+  const seen = [];
+  try {
+    process.emitWarning = (message, options) => seen.push(options?.code);
+    k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 'n'.repeat(40), dir });
+  } finally {
+    process.emitWarning = emit;
+  }
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).source, undefined, 'the unreadable source is dropped, never kept');
+  assert.equal(seen.length, 1, 'with the warning');
+});
+
+test('a rotation reads an installed descriptor led by a byte-order mark as none, as the Python twin does (FAA-200 (51))', () => {
+  const dir = path.join(temp(), 'services');
+  k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 't'.repeat(40), dir,
+    source: { repository: 'https://github.com/example/agent' } });
+  const file = k.descriptorPath('example-agent', 'default', dir);
+  fs.writeFileSync(file, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), fs.readFileSync(file)]));
+  const emit = process.emitWarning;
+  try {
+    process.emitWarning = () => {};
+    k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 'n'.repeat(40), dir });
+  } finally {
+    process.emitWarning = emit;
+  }
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).source, undefined);
+});
+
+test('readDescriptors leaves out a file that is no UTF-8 or starts with a byte-order mark, as Python does (FAA-200 (51))', () => {
+  const dir = temp();
+  const good = JSON.stringify({ id: 'a' });
+  fs.writeFileSync(path.join(dir, 'a.json'), good);
+  fs.writeFileSync(path.join(dir, 'b.json'), Buffer.from(good.replace('"a"', '"ÿb"'), 'latin1'));
+  fs.writeFileSync(path.join(dir, 'c.json'), Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(good)]));
+  assert.deepEqual(k.readDescriptors(dir).map(([file]) => path.basename(file)), ['a.json']);
+});

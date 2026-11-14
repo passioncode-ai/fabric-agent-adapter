@@ -1536,7 +1536,10 @@ class RepositoryRule(unittest.TestCase):
                      "github.com/example-org/example-agent", "https://user@github.com/example-org/example-agent",
                      "git+ssh://git@github.com/example-org/example-agent", " github.com/example-org/example-agent ",
                      "https://github.com/example-org/other-agent", "git@gitlab.com:example-org/example-agent.git",
-                     "https://github.com/example-org/example-agent.github", "", "github.com/example-org"]
+                     "https://github.com/example-org/example-agent.github", "", "github.com/example-org",
+                     # FAA-200 (8), (13): a query or fragment names no other repository; any user of an scp form
+                     "https://github.com/example-org/example-agent?ref=main", "https://github.com/example-org/example-agent#readme",
+                     "deploy@github.com:example-org/example-agent.git"]
         for a in spellings:
             for b in spellings:
                 with self.subTest(a=a, b=b):

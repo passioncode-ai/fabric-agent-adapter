@@ -24,7 +24,9 @@ the place. The context is settled when every source that names one names the sam
 
 When none names it, or they disagree, **the agent asks the operator once, naming the candidates and what each would
 do; it never guesses, never picks a "safest" one and never splits the task across contexts.** With no person in the
-session the question goes through `fabric_question_ask` (the candidates as `options`). This is the one exception to
+session the question goes through `fabric_question_ask` (the candidates as `options`, exactly one `recommended`: the one
+the project's recorded decisions and goal support, its reason in the option's `consequence`; Fabric 0.3.21 refuses
+options with none, CO-580; the operator still decides). This is the one exception to
 the template's "do not ask, do it" rule for the operator's word (FAA-207, CT-220). The answer is recorded in the
 handoff as `{context, by: "operator", at, source}`, so the next agent does not ask again. The question and the answer
 never go into either organization's board thread.

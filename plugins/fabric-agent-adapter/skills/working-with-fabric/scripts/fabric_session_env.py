@@ -58,7 +58,7 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.85.1"
+VERSION = "0.86.0"
 
 
 HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
@@ -633,8 +633,8 @@ def _repository_key(url: str) -> str:
     """One spelling of a remote: scheme, user, `.git` and case dropped; `git@host:a/b` is `host/a/b`. The kit's rule
     (dashboard_kit and check_service_rules `same_repository`), copied because a session script imports no kit module;
     test_fabric_session.RepositoryRule holds the three equal (FAA-200 (13))."""
-    url = url.strip().lower()
-    url = re.sub(r"^git@([^:]+):", r"\1/", url)
+    url = re.split(r"[?#]", url.strip().lower(), maxsplit=1)[0]  # a query or fragment names no other repository (FAA-200 (8))
+    url = re.sub(r"^[^@/:]+@([^/:]+):", r"\1/", url)  # any user of an scp form, not only git@ (FAA-200 (13))
     url = re.sub(r"^[a-z+]+://", "", url)
     url = re.sub(r"^[^@/]+@", "", url)
     return re.sub(r"\.git$", "", url).rstrip("/")
