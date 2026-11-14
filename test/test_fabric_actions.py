@@ -72,18 +72,32 @@ class Vectors(unittest.TestCase):
         self.assertIsNone(fa.action_rules("service-well-known", {}))
 
     def test_the_well_known_fixtures(self):
-        self.assertEqual(len(V["wellKnowns"]), 7)
+        self.assertEqual(len(V["wellKnowns"]), 8)  # DEC-0162: service-well-known-actions-levels-ok
         for case in V["wellKnowns"]:
             with self.subTest(case["name"]):
                 self.assertEqual(js(view_of(fa.actions_view(case["document"]))), js(case["view"]))
                 self.assertEqual(paths(fa.actions_extension_rules(case["document"])), case["findings"])
 
+    def test_the_authority_fixtures(self):  # DEC-0162 LV-5, LV-7: authorityView and its FAC-SEM-142 findings
+        self.assertEqual(len(V["authorities"]), 3)
+        for case in V["authorities"]:
+            with self.subTest(case["name"]):
+                view = fa.authority_view(case["document"])
+                view.pop("errors", None)
+                self.assertEqual(js(view), js(case["authority"]))
+                self.assertEqual(paths(fa.authority_extension_rules(case["document"])), case["findings"])
+        self.assertEqual(fa.authority_view({}), {"declared": False})
+        self.assertEqual(fa.authority_extension_rules({"extensions": {fa.AUTHORITY_EXTENSION_KEY: []}})[0]["code"], "FAC-SEM-142")
+
     def test_the_decision_and_extension_fixtures(self):
-        self.assertEqual(len(V["fixtures"]), 14)
+        self.assertEqual(len(V["fixtures"]), 19)  # DEC-0162: two decision fixtures, three of the authority extension
         for case in V["fixtures"]:
             with self.subTest(case["name"]):
                 if case["schema"] == "decision.schema.json":
                     self.assertEqual(fa.decision_shape(case["document"]), case["valid"])
+                elif case["schema"] == "service-authority-extension.schema.json":
+                    view = fa.authority_view({"extensions": {fa.AUTHORITY_EXTENSION_KEY: case["document"]}})
+                    self.assertEqual((view["declared"], view["valid"], bool(view.get("errors"))), (True, case["valid"], not case["valid"]))
                 elif case["schema"] == "service-actions-extension.schema.json":
                     view = fa.actions_view({"extensions": {KEY: case["document"]}})
                     self.assertTrue(view["declared"])

@@ -303,6 +303,32 @@ The probe reads the declaration (`well-known.actions`), checks that `tools/list`
 (`interop.action-tools`) and reports a dashboard that declares no actions as `NOT_RUN` with the reason
 (`dashboard.actions-declared`): absence does not prove a page-only button.
 
+**Levels and a place's profile (DEC-0162, DEC-0166, contract `v0.1.0+2026-11-14.2`).** In an organization's context
+a level holder (the owner, an administrator, an architect in its projects) decides as the operator does, proved by an
+`org-membership/2` attestation the hub binds to the call by the delegation token's `mem`. A service that reads levels
+declares them in its well-known document under `extensions/authority/0.1` (`levels`: each organization and the audience
+its issuer registered the service by; `actionLevels`: the lowest level of a relayed action, `owner`, `admin`,
+`architect` or `operator`; `standing: true` when it reads a place's standing mandate). `authority_view` /
+`authorityView` reads that declaration and `authority_extension_rules` / `authorityExtensionRules` holds it to
+FAC-SEM-142 (an organization named twice, a level for an id that is not a relayed action). `action_decision` /
+`actionDecision` then takes, beside the inputs above:
+
+- `levels`: the service's level contexts by organization, `{"org:<id>": {audience, keySet, held?}}`, the key set the
+  service applied under the root its estate pins (`fabric_levels` checks the attestation against it, Ed25519 included);
+- `tokenMem` and `tokenProf`: the `mem` and `prof` claims of the call's verified delegation token
+  (`fabric_delegation` refuses either one that is not a sha256 digest as `malformed-claims`);
+- `actionLevel`: the called action's `actionLevels` entry; `context`: the context the call acts in (`personal` or
+  `org:<id>`), the service's own knowledge; `standing`: True when it declares `standing`.
+
+A level decision (`by: level`, `via: level-command`) or a level mandate is read at every tier and recorded
+`{by: level, via, level, org, project?, approver, membershipDigest, revision, caller}`; an act declared `owner` or
+`admin` in an organization's context takes no operator form at all and answers `level-insufficient: owner` or `admin`
+without one; a place's standing mandate (`mandate/1` with `standing`, at most a day) is read from T2 only under a
+matching `prof` and recorded `via: profile`. A malformed `levels` is the service's fault `levels-invalid`, never a
+caller's refusal. Both twins answer the contract's `levels.json` and `profile.json` case for case
+(`test/fixtures/contract/levels-vectors.json`, `standing-vectors.json`). `McpToolServer` does not pass these inputs
+yet: a service that reads levels calls `action_decision` itself until it does (FAA-249).
+
 <a id="the-operators-mandate"></a>
 
 ## The operator's mandate

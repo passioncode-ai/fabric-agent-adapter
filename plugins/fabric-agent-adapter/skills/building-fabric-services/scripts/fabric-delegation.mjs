@@ -237,8 +237,11 @@ function spendShaped(spend) {
 }
 
 /** DL-13 row 5 as DEC-0045 types it: {claims, depth} or {problem}. A claim the profile does not know is ignored. */
+/** A `mem` or `prof` claim: a sha256 digest (DEC-0162 LV-5, DEC-0166 AU-3). */
+const CLAIM_DIGEST = /^sha256:[0-9a-f]{64}$/;
+
 function delegationShape(payload) {
-  const { iss, sub, act, aud, scope, effect, grant, spend, project, task, iat, exp, nbf, jti } = payload;
+  const { iss, sub, act, aud, scope, effect, grant, spend, project, task, mem, prof, iat, exp, nbf, jti } = payload;
   const depth = actorChainDepth(act);
   if (depth === undefined) return { problem: 'malformed-chain' };
   const typed = isUri(iss) && isUri(sub) && typeof aud === 'string' && AGENT_ID.test(aud)
@@ -247,6 +250,9 @@ function delegationShape(payload) {
     && Array.isArray(grant) && grant.length === 1 && typeof grant[0] === 'string' && grant[0].length >= 1 && grant[0].length <= 256
     && (spend === undefined || spendShaped(spend)) && (project === undefined || isUri(project))
     && (task === undefined || (typeof task === 'string' && OPAQUE_ID.test(task)))
+    // DEC-0162 LV-5 and DEC-0166 AU-3: the membership a level is bound by, and the profile, each a sha256 digest.
+    && (mem === undefined || (typeof mem === 'string' && CLAIM_DIGEST.test(mem)))
+    && (prof === undefined || (typeof prof === 'string' && CLAIM_DIGEST.test(prof)))
     && isTime(iat) && isTime(exp) && (nbf === undefined || isTime(nbf)) && typeof jti === 'string' && JTI.test(jti);
   return typed ? { claims: payload, depth } : { problem: 'malformed-claims' };
 }

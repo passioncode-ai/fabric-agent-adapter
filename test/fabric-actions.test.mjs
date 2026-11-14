@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import {
-  ACTIONS_EXTENSION_KEY as KEY, actionCaller, actionCallRules, actionDecision, operatorDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
+  ACTIONS_EXTENSION_KEY as KEY, AUTHORITY_EXTENSION_KEY, authorityExtensionRules, authorityView, actionCaller, actionCallRules, actionDecision, operatorDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
 } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-actions.mjs';
 import { PRIMARY_CAPABILITY, ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
 import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
@@ -55,17 +55,32 @@ test('the action-call fixtures', () => {
 });
 
 test('the well-known fixtures', () => {
-  assert.equal(V.wellKnowns.length, 7);
+  assert.equal(V.wellKnowns.length, 8); // DEC-0162: service-well-known-actions-levels-ok
   for (const c of V.wellKnowns) {
     assert.deepEqual(viewOf(actionsView(c.document)), c.view, c.name);
     assert.deepEqual(paths(actionsExtensionRules(c.document)), c.findings, c.name);
   }
 });
 
+test('the authority fixtures', () => { // DEC-0162 LV-5, LV-7
+  assert.equal(V.authorities.length, 3);
+  for (const c of V.authorities) {
+    const { errors: _errors, ...view } = authorityView(c.document);
+    assert.deepEqual(view, c.authority, c.name);
+    assert.deepEqual(paths(authorityExtensionRules(c.document)), c.findings, c.name);
+  }
+  assert.deepEqual(authorityView({}), { declared: false });
+  assert.equal(authorityExtensionRules({ extensions: { [AUTHORITY_EXTENSION_KEY]: [] } })[0].code, 'FAC-SEM-142');
+});
+
 test('the decision and extension fixtures', () => {
-  assert.equal(V.fixtures.length, 14);
+  assert.equal(V.fixtures.length, 19); // DEC-0162: two decision fixtures, three of the authority extension
   for (const c of V.fixtures) {
     if (c.schema === 'decision.schema.json') assert.equal(decisionShape(c.document), c.valid, c.name);
+    else if (c.schema === 'service-authority-extension.schema.json') {
+      const view = authorityView({ extensions: { [AUTHORITY_EXTENSION_KEY]: c.document } });
+      assert.deepEqual([view.declared, view.valid, Boolean(view.errors?.length)], [true, c.valid, !c.valid], c.name);
+    }
     else if (c.schema === 'service-actions-extension.schema.json') {
       const view = actionsView({ extensions: { [KEY]: c.document } });
       assert.equal(view.declared, true, c.name);
