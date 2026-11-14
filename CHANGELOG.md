@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.90.0 (2026-11-14)
+
+The kit's gate reads levels and a place's profile by itself (FAA-334; contract DEC-0162 LV-5, LV-7, DEC-0166 AU-3).
+
+### Added
+
+- `McpToolServer(authority={levels, actionLevels, standing})`: a service's level contexts, its actions' levels and its
+  standing reading, checked at start (`authority_config_problem`); every relayed action then names its effect, each
+  tool takes its call context (`add_tool(context=)`), the token's `mem` and `prof` come from the claims `authorize`
+  verified, and the gate decides a level decision, a level mandate and a standing mandate on a tool call without the
+  service calling `action_decision` itself. `authority_extension()` gives the `extensions/authority/0.1` declaration
+  (organizations and audiences, never key sets).
+- `action_gate` / `actionGate` take `levels`, `action_level` / `actionLevel`, `context`, `token_mem` / `tokenMem`,
+  `token_prof` / `tokenProf` and `standing`, and read the action's effect and project for a level form too;
+  `authority_gate_inputs`, `authority_declaration` and `authority_config_problem` (and their Node twins) build them.
+
+### Tests
+
+- `test_gate_levels.py` and `fabric-gate-levels.test.mjs`: all 113 action cases of the contract's `levels.json` and
+  `profile.json` pass through both twins' gate as `actionDecision` answers them, and every level case a tool call can
+  carry is decided by `McpToolServer` from its configuration alone.
+
 ## 0.89.0 (2026-11-14)
 
 The repin to Fabric Agent Contract `v0.1.0+2026-11-14.2` (`ced7b292`, FAA-333); `91c031c4` (`v0.1.0+2026-11-14`) stays

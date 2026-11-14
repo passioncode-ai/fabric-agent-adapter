@@ -21,6 +21,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_actions import action_decision, decision_shape, job_capability  # noqa: E402 - DEC-0121
+from fabric_levels import ACTION_LEVELS, level_contexts_well_formed  # noqa: E402 - DEC-0162
 from fabric_mandate import (  # noqa: E402 - DEC-0125, DEC-0126
     EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, is_agent_id, mandate_covers, mandate_problem, without_source)
 
@@ -423,7 +424,9 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
                 elicited: bool = False, approval: Any = None, action_digest: Optional[str] = None,
                 human_step_url: Optional[str] = None, now: Any = None, self_id: Optional[str] = None,
                 effect: Optional[str] = None, caller_agent: Optional[str] = None, spend_usd: Any = None,
-                project: Optional[str] = None, mandate_capability: Optional[str] = None) -> Dict[str, Any]:
+                project: Optional[str] = None, mandate_capability: Optional[str] = None, levels: Any = None,
+                action_level: Any = None, context: Any = None, token_mem: Any = None, token_prof: Any = None,
+                standing: bool = False) -> Dict[str, Any]:
     """One call of a declared action, before its handler runs (DEC-0121 AP-2, AP-4): fabric_actions.action_decision over
     the call's `_meta.decision` (read from `meta` only, never from arguments, decision D11), the service's authenticated
     `caller` (fabric_actions.action_caller), `target` (the object the call acts on), `elicited` (the service's own
@@ -441,7 +444,13 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     closed, as McpToolServer reads them (FAA-139): a spend that is not a finite double is none (`mandate_spend`), a
     project that is not an exact str (a subclass included) is UNREADABLE_PROJECT, which a mandate limited to projects refuses. A covered call
     answers {ok: True, record: {by: operator, via: mandate, task, chain, caller}, decision: None, mandate}; without
-    `self_id` the mandate is not read and the call is answered as before it existed."""
+    `self_id` the mandate is not read and the call is answered as before it existed.
+
+    DEC-0162, DEC-0166 (FAA-334): a service that reads levels passes `levels` (its level contexts, a map by
+    organization), `action_level` (the called action's entry of its `actionLevels`), `context` (the call's context,
+    `personal` or `org:<orgId>`) and `token_mem` (the verified token's `mem`); one that declares `standing` passes
+    `standing=True` and `token_prof` (the token's `prof`). With either, `effect` and `project` are read as above for a
+    level decision too, so a level holder's word is decided without the service calling action_decision itself."""
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19
     inputs: Dict[str, Any] = {"action": action, "tier": tier, "caller": caller, "elicited": elicited is True, "now": now}
     if isinstance(meta, dict) and "decision" in meta:
@@ -449,12 +458,22 @@ def action_gate(action: Any, *, tier: Any, caller: Any, meta: Any = None, target
     for name, value in (("target", target), ("approval", approval), ("actionDigest", action_digest), ("humanStepUrl", human_step_url)):
         if value is not None:
             inputs[name] = value
-    if self_id is not None and isinstance(meta, dict) and "mandate" in meta:
+    for name, value in (("levels", levels), ("actionLevel", action_level), ("context", context), ("tokenMem", token_mem),
+                        ("tokenProf", token_prof)):
+        if value is not None:
+            inputs[name] = value
+    if standing is True:
+        inputs["standing"] = True
+    reads_mandate = self_id is not None and isinstance(meta, dict) and "mandate" in meta
+    if reads_mandate or levels is not None or standing is True:
+        project = project if project is None or type(project) is str else UNREADABLE_PROJECT
+        for name, value in (("effect", effect), ("project", project)):
+            if value is not None:
+                inputs[name] = value
+    if reads_mandate:
         inputs.update({"mandate": meta["mandate"], "self": self_id})
         spend_usd = mandate_spend(spend_usd)
-        project = project if project is None or type(project) is str else UNREADABLE_PROJECT
-        for name, value in (("effect", effect), ("callerAgent", caller_agent), ("spendUsd", spend_usd), ("project", project),
-                            ("mandateCapability", mandate_capability)):
+        for name, value in (("callerAgent", caller_agent), ("spendUsd", spend_usd), ("mandateCapability", mandate_capability)):
             if value is not None:
                 inputs[name] = value
     answer = action_decision(inputs)
@@ -479,6 +498,56 @@ def action_refusal_tool_result(answer: Any, traceparent: Optional[str] = None) -
     import fabric_delegation as _fd  # noqa: E402 - beside this file: DL-19
     refusal = _fd.refusal_from_action(answer)
     return None if refusal is None else _fd.refusal_tool_result(refusal, traceparent=traceparent)
+
+
+def authority_config_problem(authority: Any) -> Optional[str]:
+    """Why a service's authority configuration is not one McpToolServer can read (DEC-0162 LV-5, LV-7; DEC-0166 AU-3), or
+    None. It is an object of `levels` (its level contexts: a map by `org:<orgId>` of {audience, keySet, held?}),
+    `actionLevels` (a level of ACTION_LEVELS by relayed action id) and `standing` (true), at least one of them."""
+    if not isinstance(authority, dict) or not authority or set(authority) - {"levels", "actionLevels", "standing"}:
+        return "authority is an object of levels, actionLevels and standing, at least one of them"
+    if "levels" in authority and not (authority["levels"] and level_contexts_well_formed(authority["levels"])):
+        return "authority.levels is a map by org:<orgId> of {audience, keySet (org-key-set/1), held?}"
+    levels = authority.get("actionLevels")
+    if levels is not None and not (isinstance(levels, dict) and levels and all(
+            isinstance(k, str) and isinstance(v, str) and v in ACTION_LEVELS for k, v in levels.items())):
+        return "authority.actionLevels maps an action id to one of %s" % ", ".join(ACTION_LEVELS)
+    if "standing" in authority and authority["standing"] is not True:
+        return "authority.standing is true when present"
+    return None
+
+
+def authority_declaration(authority: Dict[str, Any]) -> Dict[str, Any]:
+    """The value of extensions/authority/0.1 (`AUTHORITY_EXTENSION_KEY`) for a configuration authority_config_problem
+    accepts: each organization with the audience its issuer registered the service by, never its key set."""
+    out: Dict[str, Any] = {}
+    if "levels" in authority:
+        out["levels"] = [{"org": org, "audience": entry["audience"]} for org, entry in authority["levels"].items()]
+    for name in ("actionLevels", "standing"):
+        if name in authority:
+            out[name] = authority[name] if name == "standing" else dict(authority[name])
+    return out
+
+
+def authority_gate_inputs(authority: Any, action_id: str, context: Any, claims: Any) -> Dict[str, Any]:
+    """What action_gate reads levels and a place's profile with (FAA-334): the service's level contexts, the action's
+    level, the call's `context` (kept only when a string; the gate checks its form) and the verified token's `mem` and
+    `prof` from `claims`. Empty without a configuration."""
+    if not isinstance(authority, dict):
+        return {}
+    out: Dict[str, Any] = {"standing": authority.get("standing") is True}
+    if "levels" in authority:
+        out["levels"] = authority["levels"]
+    level = (authority.get("actionLevels") or {}).get(action_id)
+    if level is not None:
+        out["action_level"] = level
+    if isinstance(context, str):
+        out["context"] = context
+    if isinstance(claims, dict):
+        for claim, name in (("mem", "token_mem"), ("prof", "token_prof")):
+            if claim in claims:
+                out[name] = claims[claim]
+    return out
 
 
 def usage_findings(usage: Any, at: str) -> List[Dict[str, str]]:

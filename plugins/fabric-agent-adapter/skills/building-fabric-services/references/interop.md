@@ -320,6 +320,15 @@ FAC-SEM-142 (an organization named twice, a level for an id that is not a relaye
 - `actionLevel`: the called action's `actionLevels` entry; `context`: the context the call acts in (`personal` or
   `org:<id>`), the service's own knowledge; `standing`: True when it declares `standing`.
 
+The gate passes them itself (FAA-334, 0.90.0): `McpToolServer(..., authority={"levels": ..., "actionLevels": ...,
+"standing": True})` checks the configuration at start (`authority_config_problem`), requires the effect of every relayed
+action, takes each tool's call context as `add_tool(..., context=)` (a name or a function of the arguments), reads
+`mem` and `prof` from the claims of the token `authorize` verified (never from the call), and
+`server.authority_extension()` is the declaration to put under `extensions/authority/0.1` (each organization and its
+audience, never the key set). A Node service passes the same inputs to `actionGate` (`levels`, `actionLevel`,
+`context`, `tokenMem`, `tokenProf`, `standing`; `authorityGateInputs` builds them, `authorityDeclaration` the
+declaration). A job's input step keeps the reading it had before levels (no level decides it yet).
+
 A level decision (`by: level`, `via: level-command`) or a level mandate is read at every tier and recorded
 `{by: level, via, level, org, project?, approver, membershipDigest, revision, caller}`; an act declared `owner` or
 `admin` in an organization's context takes no operator form at all and answers `level-insufficient: owner` or `admin`
