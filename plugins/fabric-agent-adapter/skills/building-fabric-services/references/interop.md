@@ -212,7 +212,7 @@ setting, an export, a preview with its diff and hash) is a capability on the MCP
 with the same filters and paging, under the caller's grant as the page answers under the person's session. Never tell
 an agent to open the page. The probe's `dashboard.agent-surface` fails a dashboard whose service has no agent surface
 (no `surfaces.mcp`, and for a remote one no `surfaces.a2a` either) or whose MCP surface serves no tool. AP-1 below is
-the contract's half for actions; read parity is asked of the contract on the board (FAA-332).
+the contract's half for actions; read parity is the contract's row CT-311, its DEC to follow (FAA-332).
 
 **Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
 resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same

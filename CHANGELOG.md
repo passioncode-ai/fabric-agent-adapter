@@ -20,6 +20,9 @@ see or change that an agent cannot. The contract pin stays at `91c031c4` (`v0.1.
 - **The probe's `dashboard.agent-surface`**: a service that serves a dashboard and has no agent surface (no
   `surfaces.mcp`, and for a remote one no `surfaces.a2a` either), or whose `tools/list` serves no tool, fails. Measured
   on this Mac: two of 27 local services with a dashboard fail it.
+- **The templates follow it**: the dashboard-only recipe (service 0.2.0) serves its page's agent twin, the read-only
+  MCP tool `dashboard.snapshot` with the same sections, and the online sample (`sample-remote-service.mjs`) serves
+  `example.summary` at `POST /mcp`; both pass `dashboard.agent-surface`, which their old shape failed.
 - **`new` 0.2.0** writes `docs/agent-surface.md`, the inventory started with the agent's one capability, and a README
   section *Agent first*; the source manifest covers `docs/`.
 

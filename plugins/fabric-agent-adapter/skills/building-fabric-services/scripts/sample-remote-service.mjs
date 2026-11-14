@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // A complete ONLINE Fabric service (fabric-service/0.1, remote placement — DEC-0019): the four
-// protocol routes and a dashboard page, Node.js 20+, no dependencies beside the kit.
+// protocol routes, a dashboard page and its agent twin (`POST /mcp`, the read tool `example.summary`: what the
+// page shows, as structured data; FAA-332), Node.js 20+, no dependencies beside the kit.
 //
 // It runs two ways, the two an online service meets in practice:
 //   - terminating TLS itself:   --tls-cert cert.pem --tls-key key.pem
@@ -33,6 +34,18 @@ const startedAt = k.nowIso();
 const codes = new k.LoginCodes(null, 120, { store: new k.MemoryCodeStore(), key, token });
 const events = [k.makeEvent('1', startedAt, 'service.started', 'info', 'The example agent started.')];
 const tlsSelf = Boolean(args['tls-cert']);
+const summary = () => ({ name: 'Example Agent', jobsToday: events.length, events: events.map((e) => ({ id: e.id, at: e.at, kind: e.kind, text: e.text })) });
+const SUMMARY_TOOL = { name: 'example.summary', title: 'What the dashboard shows', description: 'The page\'s summary and its events. Read-only.',
+  inputSchema: { type: 'object', properties: {}, additionalProperties: false }, outputSchema: { type: 'object' },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false } };
+// The page's agent twin: a minimal MCP JSON-RPC answer, one read tool (a service with an SDK uses it instead).
+function mcpAnswer(m) {
+  const ok = (result) => ({ jsonrpc: '2.0', id: m.id, result });
+  if (m.method === 'initialize') return ok({ protocolVersion: m.params?.protocolVersion ?? '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'example-agent', version: '0.1.0' } });
+  if (m.method === 'tools/list') return ok({ tools: [SUMMARY_TOOL] });
+  if (m.method === 'tools/call' && m.params?.name === SUMMARY_TOOL.name) return ok({ structuredContent: summary(), content: [{ type: 'text', text: JSON.stringify(summary()) }] });
+  return { jsonrpc: '2.0', id: m.id ?? null, error: { code: -32601, message: 'Unknown method or tool.' } };
+}
 
 function send(res, status, body, headers = {}) {
   const payload = body === null ? '' : (typeof body === 'string' ? body : JSON.stringify(body));
@@ -51,8 +64,9 @@ function handler(req, res) {
     return send(res, 200, k.buildWellKnown({
       id: 'example-agent', instance: 'default', name: 'Example Agent', version: '0.1.0', build: { commit: '0000000' },
       startedAt, status: 'ready', degraded: [],
-      surfaces: { dashboard: { path: '/', login: true }, events: { path: '/fabric/v1/events' } },
-      summary: [{ label: 'Jobs today', value: events.length }],
+      surfaces: { dashboard: { path: '/', login: true }, events: { path: '/fabric/v1/events' },
+        mcp: { path: '/mcp', transport: 'streamable-http', capabilities: [SUMMARY_TOOL.name] } },
+      summary: [{ label: 'Jobs today', value: summary().jobsToday }],
       // FAA-199: it says what it uses; this example calls nothing outside itself, so the list is empty.
       extensions: k.connectionsExtension([]),
     }));
@@ -60,6 +74,17 @@ function handler(req, res) {
   if (req.method === 'GET' && url.pathname === '/fabric/v1/events') {
     if (!authorized) return send(res, 401, null);
     return k.eventsPage(async (after, limit) => events.filter((e) => after === null || Number(e.id) > Number(after)).slice(-limit), url.searchParams.get('after'), k.parseLimit(url.searchParams.get('limit'))).then((page) => send(res, 200, page));
+  }
+  if (req.method === 'POST' && url.pathname === '/mcp') {
+    if (!authorized) return send(res, 401, null);
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    return req.on('end', () => {
+      let m;
+      try { m = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { return send(res, 400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error.' } }); }
+      if (m === null || typeof m !== 'object' || m.id === undefined) return send(res, 202, null);  // a notification
+      return send(res, 200, mcpAnswer(m));
+    });
   }
   if (req.method === 'POST' && url.pathname === '/fabric/v1/login-code') {
     if (!authorized) return send(res, 401, null);

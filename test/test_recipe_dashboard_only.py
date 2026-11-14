@@ -154,9 +154,9 @@ class Entry(unittest.TestCase):
         self.proc.stdout.close()
         self.proc.stderr.close()
 
-    def request(self, method, path, headers=None):
+    def request(self, method, path, headers=None, body=None):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
-        conn.request(method, path, headers={"Host": "127.0.0.1:%d" % self.port, **(headers or {})})
+        conn.request(method, path, body=body, headers={"Host": "127.0.0.1:%d" % self.port, **(headers or {})})
         res = conn.getresponse()
         body = res.read()
         conn.close()
@@ -171,13 +171,36 @@ class Entry(unittest.TestCase):
         results = {r["rule"]: r for r in json.loads(out.stdout)["results"]}
         self.assertEqual({k: v["evidence"] for k, v in results.items() if v["verdict"] == "FAIL"}, {})
         self.assertEqual(out.returncode, 0)
-        for rule in ("well-known.identity", "events.requires-token", "login.single-use", "descriptor.port-claim"):
+        for rule in ("well-known.identity", "events.requires-token", "login.single-use", "descriptor.port-claim",
+                     "dashboard.agent-surface"):  # FAA-332: the page has its agent twin
             self.assertEqual(results[rule]["verdict"], "PASS", rule)
 
-    def test_it_has_a_dashboard_and_no_capability(self):
+    def test_it_has_a_dashboard_and_its_agent_twin(self):
         doc = self.well_known()
-        self.assertEqual(sorted(doc["surfaces"]), ["dashboard", "events"])
+        self.assertEqual(sorted(doc["surfaces"]), ["dashboard", "events", "mcp"])
+        self.assertEqual(doc["surfaces"]["mcp"]["capabilities"], ["dashboard.snapshot"])
         self.assertEqual(doc["degraded"], [{"source": "snapshot", "reason": "missing"}])
+
+    def mcp(self, method, params=None, token=None):
+        token = token if token is not None else (self.folder / "service.token").read_text().strip()
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}).encode()
+        status, _, answer = self.request("POST", "/mcp", {"Authorization": "Bearer " + token,
+                                                          "Content-Type": "application/json"}, body)
+        return status, json.loads(answer) if answer else None
+
+    def test_an_agent_reads_what_the_page_shows(self):  # FAA-332, AS-2: the same sections, as structured data
+        taken = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        sections = [{"title": "Services", "source": "fabric-dashboards list_services", "columns": ["Service", "State"],
+                     "rows": [["example-agent.default", "ready"]]}]
+        (self.folder / "snapshot.json").write_text(json.dumps({"takenAt": taken, "sections": sections}))
+        status, listing = self.mcp("tools/list")
+        self.assertEqual(status, 200)
+        tool = listing["result"]["tools"][0]
+        self.assertEqual((tool["name"], tool["annotations"]["readOnlyHint"]), ("dashboard.snapshot", True))
+        status, answer = self.mcp("tools/call", {"name": "dashboard.snapshot", "arguments": {}})
+        self.assertEqual(status, 200)
+        self.assertEqual(answer["result"]["structuredContent"]["sections"], sections)
+        self.assertEqual(self.mcp("tools/list", token="not-the-token")[0], 401)
 
     def test_the_page_shows_the_snapshot_escaped(self):
         taken = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")

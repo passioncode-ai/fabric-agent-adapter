@@ -41,4 +41,5 @@ door to one. There is no function a person can reach and an agent cannot: not to
 ## What the contract says today
 
 DEC-0121 AP-1 makes write parity normative for a service's actions. Read parity and the design order are the
-operator's rule, carried by these skills and asked of the contract on the project board (FAA-332).
+operator's rule, carried by these skills; the contract took it as its row CT-311 (a DEC extending AP-1 to
+reads, with its own rule code and vectors, follows) (FAA-332).
