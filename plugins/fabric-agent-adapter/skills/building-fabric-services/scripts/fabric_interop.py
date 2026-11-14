@@ -91,6 +91,9 @@ from fabric_interop_rules import (  # noqa: E402,F401 - the rule layer (FAA-92)
     job_step,
     action_gate,
     action_refusal_tool_result,
+    authority_config_problem,
+    authority_declaration,
+    authority_gate_inputs,
     usage_findings,
     usage_toward,
     _job_findings,
@@ -591,7 +594,8 @@ class McpToolServer:
                  elicited: Optional[Callable[[str, Dict[str, Any], Optional[str]], bool]] = None,
                  input_actions: bool = False, clock: Callable[[], float] = time.time,
                  on_fault: Optional[Callable[[str, str], None]] = None, agent_id: Optional[str] = None,
-                 identify_agent: Optional[Callable[[Any, str], Optional[str]]] = None):
+                 identify_agent: Optional[Callable[[Any, str], Optional[str]]] = None,
+                 authority: Optional[Dict[str, Any]] = None):
         # authorize(tool, headers, tier=) runs before every handler (fabric_delegation.delegation_gate, DEC-0039):
         # a refusal is answered in the DL-19 shape and the handler never runs. The built-in job tools are
         # gated by the job's own capability, and answered only for the principal and caller that started it.
@@ -608,9 +612,14 @@ class McpToolServer:
         # it when authorize accepted a token); without it a mandate is not read, as before. FAA-135:
         # identify_agent(headers, tier) names the agent id of a per-agent credential the service authenticated, read
         # when no delegation named a caller: the chain must hold it before agent_id (identified_agent reads its answer).
+        # FAA-334: authority {levels, actionLevels, standing} is the service's level contexts and profile reading; the
+        # gate then decides a level holder's word and a place's standing mandate itself (authority_extension declares it).
         if agent_id is not None and not is_agent_id(agent_id):
             raise InteropError("agent_id is this service's agent id (a lower-case id, optionally .instance; DEC-0125).")
-        self.agent_id = agent_id
+        problem = None if authority is None else authority_config_problem(authority)
+        if problem is not None:
+            raise InteropError("%s (DEC-0162, DEC-0166)." % problem)
+        self.agent_id, self.authority = agent_id, authority
         self._authorize = authorize
         self._identify, self._approve, self._elicited, self._identify_agent = identify, approve, elicited, identify_agent
         self.input_actions, self._clock, self._on_fault = input_actions is True, clock, on_fault
@@ -634,9 +643,13 @@ class McpToolServer:
             listed.append(OPERATOR_SOURCE_PROTOCOL)
         return listed
 
+    def authority_extension(self) -> Optional[Dict[str, Any]]:
+        """extensions/authority/0.1's value for build_well_known(extensions=), None without authority (FAA-334)."""
+        return None if self.authority is None else authority_declaration(self.authority)
+
     def add_tool(self, tool: Dict[str, Any], handler: Handler, action: Optional[Dict[str, Any]] = None, *,
                  target: Any = None, human_step_url: Optional[str] = None, effect: Optional[str] = None,
-                 spend: Any = None, project: Any = None) -> None:
+                 spend: Any = None, project: Any = None, context: Any = None) -> None:
         """Serve a tool. `action` (DEC-0121 AP-1) is the declared action this tool performs, {id, title, tool, gate,
         humanStep?}, its `tool` this tool's name: the server runs action_gate before the handler. `target` names the
         object a call acts on: an argument's name, or a function of the arguments; `human_step_url` is the link of a
@@ -645,7 +658,8 @@ class McpToolServer:
         DEC-0125, on a server with agent_id: `effect` is the action's effect class (governance's vocabulary), required
         for a relayed action, since a mandate covers a call by its effect; `spend` the service's own estimate of what a
         call spends, USD (a number, or a function of the arguments answering a number or None); `project` the project a
-        call acts in (a name, or a function of the arguments)."""
+        call acts in (a name, or a function of the arguments). With authority (FAA-334), `context` is the call's context,
+        `personal` or `org:<orgId>` (a name, or a function of the arguments), and a relayed action names its effect."""
         if tool["name"] in self.handlers:
             raise InteropError("Tool %s is served twice." % tool["name"])
         if "outputSchema" in tool:
@@ -659,16 +673,18 @@ class McpToolServer:
                 raise InteropError("Tool %s: a human step needs its link, an https URL or a path (DEC-0121 AP-4)." % tool["name"])
             if not (target is None or isinstance(target, str) or callable(target)):
                 raise InteropError("Tool %s: target is an argument's name or a function of the arguments." % tool["name"])
-            if self.agent_id is not None and action["gate"] == "relayed" and not (type(effect) is str and effect in EFFECT_CLASSES):
+            if (self.agent_id is not None or self.authority is not None) and action["gate"] == "relayed" \
+                    and not (type(effect) is str and effect in EFFECT_CLASSES):
                 raise InteropError("Tool %s: a relayed action on a server that reads mandates names its effect class (DEC-0125)." % tool["name"])
             if effect is not None and not (type(effect) is str and effect in EFFECT_CLASSES):
                 raise InteropError("Tool %s: effect is one of %s." % (tool["name"], ", ".join(EFFECT_CLASSES)))
             if not (spend is None or callable(spend) or (isinstance(spend, (int, float)) and not isinstance(spend, bool))):
                 raise InteropError("Tool %s: spend is a number of USD or a function of the arguments." % tool["name"])
-            if not (project is None or isinstance(project, str) or callable(project)):
-                raise InteropError("Tool %s: project is a name or a function of the arguments." % tool["name"])
+            for label, value in (("project", project), ("context", context)):
+                if not (value is None or isinstance(value, str) or callable(value)):
+                    raise InteropError("Tool %s: %s is a name or a function of the arguments." % (tool["name"], label))
             self.actions[tool["name"]] = {"action": dict(action), "target": target, "url": human_step_url,
-                                          "effect": effect, "spend": spend, "project": project}
+                                          "effect": effect, "spend": spend, "project": project, "context": context}
         self.tools.append(tool)
         self.handlers[tool["name"]] = handler
 
@@ -746,6 +762,18 @@ class McpToolServer:
                 # an estimate that raised or is not finite is none: a mandate with a ceiling then refuses (fail closed)
                 "spend_usd": spend if finite else None,
                 "project": project}  # None or an exact str, read once above: never re-decided into no project (unit r33)
+
+    def _authority_inputs(self, entry: Dict[str, Any], arguments: Dict[str, Any], delegation: Any) -> Dict[str, Any]:
+        """FAA-334: what action_gate reads levels and a profile with (authority_gate_inputs; mem and prof from the verified
+        token's claims, never the call's), and on a server without agent_id the action's effect and project too."""
+        if self.authority is None:
+            return {}
+        context = self._read(entry.get("context"), arguments)
+        out = authority_gate_inputs(self.authority, entry["action"]["id"], context, (delegation or {}).get("claims"))
+        if self.agent_id is None:  # _mandate_inputs reads them on a server with agent_id
+            project = self._read(entry.get("project"), arguments)
+            out.update(effect=entry.get("effect"), project=project if project is None or type(project) is str else _UNREADABLE_PROJECT)
+        return out
 
     @staticmethod
     def _read(value: Any, arguments: Dict[str, Any]) -> Any:
@@ -910,7 +938,8 @@ class McpToolServer:
         agent = self._caller_agent(headers, tier, delegation)
         if entry is not None:  # DEC-0121: after the authorize gate, before the handler
             gated = self._gate_action(entry["action"], name, arguments, self._target(entry["target"], arguments), entry["url"],
-                                      headers, tier, meta, caller, self._mandate_inputs(entry, arguments, agent))
+                                      headers, tier, meta, caller, {**self._mandate_inputs(entry, arguments, agent),
+                                                                    **self._authority_inputs(entry, arguments, delegation)})
             if not gated["ok"] and "invalid" in gated:
                 return self._error(rid, -32602, gated["invalid"])
             if not gated["ok"]:

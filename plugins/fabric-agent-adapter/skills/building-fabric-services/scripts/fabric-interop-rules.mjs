@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { ServiceError } from './fabric-base.mjs';
 import { jcs, refusalFromAction, refusalToolResult } from './fabric-delegation.mjs';
 import { actionDecision, decisionShape, jobCapability } from './fabric-actions.mjs'; // DEC-0121
+import { ACTION_LEVELS, levelContextsWellFormed } from './fabric-levels.mjs'; // DEC-0162
 import { EFFECT_CLASSES, OPERATOR_SOURCE_PROTOCOL, isAgentId, mandateCovers, mandateProblem, withoutSource } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
 import { isString } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
 import { isObject } from './fabric-jsvalue.mjs'; // the core's (FAA-65)
@@ -312,16 +313,26 @@ export function keptStep(step) {
     ...(project !== undefined && project !== null ? { project: typeof project === 'string' ? project : UNREADABLE_PROJECT } : {}) };
 }
 
-export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability } = {}) {
+export function actionGate({ action, tier, caller, meta, target, elicited = false, approval, actionDigest, humanStepUrl, now, self, effect, callerAgent, spendUsd, project, mandateCapability, levels, actionLevel, context, tokenMem, tokenProf, standing = false } = {}) {
   const inputs = { action, tier, caller, elicited: elicited === true, now };
   if (isObject(meta) && Object.hasOwn(meta, 'decision')) inputs.decision = meta.decision;
-  for (const [name, value] of [['target', target], ['approval', approval], ['actionDigest', actionDigest], ['humanStepUrl', humanStepUrl]]) {
+  // DEC-0162, DEC-0166 (FAA-334): a service's level contexts, the action's level, the call's context and the token's
+  // mem and prof, so the gate decides a level holder's word and a place's profile by itself.
+  for (const [name, value] of [['target', target], ['approval', approval], ['actionDigest', actionDigest], ['humanStepUrl', humanStepUrl],
+    ['levels', levels], ['actionLevel', actionLevel], ['context', context], ['tokenMem', tokenMem], ['tokenProf', tokenProf]]) {
     if (value !== undefined && value !== null) inputs[name] = value;
   }
-  if (self !== undefined && self !== null && isObject(meta) && Object.hasOwn(meta, 'mandate')) {
-    Object.assign(inputs, { mandate: meta.mandate, self });
+  if (standing === true) inputs.standing = true;
+  const readsMandate = self !== undefined && self !== null && isObject(meta) && Object.hasOwn(meta, 'mandate');
+  if (readsMandate || (levels !== undefined && levels !== null) || standing === true) {
     const read = project === undefined || project === null || typeof project === 'string' ? project : UNREADABLE_PROJECT; // fail closed (FAA-139)
-    for (const [name, value] of [['effect', effect], ['callerAgent', callerAgent], ['spendUsd', mandateSpend(spendUsd)], ['project', read], ['mandateCapability', mandateCapability]]) {
+    for (const [name, value] of [['effect', effect], ['project', read]]) {
+      if (value !== undefined && value !== null) inputs[name] = value;
+    }
+  }
+  if (readsMandate) {
+    Object.assign(inputs, { mandate: meta.mandate, self });
+    for (const [name, value] of [['callerAgent', callerAgent], ['spendUsd', mandateSpend(spendUsd)], ['mandateCapability', mandateCapability]]) {
       if (value !== undefined && value !== null) inputs[name] = value;
     }
   }
@@ -345,6 +356,49 @@ export function actionGate({ action, tier, caller, meta, target, elicited = fals
 export function actionRefusalToolResult(answer, traceparent) {
   const refusal = refusalFromAction(answer);
   return refusal === undefined ? null : refusalToolResult(refusal, traceparent);
+}
+
+/** Why a service's authority configuration is unreadable (DEC-0162 LV-5, LV-7; DEC-0166 AU-3), or null: an object of
+ * `levels` (level contexts by `org:<orgId>`), `actionLevels` (a level by relayed action id) and `standing` (true). */
+export function authorityConfigProblem(authority) {
+  if (!isObject(authority) || Object.keys(authority).length === 0 || Object.keys(authority).some((k) => !['levels', 'actionLevels', 'standing'].includes(k))) {
+    return 'authority is an object of levels, actionLevels and standing, at least one of them';
+  }
+  if (Object.hasOwn(authority, 'levels') && !(isObject(authority.levels) && Object.keys(authority.levels).length > 0 && levelContextsWellFormed(authority.levels))) {
+    return 'authority.levels is a map by org:<orgId> of {audience, keySet (org-key-set/1), held?}';
+  }
+  const levels = authority.actionLevels;
+  if (levels !== undefined && !(isObject(levels) && Object.keys(levels).length > 0 && Object.values(levels).every((v) => typeof v === 'string' && ACTION_LEVELS.includes(v)))) {
+    return `authority.actionLevels maps an action id to one of ${ACTION_LEVELS.join(', ')}`;
+  }
+  if (Object.hasOwn(authority, 'standing') && authority.standing !== true) return 'authority.standing is true when present';
+  return null;
+}
+
+/** extensions/authority/0.1's value for a configuration authorityConfigProblem accepts: each organization with its
+ * audience, never its key set. */
+export function authorityDeclaration(authority) {
+  const out = {};
+  if (Object.hasOwn(authority, 'levels')) out.levels = Object.entries(authority.levels).map(([org, entry]) => ({ org, audience: entry.audience }));
+  if (Object.hasOwn(authority, 'actionLevels')) out.actionLevels = { ...authority.actionLevels };
+  if (Object.hasOwn(authority, 'standing')) out.standing = authority.standing;
+  return out;
+}
+
+/** What actionGate reads levels and a place's profile with (FAA-334): the level contexts, the action's level, the call's
+ * context (a string only) and the verified token's mem and prof from `claims`; {} without a configuration. */
+export function authorityGateInputs(authority, actionId, context, claims) {
+  if (!isObject(authority)) return {};
+  const out = { standing: authority.standing === true };
+  if (Object.hasOwn(authority, 'levels')) out.levels = authority.levels;
+  const levels = isObject(authority.actionLevels) ? authority.actionLevels : {};
+  if (Object.hasOwn(levels, actionId)) out.actionLevel = levels[actionId];
+  if (typeof context === 'string') out.context = context;
+  if (isObject(claims)) {
+    if (Object.hasOwn(claims, 'mem')) out.tokenMem = claims.mem;
+    if (Object.hasOwn(claims, 'prof')) out.tokenProf = claims.prof;
+  }
+  return out;
 }
 
 /** FAC-SEM-119 on a usage: partial false asserts every number known, so it stands beside no null. */
