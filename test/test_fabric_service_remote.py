@@ -136,6 +136,24 @@ class RemotePlacement(unittest.TestCase):
         self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the installer's call")
         self.assertEqual(token_file.read_text(), "n" * 40)
 
+    def test_a_rotation_reads_an_installed_descriptor_that_is_no_utf8_as_none(self):
+        """FAA-200 (51): the Node twin read it with each bad byte replaced and kept its source; both drop it, warned."""
+        import shutil
+        import warnings
+        temp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, temp, True)
+        root = temp / "services"
+        fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                           token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
+        path = fs.descriptor_path("example-agent", "default", root)
+        path.write_bytes(path.read_bytes().replace(b'"Example Agent"', b'"Example \xffAgent"'))  # one byte 0xff: no UTF-8
+        with warnings.catch_warnings(record=True) as seen:
+            warnings.simplefilter("always")
+            fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                               token="n" * 40, directory=root)
+        self.assertNotIn("source", json.loads(path.read_text(encoding="utf-8")))
+        self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning])
+
     def test_a_rotation_over_a_deeply_nested_descriptor_drops_it(self):
         # FAA-200 (10): a hand-edited installed descriptor nested thousands deep is no source to keep, never a RecursionError
         import shutil

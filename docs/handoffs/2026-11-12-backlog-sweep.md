@@ -23,6 +23,7 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.84.1 | 0.84.0 shipped; the board mandate's linear-time test compares 256 KiB with 1 MiB and repeats each read until 50 ms of CPU time (Windows' 15.6 ms ticks), both twins | PR #287, merge `ba493e73`, tag `v0.84.1`, release run 43426718391 success, npm `latest` 0.84.1, GitHub release `v0.84.1` |
 | 0.85.0 | wave 7, part one: FAA-196 (14), (21), (22) reachable part, (29), (30); FAA-187 (4); FAA-182 and FAA-277 done; FAA-243 and FAA-256 done (the Windows owner check measured) | PR #288, merge `5fd028c1`, tag `v0.85.0`, release run 43501489119 success, npm `latest` 0.85.0 |
 | 0.85.1 | FAA-87: publishing through npm trusted publishing alone; the `NPM_TOKEN` secret deleted | PR #289, merge `401c9e3f`, tag `v0.85.1`, release run 43510563140 success (OIDC, provenance SLSA v1), npm `latest` 0.85.1 |
+| 0.86.0 | wave 7, part two, first cut (2026-11-14): FAA-200 (38), (44), (56), (37), (8), (13) re-measured on `main` at 0.85.1 and fixed in both twins (odd member types, linear-time source rule, special-scheme authority and host as `new URL` reads them, `ssh://` evidence, one repository-match rule); the architect's scan (`docs/evidence/architect/2026-11-14-scan.json`); board: SL-1..SL-8 (`03065f0d`) and the approvals rule (`5840c6ad`) answered | branch `agent/faa-0.86.0`; PR, merge, tag and release run in the receipts below |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -33,7 +34,8 @@ Recorded for the operator; later builder briefs name the rule.
 ## Next task
 
 1. 0.85.1 is on npm; the next release publishes through OIDC with no token (FAA-87 done).
-2. Wave 7, part two, row by row: what is left is in each row's status line. The large rows: FAA-190
+2. Wave 7, part two, row by row (0.86.0 took FAA-200 (8), (13), (37), (38), (44), (56); each open item is first
+   re-measured on `main`, as 2026-11-14 did for FAA-200's): what is left is in each row's status line. The large rows: FAA-190
    (104 items, about 90 open), FAA-200 (57, about 45), FAA-194 (40, about 30), FAA-273 ((5), (8), (10), (11) the
    cache half, (15), (17), (21), (22); `fabric_peer_owner.py` sits at 1000 lines, so (11) needs room made first),
    FAA-192 ((5), (19), (20), (21), (25), (26), (28), (30)), FAA-187 ((3), (10)). Sub-agents of this account hit their

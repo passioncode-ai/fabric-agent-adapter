@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 // How a service is found (fabric-service/0.1): its descriptor, peers and app descriptors (DEC-0061, DEC-0069), build identity and the well-known document.
 // Part of the Node service kit (FAA-65, layer L3); the twin of fabric_descriptor.py. Node 20+, no dependency.
+// Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -44,11 +45,19 @@ const AUTH_HEADER = /^[A-Za-z][A-Za-z0-9-]{0,63}$/;
 
 export const descriptorPath = (id, instance = 'default', dir = servicesDir()) => path.join(dir, `${id}.${instance}.json`);
 
+/**
+ * A descriptor's JSON read as Python's `read_text(encoding="utf-8")` and `json.loads` read it: bytes that are no UTF-8
+ * throw, and a leading byte-order mark stays and is refused by JSON.parse, never a byte replaced and kept (FAA-200 (51)).
+ */
+export function readDescriptorJson(file) {
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(fs.readFileSync(file)));
+}
+
 export function readDescriptors(dir = servicesDir()) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir).filter((n) => n.endsWith('.json')).sort().flatMap((n) => {
     try {
-      const value = JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'));
+      const value = readDescriptorJson(path.join(dir, n));
       return isPlainObject(value) ? [[path.join(dir, n), value]] : []; // no object, no descriptor (FAA-200 (50))
     } catch {
       return [];
@@ -66,6 +75,13 @@ export function validateDescriptor(d) {
   for (const key of remote ? required : [...required, 'paths']) {
     if (!(key in d)) problems.push(`missing ${key}`);
   }
+  if (problems.length) return problems;
+  // FAA-200 (38): an object member is read as its type before it is indexed, so a hand-edited descriptor is named,
+  // never thrown on (by this check and by every writer and probe that calls it), as the Python twin reads it.
+  for (const key of ['auth', 'lifecycle', 'paths', 'commands']) {
+    if (key in d && !isObj(d[key])) problems.push(`${key} must be an object`);
+  }
+  if (isObj(d.paths) && 'logs' in d.paths && !Array.isArray(d.paths.logs)) problems.push('paths.logs must be an array');
   if (problems.length) return problems;
   if (d.protocol !== PROTOCOL) problems.push(`protocol must be ${PROTOCOL}`);
   for (const [key, pattern] of [['id', ID], ['instance', INSTANCE]]) { // a string before its pattern (FAA-200 (9), (36))
@@ -140,16 +156,47 @@ const PEER_ENDPOINT = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a
 const SOURCE_URI = /^[A-Za-z][A-Za-z0-9+.-]*:(?:[A-Za-z0-9._~:/?#@!$&'()*+,;=-]|%[0-9A-Fa-f]{2})+$/;
 // Brackets belong to an IP-literal host only (RFC 3986 3.2.2); the literal is set aside before the character check.
 const IP_LITERAL = /^([A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^/?#@[\]]*@)?)\[[0-9A-Fa-f:.vV]+\]/;
-const URI_AUTHORITY = /^[A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^/?#@]*@)?(\[[^\]]*\]|[^/?#:]*)(?::([^/?#]*))?/;
+// A special scheme's authority starts after any run of slashes, none included, as `new URL` reads it, so
+// <https>:github.com:99999/o/r is read for its port too (FAA-200 (56)); any other scheme has one only after `//`.
+// A special scheme's repository is written with exactly two slashes: `new URL` also reads <https>:github.com/o/r and
+// <https>:////github.com/o/r, which no repository-match rule joins to a checkout (the Python twin's rule).
+const URI_AUTHORITY = /^(?:([Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):(\/*)|[A-Za-z][A-Za-z0-9+.-]*:\/\/)(?:[^/?#@]*@)?(\[[^\]]*\]|[^/?#:]*)(?::([^/?#]*))?/;
 function authorityOk(uri) {
   const m = URI_AUTHORITY.exec(uri);
   if (!m) return true;
-  const port = m[2];
-  return Boolean(m[1]) && (port === undefined || port === '' || (/^[0-9]{1,5}$/.test(port) && Number(port) <= 65535));
+  const [, special, slashes, host, port] = m;
+  if (!host || !(port === undefined || port === '' || (/^[0-9]{1,5}$/.test(port) && Number(port) <= 65535))) return false;
+  return !special || (slashes === '//' && specialHostOk(host));
+}
+// The WHATWG URL standard's IPv4 number parser: decimal, 0x hexadecimal or 0-led octal; null on failure.
+function ipv4Number(part) {
+  let radix = 10;
+  if (/^0[xX]/.test(part)) { part = part.slice(2); radix = 16; } else if (part.length > 1 && part[0] === '0') { part = part.slice(1); radix = 8; }
+  if (part === '') return 0;
+  const digits = { 10: /^[0-9]+$/, 16: /^[0-9a-fA-F]+$/, 8: /^[0-7]+$/ }[radix];
+  return digits.test(part) ? parseInt(part, radix) : null;
+}
+// FAA-200 (37): a special scheme's host as `new URL` would accept it, read by the same rules as the Python twin's
+// _special_host_ok: never percent-encoded, a bracketed host an IPv6 address, a host ending in a number a whole IPv4.
+function specialHostOk(host) {
+  if (host.includes('%')) return false;
+  if (host.startsWith('[')) {
+    if (!host.endsWith(']')) return false;
+    try { return new URL(`http://${host}/`).hostname !== ''; } catch { return false; }
+  }
+  let parts = host.split('.');
+  if (parts.length > 1 && parts[parts.length - 1] === '') parts = parts.slice(0, -1);
+  const last = parts[parts.length - 1];
+  if (!(last !== '' && (/^[0-9]+$/.test(last) || ipv4Number(last) !== null))) return true;
+  const numbers = parts.map((p) => (p === '' ? null : ipv4Number(p)));
+  if (parts.length > 4 || numbers.includes(null)) return false;
+  return numbers.slice(0, -1).every((n) => n <= 255) && numbers[numbers.length - 1] < 256 ** (5 - numbers.length);
 }
 // A special scheme reads a user:password@ after any run of slashes, none included, as `new URL` does (0.56.0 seam r7).
 // To the last @, a user name may hold one; any other scheme keeps a backslash in the user information (seam r8).
-const URI_PASSWORD = /^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#]*:[^/\\?#]*@|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]*:[^/?#]*@)/;
+// The user part stops at its first colon: the same verdict in linear time, where a user part that may hold colons
+// backtracked quadratically on a run of them (FAA-200 (44)).
+const URI_PASSWORD = /^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#:]*:[^/\\?#]*@|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#:]*:[^/?#]*@)/;
 const RESIDENCY = /^(A[B-Z]|[B-PR-WY][A-Z]|Q[A-L]|Z[A-Y])$/;
 
 const RUNNER_KIND_NAME = /^[a-z][a-z0-9-]{1,62}$/;
@@ -200,8 +247,8 @@ export function descriptorMemberProblems(d) {
       const repository = source.repository;
       if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
       else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential'); // before the host
+      else if (repository.includes('@') && !HIERARCHICAL.test(repository)) problems.push('source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'); // readings 7, before the authority (0.86.0)
       else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
-      else if (repository.includes('@') && !HIERARCHICAL.test(repository)) problems.push('source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'); // readings 7
       else if (repositoryCredential(repository)) problems.push("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one"); // its name is no key (seam 6)
     }
   }
@@ -274,7 +321,7 @@ export const FABRIC_SERVICE = Object.freeze(['fabric', 'default']);
  */
 export function fabricButtonPresence(dir = servicesDir()) {
   let found;
-  try { found = JSON.parse(fs.readFileSync(descriptorPath(...FABRIC_SERVICE, dir), 'utf8')); } catch { return 'absent'; }
+  try { found = readDescriptorJson(descriptorPath(...FABRIC_SERVICE, dir)); } catch { return 'absent'; }
   if (!isObj(found) || validateDescriptor(found).length) return 'absent';
   return appDescriptorStale(found, appPresent(found)) ? 'absent' : 'present';
 }

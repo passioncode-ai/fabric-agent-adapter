@@ -108,6 +108,7 @@ _LOCAL_PATH = re.compile(r"[/~.\\]|[A-Za-z]:[/\\]")  # how a local path starts, 
 _SCP_HOST = re.compile(r"[^@/:\\]+:")  # what follows the `@` of user[:password]@host:path
 _SPECIAL = re.compile(r"(?:https?|wss?|ftp|file):", re.I)  # the URL standard's special schemes, read with or without `//`
 _URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the value; a later `://` is path text (unit reading 9)
+_OTHER_URL = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*)://(?P<authority>[^/?#]*)(?P<path>[^?#]*)")
 
 
 def shown_repository(value: str) -> str:
@@ -119,7 +120,16 @@ def shown_repository(value: str) -> str:
     printed (0.62.0 readings 2 to 11). Read first as redact_url reads it: C0 controls and space off its ends, every tab,
     CR and LF out, so `<https>://u:pw@h` with a tab between its two slashes is the URL it is (unit reading 11)."""
     value = re.sub(r"[\t\n\r]", "", value.strip("".join(map(chr, range(0x21)))))
-    if _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
+    other = _OTHER_URL.match(value) if not _SPECIAL.match(value) else None
+    if other:
+        # A scheme the URL standard does not treat as special (ssh, git): redact_url keeps only its name, so the
+        # repository compared would be lost from the evidence (FAA-200 (8)). Its user information as written goes, up to
+        # the last `@` of the authority; a port of digits and a path holding no `@` stay, else only the scheme.
+        host, path = other.group("authority").rpartition("@")[2], other.group("path")
+        name = other.group("scheme").lower()
+        port_ok = re.fullmatch(r"(?:\[[0-9A-Fa-f:.]+\]|[^:\[\]\\]+)(?::[0-9]{0,5})?", host)
+        shown = "%s://%s%s" % (name, host.lower(), path) if host and port_ok and "@" not in path else name + ":<redacted>"
+    elif _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
         shown = redact_url(value)  # which drops the user information as written first (seam readings 10 and 11)
     else:
         cut = 0
@@ -440,8 +450,8 @@ def usage_problems(report: Any, service_id: str, instance: str) -> List[str]:
 def same_repository(a: str, b: str) -> bool:
     """git@github.com:o/r.git, https://github.com/o/r and github.com/o/r are one repository."""
     def norm(u: str) -> str:
-        u = u.strip().lower()
-        u = re.sub(r"^git@([^:]+):", r"\1/", u)
+        u = re.split(r"[?#]", u.strip().lower(), maxsplit=1)[0]  # a query or fragment names no other repository (FAA-200 (8))
+        u = re.sub(r"^[^@/:]+@([^/:]+):", r"\1/", u)  # any user of an scp form, not only git@ (FAA-200 (13))
         u = re.sub(r"^[a-z+]+://", "", u)
         u = re.sub(r"^[^@/]+@", "", u)
         return re.sub(r"\.git$", "", u).rstrip("/")

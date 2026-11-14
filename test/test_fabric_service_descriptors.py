@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
+import time
 import unittest
 
 from test_fabric_service import load
@@ -348,6 +349,16 @@ class OddValuesInTheServicesFolder(unittest.TestCase):
         (root / "e.json").write_text(json.dumps(d), encoding="utf-8")
         self.assertEqual([path.name for path, _ in fs.read_descriptors(root)], ["e.json"])
 
+    def test_a_file_that_is_no_utf8_or_starts_with_a_bom_is_left_out(self):
+        # FAA-200 (51): the Node twin reads with a fatal decoder that keeps the mark, so both leave these out
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        good = json.dumps({"id": "a"}).encode()
+        (root / "a.json").write_bytes(good)
+        (root / "b.json").write_bytes(good.replace(b'"a"', b'"\xffb"'))
+        (root / "c.json").write_bytes(b"\xef\xbb\xbf" + good)
+        self.assertEqual([path.name for path, _ in fs.read_descriptors(root)], ["a.json"])
+
 
 class RelativePaths(unittest.TestCase):
     def test_a_relative_path_is_named_as_relative_not_as_a_share(self):
@@ -358,6 +369,77 @@ class RelativePaths(unittest.TestCase):
         problems = " ".join(fs.validate_descriptor(d))
         self.assertIn("absolute local path", problems)
         self.assertIn("never a relative path", problems)
+
+HOSTS = json.loads((HERE / "fixtures/source-host-vectors.json").read_text(encoding="utf-8"))
+HOST_RULE = "source.repository names a host, and a port of digits up to 65535 when it has one"
+
+
+class SourceHosts(unittest.TestCase):
+    """FAA-200 (37), (56): Fabric's registry drops a descriptor whose special-scheme source `new URL` refuses, so the kit
+    refuses it first: a port read after any run of slashes, a host never percent-encoded, a whole IPv4 when it ends in
+    a number, an IPv6 inside brackets. The Node twin reads the same vectors."""
+
+    def problems(self, repository):
+        d = fixture(next(x["name"] for x in FIX["descriptors"] if x["valid"]))
+        d["source"] = {"repository": repository}
+        return fs.validate_descriptor(d)
+
+    def test_each_vector_reads_as_listed(self):
+        for value in HOSTS["accepted"]:
+            with self.subTest(accepted=value):
+                self.assertNotIn(HOST_RULE, self.problems(value))
+        for value in HOSTS["refused"]:
+            with self.subTest(refused=value):
+                self.assertIn(HOST_RULE, self.problems(value))
+
+    def test_a_run_of_colons_is_read_in_linear_time(self):
+        # FAA-200 (44): 80,000 colons took 14 s in a rotation and 27 s in the probe; the user part now stops at a colon
+        started = time.process_time()
+        self.problems("https://" + ":" * 80000)
+        self.assertLess(time.process_time() - started, 1.0)
+
+
+class OddMemberTypes(unittest.TestCase):
+    """FAA-200 (38): a hand-edited descriptor whose object member holds another type is named, never raised on, by the
+    validator, by write_descriptor and by the probe."""
+    CASES = (("auth", 5, "auth must be an object"), ("auth", None, "auth must be an object"),
+             ("paths", 5, "paths must be an object"), ("paths", {"data": "/tmp/x", "logs": 5}, "paths.logs must be an array"),
+             ("lifecycle", 5, "lifecycle must be an object"), ("lifecycle", [], "lifecycle must be an object"),
+             ("commands", 5, "commands must be an object"), ("commands", [1], "commands must be an object"),
+             ("commands", "ab", "commands must be an object"))
+
+    def descriptor(self, key, value):
+        d = fixture(next(x["name"] for x in FIX["descriptors"] if x["valid"] and "paths" in x["descriptor"]))
+        d[key] = value
+        return d
+
+    def test_the_validator_names_each(self):
+        for key, value, problem in self.CASES:
+            with self.subTest(key=key, value=value):
+                self.assertEqual(fs.validate_descriptor(self.descriptor(key, value)), [problem])
+
+    def test_a_writer_refuses_each_with_its_problem(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        for key, value, problem in self.CASES:
+            with self.subTest(key=key, value=value), self.assertRaises(fs.ServiceError) as caught:
+                fs.write_descriptor(self.descriptor(key, value), root)
+            self.assertIn(problem, str(caught.exception))
+
+    def test_the_probe_reads_each_without_raising(self):
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root, True)
+        for key, value, problem in self.CASES:
+            with self.subTest(key=key, value=value):
+                d = self.descriptor(key, value)
+                d["origin"] = "http://127.0.0.1:9"
+                path = root / "odd.json"
+                path.write_text(json.dumps(d), encoding="utf-8")
+                path.chmod(0o600)
+                results = {r["rule"]: r for r in probe.Probe(path, d, root, skip_login=True).run()}
+                self.assertEqual(results["descriptor.valid"]["verdict"], "FAIL")
+                self.assertIn(problem, results["descriptor.valid"]["evidence"])
+
 
 if __name__ == "__main__":
     unittest.main()

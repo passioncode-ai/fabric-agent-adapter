@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.86.0 (2026-11-14)
+
+Wave 7 of the backlog sweep of 2026-11-12, part two (first cut): defects of FAA-200 re-measured on `main` at 0.85.1 and
+fixed in both twins. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`).
+
+### Fixed
+
+- **A hand-edited descriptor whose object member holds another type is named, never raised on** (FAA-200 (38)):
+  `validate_descriptor` / `validateDescriptor` raised `TypeError` or `AttributeError` (Node threw on a non-iterable
+  `paths.logs`) when `auth`, `lifecycle`, `paths` or `commands` was no object or `paths.logs` no array, and so did
+  `write_descriptor`, `register_remote`, `fabric_button_presence` and the probe; they now answer `<member> must be an
+  object` or `paths.logs must be an array`. The probe's later rules read those members only as objects (`_member`), so
+  `check_service.py` prints `descriptor.valid FAIL` instead of a traceback.
+- **`source.repository` is read in linear time** (FAA-200 (44)): the password rule's user part may no longer hold a
+  colon, which gives the same verdict (a colon, then an `@`, in the user information) without the quadratic
+  backtracking: `https://` and 80,000 colons took 22.6 s in Python's validator on this Mac (about 1.4 s for 20,000 in
+  each regex pass, and Node 346 ms for 20,000); it now takes 0.02 s.
+- **A special-scheme source's port and host are read as `new URL` reads them** (FAA-200 (56), (37)): the authority of
+  `http`, `https`, `ws`, `wss` and `ftp` now starts after any run of slashes, so `https:github.com:99999/o/r`,
+  `https:/h:99999/r` and `ws:h:70000/r` are refused and `https:///o/r` (which `new URL` reads as host `o`) is accepted;
+  a host that `new URL` refuses is refused: a percent-encoded host (every `%`, a stricter rule than `new URL`'s, which
+  decodes `%41`; no repository host needs one), a bracketed host that is no IPv6 address, and a host ending in a number
+  that is no whole IPv4 address (`1.2.3.256`, `4294967296`, `1..2`, `a.1`, `09`, `0x100.1`). Fabric's registry
+  dropped such a descriptor as manifest-invalid. A special scheme is written with exactly two slashes:
+  `https:github.com/o/r` (accepted until now) and `https:////github.com/o/r` are refused, since `new URL` reads them
+  but no repository-match rule (the kit's three, Fabric's `repoKey`) joins them to a checkout. None of the 54
+  descriptors installed on the measuring Mac changes its verdict. Pinned by `test/fixtures/source-host-vectors.json`
+  (its `stricter` rows are the two rules stricter than `new URL`), which the Node test also holds against `new URL`.
+- **The provider entry reads `source.repository` as the descriptor does** (FAA-200 (37), (44), (49), (56)):
+  `fabric_provider.py` takes the same authority and host rule and the linear-time password rule (its copy took 0.82 s
+  on 20,000 colons); `test_provider.SourceHosts` holds it to the shared vectors, since Fabric's registry reads both
+  with one `new URL`.
+- **The probe shows which repository an `ssh://` or `git://` source names** (FAA-200 (8)): `shown_repository` printed
+  `ssh:<redacted>`, so the evidence lost the repository compared; it now prints `ssh://github.com/o/r.git`, its user
+  information as written, a query and a fragment dropped, and only the scheme when a port is no number or an `@` is
+  left in the path. `redact_url` keeps printing other schemes by their name (the shared HTTP vectors are unchanged).
+- **One repository-match rule reads a query, a fragment and any scp user** (FAA-200 (8), (13)): `same_repository` in
+  `dashboard_kit` and `check_service_rules`, and the session hooks' copy, drop a query and a fragment
+  (`https://github.com/o/r?ref=main` is `git@github.com:o/r`) and read `deploy@github.com:o/r` as the scp form it is,
+  not only `git@`; `test_fabric_session.RepositoryRule` holds the three equal over the new spellings.
+- **Node reads a descriptor that is no UTF-8 as Python does** (FAA-200 (51)): `registerRemote`, `readDescriptors` and
+  `fabricButtonPresence` read it with each bad byte replaced and kept it, where Python's strict read leaves it out; the
+  three now read through one `readDescriptorJson` (a fatal decoder that keeps a leading byte-order mark, which
+  `JSON.parse` refuses as `json.loads` does).
+
+### Documentation
+
+- **A Node installer keeps the no-source warning** (FAA-200 (48)): `references/protocol.md` says the warning is printed
+  on the next tick, so an installer that ends right after `writeDescriptor` or `registerRemote` sets `process.exitCode`;
+  `process.exit()` drops the line (measured: nothing printed). The kit does not print the line itself, which would
+  ignore `--no-warnings`.
+
 ## 0.85.1 (2026-11-13)
 
 ### Changed

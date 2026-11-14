@@ -168,3 +168,36 @@ test('a relative path is named as relative, not as a share (FAA-200 (6))', () =>
   const problems = k.validateDescriptor(d).join(' ');
   assert.ok(problems.includes('absolute local path') && problems.includes('never a relative path'), problems);
 });
+
+// FAA-200 (37), (56), (44): the source's host and port as new URL reads them, the twin of SourceHosts.
+const HOSTS = JSON.parse(fs.readFileSync(new URL('./fixtures/source-host-vectors.json', import.meta.url), 'utf8'));
+const HOST_RULE = 'source.repository names a host, and a port of digits up to 65535 when it has one';
+const withSource = (repository) => ({ ...fixture(FIX.descriptors.find((d) => d.valid).name), source: { repository } });
+
+test('each source-host vector reads as listed, and as new URL reads it outside the stricter rows', () => {
+  for (const value of HOSTS.accepted) assert.ok(!k.validateDescriptor(withSource(value)).includes(HOST_RULE), value);
+  for (const value of HOSTS.refused) assert.ok(k.validateDescriptor(withSource(value)).includes(HOST_RULE), value);
+  for (const value of [...HOSTS.accepted, ...HOSTS.refused].filter((v) => /^(https?|wss?|ftp):/i.test(v) && !HOSTS.stricter.includes(v))) {
+    let parses = true;
+    try { new URL(value); } catch { parses = false; }
+    assert.equal(parses, HOSTS.accepted.includes(value), value);
+  }
+});
+
+test('a run of colons in the source is read in linear time', () => {
+  const started = process.cpuUsage();
+  k.validateDescriptor(withSource(`https://${':'.repeat(80000)}`));
+  const used = process.cpuUsage(started);
+  assert.ok((used.user + used.system) / 1e6 < 1, `${used.user} us`);
+});
+
+test('an object member of another type is named, never thrown on (FAA-200 (38))', () => {
+  const base = fixture(FIX.descriptors.find((d) => d.valid && 'paths' in d.descriptor).name);
+  for (const [key, value, problem] of [['auth', 5, 'auth must be an object'], ['auth', null, 'auth must be an object'],
+    ['paths', 5, 'paths must be an object'], ['paths', { data: '/tmp/x', logs: 5 }, 'paths.logs must be an array'],
+    ['lifecycle', 5, 'lifecycle must be an object'], ['lifecycle', [], 'lifecycle must be an object'],
+    ['commands', 5, 'commands must be an object'], ['commands', [1], 'commands must be an object'],
+    ['commands', 'ab', 'commands must be an object']]) {
+    assert.deepEqual(k.validateDescriptor({ ...structuredClone(base), [key]: value }), [problem], `${key}=${JSON.stringify(value)}`);
+  }
+});

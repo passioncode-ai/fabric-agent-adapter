@@ -390,5 +390,26 @@ class CliRefusalTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
 
 
+
+class SourceHosts(unittest.TestCase):
+    """FAA-200 (37), (49), (56): the provider entry reads source.repository's host and port as the service kit's
+    descriptor does (Fabric's registry applies one `new URL` reading to both), on the descriptor's shared vectors."""
+    HOSTS = json.loads((ROOT / "test/fixtures/source-host-vectors.json").read_text(encoding="utf-8"))
+    RULE = "source.repository names a host, and a port of digits up to 65535 when it has one"
+
+    def test_each_vector_reads_as_the_descriptor_reads_it(self):
+        for value in self.HOSTS["accepted"]:
+            with self.subTest(accepted=value):
+                self.assertNotIn(self.RULE, fp.validate_provider_entry(entry(source={"repository": value})))
+        for value in self.HOSTS["refused"]:
+            with self.subTest(refused=value):
+                self.assertIn(self.RULE, fp.validate_provider_entry(entry(source={"repository": value})))
+
+    def test_a_run_of_colons_is_read_in_linear_time(self):
+        import time
+        started = time.process_time()
+        fp.validate_provider_entry(entry(source={"repository": "https:" + ":" * 80000}))
+        self.assertLess(time.process_time() - started, 1.0)
+
 if __name__ == "__main__":
     unittest.main()

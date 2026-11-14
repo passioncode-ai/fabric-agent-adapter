@@ -1,0 +1,49 @@
+{
+  "about": "FAA-200 (37), (56): a special-scheme source.repository is accepted exactly when it is written with two slashes and its authority names a host and port new URL accepts. The kit is stricter than new URL in two ways, listed under stricter: a host is never percent-encoded (new URL decodes %41), and a special scheme takes exactly two slashes (new URL also reads https:github.com/o/r and https:////github.com/o/r, which no repository-match rule joins to a checkout). Held by test_fabric_service_descriptors.SourceHosts, test_provider and fabric-service-descriptors.test.mjs; the Node test also checks every special-scheme row outside stricter against new URL itself.",
+  "accepted": [
+    "https://github.com/o/r",
+    "https://1.2.3.4/o/r",
+    "https://256/o/r",
+    "https://4294967295/r",
+    "https://0x7f.1/r",
+    "https://0x/r",
+    "https://1.2.3./r",
+    "https://a.b1/r",
+    "https://[::1]/r",
+    "https://[::1.2.3.4]/r",
+    "https://example.com./r",
+    "https://github.com:443/o/r",
+    "ftp://a!b/r",
+    "http://0.0.0.0/r",
+    "ssh://git@github.com/o/r.git",
+    "git://1.2.3.256/r"
+  ],
+  "refused": [
+    "https:github.com:99999/o/r",
+    "https:/h:99999/r",
+    "ws:h:70000/r",
+    "https://%00/r",
+    "https://%20/r",
+    "https://%2F/r",
+    "https://%41/r",
+    "https://1.2.3.256/o/r",
+    "https://4294967296/r",
+    "https://1.2.3.4.5/r",
+    "https://1..2/r",
+    "https://a.1/r",
+    "https://09/r",
+    "https://08.1/r",
+    "https://[1::2::3]/r",
+    "https://0x100.1/r",
+    "ssh://h:99999/r",
+    "https:github.com/o/r",
+    "https:///o/r",
+    "https:////github.com/o/r"
+  ],
+  "stricter": [
+    "https://%41/r",
+    "https:github.com/o/r",
+    "https:///o/r",
+    "https:////github.com/o/r"
+  ]
+}

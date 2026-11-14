@@ -53,9 +53,15 @@ _ID = re.compile(r"^[a-z][a-z0-9-]{1,62}\Z")
 _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*\Z")
 # A special scheme (http, https, ws, wss, ftp) reads a user:password@ after any run of slashes, none included, as
 # `new URL` does: <https>:bot:pw@host carries the password too (0.56.0 seam r7).
-_URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#]*:[^/\\?#]*@"
+# The user part stops at its first colon: the same verdict in linear time (FAA-200 (44)), as the service kit's copy.
+_URI_PASSWORD = re.compile(r"^(?:(?:[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):[/\\]*[^/\\?#:]*:[^/\\?#]*@"
                            # any other scheme: a backslash belongs to the user information (seam r8)
-                           r"|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*:[^/?#]*@)")
+                           r"|(?![Hh][Tt][Tt][Pp][Ss]?:|[Ww][Ss][Ss]?:|[Ff][Tt][Pp]:)[A-Za-z][A-Za-z0-9+.-]*://[^/?#:]*:[^/?#]*@)")
+# The service kit's authority rule for source.repository (fabric_descriptor `_authority_ok`, FAA-200 (37), (49), (56)):
+# Fabric's registry reads a provider entry's repository with the same `new URL`, so an entry the kit accepts is never
+# dropped there. test_provider.SourceHosts holds this copy to the descriptor's on the shared vectors.
+_URI_AUTHORITY = re.compile(r"^(?:(?P<special>[Hh][Tt][Tt][Pp][Ss]?|[Ww][Ss][Ss]?|[Ff][Tt][Pp]):(?P<slashes>/*)|[A-Za-z][A-Za-z0-9+.-]*://)"
+                            r"(?:[^/?#@]*@)?(?P<host>\[[^\]]*\]|[^/?#:]*)(?::(?P<port>[^/?#]*))?")
 _SECRET_REF = re.compile(r"^secret-ref:([A-Za-z0-9][A-Za-z0-9._/:@-]{0,255})\Z")
 _LOCAL_PATH = re.compile(LOCAL_PATH_PATTERN)
 _URL = re.compile(URL_PATTERN)
@@ -161,6 +167,8 @@ def validate_provider_entry(entry: Any) -> List[str]:
             problems.append("source.repository carries no password or credential: it names the repository (write the repository's name in lower case if it is one)")
         elif "repository" in source and not _is_uri(source["repository"]):
             problems.append("source.repository is an absolute URI")
+        elif "repository" in source and not _authority_ok(source["repository"]):
+            problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
     if not isinstance(entry["installedAt"], str) or not _TIMESTAMP.fullmatch(entry["installedAt"]):
         problems.append("installedAt is an RFC 3339 date-time")
     if not isinstance(entry["installedBy"], str) or not 1 <= len(entry["installedBy"]) <= 200:
@@ -169,6 +177,50 @@ def validate_provider_entry(entry: Any) -> List[str]:
         problems.append("extensions is an object whose keys are URIs")
     problems.extend(_run_problems(entry["run"]))
     return problems
+
+
+def _ipv4_number(part: str) -> Optional[int]:
+    radix = 10
+    if part[:2] in ("0x", "0X"):
+        part, radix = part[2:], 16
+    elif len(part) > 1 and part[0] == "0":
+        part, radix = part[1:], 8
+    if part == "":
+        return 0
+    digits = {10: "0123456789", 16: "0123456789abcdefABCDEF", 8: "01234567"}[radix]
+    return int(part, radix) if all(c in digits for c in part) else None
+
+
+def _special_host_ok(host: str) -> bool:
+    if "%" in host:
+        return False
+    if host.startswith("["):
+        import ipaddress
+        try:
+            ipaddress.IPv6Address(host[1:-1])
+        except ValueError:
+            return False
+        return host.endswith("]")
+    parts = host.split(".")
+    if len(parts) > 1 and parts[-1] == "":
+        parts = parts[:-1]
+    last = parts[-1]
+    if not ((last != "" and last.isdigit() and last.isascii()) or (last != "" and _ipv4_number(last) is not None)):
+        return True
+    numbers = [_ipv4_number(p) if p else None for p in parts]
+    if len(parts) > 4 or None in numbers:
+        return False
+    return all(n <= 255 for n in numbers[:-1]) and numbers[-1] < 256 ** (5 - len(numbers))
+
+
+def _authority_ok(uri: str) -> bool:
+    m = _URI_AUTHORITY.match(uri)
+    if not m:
+        return True
+    port, host = m.group("port"), m.group("host")
+    if not host or not (port is None or port == "" or (port.isdigit() and len(port) <= 5 and int(port) <= 65535)):
+        return False
+    return not m.group("special") or (m.group("slashes") == "//" and _special_host_ok(host))
 
 
 def _is_uri(value: Any) -> bool:

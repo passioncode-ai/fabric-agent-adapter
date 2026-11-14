@@ -290,6 +290,17 @@ class ShownRepositoryTests(unittest.TestCase):
             self.assertNotIn(token.lower(), rules.shown_repository(value).lower(), "a later :// is no scheme")
             self.assertNotIn("deploy", rules.shown_repository(value))
 
+        # FAA-200 (8): a scheme the URL standard does not treat as special shows its host and path, so the evidence
+        # still says which repository was compared; its user information as written, a query and a fragment go.
+        for value, shown in (("ssh://git@github.com/example-org/r.git", "ssh://github.com/example-org/r.git"),
+                             ("SSH://h.example:22/r", "ssh://h.example:22/r"),
+                             ("ssh://\\u:fixture-pw@x.example/r", "ssh://x.example/r"),
+                             ("git://github.com/example-org/r?ref=fixture-pw#x", "git://github.com/example-org/r"),
+                             ("ssh://[::1]:22/r", "ssh://[::1]:22/r"),
+                             ("ssh://u:fixture/pw@h.example/r", "ssh:<redacted>"),  # an @ left in the path: only the scheme
+                             ("ssh://h.example:2x/r", "ssh:<redacted>")):
+            self.assertEqual(rules.shown_repository(value), shown, value)
+
 
 class LiveOpensInHostTests(LiveSample):
     """The sample service, probed with --repo pointing at a checkout built here."""
