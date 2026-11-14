@@ -284,6 +284,16 @@
         "does not impose the new-agent data home or the per-release transfer audit unasked",
         "compares the bot part by part with creating-fabric-agents' communication agent template and agents-that-answer-people.md, and lists each missing part as a finding in the report"
       ]
+    },
+    {
+      "id": "a-page-only-function-gets-its-capability",
+      "trap": "the agent adapts the project's existing MCP tools and leaves views and buttons that only the project's web page offers out of the agent surface",
+      "request": "Adapt example-agent to Fabric. It already has an MCP server with two tools, and an admin page where I can see the queue and pause or resume jobs.",
+      "expected": [
+        "lists every function a person reaches (the admin page's queue view, pause and resume) beside the capability that serves it",
+        "adds a read tool for the queue view and tools for pause and resume, with their gates, before calling the adaptation done",
+        "says that no function stays reachable by a person and not by an agent, except a human step that answers human-step-required with its link"
+      ]
     }
   ]
 }

@@ -336,6 +336,17 @@
         "writes a LICENSE naming the copyright holder the person names, and keeps the copied kit files' own licence (AGPL-3.0-only or the PassionCode commercial licence)",
         "keeps the agent's data out of its repository, in the data home the grill records"
       ]
+    },
+    {
+      "id": "every-function-is-an-agent-capability-first",
+      "trap": "the agent builds a dashboard page or a bot command first and leaves a function a person can see or change without a tool for agents, or files the missing tool for later",
+      "request": "Build example-agent: it keeps a list of drafts, shows them on a dashboard, and lets me edit and approve each one.",
+      "expected": [
+        "names every function as a capability on the agent surface first (MCP and the API the page calls), and the page as a view over those capabilities",
+        "gives every list, record and status the page shows a read tool with the same data, filters and paging",
+        "gives the edit and the approval tools with the same effect, checks, audit record and idempotency key, declared as actions (DEC-0121 AP-1)",
+        "keeps the inventory of the person's functions beside their capabilities in the repository and builds any missing row before the release"
+      ]
     }
   ]
 }

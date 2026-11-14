@@ -368,6 +368,9 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
             self.assertEqual(results[rule]["verdict"], "PASS", rule)
         self.assertEqual(results["lifecycle.platform"]["verdict"], "NOT_RUN")
         self.assertEqual(results["network.loopback-only"]["verdict"], "NOT_RUN")
+        # FAA-332: the page's agent twin answers over the same TLS origin, its read tool listed
+        self.assertEqual(results["dashboard.agent-surface"]["verdict"], "PASS")
+        self.assertIn("1 tool", results["dashboard.agent-surface"]["evidence"])
 
     def test_an_untrusted_certificate_is_a_fail_not_a_pass(self):
         import io

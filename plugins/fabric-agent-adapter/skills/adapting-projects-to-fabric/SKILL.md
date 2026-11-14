@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.87.0"
+  version: "0.88.0"
   contract-version: "0.1.0"
   contract-commit: "91c031c464695ae9661c12f97ce1e5dc3cb5448c"
 ---
@@ -77,6 +77,9 @@ If the inspector returns `undetermined`, answer its lifecycle question before cr
 files. A repository can expose multiple surfaces; choose a profile per capability, not
 per vendor. Load [profile selection](references/profile-selection.md) whenever choosing
 or reviewing a profile.
+
+While inspecting, list every function a person reaches in the project (each page route and view, button, form,
+export, bot command, CLI verb, report): step 4d gives each one its capability.
 
 ### 2. Pin the normative contract
 
@@ -172,6 +175,15 @@ arrays only, env values as `secret-ref:` references, never the id of an existing
 A provider entry only describes an MCP server: a CLI that does not speak MCP gets no entry; it is
 announced by its `local-runner` manifest (step 3). An agent that runs as a service uses a
 descriptor instead (`building-fabric-services`).
+
+### 4d. Give an agent every function a person has
+
+An adapted agent is built for agents first: no function stays reachable by a person and not by an agent, to view or
+to edit. Set the list from step 1 beside the capability that serves each function. A view with no read capability
+gets a read tool over the query the page already runs (the same data, filters and paging); a control with no tool
+gets its tool and its action declaration with a gate (DEC-0121 AP-1). Only a human step stays the person's, and its
+tool answers `human-step-required` with the link. Build every missing row before you call the adaptation done, and
+keep the inventory in the repository. Load [the agent surface reference](references/agent-surface.md) (AS-1 to AS-6).
 
 ### 4c. Keep the instance out of the source
 

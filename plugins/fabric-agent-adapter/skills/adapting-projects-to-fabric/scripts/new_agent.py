@@ -16,6 +16,8 @@ It writes, into an empty (or new) folder:
   starts degraded when it cannot read it, and starts when there is none; `config/placement.example.json` shows the
   record's shape on neutral values;
 - `README.md`, `LICENSE` (all rights reserved until the owner names the terms), `.gitignore`;
+- `docs/agent-surface.md`: the inventory of every function a person reaches beside its capability (FAA-332, the
+  agent surface reference's AS-6), starting with the one capability;
 - with `--service`: `service/`, the service kit's sample (`service.py`, a fabric-service/0.1 service with one capability
   and a job) and the kit modules it imports, copied by `fabric_kit.py install`, whose digests `fabric_kit.py status`
   checks later.
@@ -41,7 +43,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import adapt_project as ap  # noqa: E402 - the scaffolder and the source manifest, beside this file
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 RECORD = "fabric/new-agent.json"
 #: The agent's id: the package's `name` grammar (`fabric-package.schema.json#/$defs/name`), kebab case.
 AGENT_ID = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
@@ -158,6 +160,14 @@ A Fabric agent made with the Fabric Agent Adapter's `new` command, contract `{co
   never a value. `fabric_source_check.py check .` reads the source under it (exit 0 before every release).
 - `src/placement.py`: the placement guard the agent runs at start, before it polls, schedules or listens.
 {service_line}
+## Agent first
+
+This agent is built for agents first: there is no function a person can reach and an agent cannot, not to view, not to
+edit. Each function is a capability on its agent surface (an MCP tool served from the API its page or bot calls), and
+a page, a bot or a report is a view over those capabilities. Keep the inventory of every function a person reaches
+beside the capability that serves it in `docs/agent-surface.md`, and build any missing row before a release (the
+adapter's agent surface reference, AS-1 to AS-6).
+
 ## Configure
 
 Keys are read by name from the environment or the secret store, never from a file of this repository. Slots:
@@ -168,6 +178,16 @@ Keys are read by name from the environment or the secret store, never from a fil
 The agent's data lives apart from this source, in its data home (`<agent>-data`, or the service kit's folders), from
 the first commit.
 '''
+
+AGENT_SURFACE = """# Agent surface
+
+Every function a person reaches, beside the capability that serves it (the adapter's agent surface reference, AS-6).
+A row with no capability is built before the release, never filed for later.
+
+| Function a person reaches | Where | Capability | Read or write | Gate |
+|---|---|---|---|---|
+| {capability} | (none yet: no page, bot or CLI) | `{capability}` | write | {gate} |
+"""
 
 GITIGNORE = """# the instance: real configuration, keys and what running the agent leaves
 config/*.json
@@ -205,7 +225,7 @@ def plan(args: argparse.Namespace) -> Dict[str, str]:
     files = dict(ap._generated_files(scaffold))
     service_id = "%s.default" % agent_id
     label = "com.example.%s" % agent_id
-    include = ["README.md", "LICENSE", ".gitignore", "src/", "tests/", "config/placement.example.json",
+    include = ["README.md", "LICENSE", ".gitignore", "src/", "tests/", "docs/", "config/placement.example.json",
                "fabric-agent.json", "fabric-contract.lock.json", "fabric/"] + (["service/"] if args.service else [])
     manifest = ap.source_manifest(include, "%s, a Fabric agent" % agent_id, service=args.service)
     slots = "\n".join("- `%s` (%s%s): %s" % (s["name"], s["kind"], ", optional" if s.get("optional") else "", s["purpose"])
@@ -221,6 +241,7 @@ def plan(args: argparse.Namespace) -> Dict[str, str]:
         "src/placement.py": PLACEMENT_PY,
         "tests/test_placement.py": PLACEMENT_TEST.format(service_id=service_id, label=label),
         "config/placement.example.json": _placement_example(service_id, label),
+        "docs/agent-surface.md": AGENT_SURFACE.format(capability=capability, gate="none" if args.effect == "none" else "relayed"),
     })
     record = {"tool": "fabric-agent-adapter new %s" % VERSION, "id": agent_id, "profile": args.profile, "service": args.service,
               "capability": capability, "effect": args.effect, "contract": ap.CONTRACT_COMMIT}

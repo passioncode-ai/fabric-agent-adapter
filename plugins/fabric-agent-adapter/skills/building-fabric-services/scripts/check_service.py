@@ -96,7 +96,7 @@ from check_service_rules import _semver  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import usage_problems  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
-from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict  # noqa: E402 - DEC-0121
+from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict, dashboard_agent_surface_verdict  # noqa: E402,E501 - DEC-0121, FAA-332
 from check_service_rules import opens_in_host_verdict, service_checkout, declared_limits, holds_verdict  # noqa: E402 - FAA-118, FAA-298
 from check_service_rules import well_known_a2a_verdict, a2a_card_verdict  # noqa: E402 - DEC-0122
 import fabric_a2a as fa2  # noqa: E402 - DEC-0122
@@ -615,7 +615,7 @@ class Probe:
                      "%s names %s" % (where, named) if named else "%s carries no %s block naming %s" % (where, fs.EXTENSION_KEY, me))
         capabilities = [c for c in (manifest or {}).get("capabilities", []) if isinstance(c, dict)]
         names = {c.get("name") for c in capabilities}
-        mcp_surface = ((self.wk or {}).get("surfaces") or {}).get("mcp")
+        mcp_surface, listed_tools = ((self.wk or {}).get("surfaces") or {}).get("mcp"), None  # FAA-332: tools/list, once read
         listed = (mcp_surface or {}).get("capabilities")
         if listed is None or manifest is None:
             self.add("interop.well-known-capabilities", "NOT_RUN", "no capability list on the MCP surface" if listed is None else where)
@@ -661,8 +661,10 @@ class Probe:
                 self.tools_match_rule(capabilities, manifest_path, tools)
                 self.job_tools_rule(capabilities, tools)
                 self.add("interop.action-tools", *action_tools_verdict(self.wk, tools))  # DEC-0121 AP-1: the live twin
+                listed_tools = tools
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
+        self.add("dashboard.agent-surface", *dashboard_agent_surface_verdict(self.wk, listed_tools, remote=self.remote))  # FAA-332
         self.events_trace_rule(self.events)
 
     def channel_agent_rule(self) -> None:

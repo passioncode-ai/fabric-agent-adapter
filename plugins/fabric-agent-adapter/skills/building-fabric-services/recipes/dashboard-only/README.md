@@ -1,7 +1,8 @@
 # Recipe: a service that is only a dashboard
 
-A `fabric-service/0.1` service with a dashboard and nothing else: no capabilities, no `mcp` surface, no `usage`
-surface, no provider key and no token of anybody else. Fabric Dashboards asked for it (FD-171, board thread
+A `fabric-service/0.1` service with a dashboard and its agent twin, and nothing else: one read-only MCP tool,
+`dashboard.snapshot`, that answers what the page shows (FAA-332, service 0.2.0: nothing a person sees is out of an
+agent's reach), no other capability, no `usage` surface, no provider key and no token of anybody else. Fabric Dashboards asked for it (FD-171, board thread
 `38c35e11`) for a page that shows what the agents of this computer are doing; this recipe is the shape agreed there
 (FAA-268). Built only on the service kit (`fabric_service.py`, `fabric-service.mjs`). Tests:
 `test/test_recipe_dashboard_only.py` and `test/recipe-dashboard-only.test.mjs`.
@@ -54,7 +55,8 @@ directory. `check_service.py <id>` passes every rule it can run on it (the test 
 
 The page shows `<folder>/snapshot.json`, which the person's agent writes from what it reads through the Fabric
 Dashboards MCP (`list_services`, `spend`, `connections`) and Project Observatory's tools. The service itself calls
-nobody, so it holds no token but its own:
+nobody, so it holds no token but its own. An agent reads the same sections, `takenAt` and `degraded` as structured
+data from `POST /mcp` (the service token, `tools/call` `dashboard.snapshot`):
 
 ```json
 {"takenAt": "2026-11-12T08:00:00Z",

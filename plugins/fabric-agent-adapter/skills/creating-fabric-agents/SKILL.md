@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.87.0"
+  version: "0.88.0"
   contract-version: "0.1.0"
   contract-commit: "91c031c464695ae9661c12f97ce1e5dc3cb5448c"
 ---
@@ -68,6 +68,7 @@ board (or, with a grant, its scan tool over the source projects), and build from
 | **Who calls it?** | **a named consumer**: the project, schedule, or workflow that will actually invoke this capability. No consumer, no agent: a role that "would be useful" is a catalogue entry, not a build order |
 | **Workflow or agent?** | if every step can be named now, build a deterministic workflow behind the capability and skip the autonomy; an agent buys flexibility with latency, cost, and a new failure class, and that price needs a reason |
 | **Which profile?** | `mcp` when Fabric owns planning and retries and the capability has a schema; `a2a` when the provider owns its task lifecycle end to end; `local-runner` when it is a terminal agent Fabric drives. When unsure, the sibling skill's profile-selection reference is the decision record |
+| **Agent first?** | every function the agent will have, whatever a person will see or change, is listed now as a capability on its agent surface (an MCP tool served from the API its page or bot calls); a page, a bot, a CLI or a report is a view over those capabilities, never the only door, and nothing a person can view or edit is out of an agent's reach ([the agent surface reference](references/agent-surface.md), AS-1 to AS-6) |
 | **What effects?** | declare anything money-, deletion-, or publication-adjacent now; the host's floor and grants are designed against these declarations, and one discovered late invalidates the admission |
 | **Where does it run, for whom?** | this machine, the person's cloud or an organization's, and in which contexts (`personal`, `org:<id>`): one instance per context, its secrets, spend and journal never crossing into another. Record which capabilities need the person's machine and what they answer when it is off (references/where-agents-run.md) |
 | **Does it run around the clock?** | the uptime category, decided now: **A** when a capability must answer while the owner's machine is off or asleep (a schedule, a chat, callers outside the machine): the agent gets a cloud host from its first release, Heroku unless a reason names another (the person's or an organization's cloud, or PassionCode's for a paid agent), built as an online service (building-fabric-services, the remote placement) and started from the cloud Fabric-server template, whose repository an agent reads from the instance's settings or the estate's agent map, never from this skill; **B** when nothing needs it then: local only, no cloud (a local service, or a CLI or local runner when nothing calls it while the owner is away), reading an A agent's data through that agent's MCP or API. The README names the category (references/where-agents-run.md) |
@@ -213,6 +214,12 @@ document and events feed are part of this step, not a later retrofit. An uptime 
 skill as an online service (its remote placement: the https origin, keys as the platform's secrets). If that skill is
 absent, apply the `fabric-service/0.1` rules from the pinned contract's
 `docs/specification/service.md` by hand and mark its probe `NOT_RUN`.
+
+Build each function as a capability first and its page, bot command or report as a view over it: every list or
+record a person sees gets a read tool with the same data, filters and paging, and every change a person makes gets a
+tool with the same effect, checks, audit record and idempotency key (DEC-0121 AP-1). Keep the inventory of the
+person's functions beside their capabilities and build any missing row before the release (AS-6 of
+[the agent surface reference](references/agent-surface.md)).
 
 Build the capability behind the chosen surface. Keep model choice and internal reasoning
 outside the contract; expose typed outcomes, evidence, and protocol-visible state. One fact

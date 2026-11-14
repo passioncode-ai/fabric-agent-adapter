@@ -3,8 +3,9 @@
 
   python3 dashboard_service.py serve --descriptor <path>
 
-It serves the well-known document (surfaces `dashboard` and `events`, no `mcp`, no `usage`: it calls no model and
-offers no capability), its events feed, the login code and the signed-in page. The page shows `<folder>/snapshot.json`,
+It serves the well-known document (surfaces `dashboard`, `events` and `mcp`, no `usage`: it calls no model), its
+events feed, the login code, the signed-in page and the page's agent twin: the MCP tool `dashboard.snapshot` answers
+what the page shows, the same sections as structured data (FAA-332: nothing a person sees is out of an agent's reach). The page shows `<folder>/snapshot.json`,
 which the person's agent writes from what it read through the Fabric Dashboards MCP (`list_services`, `spend`,
 `connections`) and Project Observatory; the service holds no token but its own and calls nobody. A missing snapshot,
 one that cannot be read and one older than a day are reported in `degraded`, never shown as data.
@@ -33,8 +34,19 @@ try:
 except ImportError:  # in the adapter's repository: the kit is two folders up
     sys.path.append(str(Path(__file__).resolve().parents[2] / "scripts"))
     import fabric_service as fs
+import fabric_interop as fi  # noqa: E402 - beside fabric_service, wherever it was found
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
+#: The page's agent twin (FAA-332, AS-2): what the page shows, as structured data, read-only.
+SNAPSHOT_TOOL = {
+    "name": "dashboard.snapshot", "title": "What the dashboard shows",
+    "description": "The sections the dashboard shows (title, source, columns, rows), when they were taken, and why the "
+                   "snapshot is degraded when it is. Read-only.",
+    "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+    "outputSchema": {"type": "object", "properties": {"takenAt": {"type": "string"}, "sections": {"type": "array"},
+                                                      "degraded": {"type": "string"}}},
+    "annotations": {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": False},
+}
 STALE_SECONDS = 24 * 3600
 MAX_SNAPSHOT_BYTES = 1048576
 _HERE = Path(__file__).resolve().parent
@@ -108,6 +120,8 @@ class Service:
         self.started_at = fs.now_iso()
         self.build = {"commit": os.environ.get("FABRIC_BUILD_COMMIT", "0000000"), "builtAt": self.started_at}
         self.drain = fs.Drain()
+        self.mcp = fi.McpToolServer(self.id, VERSION)
+        self.mcp.add_tool(SNAPSHOT_TOOL, lambda args, ctx: self.snapshot())
 
     def start(self) -> None:
         self.lock = fs.hold_single_instance(self.data)  # the lock before any side effect
@@ -126,7 +140,8 @@ class Service:
             service_id=self.id, instance=self.instance, name=self.name, version=VERSION, build=self.build,
             started_at=self.started_at, status="ready", degraded=degraded,
             summary=[{"label": "Sections", "value": len(snap.get("sections") or [])}],
-            surfaces={"dashboard": {"path": "/", "login": True}, "events": {"path": "/fabric/v1/events"}},
+            surfaces={"dashboard": {"path": "/", "login": True}, "events": {"path": "/fabric/v1/events"},
+                      "mcp": {"path": "/mcp", "transport": "streamable-http", "capabilities": [SNAPSHOT_TOOL["name"]]}},
             extensions=dict(fs.dashboard_extension() if KIT_DIR is not None else {},
                             **fs.connections_extension(CONNECTIONS, degraded=degraded)))
 
@@ -209,6 +224,21 @@ def make_handler(svc: Service):
                 if not self._token_ok():
                     return
                 return self._send(200, svc.codes.issue())
+            if url.path == "/mcp":
+                if not self._token_ok():
+                    return
+                length = int(self.headers.get("Content-Length") or 0)
+                if not 0 <= length <= MAX_SNAPSHOT_BYTES:
+                    return self._send(413, {"error": "The request is too large."})
+                try:
+                    message = json.loads(self.rfile.read(length) or b"null")
+                except (ValueError, RecursionError):
+                    return self._send(400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error."}})
+                with svc.drain.work():
+                    response = svc.mcp.handle(message, self.headers, tier="T0")  # T0: the service token authenticated it
+                if response is not None and (response.get("error") or {}).get("code") == fi.HEADER_MISMATCH:
+                    return self._send(400, response)
+                return self._send(202) if response is None else self._send(200, response)
             if url.path == "/logout":
                 if self.headers.get("X-Fabric-Request") != "1":  # another site's form never signs the operator out
                     return self._send(403, {"error": "Missing request header."})
