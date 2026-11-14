@@ -322,6 +322,26 @@ class ProbeActionsRuleTests(unittest.TestCase):
         for words in ("minItems", "read-only", "CT-126", "DEC-0121"):
             self.assertIn(words, evidence)
 
+    def test_a_dashboard_needs_an_agent_surface(self):  # FAA-332: no function a person reaches and an agent cannot
+        self.assertEqual(self.rules.dashboard_agent_surface_verdict(with_actions(None, dashboard=False), None)[0], "NOT_RUN")
+        verdict, evidence = self.rules.dashboard_agent_surface_verdict(with_actions(None), {"sample.echo": {}})
+        self.assertEqual(verdict, "PASS", evidence)
+        self.assertIn("1 tool", evidence)
+        self.assertEqual(self.rules.dashboard_agent_surface_verdict(with_actions(None), None)[0], "PASS")  # listing not read
+        verdict, evidence = self.rules.dashboard_agent_surface_verdict(with_actions(None), {})
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("serves no tool", evidence)
+        page_only = {"surfaces": {"dashboard": {"path": "/", "login": True}, "events": {"path": "/e"}}}
+        verdict, evidence = self.rules.dashboard_agent_surface_verdict(page_only, None)
+        self.assertEqual(verdict, "FAIL")
+        for words in ("no agent surface", "AS-2", "DEC-0121 AP-1"):
+            self.assertIn(words, evidence)
+        self.assertEqual(self.rules.dashboard_agent_surface_verdict(page_only, None, remote=True)[0], "FAIL")
+        a2a = {"surfaces": {"dashboard": {"path": "/"}, "a2a": {"path": "/a2a", "protocolVersion": "1.0"}}}
+        verdict, evidence = self.rules.dashboard_agent_surface_verdict(a2a, None, remote=True)
+        self.assertEqual(verdict, "PASS", evidence)
+        self.assertIn("A2A", evidence)
+
     def test_a_dashboard_with_a_valid_declaration_passes_and_an_invalid_one_fails(self):
         ok = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}])
         self.assertEqual(self.rules.actions_declared_verdict(ok)[0], "PASS")

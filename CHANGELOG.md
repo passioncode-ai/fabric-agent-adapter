@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.88.0 (2026-11-14)
+
+Every agent is built for agents first (FAA-332, the operator's rule of 2026-11-14): there is no function a person can
+see or change that an agent cannot. The contract pin stays at `91c031c4` (`v0.1.0+2026-11-14`).
+
+### Added
+
+- **The agent surface reference** (`references/agent-surface.md`, one text in creating-fabric-agents and
+  adapting-projects-to-fabric): AS-1 the capability comes first and a page, bot, CLI or report is a view over it; AS-2
+  read parity, the same data with the same filters and paging as structured data; AS-3 write parity, DEC-0121 AP-1;
+  AS-4 only a human step stays the person's, answered `human-step-required` with its link; AS-5 parity never widens
+  access; AS-6 an inventory of every function a person reaches beside its capability, a missing row built before the
+  release.
+- creating-fabric-agents' grill asks **Agent first?** and Step 4 builds each function as a capability first;
+  adapting-projects-to-fabric lists the person's functions at inspection and gives each its capability in **step 4d**;
+  building-fabric-services adds **every view a read tool** beside every button a tool (SKILL.md, `dashboard.md` item 8,
+  the interop reference's *Read parity*).
+- **The probe's `dashboard.agent-surface`**: a service that serves a dashboard and has no agent surface (no
+  `surfaces.mcp`, and for a remote one no `surfaces.a2a` either), or whose `tools/list` serves no tool, fails. Measured
+  on this Mac: two of 27 local services with a dashboard fail it.
+- **`new` 0.2.0** writes `docs/agent-surface.md`, the inventory started with the agent's one capability, and a README
+  section *Agent first*; the source manifest covers `docs/`.
+
 ## 0.87.0 (2026-11-14)
 
 The repin to Fabric Agent Contract `v0.1.0+2026-11-14` (`91c031c4`, FAA-331); `93e7db16` (`v0.1.0+2026-11-08.1`) stays

@@ -39,6 +39,8 @@ Actions (fabric-actions/0.1, DEC-0121): `well-known.actions` holds a declared ex
 `interop.action-tools` fails a declared action whose tool tools/list does not serve (and a local service that declares
 actions with no MCP surface; a remote one there is NOT_RUN, its twin may be on A2A), and `dashboard.actions-declared`
 is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboard cannot declare an empty list).
+`dashboard.agent-surface` (FAA-332) fails a dashboard whose service has no agent surface (no surfaces.mcp, or for a
+remote one no surfaces.a2a either) or whose tools/list serves no tool: nothing a person sees or does is the page's alone.
 
 channel-agent.declaration (DEC-0150, FAC-SEM-162 to 165): extensions/channel-agent/0.1 under provider.extensions of the
 manifest the descriptor names, or, with no manifest, under extensions of the well-known answer (CA-1). FAC-SEM-164's
@@ -97,6 +99,7 @@ from check_service_rules import usage_problems  # noqa: E402,F401 - moved (FAA-6
 from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
 from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict  # noqa: E402 - DEC-0121
+from check_service_rules import dashboard_agent_surface_verdict  # noqa: E402 - FAA-332
 from check_service_rules import opens_in_host_verdict, service_checkout, declared_limits, holds_verdict  # noqa: E402 - FAA-118, FAA-298
 from check_service_rules import well_known_a2a_verdict, a2a_card_verdict  # noqa: E402 - DEC-0122
 import fabric_a2a as fa2  # noqa: E402 - DEC-0122
@@ -647,12 +650,14 @@ class Probe:
                 self.add(rule, "NOT_RUN", reason)
             self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason, no_surface=not mcp_surface,
                                                                     remote=self.remote))
+            self.add("dashboard.agent-surface", *dashboard_agent_surface_verdict(self.wk, None, remote=self.remote))
         else:
             try:
                 listing = self.mcp_call("tools/list", {})
             except (OSError, ValueError) as exc:
                 self.add("interop.tools-match", "FAIL", "tools/list failed: %s" % exc)
                 self.add("interop.action-tools", *action_tools_verdict(self.wk, None, "tools/list failed: %s" % exc))
+                self.add("dashboard.agent-surface", *dashboard_agent_surface_verdict(self.wk, None, remote=self.remote))
                 listing = None
             if listing is not None:
                 sent = self.sent_traceparent
@@ -661,6 +666,7 @@ class Probe:
                 self.tools_match_rule(capabilities, manifest_path, tools)
                 self.job_tools_rule(capabilities, tools)
                 self.add("interop.action-tools", *action_tools_verdict(self.wk, tools))  # DEC-0121 AP-1: the live twin
+                self.add("dashboard.agent-surface", *dashboard_agent_surface_verdict(self.wk, tools, remote=self.remote))
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
         self.events_trace_rule(self.events)

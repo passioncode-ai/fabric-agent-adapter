@@ -83,6 +83,14 @@ class NewAgentTests(unittest.TestCase):
         placement = json.loads((self.folder / "config/placement.example.json").read_text(encoding="utf-8"))
         self.assertEqual(placement["schema"], "observatory-placement/1")
         self.assertEqual(placement["elsewhere"][0]["serviceId"], "example-agent.default")
+        readme = " ".join((self.folder / "README.md").read_text(encoding="utf-8").split())  # FAA-332
+        for words in ("## Agent first", "no function a person can reach and an agent cannot", "docs/agent-surface.md"):
+            self.assertIn(words, readme)
+        surface = (self.folder / "docs/agent-surface.md").read_text(encoding="utf-8")
+        self.assertIn("| example_agent.run | (none yet: no page, bot or CLI) | `example_agent.run` | write | none |", surface)
+        self.assertIn("docs/agent-surface.md", answer["created"])
+        self.assertEqual(json.loads((self.folder / "fabric/new-agent.json").read_text(encoding="utf-8"))["tool"],
+                         "fabric-agent-adapter new 0.2.0")
         # the generated project passes the source check under its own manifest, and its own tests
         code, report = self.source_check(self.folder)
         self.assertEqual(code, 0, report)

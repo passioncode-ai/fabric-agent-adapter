@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
-  version: "0.87.0"
+  version: "0.88.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "91c031c464695ae9661c12f97ce1e5dc3cb5448c"
@@ -265,6 +265,7 @@ with the same effect, checks, audit record and idempotency key, registered with
 `build_well_known(actions=server.action_table())` under `extensions/actions/0.1`. A `relayed` action called with the
 operator's decision in `_meta.decision` is the operator's act, never answered "operator session required". When to
 adopt, the gates, the hooks, the board responder's take-back and the refusals: the interop reference's *Actions* section.
+**and every view a read tool** (same data, filters, paging; *Read parity* there).
 
 **Say what the agent uses** (`fabric-connections/0.1`, DEC-0096) so Fabric Dashboards draws its chain: the other
 agents, models, connectors, stores and channels, each with its state, from
@@ -306,7 +307,7 @@ It reports `PASS`, `FAIL` or `NOT_RUN` per rule (descriptor, port claim, `descri
 shape, identity, latency, Host/Origin/cross-site guards, loopback bind, token file,
 events auth and shape, single-use login, state outside code, instance lock, plist,
 launchd pid equals answering pid, `dashboard.declared` (ED-9), `well-known.actions` (DEC-0121),
-`dashboard.actions-declared` (`NOT_RUN` when a dashboard declares no actions), `dashboard.opens-in-host` (no browser
+`dashboard.actions-declared` (`NOT_RUN` when a dashboard declares no actions), `dashboard.agent-surface`, `dashboard.opens-in-host` (no browser
 opener aimed at the service's pages in its checkout; `--repo PATH` names the checkout, and a service installed
 from a release folder needs it), and the `interop.*` rules:
 manifest link, capability list, tools equal to the manifest, job tools, unknown job, trace

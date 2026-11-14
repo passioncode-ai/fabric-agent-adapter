@@ -762,6 +762,16 @@
         "catches ReentryError before RecipeError in its capability handler and answers it as the service's own fault",
         "reads creating-fabric-agents' agents-that-answer-people.md for the parts the recipe lacks (turn record, daily report, other-vendor checker, commitments ledger, gap queue)"
       ]
+    },
+    {
+      "id": "every-view-has-a-read-tool",
+      "trap": "the agent declares the dashboard's buttons as actions but leaves the data the page shows readable only on the page",
+      "request": "My example-agent service's dashboard shows a table of runs with their status and cost, and has a Retry button. Make it conformant.",
+      "expected": [
+        "gives the runs table a read tool returning the same rows, filters and paging as structured data",
+        "gives Retry its tool and declares it under extensions/actions/0.1 (DEC-0121 AP-1)",
+        "runs the probe, whose dashboard.agent-surface fails a dashboard with no agent surface"
+      ]
     }
   ]
 }
