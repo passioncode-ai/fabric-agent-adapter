@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.89.0 (2026-11-14)
+
+The repin to Fabric Agent Contract `v0.1.0+2026-11-14.2` (`ced7b292`, FAA-333); `91c031c4` (`v0.1.0+2026-11-14`) stays
+supported for bundles issued under it.
+
+### Added
+
+- **Authority levels (DEC-0162)** in both kit twins: `fabric_levels` / `fabric-levels.mjs` verifies an
+  `org-membership/1` or `/2` attestation under the organization's key set the service applied (Ed25519 by the kit's own
+  `fabric_crypto`), answers whether a level stands for one call (`level_standing`: the organization is the call's, the
+  attestation verifies for this service's audience, is active, bound by the token's `mem`, covers the level and, for an
+  architect, the project) and checks FAC-SEM-170. `action_decision` / `actionDecision` takes a level decision
+  (`by: level`, `via: level-command`) and a level mandate at every tier at a service given `levels`, refuses an act
+  declared `owner` or `admin` in an organization's context any operator form (`level-insufficient: owner|admin`), and
+  reads `change-policy` as `admin` at least. `authority_view` and `authority_extension_rules` read
+  `extensions/authority/0.1` and hold it to FAC-SEM-142.
+- **A place's standing mandate (DEC-0166)**: `mandate/1` with `standing` (at most a day, `profile_digest`), read at a
+  service that declares `standing`, from T2 only under the token's matching `prof`, recorded `via: profile`; no profile
+  covers `autonomy.profile.set` (FAC-SEM-173) and one an organization's level holder set covers nothing declared above
+  that level.
+- The delegation verifier types the token's `mem` and `prof` claims (a sha256 digest, else `malformed-claims`).
+- `levels/1`, `org-membership/2` and `standing/1` are known protocol revisions.
+- working-with-fabric: in an organization, a level holder's word counts as the operator's within their level, relayed
+  as a level decision or mandate (`references/authority-levels.md`).
+
+### Vectors
+
+- `levels-vectors.json` and `standing-vectors.json`, written by the new `make_levels_vectors.mjs` from the contract's
+  `levels.json` and `profile.json`, every answer re-checked by the contract's functions; both twins answer all 153
+  cases. `actions-vectors.json` gains the authority fixtures, `mandate-vectors.json` the level mandate's, the
+  delegation vectors four token cases for `mem` and `prof`.
+
 ## 0.88.0 (2026-11-14)
 
 Every agent is built for agents first (FAA-332, the operator's rule of 2026-11-14): there is no function a person can

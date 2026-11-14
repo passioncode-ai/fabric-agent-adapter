@@ -4582,6 +4582,132 @@
    ]
   },
   {
+   "name": "mandate-level",
+   "valid": true,
+   "document": {
+    "kind": "mandate/1",
+    "by": "level",
+    "level": "architect",
+    "org": "org:org-a",
+    "membership": {
+     "type": "org-membership/2",
+     "issuer": "https://orgs.example",
+     "org": "org:org-a",
+     "audience": "reviews-service-a1",
+     "subject": "m-arch-03",
+     "role": "architect",
+     "projects": [
+      "alpha",
+      "beta"
+     ],
+     "external": false,
+     "status": "active",
+     "revision": 3,
+     "membershipEndsAt": null,
+     "issuedAt": "2026-10-25T11:00:00Z",
+     "notBefore": "2026-10-25T11:00:00Z",
+     "expiresAt": "2026-10-25T12:00:00Z",
+     "extensions": {},
+     "alg": "EdDSA",
+     "kid": "mem-2026-10",
+     "sig": "RrABkwV8ubdv_gWsjle26Lj5uG4Q4FeAc2qFy7ENRhxw3m8ioGjcxYd3QIiUM-lGgV4jUatmUi2BtWBFGdO-Aw"
+    },
+    "task": "answer the reviews of the week",
+    "instruction": "answer this week's reviews in project alpha",
+    "at": "2026-10-25T11:20:00Z",
+    "expiresAt": "2026-10-26T11:20:00Z",
+    "scope": {
+     "capabilities": [
+      "reviews.approve"
+     ],
+     "effects": [
+      "reply"
+     ],
+     "projects": [
+      "alpha"
+     ]
+    },
+    "chain": [
+     {
+      "agent": "example-developer",
+      "at": "2026-10-25T11:20:00Z"
+     },
+     {
+      "agent": "example-reviewer",
+      "at": "2026-10-25T11:25:00Z"
+     }
+    ]
+   },
+   "problem": null,
+   "findings": []
+  },
+  {
+   "name": "mandate-operator-with-level",
+   "valid": false,
+   "document": {
+    "kind": "mandate/1",
+    "by": "operator",
+    "level": "architect",
+    "org": "org:org-a",
+    "membership": {
+     "type": "org-membership/2",
+     "issuer": "https://orgs.example",
+     "org": "org:org-a",
+     "audience": "reviews-service-a1",
+     "subject": "m-arch-03",
+     "role": "architect",
+     "projects": [
+      "alpha",
+      "beta"
+     ],
+     "external": false,
+     "status": "active",
+     "revision": 3,
+     "membershipEndsAt": null,
+     "issuedAt": "2026-10-25T11:00:00Z",
+     "notBefore": "2026-10-25T11:00:00Z",
+     "expiresAt": "2026-10-25T12:00:00Z",
+     "extensions": {},
+     "alg": "EdDSA",
+     "kid": "mem-2026-10",
+     "sig": "RrABkwV8ubdv_gWsjle26Lj5uG4Q4FeAc2qFy7ENRhxw3m8ioGjcxYd3QIiUM-lGgV4jUatmUi2BtWBFGdO-Aw"
+    },
+    "task": "answer the reviews of the week",
+    "instruction": "answer this week's reviews in project alpha",
+    "at": "2026-10-25T11:20:00Z",
+    "expiresAt": "2026-10-26T11:20:00Z",
+    "scope": {
+     "capabilities": [
+      "reviews.approve"
+     ],
+     "effects": [
+      "reply"
+     ],
+     "projects": [
+      "alpha"
+     ]
+    },
+    "chain": [
+     {
+      "agent": "example-developer",
+      "at": "2026-10-25T11:20:00Z"
+     },
+     {
+      "agent": "example-reviewer",
+      "at": "2026-10-25T11:25:00Z"
+     }
+    ]
+   },
+   "problem": "mandate-malformed",
+   "findings": [
+    {
+     "code": "FAC-SEM-144",
+     "instancePath": "",
+     "message": "the mandate is not valid: mandate-malformed (DEC-0125 MD-1, MD-2; DEC-0136 MD-2a)"
+    }
+   ]
+  },
+  {
    "name": "mandate-relayed",
    "valid": true,
    "document": {

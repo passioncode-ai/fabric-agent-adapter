@@ -38,7 +38,7 @@ class Vectors(unittest.TestCase):
                 self.assertEqual(js(fm.mandate_covers(case["input"])), js(case["expected"]))
 
     def test_every_catalogue_fixture(self):
-        self.assertEqual(len(V["fixtures"]), 5)
+        self.assertEqual(len(V["fixtures"]), 7)  # DEC-0162: mandate-level, mandate-operator-with-level
         for fixture in V["fixtures"]:
             with self.subTest(fixture["name"]):
                 self.assertIs(fm.mandate_shape(fixture["document"]), fixture["valid"])

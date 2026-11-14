@@ -135,6 +135,9 @@
     "learning-note": [
       "1"
     ],
+    "levels": [
+      "1"
+    ],
     "machine-report": [
       "1"
     ],
@@ -169,7 +172,8 @@
       "1"
     ],
     "org-membership": [
-      "1"
+      "1",
+      "2"
     ],
     "org-root-registration": [
       "1"
@@ -199,6 +203,9 @@
       "1"
     ],
     "session-handoff": [
+      "1"
+    ],
+    "standing": [
       "1"
     ],
     "service-load": [

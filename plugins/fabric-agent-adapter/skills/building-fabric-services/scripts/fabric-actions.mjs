@@ -28,10 +28,15 @@
 // text has no other kind; an inherited member is not read). Never throws on what it reads. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';
 import { isObject, jsonEqual } from './fabric-jsvalue.mjs';
-import { mandateCovers, sourceShape } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
+import { EFFECT_CLASSES, mandateCovers, sourceShape } from './fabric-mandate.mjs'; // DEC-0125, DEC-0126
+import { ACTION_LEVELS, CALL_CONTEXT, DECIDING_LEVELS, levelContextsWellFormed, levelStanding } from './fabric-levels.mjs'; // DEC-0162
 import { formatRfc3339, parseRfc3339Ms } from './fabric-time.mjs';
 
 export const ACTIONS_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1';
+/** The authority extension (DEC-0162 LV-5, LV-7; DEC-0166 AU-3): the organizations whose levels a service reads, the
+ * level each relayed action needs and whether it reads standing mandates. */
+export const AUTHORITY_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/authority/0.1';
+export { ACTION_LEVELS };
 /** The three refusals DEC-0121 adds to DL-19's one code set, and DL-17's refusal a T2 caller still gets. */
 export const OPERATOR_DECISION_REQUIRED = 'operator-decision-required';
 export const DECISION_INVALID = 'decision-invalid';
@@ -53,6 +58,9 @@ const STEP_URL = /^(https:\/\/|\/)/;
 const ACTION_MEMBERS = new Set(['id', 'title', 'tool', 'gate', 'humanStep']);
 const DECISION_MEMBERS = new Set(['by', 'via', 'action', 'target', 'instruction', 'at', 'source']);
 const KEY_PATH = `/extensions/${ACTIONS_EXTENSION_KEY.replace(/~/g, '~0').replace(/\//g, '~1')}`;
+const LEVEL_DECISION_MEMBERS = new Set(['by', 'via', 'level', 'org', 'project', 'action', 'target', 'instruction', 'at', 'membership']);
+const ORG_ID = /^org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
+const PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 /** An own member that is not undefined, as the validator reads a member as present. */
 const has = (value, key) => Object.hasOwn(value, key) && value[key] !== undefined;
@@ -104,12 +112,25 @@ export const readableAction = (action) => actionErrors(action, '').length === 0 
  * mandate.schema.json#/$defs/source reads it (DEC-0126).
  */
 export function decisionShape(value) {
+  if (isObject(value) && value.by === 'level') return levelDecisionShape(value);
   if (!isObject(value) || Object.keys(value).some((key) => !DECISION_MEMBERS.has(key))) return false;
   if (['by', 'via', 'action', 'instruction', 'at'].some((key) => !has(value, key))) return false;
   return value.by === 'operator' && value.via === 'relayed-instruction' && matches(REQUEST_KEY, value.action, 64)
     && (!has(value, 'target') || text(value.target, 1, 200)) && text(value.instruction, 1, 500)
     && typeof value.at === 'string' && !Number.isNaN(parseRfc3339Ms(value.at))
     && (!has(value, 'source') || sourceShape(value.source));
+}
+
+/** decision.schema.json#/$defs/level (DEC-0162 LV-3): a level holder's decision, its attestation an object the service
+ * verifies (fabric-levels.mjs), never this shape; `project` required for an architect. */
+function levelDecisionShape(value) {
+  if (Object.keys(value).some((key) => !LEVEL_DECISION_MEMBERS.has(key))) return false;
+  if (['by', 'via', 'level', 'org', 'action', 'instruction', 'at', 'membership'].some((key) => !has(value, key))) return false;
+  if (value.level === 'architect' && !has(value, 'project')) return false;
+  return value.via === 'level-command' && DECIDING_LEVELS.includes(value.level) && text(value.org, 0, 132) && ORG_ID.test(value.org)
+    && (!has(value, 'project') || (text(value.project, 1, 128) && PROJECT_ID.test(value.project)))
+    && matches(REQUEST_KEY, value.action, 64) && (!has(value, 'target') || text(value.target, 1, 200)) && text(value.instruction, 1, 500)
+    && typeof value.at === 'string' && !Number.isNaN(parseRfc3339Ms(value.at)) && isObject(value.membership);
 }
 
 const acceptedApproval = (approval) => isObject(approval) && member(approval, 'ok') === true && nonEmpty(member(approval, 'approver'));
@@ -149,20 +170,60 @@ export function actionDecision(inputs) {
   }
   const caller = field('caller');
   if (!nonEmpty(caller)) return { fault: 'caller-missing' };
+  const levels = field('levels');
+  // The service's level contexts are a map by organization; an array (the declaration itself) is its fault.
+  if (levels !== undefined && !levelContextsWellFormed(levels)) return { fault: 'levels-invalid' };
+  if (field('actionLevel') !== undefined && !ACTION_LEVELS.includes(field('actionLevel'))) return { fault: 'action-level-invalid' };
+  const decision = field('decision');
+  const mandate = field('mandate');
   const approval = field('approval');
-  if (acceptedApproval(approval)) return { ok: true, recordAs: { by: approval.approver, via: 'approval', caller } };
   const tier = field('tier');
-  if (tier !== 'T0' && tier !== 'T1') {
-    const digest = field('actionDigest');
-    if (typeof digest !== 'string' || !SHA256.test(digest)) return { fault: 'digest-missing' };
+  const levelDecision = isObject(decision) && decision.by === 'level';
+  const inside = tier === 'T0' || tier === 'T1';
+  // LV-7: at a service that reads levels the effect decides whether `change-policy` raises the action to `admin`.
+  if (isObject(levels) && !EFFECT_CLASSES.includes(field('effect'))) return { fault: 'effect-missing' };
+  const min = minLevelOf(field);
+  const levelAct = isObject(levels) && (min === 'owner' || min === 'admin');
+  const context = field('context');
+  const contextOk = typeof context === 'string' && CALL_CONTEXT.test(context);
+  if (levelAct && !contextOk) return { fault: 'context-missing' };
+  // LV-7: in an organization's context an act declared `owner` or `admin` is decided only at that level.
+  const levelOnly = levelAct && context.startsWith('org:');
+  const levelMandate = (decision === undefined || ((!inside || levelOnly) && !levelDecision)) && isObject(mandate) && mandate.by === 'level';
+  if (acceptedApproval(approval) && !levelOnly) return { ok: true, recordAs: { by: approval.approver, via: 'approval', caller } };
+  if (inside && field('elicited') === true && !levelOnly) return { ok: true, recordAs: { by: 'operator', via: 'elicitation', caller } };
+  const levelRead = levelDecision && isObject(levels);
+  // DEC-0166 AU-3: a standing mandate is read at every tier by a service that declares `standing`.
+  const standingMandate = !levelOnly && (decision === undefined || (!inside && !levelRead)) && field('standing') === true && isObject(mandate) && isObject(mandate.standing);
+  const digest = field('actionDigest');
+  const digestOk = typeof digest === 'string' && SHA256.test(digest);
+  if ((isObject(levels) && (levelDecision || levelMandate)) || standingMandate) {
+    const clock = parseRfc3339Ms(field('now'));
+    if (Number.isNaN(clock)) return { fault: 'now-unreadable' };
+    if (!contextOk) return { fault: 'context-missing' };
+    if (!inside && !digestOk) return { fault: 'digest-missing' };
+    const read = levelRead ? byLevel(field, action, caller, clock) : byMandate(field, action, caller);
+    if ('ignored' in read) return inside ? refuse(OPERATOR_DECISION_REQUIRED) : { ok: false, code: APPROVAL_REQUIRED, data: { actionDigest: digest } };
+    if (!inside && read.ok === false && (read.code === OPERATOR_DECISION_REQUIRED || read.code === DECISION_INVALID)) {
+      return { ...read, data: { ...(read.data ?? {}), actionDigest: digest } };
+    }
+    return read;
+  }
+  if (!inside) {
+    if (!digestOk) return { fault: 'digest-missing' };
+    // No approval decides an act only a level decides (LV-7), so a T2 caller is told the level, with the digest.
+    if (levelOnly) return { ok: false, code: OPERATOR_DECISION_REQUIRED, data: { detail: `level-insufficient: ${min}`, actionDigest: digest } };
     return { ok: false, code: APPROVAL_REQUIRED, data: { actionDigest: digest } };
   }
-  if (field('elicited') === true) return { ok: true, recordAs: { by: 'operator', via: 'elicitation', caller } };
   const clock = parseRfc3339Ms(field('now'));
   if (Number.isNaN(clock)) return { fault: 'now-unreadable' };
-  const decision = field('decision');
-  if (decision === undefined && field('mandate') !== undefined) return byMandate(field, action, caller);
-  if (decision === undefined) return refuse(OPERATOR_DECISION_REQUIRED);
+  if (levelOnly) return { ok: false, code: OPERATOR_DECISION_REQUIRED, data: { detail: `level-insufficient: ${min}` } };
+  // A level decision at a service that reads no levels is as if absent (LV-10), so a mandate the call carries is read.
+  if ((decision === undefined || levelDecision) && mandate !== undefined) {
+    const answer = byMandate(field, action, caller);
+    return 'ignored' in answer ? refuse(OPERATOR_DECISION_REQUIRED) : answer;
+  }
+  if (decision === undefined || levelDecision) return refuse(OPERATOR_DECISION_REQUIRED);
   if (!decisionShape(decision)) return refuse(DECISION_INVALID);
   if (decision.action !== action.id || (has(decision, 'target') && decision.target !== field('target'))) return refuse(DECISION_INVALID);
   const at = parseRfc3339Ms(decision.at);
@@ -194,13 +255,51 @@ function byMandate(field, action, caller) {
   if (!jobCapability(capability)) return { fault: 'mandate-capability-missing' };
   const spendUsd = field('spendUsd');
   const project = field('project');
+  const context = field('context');
+  const min = minLevelOf(field);
   const answer = mandateCovers({
     mandate: field('mandate'), tier: field('tier'), now: field('now'), self,
     ...(field('callerAgent') === undefined ? {} : { callerAgent: field('callerAgent') }),
-    call: { capability, action: action.id, effect, ...(typeof spendUsd === 'number' ? { spendUsd } : {}), ...(typeof project === 'string' ? { project } : {}) },
+    ...(isObject(field('levels')) ? { levels: field('levels'), tokenMem: field('tokenMem') } : {}),
+    ...(field('standing') === true ? { standing: true, ...(field('tokenProf') === undefined ? {} : { tokenProf: field('tokenProf') }) } : {}),
+    call: { capability, action: action.id, effect, ...(typeof spendUsd === 'number' ? { spendUsd } : {}), ...(typeof project === 'string' ? { project } : {}),
+      ...(typeof context === 'string' ? { context } : {}), ...(min === undefined ? {} : { minLevel: min }) },
   });
   if ('recordAs' in answer) return { ok: true, recordAs: { ...answer.recordAs, caller } };
-  return answer; // never `ignored`: the tier was read first, so a T2 call answered approval-required before (MD-5)
+  // `ignored`: a T2 operator mandate (MD-5), or a level mandate at a service that reads no levels (LV-10).
+  return answer;
+}
+
+/** The lowest level that decides the action: the service's declaration, raised to `admin` for an action whose effect is
+ * `change-policy`, which an owner or an admin decides and never an architect (DEC-0162 LV-7). */
+function minLevelOf(field) {
+  const declared = field('actionLevel');
+  return field('effect') === 'change-policy' && (declared === undefined || declared === 'architect') ? 'admin' : declared;
+}
+
+/** A relayed action's call that carries a level decision, at a service that reads levels (DEC-0162 LV-3 to LV-6, LV-10,
+ * LV-11), at any tier, as the contract's byLevel reads it. */
+function byLevel(field, action, caller, clock) {
+  const decision = field('decision');
+  if (!decisionShape(decision)) return refuse(DECISION_INVALID);
+  if (decision.action !== action.id || (has(decision, 'target') && decision.target !== field('target'))) return refuse(DECISION_INVALID);
+  const at = parseRfc3339Ms(decision.at);
+  if (at > clock + CLOCK_SKEW_SECONDS * 1000 || at < clock - DECISION_LIFETIME_SECONDS * 1000) return refuse(DECISION_INVALID);
+  const project = typeof field('project') === 'string' ? field('project') : undefined;
+  if (has(decision, 'project') && decision.project !== project) return refuse(DECISION_INVALID);
+  const min = minLevelOf(field);
+  const standing = levelStanding({
+    membership: decision.membership, org: decision.org, level: decision.level, at: decision.at,
+    ...(project === undefined ? {} : { project }), ...(min === undefined ? {} : { minLevel: min }),
+    context: field('context'), contexts: field('levels'), tokenMem: field('tokenMem'), now: clock,
+  });
+  if (!standing.ok) {
+    return 'invalid' in standing
+      ? { ok: false, code: DECISION_INVALID, data: { detail: standing.invalid } }
+      : { ok: false, code: OPERATOR_DECISION_REQUIRED, data: { detail: standing.insufficient } };
+  }
+  const { level, org, approver, membershipDigest, revision } = standing;
+  return { ok: true, recordAs: { by: 'level', via: 'level-command', level, org, ...(project === undefined ? {} : { project }), approver, membershipDigest, revision, caller } };
 }
 
 /**
@@ -217,6 +316,73 @@ export function actionsView(wellKnown) {
 }
 
 const finding = (instancePath, message) => ({ code: 'FAC-SEM-142', instancePath, message });
+
+const AUTHORITY_PATH = `/extensions/${AUTHORITY_EXTENSION_KEY.replace(/~/g, '~0').replace(/\//g, '~1')}`;
+const AUDIENCE = /^[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}$/;
+
+/** service-authority-extension.schema.json (DEC-0162, DEC-0166): an open object of at least one member whose `standing`
+ * is true, `levels` 1 to 16 {org, audience} and `actionLevels` 1 to 128 levels keyed by action id. Each error is
+ * `<path> <keyword>`; the wording is not part of a vector (0.50.0 brief D6). */
+function authorityErrors(value) {
+  if (!isObject(value)) return ['/ type'];
+  if (Object.keys(value).length === 0) return ['/ minProperties'];
+  const errors = [];
+  if (Object.hasOwn(value, 'standing') && value.standing !== true) errors.push('/standing const');
+  if (Object.hasOwn(value, 'levels')) {
+    const { levels } = value;
+    if (!Array.isArray(levels) || levels.length < 1 || levels.length > 16) errors.push(`/levels ${!Array.isArray(levels) ? 'type' : levels.length < 1 ? 'minItems' : 'maxItems'}`);
+    else levels.forEach((entry, index) => {
+      if (!(isObject(entry) && Object.keys(entry).sort().join() === 'audience,org' && text(entry.org, 0, 132) && ORG_ID.test(entry.org)
+        && typeof entry.audience === 'string' && AUDIENCE.test(entry.audience))) errors.push(`/levels/${index} schema`);
+    });
+  }
+  if (Object.hasOwn(value, 'actionLevels')) {
+    const levels = value.actionLevels;
+    const count = isObject(levels) ? Object.keys(levels).length : 0;
+    if (!isObject(levels) || count < 1 || count > 128) errors.push(`/actionLevels ${!isObject(levels) ? 'type' : count < 1 ? 'minProperties' : 'maxProperties'}`);
+    else for (const [key, level] of Object.entries(levels)) {
+      if (!REQUEST_KEY.test(key)) errors.push('/actionLevels propertyNames');
+      if (!ACTION_LEVELS.includes(level)) errors.push(`/actionLevels/${key} enum`);
+    }
+  }
+  return errors;
+}
+
+/**
+ * The host reader of extensions/authority/0.1 (DEC-0162 LV-5, LV-7; DEC-0166 AU-3), as the contract's authorityView:
+ * {declared: false}, {declared: true, valid: false, errors} or {declared: true, valid: true, levels?, actionLevels?,
+ * standing?}. A service passes the level contexts it holds for those organizations and the called action's entry on to
+ * actionDecision. Never throws.
+ */
+export function authorityView(wellKnown) {
+  const extensions = member(wellKnown, 'extensions');
+  if (!isObject(extensions) || !Object.hasOwn(extensions, AUTHORITY_EXTENSION_KEY)) return { declared: false };
+  const value = extensions[AUTHORITY_EXTENSION_KEY];
+  const errors = authorityErrors(value);
+  if (errors.length) return { declared: true, valid: false, errors };
+  const { levels, actionLevels, standing } = value;
+  return { declared: true, valid: true, ...(levels === undefined ? {} : { levels }), ...(actionLevels === undefined ? {} : { actionLevels }), ...(standing === undefined ? {} : { standing }) };
+}
+
+/** FAC-SEM-142 on the authority key of a well-known document (DEC-0162 LV-5, LV-7): a value that is not its schema's, an
+ * organization named twice in `levels`, a level for an id that is not a relayed action of the actions declaration. */
+export function authorityExtensionRules(wellKnown) {
+  const view = authorityView(wellKnown);
+  if (!view.declared) return [];
+  if (!view.valid) return [finding(AUTHORITY_PATH, `the authority declaration is invalid (${view.errors.join('; ')}); a reader treats it as not declared and reports it (DEC-0162)`)];
+  const findings = [];
+  const orgs = new Set();
+  (view.levels ?? []).forEach((entry, index) => {
+    if (orgs.has(entry.org)) findings.push(finding(`${AUTHORITY_PATH}/levels/${index}/org`, `organization ${entry.org} is named twice (DEC-0162 LV-5)`));
+    orgs.add(entry.org);
+  });
+  const actions = actionsView(wellKnown);
+  const relayed = new Set(actions.declared && actions.valid ? actions.actions.filter((action) => action.gate === 'relayed').map((action) => action.id) : []);
+  for (const id of Object.keys(view.actionLevels ?? {})) {
+    if (!relayed.has(id)) findings.push(finding(`${AUTHORITY_PATH}/actionLevels/${id.replace(/~/g, '~0').replace(/\//g, '~1')}`, `${id} is not a relayed action of the actions declaration: a level is declared only for one (DEC-0162 LV-7)`));
+  }
+  return findings;
+}
 
 /**
  * FAC-SEM-142 on a well-known document that carries the actions key: a value that is not its schema's (one finding at

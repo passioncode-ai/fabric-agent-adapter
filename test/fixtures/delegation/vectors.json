@@ -1820,6 +1820,160 @@
    }
   },
   {
+   "name": "mem claim",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYiLCJtZW0iOiJzaGEyNTY6YTFhMWExYTFhMWExYTFhMWExYTFhMWExYTFhMWExYTFhMWExYTFhMWExYTFhMWExYTFhMWExYTFhMWExYTFhMSJ9.vhQPh4icy-3PLonly7St3a4N806FTT4cZdpa6M9Fo9ilvvldVtHixLnRTLFKdSJWVXG9uorDojLFU8eM2FyrAg",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": true,
+    "principal": "urn:person:operator",
+    "caller": "example-media",
+    "chain": [
+     "example-media",
+     "example-agent.default"
+    ],
+    "kid": "estate-new"
+   }
+  },
+  {
+   "name": "mem not a digest",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYiLCJtZW0iOiJzaGEyNTY6QUJDIn0.36m6v_qXwO1Cxt4XJakLUg2xjbVF9rgw8zwJjtpsoNKutihX_4eS7ASxA7xczwQ2w0rjJb-tD64tMv8KMXKZAw",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
+   "name": "prof claim",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYiLCJwcm9mIjoic2hhMjU2OmIyYjJiMmIyYjJiMmIyYjJiMmIyYjJiMmIyYjJiMmIyYjJiMmIyYjJiMmIyYjJiMmIyYjJiMmIyYjJiMmIyYjIifQ.dd7JDRpSHs5ohHa_cg2Rzj6vEY1l3K5vNoiqwMZHtwuGFRoUzK4leCwemJxChQMIZk0kC6K_YXJgSaMAQFUmAw",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": true,
+    "principal": "urn:person:operator",
+    "caller": "example-media",
+    "chain": [
+     "example-media",
+     "example-agent.default"
+    ],
+    "kid": "estate-new"
+   }
+  },
+  {
+   "name": "prof not a digest",
+   "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOlt7IndpbmRvdyI6InRhc2siLCJyZW1haW5pbmdVc2QiOjEuNX0seyJ3aW5kb3ciOiJkYXkiLCJyZW1haW5pbmdVc2QiOjQuMn0seyJ3aW5kb3ciOiJtb250aCIsInJlbWFpbmluZ1VzZCI6Mzh9XSwicGVyQ2FsbE1heFVzZCI6MC41fSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYiLCJwcm9mIjo0Mn0.cEHLDi8wBw6BIELnM0bVL3Q2VvMHo7HTAxk7VkLXGzghKb6cj48sfVqaPaOfKLfnU3X6GVbM3rtsAzmoGKGCBA",
+   "options": {
+    "audience": "example-writer",
+    "jwks": {
+     "keys": [
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "7vnNBNaeu19galpnrteH6OnlZCfOv8apYQJ1QjcxTq8",
+       "kid": "estate-new",
+       "use": "sig",
+       "alg": "EdDSA"
+      },
+      {
+       "kty": "OKP",
+       "crv": "Ed25519",
+       "x": "66ueh2YLndQqBDpGKTMNc83J_MVfWPHqTtlLXArcewk",
+       "kid": "estate-old",
+       "use": "sig",
+       "alg": "EdDSA"
+      }
+     ]
+    },
+    "now": 1791720030,
+    "capability": "writer.write",
+    "effect": "draft",
+    "issuer": "urn:fabric:estate:example"
+   },
+   "expected": {
+    "ok": false,
+    "code": "unauthenticated",
+    "detail": "malformed-claims"
+   }
+  },
+  {
    "name": "spend limited with no window",
    "token": "eyJhbGciOiJFZERTQSIsInR5cCI6ImZhYnJpYy1kZWxlZ2F0aW9uK2p3dCIsImtpZCI6ImVzdGF0ZS1uZXcifQ.eyJpc3MiOiJ1cm46ZmFicmljOmVzdGF0ZTpleGFtcGxlIiwic3ViIjoidXJuOnBlcnNvbjpvcGVyYXRvciIsImFjdCI6eyJzdWIiOiJleGFtcGxlLW1lZGlhIiwic2Vzc2lvbiI6InJ1bi0yMDI2LTEwLTExLTAwNDIiLCJhY3QiOnsic3ViIjoiZXhhbXBsZS1hZ2VudC5kZWZhdWx0In19LCJhdWQiOiJleGFtcGxlLXdyaXRlciIsInNjb3BlIjoid3JpdGVyLndyaXRlIHdyaXRlci5jaGVjayIsImVmZmVjdCI6WyJkcmFmdCJdLCJncmFudCI6WyJ1cm46Z3JhbnQ6cHJvamVjdC1hOmV4YW1wbGUtbWVkaWEtd3JpdGVyIzMiXSwic3BlbmQiOnsibW9kZSI6ImxpbWl0ZWQiLCJyZW1haW5pbmciOltdfSwicHJvamVjdCI6InVybjpwcm9qZWN0OmEiLCJpYXQiOjE3OTE3MjAwMDAsImV4cCI6MTc5MTcyMDYwMCwianRpIjoiMDFKQTdZNVEzQzJLOU04TjRQNlIwUzFUMlYifQ.DziTyiZi48PQHXKkVn0OCeWmQtuPzcKhZLZkAtJpGw9uXAY09mww2wayBJABy66cQO082JSrj8YbJ06JThgtCw",
    "options": {

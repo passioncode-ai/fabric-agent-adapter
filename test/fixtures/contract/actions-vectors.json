@@ -1,6 +1,6 @@
 {
- "about": "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases and jobSteps (DEC-0141 MJ-1), FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, and every decision and service-actions-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
- "source": "fixtures/vectors/actions.json, fixtures/semantic/action-call-*.json, fixtures/semantic/service-well-known-actions-*.json, fixtures/catalogue.json, src/actions.ts",
+ "about": "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases and jobSteps (DEC-0141 MJ-1), FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, the authority extension's (DEC-0162: authorityView and authorityExtensionRules), and every decision, service-actions-extension and service-authority-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
+ "source": "fixtures/vectors/actions.json, fixtures/semantic/action-call-*.json, fixtures/semantic/service-well-known-actions-*.json, fixtures/semantic/service-well-known-authority-*.json, fixtures/catalogue.json, src/actions.ts",
  "cases": [
   {
    "name": "none from T0",
@@ -3907,6 +3907,115 @@
    ]
   },
   {
+   "name": "service-well-known-actions-levels-ok",
+   "description": "Levels read in one organization and a relayed action's level, in the authority key beside the actions key (DEC-0162 LV-5, LV-7).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "mcp": {
+      "path": "/mcp",
+      "transport": "streamable-http",
+      "capabilities": [
+       "reviews.approve",
+       "jobs.retry",
+       "accounts.connect"
+      ]
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     }
+    },
+    "update": {
+     "available": null
+    },
+    "extensions": {
+     "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1": {
+      "actions": [
+       {
+        "id": "approve-reply",
+        "title": "Approve the reply",
+        "tool": "reviews.approve",
+        "gate": "relayed"
+       },
+       {
+        "id": "retry",
+        "title": "Retry",
+        "tool": "jobs.retry",
+        "gate": "none"
+       }
+      ]
+     },
+     "https://fabric.passioncode.ai/agent-contract/extensions/authority/0.1": {
+      "levels": [
+       {
+        "org": "org:example-org",
+        "audience": "example-agent.default"
+       }
+      ],
+      "actionLevels": {
+       "approve-reply": "admin"
+      }
+     }
+    }
+   },
+   "view": {
+    "declared": true,
+    "valid": true,
+    "actions": [
+     {
+      "id": "approve-reply",
+      "title": "Approve the reply",
+      "tool": "reviews.approve",
+      "gate": "relayed"
+     },
+     {
+      "id": "retry",
+      "title": "Retry",
+      "tool": "jobs.retry",
+      "gate": "none"
+     }
+    ]
+   },
+   "findings": []
+  },
+  {
    "name": "service-well-known-actions-no-capability-list",
    "description": "Actions declared by a service whose MCP surface lists no capabilities: nothing to compare the tools with (DEC-0121 AP-1).",
    "document": {
@@ -4304,6 +4413,326 @@
    ]
   }
  ],
+ "authorities": [
+  {
+   "name": "service-well-known-actions-levels-ok",
+   "description": "Levels read in one organization and a relayed action's level, in the authority key beside the actions key (DEC-0162 LV-5, LV-7).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "mcp": {
+      "path": "/mcp",
+      "transport": "streamable-http",
+      "capabilities": [
+       "reviews.approve",
+       "jobs.retry",
+       "accounts.connect"
+      ]
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     }
+    },
+    "update": {
+     "available": null
+    },
+    "extensions": {
+     "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1": {
+      "actions": [
+       {
+        "id": "approve-reply",
+        "title": "Approve the reply",
+        "tool": "reviews.approve",
+        "gate": "relayed"
+       },
+       {
+        "id": "retry",
+        "title": "Retry",
+        "tool": "jobs.retry",
+        "gate": "none"
+       }
+      ]
+     },
+     "https://fabric.passioncode.ai/agent-contract/extensions/authority/0.1": {
+      "levels": [
+       {
+        "org": "org:example-org",
+        "audience": "example-agent.default"
+       }
+      ],
+      "actionLevels": {
+       "approve-reply": "admin"
+      }
+     }
+    }
+   },
+   "authority": {
+    "declared": true,
+    "valid": true,
+    "levels": [
+     {
+      "org": "org:example-org",
+      "audience": "example-agent.default"
+     }
+    ],
+    "actionLevels": {
+     "approve-reply": "admin"
+    }
+   },
+   "findings": []
+  },
+  {
+   "name": "service-well-known-authority-level-not-relayed",
+   "description": "A level declared for an action that is not relayed (FAC-SEM-142, DEC-0162 LV-7).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "mcp": {
+      "path": "/mcp",
+      "transport": "streamable-http",
+      "capabilities": [
+       "reviews.approve",
+       "jobs.retry",
+       "accounts.connect"
+      ]
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     }
+    },
+    "update": {
+     "available": null
+    },
+    "extensions": {
+     "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1": {
+      "actions": [
+       {
+        "id": "approve-reply",
+        "title": "Approve the reply",
+        "tool": "reviews.approve",
+        "gate": "relayed"
+       },
+       {
+        "id": "retry",
+        "title": "Retry",
+        "tool": "jobs.retry",
+        "gate": "none"
+       }
+      ]
+     },
+     "https://fabric.passioncode.ai/agent-contract/extensions/authority/0.1": {
+      "levels": [
+       {
+        "org": "org:example-org",
+        "audience": "example-agent.default"
+       }
+      ],
+      "actionLevels": {
+       "retry": "owner"
+      }
+     }
+    }
+   },
+   "authority": {
+    "declared": true,
+    "valid": true,
+    "levels": [
+     {
+      "org": "org:example-org",
+      "audience": "example-agent.default"
+     }
+    ],
+    "actionLevels": {
+     "retry": "owner"
+    }
+   },
+   "findings": [
+    "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1authority~10.1/actionLevels/retry"
+   ]
+  },
+  {
+   "name": "service-well-known-authority-org-twice",
+   "description": "One organization named twice in the authority key's levels (FAC-SEM-142, DEC-0162 LV-5).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "mcp": {
+      "path": "/mcp",
+      "transport": "streamable-http",
+      "capabilities": [
+       "reviews.approve",
+       "jobs.retry",
+       "accounts.connect"
+      ]
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     }
+    },
+    "update": {
+     "available": null
+    },
+    "extensions": {
+     "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1": {
+      "actions": [
+       {
+        "id": "approve-reply",
+        "title": "Approve the reply",
+        "tool": "reviews.approve",
+        "gate": "relayed"
+       },
+       {
+        "id": "retry",
+        "title": "Retry",
+        "tool": "jobs.retry",
+        "gate": "none"
+       }
+      ]
+     },
+     "https://fabric.passioncode.ai/agent-contract/extensions/authority/0.1": {
+      "levels": [
+       {
+        "org": "org:example-org",
+        "audience": "example-agent.default"
+       },
+       {
+        "org": "org:example-org",
+        "audience": "example-agent.second"
+       }
+      ]
+     }
+    }
+   },
+   "authority": {
+    "declared": true,
+    "valid": true,
+    "levels": [
+     {
+      "org": "org:example-org",
+      "audience": "example-agent.default"
+     },
+     {
+      "org": "org:example-org",
+      "audience": "example-agent.second"
+     }
+    ]
+   },
+   "findings": [
+    "/extensions/https:~1~1fabric.passioncode.ai~1agent-contract~1extensions~1authority~10.1/levels/1/org"
+   ]
+  }
+ ],
  "fixtures": [
   {
    "name": "service-well-known-actions",
@@ -4393,6 +4822,46 @@
      }
     }
    }
+  },
+  {
+   "name": "service-authority-extension",
+   "schema": "service-authority-extension.schema.json",
+   "valid": true,
+   "document": {
+    "levels": [
+     {
+      "org": "org:example-org",
+      "audience": "example-publisher.default"
+     }
+    ],
+    "actionLevels": {
+     "change-plan": "owner",
+     "revoke-key": "admin",
+     "approve-rule": "operator"
+    }
+   }
+  },
+  {
+   "name": "service-authority-extension-unknown-level",
+   "schema": "service-authority-extension.schema.json",
+   "valid": false,
+   "document": {
+    "levels": [
+     {
+      "org": "org:example-org",
+      "audience": "example-publisher.default"
+     }
+    ],
+    "actionLevels": {
+     "change-plan": "member"
+    }
+   }
+  },
+  {
+   "name": "service-authority-extension-empty",
+   "schema": "service-authority-extension.schema.json",
+   "valid": false,
+   "document": {}
   },
   {
    "name": "service-actions-extension",
@@ -4501,6 +4970,59 @@
     "action": "approve-reply",
     "instruction": "approve the reply to the review from Anna",
     "at": "2026-10-24T09:30:00Z"
+   }
+  },
+  {
+   "name": "decision-level",
+   "schema": "decision.schema.json",
+   "valid": true,
+   "document": {
+    "by": "level",
+    "via": "level-command",
+    "level": "architect",
+    "org": "org:org-a",
+    "action": "approve-reply",
+    "instruction": "approve the reply to the review from Anna",
+    "at": "2026-10-25T11:20:00Z",
+    "membership": {
+     "type": "org-membership/2",
+     "issuer": "https://orgs.example",
+     "org": "org:org-a",
+     "audience": "reviews-service-a1",
+     "subject": "m-arch-03",
+     "role": "architect",
+     "projects": [
+      "alpha",
+      "beta"
+     ],
+     "external": false,
+     "status": "active",
+     "revision": 3,
+     "membershipEndsAt": null,
+     "issuedAt": "2026-10-25T11:00:00Z",
+     "notBefore": "2026-10-25T11:00:00Z",
+     "expiresAt": "2026-10-25T12:00:00Z",
+     "extensions": {},
+     "alg": "EdDSA",
+     "kid": "mem-2026-10",
+     "sig": "RrABkwV8ubdv_gWsjle26Lj5uG4Q4FeAc2qFy7ENRhxw3m8ioGjcxYd3QIiUM-lGgV4jUatmUi2BtWBFGdO-Aw"
+    },
+    "project": "alpha"
+   }
+  },
+  {
+   "name": "decision-level-no-membership",
+   "schema": "decision.schema.json",
+   "valid": false,
+   "document": {
+    "by": "level",
+    "via": "level-command",
+    "level": "architect",
+    "org": "org:org-a",
+    "action": "approve-reply",
+    "instruction": "approve the reply to the review from Anna",
+    "at": "2026-10-25T11:20:00Z",
+    "project": "alpha"
    }
   },
   {

@@ -42,10 +42,15 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 
 from fabric_base import ServiceError  # noqa: E402
 from fabric_jsvalue import MISSING, contains, get, is_number, json_equal, json_stringify  # noqa: E402
-from fabric_mandate import mandate_covers, source_shape  # noqa: E402 - DEC-0125, DEC-0126
+from fabric_mandate import EFFECT_CLASSES, mandate_covers, source_shape  # noqa: E402 - DEC-0125, DEC-0126
+import fabric_levels as _levels  # noqa: E402 - DEC-0162
 from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
 
 ACTIONS_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/actions/0.1"
+#: The authority extension (DEC-0162 LV-5, LV-7; DEC-0166 AU-3): the organizations whose levels a service reads, the
+#: level each relayed action needs and whether it reads standing mandates.
+AUTHORITY_EXTENSION_KEY = "https://fabric.passioncode.ai/agent-contract/extensions/authority/0.1"
+ACTION_LEVELS = _levels.ACTION_LEVELS
 #: The three refusals DEC-0121 adds to DL-19's one code set, and DL-17's refusal a T2 caller still gets.
 OPERATOR_DECISION_REQUIRED = "operator-decision-required"
 DECISION_INVALID = "decision-invalid"
@@ -66,7 +71,12 @@ _SHA256 = re.compile(r"sha256:[0-9a-f]{64}", re.ASCII)
 _STEP_URL = re.compile(r"https://|/")  # a prefix, as the contract's /^(https:\/\/|\/)/ tests it
 _ACTION_MEMBERS = ("id", "title", "tool", "gate", "humanStep")
 _DECISION_MEMBERS = ("by", "via", "action", "target", "instruction", "at", "source")
+_LEVEL_DECISION_MEMBERS = ("by", "via", "level", "org", "project", "action", "target", "instruction", "at", "membership")
+_ORG = re.compile(r"org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}", re.ASCII)
+_PROJECT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", re.ASCII)
+_AUDIENCE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}", re.ASCII)
 _KEY_PATH = "/extensions/" + ACTIONS_EXTENSION_KEY.replace("~", "~0").replace("/", "~1")
+_AUTHORITY_PATH = "/extensions/" + AUTHORITY_EXTENSION_KEY.replace("~", "~0").replace("/", "~1")
 
 
 def _text(value: Any, low: int, high: int) -> bool:
@@ -132,6 +142,8 @@ def decision_shape(value: Any) -> bool:
     target of 1..200, the operator's words of 1..500, `at` read strictly (the contract's strictTime; ajv-formats'
     date-time also admits a space for T and a leap second, which this refuses, decision D5), and an optional `source`
     as mandate.schema.json#/$defs/source reads it (DEC-0126)."""
+    if isinstance(value, dict) and value.get("by") == "level":
+        return _level_decision_shape(value)
     if not isinstance(value, dict) or any(key not in _DECISION_MEMBERS for key in value):
         return False
     if any(key not in value for key in ("by", "via", "action", "instruction", "at")):
@@ -143,6 +155,25 @@ def decision_shape(value: Any) -> bool:
             and _text(value["instruction"], 1, 500)
             and isinstance(value["at"], str) and not math.isnan(parse_rfc3339_ms(value["at"]))
             and ("source" not in value or source_shape(value["source"])))
+
+
+def _level_decision_shape(value: Dict[str, Any]) -> bool:
+    """`decision.schema.json#/$defs/level` (DEC-0162 LV-3): a level holder's decision, its attestation an object the
+    service verifies (fabric_levels), never this shape; `project` required for an architect."""
+    if any(key not in _LEVEL_DECISION_MEMBERS for key in value):
+        return False
+    if any(key not in value for key in ("by", "via", "level", "org", "action", "instruction", "at", "membership")):
+        return False
+    if value["level"] == "architect" and "project" not in value:
+        return False
+    return (value["via"] == "level-command" and isinstance(value["level"], str) and value["level"] in _levels.DECIDING_LEVELS
+            and _text(value["org"], 0, 132) and _ORG.fullmatch(value["org"]) is not None
+            and ("project" not in value or (_text(value["project"], 1, 128) and _PROJECT.fullmatch(value["project"]) is not None))
+            and _matches(_REQUEST_KEY, value["action"], 64)
+            and ("target" not in value or _text(value["target"], 1, 200))
+            and _text(value["instruction"], 1, 500)
+            and isinstance(value["at"], str) and not math.isnan(parse_rfc3339_ms(value["at"]))
+            and isinstance(value["membership"], dict))
 
 
 def _accepted_approval(approval: Any) -> bool:
@@ -190,23 +221,69 @@ def action_decision(inputs: Any) -> Dict[str, Any]:
     caller = get(inputs, "caller")
     if not _non_empty(caller):
         return {"fault": "caller-missing"}
-    approval = get(inputs, "approval")
-    if _accepted_approval(approval):
+    levels, action_level = get(inputs, "levels"), get(inputs, "actionLevel")
+    # The service's level contexts are a map by organization; an array (the declaration itself) is its fault.
+    if levels is not MISSING and not _levels.level_contexts_well_formed(levels):
+        return {"fault": "levels-invalid"}
+    if action_level is not MISSING and not (isinstance(action_level, str) and action_level in ACTION_LEVELS):
+        return {"fault": "action-level-invalid"}
+    decision, mandate, approval = get(inputs, "decision"), get(inputs, "mandate"), get(inputs, "approval")
+    level_decision = isinstance(decision, dict) and decision.get("by") == "level"
+    inside = _one_of(get(inputs, "tier"), ("T0", "T1"))
+    reads_levels = isinstance(levels, dict)
+    # LV-7: at a service that reads levels the effect decides whether `change-policy` raises the action to `admin`.
+    if reads_levels and not (isinstance(get(inputs, "effect"), str) and inputs["effect"] in EFFECT_CLASSES):
+        return {"fault": "effect-missing"}
+    least = _min_level_of(inputs)
+    level_act = reads_levels and least in ("owner", "admin")
+    context = get(inputs, "context")
+    context_ok = isinstance(context, str) and _levels.CALL_CONTEXT.fullmatch(context) is not None
+    if level_act and not context_ok:
+        return {"fault": "context-missing"}
+    # LV-7: in an organization's context an act declared `owner` or `admin` is decided only at that level.
+    level_only = level_act and context.startswith("org:")
+    level_mandate = ((decision is MISSING or ((not inside or level_only) and not level_decision))
+                     and isinstance(mandate, dict) and mandate.get("by") == "level")
+    if _accepted_approval(approval) and not level_only:
         return {"ok": True, "recordAs": {"by": approval["approver"], "via": "approval", "caller": caller}}
-    if not _one_of(get(inputs, "tier"), ("T0", "T1")):
-        digest = get(inputs, "actionDigest")
-        if not isinstance(digest, str) or _SHA256.fullmatch(digest) is None:
-            return {"fault": "digest-missing"}
-        return {"ok": False, "code": APPROVAL_REQUIRED, "data": {"actionDigest": digest}}
-    if get(inputs, "elicited") is True:
+    if inside and get(inputs, "elicited") is True and not level_only:
         return {"ok": True, "recordAs": {"by": "operator", "via": "elicitation", "caller": caller}}
+    level_read = level_decision and reads_levels
+    # DEC-0166 AU-3: a standing mandate is read at every tier by a service that declares `standing`.
+    standing_mandate = (not level_only and (decision is MISSING or (not inside and not level_read))
+                        and get(inputs, "standing") is True and isinstance(mandate, dict) and isinstance(mandate.get("standing"), dict))
+    digest = get(inputs, "actionDigest")
+    digest_ok = isinstance(digest, str) and _SHA256.fullmatch(digest) is not None
+    if (reads_levels and (level_decision or level_mandate)) or standing_mandate:
+        clock = parse_rfc3339_ms(get(inputs, "now"))
+        if math.isnan(clock):
+            return {"fault": "now-unreadable"}
+        if not context_ok:
+            return {"fault": "context-missing"}
+        if not inside and not digest_ok:
+            return {"fault": "digest-missing"}
+        read = _by_level(inputs, action, caller, clock) if level_read else _by_mandate(inputs, action, caller)
+        if "ignored" in read:
+            return _refuse(OPERATOR_DECISION_REQUIRED) if inside else {"ok": False, "code": APPROVAL_REQUIRED, "data": {"actionDigest": digest}}
+        if not inside and read.get("ok") is False and read.get("code") in (OPERATOR_DECISION_REQUIRED, DECISION_INVALID):
+            return dict(read, data=dict(read.get("data") or {}, actionDigest=digest))
+        return read
+    if not inside:
+        if not digest_ok:
+            return {"fault": "digest-missing"}
+        if level_only:  # no approval decides an act only a level decides (LV-7)
+            return {"ok": False, "code": OPERATOR_DECISION_REQUIRED, "data": {"detail": "level-insufficient: %s" % least, "actionDigest": digest}}
+        return {"ok": False, "code": APPROVAL_REQUIRED, "data": {"actionDigest": digest}}
     clock = parse_rfc3339_ms(get(inputs, "now"))
     if math.isnan(clock):
         return {"fault": "now-unreadable"}
-    decision = get(inputs, "decision")
-    if decision is MISSING and get(inputs, "mandate") is not MISSING:
-        return _by_mandate(inputs, action, caller)
-    if decision is MISSING:
+    if level_only:
+        return {"ok": False, "code": OPERATOR_DECISION_REQUIRED, "data": {"detail": "level-insufficient: %s" % least}}
+    # A level decision at a service that reads no levels is as if absent (LV-10), so a mandate the call carries is read.
+    if (decision is MISSING or level_decision) and mandate is not MISSING:
+        answer = _by_mandate(inputs, action, caller)
+        return _refuse(OPERATOR_DECISION_REQUIRED) if "ignored" in answer else answer
+    if decision is MISSING or level_decision:
         return _refuse(OPERATOR_DECISION_REQUIRED)
     if not decision_shape(decision):
         return _refuse(DECISION_INVALID)
@@ -245,21 +322,81 @@ def _by_mandate(inputs: Any, action: Dict[str, Any], caller: str) -> Dict[str, A
     if not job_capability(capability):
         return {"fault": "mandate-capability-missing"}
     call: Dict[str, Any] = {"capability": capability, "action": action["id"], "effect": effect}
-    spend, project = get(inputs, "spendUsd"), get(inputs, "project")
+    spend, project, context = get(inputs, "spendUsd"), get(inputs, "project"), get(inputs, "context")
     if is_number(spend):
         call["spendUsd"] = spend
     if isinstance(project, str):
         call["project"] = project
+    if isinstance(context, str):
+        call["context"] = context
+    least = _min_level_of(inputs)
+    if least is not None:
+        call["minLevel"] = least
     covers: Dict[str, Any] = {"mandate": inputs["mandate"], "tier": get(inputs, "tier"), "now": get(inputs, "now"),
                               "self": me, "call": call}
     if get(inputs, "callerAgent") is not MISSING:
         covers["callerAgent"] = inputs["callerAgent"]
+    if isinstance(get(inputs, "levels"), dict):
+        covers["levels"] = inputs["levels"]
+        if get(inputs, "tokenMem") is not MISSING:
+            covers["tokenMem"] = inputs["tokenMem"]
+    if get(inputs, "standing") is True:
+        covers["standing"] = True
+        if get(inputs, "tokenProf") is not MISSING:
+            covers["tokenProf"] = inputs["tokenProf"]
     answer = mandate_covers(covers)
     if "recordAs" in answer:
         record = dict(answer["recordAs"])
         record["caller"] = caller
         return {"ok": True, "recordAs": record}
-    return answer  # never `ignored`: the tier was read first, so a T2 call answered approval-required before (MD-5)
+    # `ignored`: a T2 operator mandate (MD-5), or a level mandate at a service that reads no levels (LV-10); the
+    # caller answers as if the call carried no mandate.
+    return answer
+
+
+def _min_level_of(inputs: Any) -> Optional[str]:
+    """The lowest level that decides the action: the service's declaration, raised to `admin` for an action whose effect
+    is `change-policy`, which an owner or an admin decides and never an architect (DEC-0162 LV-7)."""
+    declared = get(inputs, "actionLevel")
+    declared = None if declared is MISSING else declared
+    return "admin" if get(inputs, "effect") == "change-policy" and declared in (None, "architect") else declared
+
+
+def _by_level(inputs: Any, action: Dict[str, Any], caller: str, clock: float) -> Dict[str, Any]:
+    """A relayed action's call that carries a level decision, at a service that reads levels (DEC-0162 LV-3 to LV-6,
+    LV-10, LV-11), at any tier, as the contract's byLevel reads it."""
+    decision = inputs["decision"]
+    if not decision_shape(decision):
+        return _refuse(DECISION_INVALID)
+    if decision["action"] != action["id"] or ("target" in decision and not (
+            isinstance(get(inputs, "target"), str) and decision["target"] == inputs["target"])):
+        return _refuse(DECISION_INVALID)
+    at = parse_rfc3339_ms(decision["at"])
+    if at > clock + CLOCK_SKEW_SECONDS * 1000 or at < clock - DECISION_LIFETIME_SECONDS * 1000:
+        return _refuse(DECISION_INVALID)
+    project = get(inputs, "project")
+    project = project if isinstance(project, str) else None
+    if "project" in decision and decision["project"] != project:  # a decision for one project decides nothing elsewhere
+        return _refuse(DECISION_INVALID)
+    standing_inputs: Dict[str, Any] = {"membership": decision["membership"], "org": decision["org"], "level": decision["level"],
+                                       "at": decision["at"], "context": inputs["context"], "contexts": inputs["levels"],
+                                       "tokenMem": None if get(inputs, "tokenMem") is MISSING else inputs["tokenMem"], "now": clock}
+    if project is not None:
+        standing_inputs["project"] = project
+    least = _min_level_of(inputs)
+    if least is not None:
+        standing_inputs["minLevel"] = least
+    standing = _levels.level_standing(standing_inputs)
+    if not standing["ok"]:
+        if "invalid" in standing:
+            return {"ok": False, "code": DECISION_INVALID, "data": {"detail": standing["invalid"]}}
+        return {"ok": False, "code": OPERATOR_DECISION_REQUIRED, "data": {"detail": standing["insufficient"]}}
+    record: Dict[str, Any] = {"by": "level", "via": "level-command", "level": standing["level"], "org": standing["org"]}
+    if project is not None:
+        record["project"] = project
+    record.update({"approver": standing["approver"], "membershipDigest": standing["membershipDigest"],
+                   "revision": standing["revision"], "caller": caller})
+    return {"ok": True, "recordAs": record}
 
 
 def actions_view(well_known: Any) -> Dict[str, Any]:
@@ -273,6 +410,84 @@ def actions_view(well_known: Any) -> Dict[str, Any]:
     if errors:
         return {"declared": True, "valid": False, "errors": errors}
     return {"declared": True, "valid": True, "actions": value["actions"]}
+
+
+def _authority_errors(value: Any) -> List[str]:
+    """`service-authority-extension.schema.json` (DEC-0162, DEC-0166): an open object of at least one member whose
+    `standing` is true, `levels` 1 to 16 {org, audience} and `actionLevels` 1 to 128 levels keyed by action id. Each
+    error is `<path> <keyword>`; the wording is not part of a vector (0.50.0 brief D6)."""
+    if not isinstance(value, dict):
+        return ["/ type"]
+    if not value:
+        return ["/ minProperties"]
+    errors: List[str] = []
+    if "standing" in value and value["standing"] is not True:
+        errors.append("/standing const")
+    if "levels" in value:
+        levels = value["levels"]
+        if not isinstance(levels, list) or not 1 <= len(levels) <= 16:
+            errors.append("/levels " + ("type" if not isinstance(levels, list) else "minItems" if not levels else "maxItems"))
+        else:
+            for index, entry in enumerate(levels):
+                if not (isinstance(entry, dict) and sorted(entry) == ["audience", "org"] and _text(entry["org"], 0, 132)
+                        and _ORG.fullmatch(entry["org"]) is not None and isinstance(entry["audience"], str)
+                        and _AUDIENCE.fullmatch(entry["audience"]) is not None):
+                    errors.append("/levels/%d schema" % index)
+    if "actionLevels" in value:
+        levels = value["actionLevels"]
+        if not isinstance(levels, dict) or not 1 <= len(levels) <= 128:
+            errors.append("/actionLevels " + ("type" if not isinstance(levels, dict) else "minProperties" if not levels else "maxProperties"))
+        else:
+            for key, level in levels.items():
+                if _REQUEST_KEY.fullmatch(key) is None:
+                    errors.append("/actionLevels propertyNames")
+                if not (isinstance(level, str) and level in ACTION_LEVELS):
+                    errors.append("/actionLevels/%s enum" % key)
+    return errors
+
+
+def authority_view(well_known: Any) -> Dict[str, Any]:
+    """The host reader of extensions/authority/0.1 (DEC-0162 LV-5, LV-7; DEC-0166 AU-3), as the contract's
+    authorityView: `{declared: False}`, `{declared: True, valid: False, errors}` or `{declared: True, valid: True,
+    levels?, actionLevels?, standing?}`. A service passes `levels` and `actionLevels` on to action_decision: the level
+    contexts it holds for those organizations and the entry for the called action. Never raises."""
+    extensions = get(well_known, "extensions")
+    if not isinstance(extensions, dict) or AUTHORITY_EXTENSION_KEY not in extensions:
+        return {"declared": False}
+    value = extensions[AUTHORITY_EXTENSION_KEY]
+    errors = _authority_errors(value)
+    if errors:
+        return {"declared": True, "valid": False, "errors": errors}
+    view: Dict[str, Any] = {"declared": True, "valid": True}
+    for name in ("levels", "actionLevels", "standing"):
+        if name in value:
+            view[name] = value[name]
+    return view
+
+
+def authority_extension_rules(well_known: Any) -> List[Dict[str, str]]:
+    """FAC-SEM-142 on the authority key of a well-known document (DEC-0162 LV-5, LV-7): a value that is not its schema's,
+    an organization named twice in `levels`, a level for an id that is not a relayed action of the actions declaration."""
+    view = authority_view(well_known)
+    if not view["declared"]:
+        return []
+    if not view["valid"]:
+        return [_finding(_AUTHORITY_PATH, "the authority declaration is invalid (%s); a reader treats it as not declared and "
+                                          "reports it (DEC-0162)" % "; ".join(view["errors"]))]
+    findings: List[Dict[str, str]] = []
+    orgs = set()
+    for index, entry in enumerate(view.get("levels", [])):
+        if entry["org"] in orgs:
+            findings.append(_finding("%s/levels/%d/org" % (_AUTHORITY_PATH, index), "organization %s is named twice (DEC-0162 LV-5)" % entry["org"]))
+        orgs.add(entry["org"])
+    actions = actions_view(well_known)
+    relayed = {a["id"] for a in actions["actions"] if a["gate"] == "relayed"} if actions.get("valid") else set()
+    for key in view.get("actionLevels", {}):
+        if key not in relayed:
+            findings.append(_finding("%s/actionLevels/%s" % (_AUTHORITY_PATH, key.replace("~", "~0").replace("/", "~1")),
+                                     "%s is not a relayed action of the actions declaration: a level is declared only for one "
+                                     "(DEC-0162 LV-7)" % key))
+    return findings
 
 
 def _finding(instance_path: str, message: str) -> Dict[str, str]:

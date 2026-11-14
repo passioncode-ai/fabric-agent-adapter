@@ -9,9 +9,9 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.88.0"
+  version: "0.89.0"
   contract-version: "0.1.0"
-  contract-commit: "91c031c464695ae9661c12f97ce1e5dc3cb5448c"
+  contract-commit: "ced7b29265c424688602dda998c0ea4db2ba46a9"
 ---
 
 # Adapting projects to Fabric
@@ -87,7 +87,7 @@ Use exactly:
 
 - contract version `0.1.0`;
 - repository `https://github.com/passioncode-ai/fabric-agent-contract`;
-- commit `91c031c464695ae9661c12f97ce1e5dc3cb5448c`.
+- commit `ced7b29265c424688602dda998c0ea4db2ba46a9`.
 
 This is the default for new bundles. When checking an issued legacy bundle, preserve its
 explicit supported lock and use that exact clean checkout. Never silently upgrade or

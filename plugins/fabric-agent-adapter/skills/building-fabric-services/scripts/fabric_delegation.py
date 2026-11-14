@@ -119,6 +119,7 @@ _URI = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:\S+\Z")
 _JTI = re.compile(r"^[A-Za-z0-9._~-]{16,128}\Z")
 _SCOPE = re.compile(r"^[a-z][a-z0-9._-]{1,127}( [a-z][a-z0-9._-]{1,127})*\Z")
 _SPEND_WINDOWS = ("total", "task", "project", "day", "week", "month")
+_CLAIM_DIGEST = re.compile(r"sha256:[0-9a-f]{64}", re.ASCII)  # a `mem` or `prof` claim (DEC-0162, DEC-0166)
 
 
 def _full(pattern: "re.Pattern[str]", value: Any) -> bool:
@@ -362,6 +363,9 @@ def _delegation_shape(payload: Dict[str, Any]) -> Tuple[Optional[str], Optional[
              and ("spend" not in payload or _spend_shaped(payload["spend"]))
              and ("project" not in payload or _full(_URI, payload["project"]))
              and ("task" not in payload or _full(OPAQUE_ID, payload["task"]))
+             # DEC-0162 LV-5 and DEC-0166 AU-3: the membership a level is bound by, and the profile, each a sha256 digest
+             and ("mem" not in payload or _full(_CLAIM_DIGEST, payload["mem"]))
+             and ("prof" not in payload or _full(_CLAIM_DIGEST, payload["prof"]))
              and _is_time(payload.get("iat")) and _is_time(payload.get("exp"))
              and ("nbf" not in payload or _is_time(payload["nbf"])) and _full(_JTI, payload.get("jti")))
     return (None, depth) if typed else ("malformed-claims", None)

@@ -41,6 +41,9 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 from fabric_base import ServiceError  # noqa: E402
 from fabric_jsvalue import MISSING, get, is_number, js_string, js_to_number, real_number, same, set_has  # noqa: E402
 from fabric_time import format_rfc3339, parse_rfc3339_ms  # noqa: E402
+from fabric_crypto import sha256 as _sha256  # noqa: E402
+from fabric_jsvalue import jcs as _jcs  # noqa: E402
+import fabric_levels as _levels  # noqa: E402 - DEC-0162: the level a level mandate stands at
 
 #: The longest a mandate stands after the operator gave it (FAC-SEM-144).
 MANDATE_LIFETIME_SECONDS = 7 * 24 * 60 * 60
@@ -55,8 +58,17 @@ DEFAULT_LIFETIME_SECONDS = 24 * 60 * 60
 EFFECT_CLASSES = ("none", "draft", "publish", "send", "reply", "charge", "delete", "merge", "deploy", "change-policy")
 _READS_AND_DRAFTS = ("none", "draft")
 _NEVER_BY_MANDATE = "change-policy"  # approving one's own promotion, grant, checker rule or policy change (AP-5)
+#: The longest a standing mandate stands: the hub restates it from the profile at least daily (DEC-0166 AU-3).
+STANDING_LIFETIME_SECONDS = 24 * 60 * 60
+#: The hub's action that sets a place's profile; no profile covers it, so no assignment raises its own autonomy (AU-5).
+PROFILE_SET_CAPABILITY = "autonomy.profile.set"
 _MEMBERS = ("kind", "by", "task", "instruction", "at", "expiresAt", "scope", "chain")
-_OPTIONAL = ("source",)  # DEC-0126 OA-2
+_OPTIONAL = ("source", "level", "org", "membership", "standing")  # DEC-0126 OA-2; DEC-0162 LV-6; DEC-0166 AU-1
+_LEVEL_MEMBERS = ("level", "org", "membership")
+_STANDING_MEMBERS = ("place", "placeKind", "revision", "context", "estateCapabilities", "setLevel")
+_ORG = re.compile(r"org:[A-Za-z0-9][A-Za-z0-9_-]{0,127}", re.ASCII)
+_PLACE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:~-]{0,127}", re.ASCII)
+_CONTEXT = re.compile(r"(?:personal|org:[A-Za-z0-9][A-Za-z0-9_-]{0,127})", re.ASCII)
 _SOURCE_MEMBERS = ("project", "session", "thread")
 #: The register name of the protocol a target lists when it reads `source` (DEC-0126 OA-7).
 OPERATOR_SOURCE_PROTOCOL = "operator-source/1"
@@ -143,6 +155,23 @@ def _step_shape(step: Any) -> bool:
             and ("scope" not in step or _scope_shape(step["scope"])))
 
 
+def _standing_shape(standing: Any) -> bool:
+    """`mandate.schema.json#/properties/standing` (DEC-0166 AU-1)."""
+    if not isinstance(standing, dict) or any(key not in _STANDING_MEMBERS for key in standing):
+        return False
+    if any(key not in standing for key in ("place", "placeKind", "revision", "context")):
+        return False
+    revision = standing["revision"]
+    return (_string(standing["place"], 1, 128) and _matches(_PLACE, standing["place"])
+            and isinstance(standing["placeKind"], str) and standing["placeKind"] in ("headless", "person")
+            and (type(revision) is int or (type(revision) is float and revision.is_integer())) and 1 <= revision <= 2147483647
+            and _matches(_CONTEXT, standing["context"])
+            and ("estateCapabilities" not in standing or standing["estateCapabilities"] is True)
+            and ("setLevel" not in standing or (isinstance(standing["setLevel"], str) and standing["setLevel"] in ("owner", "admin")))
+            # AU-2: a setter's level exactly in an organization's context, and always there.
+            and ("setLevel" in standing) == standing["context"].startswith("org:"))
+
+
 def mandate_shape(mandate: Any) -> bool:
     """`mandate.schema.json` (DEC-0125): the members, their lengths, patterns and enums, the chain of 1 to 4 steps. Times
     are read strictly (the contract's strictTime): ajv-formats' date-time also admits a space for T, an offset without
@@ -153,8 +182,21 @@ def mandate_shape(mandate: Any) -> bool:
     if any(key not in mandate for key in _MEMBERS) or ("source" in mandate and not source_shape(mandate["source"])):
         return False
     chain = mandate["chain"]
+    by_level = isinstance(mandate["by"], str) and mandate["by"] == "level"
+    if by_level:  # DEC-0162 LV-6: the level, its organization and the holder's attestation, read by fabric_levels
+        if any(key not in mandate for key in _LEVEL_MEMBERS) or not (
+                isinstance(mandate["level"], str) and mandate["level"] in _levels.DECIDING_LEVELS
+                and _string(mandate["org"], 0, 132) and _matches(_ORG, mandate["org"]) and isinstance(mandate["membership"], dict)):
+            return False
+    elif any(key in mandate for key in _LEVEL_MEMBERS):
+        return False
+    if "standing" in mandate:  # DEC-0166 AU-1: a place's profile, stated by the operator's side only
+        if not _standing_shape(mandate["standing"]) or mandate["by"] != "operator":
+            return False
+        if "estateCapabilities" in mandate["standing"] and isinstance(mandate["scope"], dict) and "capabilities" in mandate["scope"]:
+            return False
     return (isinstance(mandate["kind"], str) and mandate["kind"] == "mandate/1"
-            and isinstance(mandate["by"], str) and mandate["by"] == "operator"
+            and isinstance(mandate["by"], str) and mandate["by"] in ("operator", "level")
             and _string(mandate["task"], 1, 200) and _string(mandate["instruction"], 1, 500)
             and _time(mandate["at"]) and _time(mandate["expiresAt"]) and _scope_shape(mandate["scope"])
             and isinstance(chain, list) and 1 <= len(chain) <= 4 and all(_step_shape(step) for step in chain))
@@ -198,6 +240,18 @@ def scope_within(child: Dict[str, Any], parent: Dict[str, Any]) -> bool:
             and _ceiling_within(get(child, "perCallMaxUsd"), get(parent, "perCallMaxUsd")))
 
 
+def profile_digest(mandate: Dict[str, Any]) -> str:
+    """The digest a delegation token's `prof` claim carries for a standing mandate (DEC-0166 AU-3): sha256 of the RFC
+    8785 form of the mandate without its `chain` and its `source`. Raises ValueError for one with no canonical form (a
+    lone surrogate), which mandate_problem refuses as malformed first."""
+    stated = {key: value for key, value in mandate.items() if key not in ("chain", "source")}
+    try:
+        data = _jcs(stated).encode("utf-8")
+    except (TypeError, UnicodeEncodeError) as exc:
+        raise ValueError("the profile has no canonical form") from exc
+    return "sha256:" + _sha256(data).hex()
+
+
 def mandate_problem(mandate: Any) -> Optional[str]:
     """The first problem of a mandate as a document (FAC-SEM-144), or None: `mandate-malformed` (not the schema's,
     standing more than 7 days, a chain that goes back in time, reaches the expiry or names an agent twice) or
@@ -205,7 +259,8 @@ def mandate_problem(mandate: Any) -> Optional[str]:
     if not mandate_shape(mandate):
         return "mandate-malformed"
     at, expires = parse_rfc3339_ms(mandate["at"]), parse_rfc3339_ms(mandate["expiresAt"])
-    if expires <= at or expires > at + MANDATE_LIFETIME_SECONDS * 1000:
+    lifetime = MANDATE_LIFETIME_SECONDS if "standing" not in mandate else STANDING_LIFETIME_SECONDS
+    if expires <= at or expires > at + lifetime * 1000:
         return "mandate-malformed"
     held, last = mandate["scope"], at
     for step in mandate["chain"]:
@@ -219,6 +274,11 @@ def mandate_problem(mandate: Any) -> Optional[str]:
             held = step["scope"]
     if len({step["agent"] for step in mandate["chain"]}) != len(mandate["chain"]):
         return "mandate-malformed"
+    if "standing" in mandate:  # a profile with no canonical form has no digest, so no token binds it
+        try:
+            profile_digest(mandate)
+        except ValueError:
+            return "mandate-malformed"
     return None
 
 
@@ -304,11 +364,11 @@ def _spend_number(spend: Any) -> float:
     return 0.0 if value is None else js_to_number(js_string(value))
 
 
-_CALL_MEMBERS = ("action", "capability", "effect", "spendUsd", "project")
+_CALL_MEMBERS = ("action", "capability", "effect", "spendUsd", "project", "context", "minLevel")
 
 
 def _call_members(call: Dict[str, Any]) -> Dict[str, Any]:
-    """The five members the contract reads, each once as `call[name]`, as the board path reads them
+    """The members the contract reads, each once as `call[name]`, as the board path reads them
     (`fabric_board_link`): a `__getitem__` override or a default answers, never the dict's storage (FAA-196 (21))."""
     read: Dict[str, Any] = {}
     for name in _CALL_MEMBERS:
@@ -343,11 +403,34 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     clock = parse_rfc3339_ms(now)
     if math.isnan(clock):
         return {"fault": "now-unreadable"}
-    if not (isinstance(tier, str) and tier in ("T0", "T1")):
+    levels, token_prof = get(inputs, "levels"), get(inputs, "tokenProf")
+    by_level = isinstance(mandate, dict) and mandate.get("by") == "level"
+    # Level contexts given but malformed are the callee's own fault, never "reads no levels" (DEC-0162).
+    if levels is not MISSING and not _levels.level_contexts_well_formed(levels):
+        return {"fault": "levels-invalid"}
+    standing = not by_level and isinstance(mandate, dict) and isinstance(mandate.get("standing"), dict)
+    if standing and get(inputs, "standing") is not True:
+        return {"ignored": "standing-not-read"}  # DEC-0166 AU-3: a callee that declares no `standing` reads none
+    if by_level and not isinstance(levels, dict):
+        return {"ignored": "levels-not-read"}  # LV-10: a callee that reads no levels ignores a level mandate
+    context = get(call, "context")
+    context_ok = isinstance(context, str) and _CONTEXT.fullmatch(context) is not None
+    if by_level and not context_ok:
+        return {"fault": "context-missing"}  # LV-4: a level stands only in the organization the call acts in
+    inside = isinstance(tier, str) and tier in ("T0", "T1")
+    # A standing mandate from T2 needs the token's `prof` (AU-3); a task's operator mandate from T2 changes nothing (MD-5).
+    if not inside and ((token_prof is MISSING) if standing else not by_level):
         return {"ignored": "mandate-at-t2"}
+    if standing and not context_ok:
+        return {"fault": "context-missing"}  # AU-1: a standing mandate stands only in its own context
     problem = mandate_problem(mandate)
     if problem:
         return _invalid(problem)
+    digest = profile_digest(mandate) if standing else None
+    if standing and token_prof is not MISSING and token_prof != digest:
+        return _invalid("profile-unbound")
+    if standing and mandate["standing"]["context"] != context:
+        return _invalid("profile-context")
     holders = [step["agent"] for step in mandate["chain"]]
     if len(holders) < 2 or not same(holders[-1], me) or (caller_agent is not MISSING and not same(holders[-2], caller_agent)):
         return _invalid("mandate-not-for-this-call")
@@ -358,9 +441,16 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     scope = effective_scope(mandate)
     actions, capabilities = get(scope, "actions"), get(scope, "capabilities")
     action, effect = get(call, "action"), get(call, "effect")
+    # AU-5: no mandate sets a place's profile, so no assignment raises its own autonomy.
+    if same(get(call, "capability"), PROFILE_SET_CAPABILITY) or same(action, PROFILE_SET_CAPABILITY):
+        return _outside("outside-mandate: capability")
     if action is not MISSING and actions is not MISSING and not _member_of(actions, action):
         return _outside("outside-mandate: action")
-    if action is not MISSING and actions is MISSING and capabilities is MISSING:
+    # AU-4: a headless default may name every capability of the estate's registered services, only inside the boundary.
+    estate_wide = standing and mandate["standing"].get("estateCapabilities") is True and capabilities is MISSING
+    if estate_wide and not inside:
+        return _outside("outside-mandate: capability")
+    if not estate_wide and action is not MISSING and actions is MISSING and capabilities is MISSING:
         return _outside("outside-mandate: action")
     if capabilities is not MISSING and not _member_of(capabilities, get(call, "capability")):
         return _outside("outside-mandate: capability")
@@ -368,7 +458,7 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
         return _outside("outside-mandate: effect")
     # An external effect needs the call named: a relayed action by `actions` or `capabilities`, any other call by
     # `capabilities`, since `actions` covers relayed actions only.
-    if not set_has(list(_READS_AND_DRAFTS), effect) and capabilities is MISSING and (action is MISSING or actions is MISSING):
+    if not estate_wide and not set_has(list(_READS_AND_DRAFTS), effect) and capabilities is MISSING and (action is MISSING or actions is MISSING):
         return _outside("outside-mandate: capability")
     ceiling, spend = get(scope, "perCallMaxUsd"), get(call, "spendUsd")
     # A spend is read as the contract reads it only when it is JSON data as json.loads gives it, by exact type all the
@@ -394,7 +484,36 @@ def mandate_covers(inputs: Any) -> Dict[str, Any]:
     project, projects = get(call, "project"), get(scope, "projects")
     if project is not MISSING and projects is not MISSING and not _member_of(projects, project):
         return _outside("outside-mandate: project")
-    record: Dict[str, Any] = {"by": "operator", "via": "mandate", "task": mandate["task"], "chain": holders}
+    min_level = get(call, "minLevel")
+    # AU-2: a profile an organization's level holder set covers no action its service declares above that level (LV-7).
+    set_level = mandate["standing"].get("setLevel") if standing else None
+    short = None if set_level is None else _levels.level_short_of(set_level, None if min_level is MISSING else min_level, project is not MISSING)
+    if short is not None:
+        return _outside(short)
+    profile: Dict[str, Any] = {"via": "profile" if standing else "mandate", "task": mandate["task"], "chain": holders}
+    if standing:  # AU-6: a call under a profile is recorded with the place, the revision and the digest
+        profile["profile"] = {"place": mandate["standing"]["place"], "revision": mandate["standing"]["revision"], "digest": digest}
+        if set_level is not None:
+            profile["profile"]["setLevel"] = set_level
+    if by_level:
+        # LV-6: the level stands as the operator's word only inside its scope, after every check of the mandate itself.
+        level_inputs: Dict[str, Any] = {"membership": mandate["membership"], "org": mandate["org"], "level": mandate["level"],
+                                        "at": mandate["at"], "context": context, "contexts": levels,
+                                        "tokenMem": None if get(inputs, "tokenMem") is MISSING else get(inputs, "tokenMem"), "now": clock}
+        if project is not MISSING:
+            level_inputs["project"] = project
+        if min_level is not MISSING:
+            level_inputs["minLevel"] = min_level
+        answer = _levels.level_standing(level_inputs)
+        if not answer["ok"]:
+            return _invalid(answer["invalid"]) if "invalid" in answer else _outside(answer["insufficient"])
+        record_level: Dict[str, Any] = {"by": "level", "level": answer["level"], "org": answer["org"]}
+        if project is not MISSING:
+            record_level["project"] = project
+        record_level.update({"approver": answer["approver"], "membershipDigest": answer["membershipDigest"], "revision": answer["revision"]})
+        record_level.update(profile)
+        return {"ok": True, "recordAs": record_level}
+    record: Dict[str, Any] = dict({"by": "operator"}, **profile)
     if "source" in mandate:  # where the operator said it travels into the record, as the reason the callee acted (OA-6)
         record["source"] = dict(mandate["source"])
     return {"ok": True, "recordAs": record}
@@ -449,12 +568,30 @@ def operator_mandate(task: str, instruction: str, scope: Dict[str, Any], lead: s
     return mandate
 
 
+def _standing_findings(mandate: Dict[str, Any]) -> List[Dict[str, str]]:
+    """FAC-SEM-173 (DEC-0166 AU-5): a standing mandate whose scope, or a chain step's, names `autonomy.profile.set` among
+    its capabilities or actions, or `change-policy` among its effects: a profile never sets a profile."""
+    if "standing" not in mandate:
+        return []
+    scopes = [("/scope", mandate["scope"])] + [("/chain/%d/scope" % i, step["scope"]) for i, step in enumerate(mandate["chain"]) if "scope" in step]
+    message = ("a standing mandate never covers %s or %s: no profile sets a profile (DEC-0166 AU-5)"
+               % (PROFILE_SET_CAPABILITY, _NEVER_BY_MANDATE))
+    return [{"code": "FAC-SEM-173", "instancePath": path, "message": message} for path, scope in scopes
+            if PROFILE_SET_CAPABILITY in scope.get("capabilities", []) or PROFILE_SET_CAPABILITY in scope.get("actions", [])
+            or _NEVER_BY_MANDATE in scope["effects"]]
+
+
 def mandate_rules(kind: str, value: Any) -> Optional[List[Dict[str, str]]]:
-    """FAC-SEM-144 on kind `mandate` (the document itself), None for any other kind."""
+    """FAC-SEM-144 on kind `mandate` (the document itself); FAC-SEM-170 and FAC-SEM-173 on one not malformed; None
+    for any other kind."""
     if kind != "mandate":
         return None
     problem = mandate_problem(value)
-    if not problem:
-        return []
-    return [{"code": "FAC-SEM-144", "instancePath": "",
-             "message": "the mandate is not valid: %s (DEC-0125 MD-1, MD-2; DEC-0136 MD-2a)" % problem}]
+    findings: List[Dict[str, str]] = []
+    if problem:
+        findings.append({"code": "FAC-SEM-144", "instancePath": "",
+                         "message": "the mandate is not valid: %s (DEC-0125 MD-1, MD-2; DEC-0136 MD-2a)" % problem})
+    if problem != "mandate-malformed":
+        findings += _levels.level_rules(kind, value) or []
+        findings += _standing_findings(value)
+    return findings

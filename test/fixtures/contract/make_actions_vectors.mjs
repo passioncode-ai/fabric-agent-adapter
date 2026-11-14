@@ -30,7 +30,7 @@ const src = (file) => import(pathToFileURL(path.join(args['contract-src'], file)
 const read = (file) => JSON.parse(fs.readFileSync(path.join(args.contract, file), 'utf8'));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-const { actionDecision, actionsView, actionsExtensionRules, actionRules } = await src('actions.ts');
+const { actionDecision, actionsView, actionsExtensionRules, actionRules, authorityView, authorityExtensionRules } = await src('actions.ts');
 const { createValidatorSync } = await src('validator.ts');
 const { SCHEMA_PREFIX } = await src('contract.ts');
 const validator = createValidatorSync();
@@ -69,7 +69,21 @@ const wellKnowns = semanticFiles(/^service-well-known-actions-.*\.json$/).map((f
   return { name: file.replace(/\.json$/, ''), description: fixture.description, document: fixture.input, view: view(fixture.input), findings: paths(findings) };
 });
 
-const SCHEMAS = ['decision.schema.json', 'service-actions-extension.schema.json'];
+// DEC-0162: the authority extension, read by authorityView and FAC-SEM-142's authorityExtensionRules, beside the
+// actions key; the view's `errors` wording is not part of a vector (decision D6 of the 0.50.0 brief).
+const authorityOf = (document) => {
+  const { declared, valid: ok, levels, actionLevels, standing } = authorityView(document);
+  if (ok === undefined) return { declared };
+  return ok ? { declared, valid: ok, ...(levels === undefined ? {} : { levels }), ...(actionLevels === undefined ? {} : { actionLevels }), ...(standing === undefined ? {} : { standing }) } : { declared, valid: ok };
+};
+const authorities = semanticFiles(/^service-well-known-(authority-.*|actions-levels-ok)\.json$/).map((file) => {
+  const fixture = read(`fixtures/semantic/${file}`);
+  const findings = [...actionsExtensionRules(fixture.input), ...authorityExtensionRules(fixture.input)];
+  if (same(findings.length > 0, fixture.expect.includes('FAC-SEM-142')) === false) throw new Error(`${file}: FAC-SEM-142 is not the fixture's expect`);
+  return { name: file.replace(/\.json$/, ''), description: fixture.description, document: fixture.input, authority: authorityOf(fixture.input), findings: paths(authorityExtensionRules(fixture.input)) };
+});
+
+const SCHEMAS = ['decision.schema.json', 'service-actions-extension.schema.json', 'service-authority-extension.schema.json'];
 const fixtures = read('fixtures/catalogue.json')
   .filter((e) => SCHEMAS.includes(e.schema) || e.path === 'positive/service-well-known-actions.json')
   .map((e) => {
@@ -79,11 +93,11 @@ const fixtures = read('fixtures/catalogue.json')
   });
 
 fs.writeFileSync(out, `${JSON.stringify({
-  about: "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases and jobSteps (DEC-0141 MJ-1), FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, and every decision and service-actions-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
-  source: 'fixtures/vectors/actions.json, fixtures/semantic/action-call-*.json, fixtures/semantic/service-well-known-actions-*.json, fixtures/catalogue.json, src/actions.ts',
-  cases: vectors.cases, jobSteps: vectors.jobSteps, declarations: vectors.declarations, actionCalls, wellKnowns, fixtures,
+  about: "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases and jobSteps (DEC-0141 MJ-1), FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, the authority extension's (DEC-0162: authorityView and authorityExtensionRules), and every decision, service-actions-extension and service-authority-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
+  source: 'fixtures/vectors/actions.json, fixtures/semantic/action-call-*.json, fixtures/semantic/service-well-known-actions-*.json, fixtures/semantic/service-well-known-authority-*.json, fixtures/catalogue.json, src/actions.ts',
+  cases: vectors.cases, jobSteps: vectors.jobSteps, declarations: vectors.declarations, actionCalls, wellKnowns, authorities, fixtures,
 }, null, 1)}\n`);
-console.log(`${vectors.cases.length} cases, ${vectors.jobSteps.length} job steps, ${vectors.declarations.length} declarations, ${actionCalls.length} action calls, ${wellKnowns.length} well-known documents, ${fixtures.length} fixtures`);
+console.log(`${vectors.cases.length} cases, ${vectors.jobSteps.length} job steps, ${vectors.declarations.length} declarations, ${actionCalls.length} action calls, ${wellKnowns.length} well-known documents, ${authorities.length} authority documents, ${fixtures.length} fixtures`);
 
 if (args.extra) {
   const extra = JSON.parse(fs.readFileSync(args.extra, 'utf8'));

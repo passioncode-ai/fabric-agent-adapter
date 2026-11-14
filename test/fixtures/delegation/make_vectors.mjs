@@ -117,6 +117,11 @@ const delegation = [
   ['actor session not an opaque id', token({ act: { sub: 'example-media', session: 'has space' } }), {}],
   ['task claim', token({ task: 'task-42' }), {}],
   ['task not an opaque id', token({ task: 'a b' }), {}],
+  // DEC-0162 LV-5 and DEC-0166 AU-3: a membership's and a profile's digest, each sha256 of the RFC 8785 statement.
+  ['mem claim', token({ mem: `sha256:${'a1'.repeat(32)}` }), {}],
+  ['mem not a digest', token({ mem: 'sha256:ABC' }), {}],
+  ['prof claim', token({ prof: `sha256:${'b2'.repeat(32)}` }), {}],
+  ['prof not a digest', token({ prof: 42 }), {}],
   ['spend limited with no window', token({ spend: { mode: 'limited', remaining: [] } }), {}],
   ['spend unlimited', token({ spend: { mode: 'unlimited' } }), {}],
   ['jti too short', token({ jti: 'short' }), {}],

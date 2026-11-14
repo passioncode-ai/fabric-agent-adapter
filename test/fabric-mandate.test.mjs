@@ -28,7 +28,7 @@ test('every contract case', () => {
 });
 
 test('every catalogue fixture', () => {
-  assert.equal(V.fixtures.length, 5);
+  assert.equal(V.fixtures.length, 7); // DEC-0162: mandate-level, mandate-operator-with-level
   for (const f of V.fixtures) {
     assert.equal(mandateShape(f.document), f.valid, f.name);
     assert.equal(mandateProblem(f.document) ?? null, f.problem, f.name);
