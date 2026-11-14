@@ -724,6 +724,7 @@
         "finds the context unsettled (a Project of two organizations settles nothing) and asks the operator once, naming each candidate context and what the task would do there, each as an option",
         "never guesses, never picks the safest candidate and never splits the task across org:acme and org:globex; goes on with parts that need no context meanwhile",
         "with no person in the session asks through fabric_question_ask with the candidates as options and heartbeats waitingOn that question",
+        "marks exactly one option recommended, the candidate the project's recorded decisions and goal support, with that reason in its consequence (Fabric 0.3.21 refuses options with no recommended one, CO-580); the recommendation is advice and the task still waits for the operator's answer",
         "records the answer as {context, by: operator, at, source} in the handoff and posts neither the question nor the answer on either organization's board thread",
         "says this is the one exception to the rule that the operator's word is done without asking (FAA-207)"
       ]
@@ -792,6 +793,17 @@
       "expected": [
         "names the symptom as Fabric's CO-563, fixed in Fabric 0.3.20: a Fabric before it offered a headless run only fabric_whoami",
         "on a Fabric before 0.3.20 an interactive session reconnects the fabric MCP server after fabric_whoami; a headless run cannot, so it says so in its exit report and never claims the board was read"
+      ]
+    },
+    {
+      "id": "a-solved-harness-problem-is-a-fix-record",
+      "trap": "the agent spent an hour on an MCP server that said 'Needs authentication' in one Claude home and worked in another, fixed it, wrote an Observatory lesson and stopped, so the next agent on another machine solved it again",
+      "request": "Fixed it: the Figma MCP said 'Needs authentication' because this session runs in an isolated home whose keychain item had no token; signing in there once made it work. Close this out.",
+      "expected": [
+        "writes the retro: the Observatory lesson (observatory_lesson) for the class",
+        "also sends the case to the agents database as a fix record: a board request to the Project com.directory lists under agents-db.contribute (or change.request) whose body starts 'fix: <the symptom>' with key: value lines for kind, side, environment, cause, proof, fix and verify, or agents_db.contribute with type fix where it holds a grant (the base's playbooks/record-fix.md)",
+        "scrubs it first: no home path, key, token, private address or person's, client's or organization's name; a role instead",
+        "searches the base's fixes first where it can and sends no case the base already holds; sends it only from a folder that is already a Fabric Project, never from a run Fabric started on a board request"
       ]
     }
   ]

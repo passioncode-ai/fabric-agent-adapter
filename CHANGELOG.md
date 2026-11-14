@@ -51,6 +51,14 @@ fixed in both twins. The contract pin stays at `93e7db16` (`v0.1.0+2026-11-08.1`
   on the next tick, so an installer that ends right after `writeDescriptor` or `registerRemote` sets `process.exitCode`;
   `process.exit()` drops the line (measured: nothing printed). The kit does not print the line itself, which would
   ignore `--no-warnings`.
+- **A solved frequent problem goes to the agents database as a `fix` record** (FAA-329, board request from
+  fabric-workspace): working-with-fabric's retro step and `references/agents-database.md` (one text in all four skills)
+  say how: a board request whose body starts `fix: <the symptom>` with `kind`, `side`, `environment`, `cause`, `proof`,
+  `fix` and `verify` lines, or `agents_db.contribute` with `type: fix`, scrubbed first, beside the Observatory lesson.
+- **A question with options marks one `recommended`** (FAA-330, board request from Fabric): Fabric 0.3.21 refuses
+  `fabric_question_ask` options with none (CO-580), so the context question (`task-context.md`) and creating-fabric-agents'
+  working rules mark the candidate the project's recorded decisions and goal support, its reason in `consequence`; the
+  operator still decides.
 
 ## 0.85.1 (2026-11-13)
 

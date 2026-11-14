@@ -35,7 +35,10 @@ an agent that reaches one context, or whose context is settled, asks nothing.
 
 With a person in the session, ask in the chat. With nobody there (a dispatched run, a headless place), ask through
 `fabric_question_ask` with the candidates as `options` and `about: "task.context"`, send `fabric_heartbeat` with
-`waitingOn: {kind: "question", id}`, and name the open step in your report. A board request you cannot place is
+`waitingOn: {kind: "question", id}`, and name the open step in your report. Mark exactly one option `recommended`: the
+candidate the project's recorded decisions and goal support, with that reason in its `consequence` (Fabric 0.3.21
+refuses a question whose options carry no recommended one, CO-580). The recommendation is advice, never the pick: the
+task still waits for the operator's answer. A board request you cannot place is
 answered with a `com.reply` naming the step, never worked in a guessed context.
 
 ## Record the answer (TC-5)

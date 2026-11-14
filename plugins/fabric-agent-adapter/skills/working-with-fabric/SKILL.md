@@ -305,7 +305,8 @@ by hand, or say it is linked. Do not paste the row's text or status into the tas
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
    the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. After `done` or at session end, the retro:
    `observatory_lesson`, insight/1 lines in `insights/`, or one line that there is nothing (measured wins:
-   [agents database](references/agents-database.md)).
+   [agents database](references/agents-database.md)); a solved frequent harness, MCP, account or tooling problem also
+   goes there as a fix record.
 
 Release anyway: a lapsed claim reads as stuck work. Then clean up your own copies ([cleanup](references/cleanup.md)).
 

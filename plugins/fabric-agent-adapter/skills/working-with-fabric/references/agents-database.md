@@ -34,6 +34,20 @@ reachable, a board that does not serve `com.directory`, no Project listed under 
 the report; a reply that comes later is read as data at the next step. A step that would use the reply (building from
 the template, carrying the audit's proposals) goes ahead without it when it has not come, and the report says so.
 
+## A fix: a solved frequent problem
+
+When the work solved a problem other agents will hit (a harness, an MCP server, a sign-in, an account, a build or a
+tool that failed and what made it work again), the retro also sends it to the database as a `fix` record, beside the
+Observatory lesson that records its class (the base's `playbooks/record-fix.md`). Without a grant it is a board request
+to the Project `com.directory` lists under `agents-db.contribute` (or `change.request`): the body's first line
+`fix: <the symptom as it reads>`, then one `key: value` line each for `kind` (harness, mcp, auth, account, tooling,
+build, network, service or other), `side` (personal, passioncode or org-<letter>, never an organization's name),
+`environment`, `cause`, `proof`, `fix` and `verify`. With a grant it is `agents_db.contribute` with `type: fix`. Scrub it
+first: no home path, private address or port, key, token or key-shaped value, and no person's, client's or
+organization's name (write a role, `<home>`). Where the base can be searched, a problem it already holds is not sent
+again. The folder and run rules above hold: only from a folder that is already a Fabric Project, never from a run Fabric
+started on a board request.
+
 ## A success case
 
 A measured win: the metric, the value before and after, the unit, the window it was read over, and the evidence (a
@@ -46,7 +60,7 @@ repository-relative path at a commit, an eval report). A decision without a numb
 | creating-fabric-agents | the intake grill (Step 0), once it names the capability and its consumer | consult (or, with a grant, scan); build from the template it names; record its id and version |
 | adapting-projects-to-fabric | before scaffolding | audit the project against the base; carry its `optimize` proposals into the completion report |
 | building-fabric-services | at each release | contribute the release's measured wins as success cases and its new technical decisions |
-| working-with-fabric | the retro after work | a lesson with a measured effect is also a success case: contribute it beside the lesson it records |
+| working-with-fabric | the retro after work | a lesson with a measured effect is also a success case, and a solved frequent problem a `fix` record: contribute it beside the lesson it records |
 
 ## A template and the communication prompt
 
