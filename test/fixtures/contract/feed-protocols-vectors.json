@@ -204,6 +204,9 @@
     "service-load": [
       "1"
     ],
+    "activity-unit": [
+      "1"
+    ],
     "share-registration": [
       "1"
     ],

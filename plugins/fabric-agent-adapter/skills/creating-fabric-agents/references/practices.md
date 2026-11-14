@@ -71,10 +71,13 @@ finished. Organization members have the full page with every receipt: the Passio
 - **Show who decides each stop**, and keep the person's queue to the person's stops.
 - **An approval holds the work; it does not refuse it.**
 - **Record every agent decision with its reason.**
-- **The owner's word is done the first time, by the agent**: no command handed to the person to run; on a risk, one
-  short question, then a corrected way and the act. Only a human gate (sign-in, a one-time code, payment, a tool that
-  refuses the agent) goes to the person, with its reason, after the agent's own routes; money limits and secrets
-  stay (the contract's CT-220).
+- **The owner's word is done the first time, by the agent** (the contract's DEC-0156, OW-1 to OW-6): every step inside
+  the task is the agent's within the grants, mandates and money limits; no command, button or card handed to the person
+  where a twin or another route reaches the step; on a risk, one short message naming it and the corrected way, and the
+  rest goes on (the step waits only when the corrected way is outside the words and the mandate, a limit gates it, or
+  nothing undoes cleanly). Only what technically needs a person (sign-in, a one-time code, payment, a secret typed in,
+  a tool that refuses the agent) goes to them, with its reason, after the agent's own routes; money limits and secrets
+  stay, and only the owner's words carry a task.
 - **A fallback sent instead of a rejected reply must stand alone**, and never append a fixed text in one language to a
   reply in another.
 - **An answer that promises a person is a handoff, or nobody comes.**

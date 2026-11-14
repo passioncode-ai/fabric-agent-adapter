@@ -1,6 +1,6 @@
 # Operations digests: a service's own hourly and daily counts
 
-The contract's DEC-0153 ([ops-digest.md at the pin](https://github.com/passioncode-ai/fabric-agent-contract/blob/93e7db164c7829e2783b4b7705c4113bb5201131/docs/specification/ops-digest.md))
+The contract's DEC-0153 ([ops-digest.md at the pin](https://github.com/passioncode-ai/fabric-agent-contract/blob/91c031c464695ae9661c12f97ce1e5dc3cb5448c/docs/specification/ops-digest.md))
 asks every product to count its own operations log and keep two kinds of lines on its own machine: one
 `ops.digest.hourly@1` line for each hour it observed itself running in, an empty one included, and one
 `ops.digest.daily@1` line for each closed UTC day that has hourly lines. No model reads the log; the fold is

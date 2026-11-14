@@ -117,6 +117,9 @@ attribution and names no caller, session or person. `usage_findings` / `usageFin
 - the window: every day exists, is not after `generatedAt`'s UTC date, and is at most 30 days before it;
 - the projects: each project and task run once, and their calls, priced calls and known costs within the days' (CT-40).
 
+A cost sum is compared within rounding (DEC-0163): 0.000001, a relative 1e-9 of the larger side, and half a millionth
+for each row with a known cost summed on either side, so rows rounded to six places one by one never fail the check.
+
 A row's `route` may be `platform-metered`: the hosting platform's own metered models under the deployment's account.
 
 ## OpenRouter attribution (DEC-0065)
