@@ -2,14 +2,14 @@
 name: building-fabric-services
 description: >-
   Use when running an agent as a fabric-service/0.1 service, local or online: dashboard, auth, jobs, spend, board
-  requests. Triggers: "make this agent a local service", «сделай агенту дашборд», «локальный сервис агента». NOT
-  for a provider manifest (adapting-projects-to-fabric), a new agent (creating-fabric-agents) or a session
+  requests, launchd, data folders, estate record, runner routes, signed packages. Triggers: «сделай агенту дашборд». NOT for a
+  provider manifest (adapting-projects-to-fabric), a new agent (creating-fabric-agents) or a session
   (working-with-fabric).
 license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
-  version: "0.90.3"
+  version: "0.90.4"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "ced7b29265c424688602dda998c0ea4db2ba46a9"

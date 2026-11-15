@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.90.4 (2026-11-15)
+
+### Changed
+
+- building-fabric-services' description names launchd, data folders, the estate record, runner routes and signed
+  packages within the listing budget (FAA-336): its trigger evals pass 47/50 on haiku and 48/50 on sonnet, from 40/50
+  and 43/50 (`docs/evidence/evals/2026-11-15-faa-336.md`). The full trigger list stays in `references/when-to-use.md`.
+
 ## 0.90.3 (2026-11-15)
 
 Wave 7 part two: FAA-192 closed.
