@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.91.5 (2026-11-15)
+
+### Fixed
+
+- A board-dispatched run that ends `failed_known` closes its workflow `failed`, not `blocked`: Observatory takes `failed`
+  since v0.35.17 (OBS-525); where an older Observatory refuses it, the run writes the same checkpoint again as `blocked`
+  (FAA-201). The exit contract stays under Hermes' 4000 characters (3994 at its longest); `references/on-demand-session.md`
+  step 6 and the scenario eval say the same.
+- The dashboard kit's layout probe (ED-1 to ED-5) passes on the shipped pages: the dashboard-only recipe puts each table
+  in a labelled `fd-scroll` box with `fd-table`, so a wide table never scrolls a narrow panel sideways; the sample
+  service's Take back button carries `fd-btn`; the remote sample page has `lang` and a viewport
+  (`test_a_wide_table_scrolls_in_its_own_box`).
+
+### Changed
+
+- The probe's lifecycle rules move verbatim into `check_service_lifecycle.py` (class `LifecycleRules`, which `Probe`
+  inherits): `check_service.py` drops from 999 to 875 lines, below the 1000-line ceiling with room. No behaviour changes.
+- The board responder's recovery (the slot kept, moved and taken back after a lost answer) moves verbatim from
+  `fabric_board_session` into a new kit module `fabric_board_recovery` (Node `fabric-board-recovery.mjs`, class
+  `Recovery`, which `Responder` extends): `fabric_board_session.py` drops from 1000 to 787 lines, the Node twin from 998
+  to 777. `TERMINAL` and `NOT_OURS` are re-exported where they were; Node now exports them too. No behaviour changes.
+
+### Backlog
+
+- FAA-319 done: one board announcement told the 15 projects whose services declare limits how to adopt `fabric_holds`.
+  FAA-179, FAA-206 and FAA-286 closed with receipts; new rows FAA-339 (a real-client scenario-eval runner) and FAA-340
+  (a root install on a headless Mac).
+
 ## 0.91.4 (2026-11-15)
 
 ### Fixed
