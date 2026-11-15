@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.3.1+kit.9: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
+    peer_owner 1.3.1+kit.10: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
     `observatory/engine/peer_owner.py`, vendored at f86f0622, read against 2180235c for 1.2.0 and a69c6fee for 1.3.1),
     kit layer L0 (DEC-0154 HA-2, FAA-226, FAA-258). 1.3.1's proof from this account's own sockets (DEC-0155 RT-2) is the
     kit's `fabric_socket_proof`, asked when it sits beside this file (FAA-292, FAA-327); else this file
@@ -83,7 +83,7 @@ import threading
 import time
 from typing import NamedTuple, Optional, Tuple
 
-PEER_OWNER_VERSION = "1.3.1+kit.9"  # this file's own, for projects that copy it: 1.3.1 with the kit's differences above
+PEER_OWNER_VERSION = "1.3.1+kit.10"  # this file's own, for projects that copy it: 1.3.1 with the kit's differences above
 
 THIS_ACCOUNT, ANOTHER_ACCOUNT, SYSTEM, UNKNOWN, NONE = "this-account", "another-account", "system", "unknown", "none"
 KINDS = (THIS_ACCOUNT, ANOTHER_ACCOUNT, SYSTEM, UNKNOWN, NONE)
@@ -226,8 +226,7 @@ def parse_netstat(text: str) -> list[Row]:
         tok = line.split()
         if len(tok) < leading + trailing + 1 or not tok[0].startswith("tcp"):
             continue
-        local = _netstat_address(tok[3])
-        remote = _netstat_address(tok[4])
+        local, remote = _netstat_address(tok[3]), _netstat_address(tok[4])
         if local is None or remote is None:
             continue
         process = " ".join(tok[leading:len(tok) - trailing])
@@ -306,22 +305,16 @@ def _proc_address(text: str, family: int, order: str) -> tuple[str, int]:
 
 
 #: XNU's export records (`#pragma pack(4)`): kinds and the offsets this module reads.
-XSO_SOCKET = 0x001
-XSO_INPCB = 0x010
-XSO_TCPCB = 0x020
+XSO_SOCKET, XSO_INPCB, XSO_TCPCB = 0x001, 0x010, 0x020
 _TCP_STATE = 36                   # xtcpcb_n.t_state: TCPS_LISTEN 1, TCPS_TIME_WAIT 10
-_TCP_MIN = 40
-_TCPS_LISTEN = 1
-_TCPS_TIME_WAIT = 10
+_TCP_MIN, _TCPS_LISTEN, _TCPS_TIME_WAIT = 40, 1, 10
 _INP_HANDLE = slice(8, 16)        # xinpcb_n.xi_inpp
 _INP_PORTS = 16                   # inp_fport, inp_lport, network order
 _INP_VFLAG = 44                   # inp_vflag: INP_IPV4 0x1, INP_IPV6 0x2
 _INP_FOREIGN = 48                 # 16 bytes; an IPv4 address in its last 4 (in_addr_4in6)
-_INP_LOCAL = 64
-_INP_MIN = 80
+_INP_LOCAL, _INP_MIN = 64, 80
 _SO_PCB = slice(28, 36)           # xsocket_n.so_pcb, equal to the inpcb's xi_inpp
-_SO_UID = 64                      # so_uid, then so_last_pid
-_SO_MIN = 72
+_SO_UID, _SO_MIN = 64, 72         # so_uid, then so_last_pid; the record's least length
 
 
 def parse_pcblist_n(blob: bytes) -> list[Row]:
@@ -564,12 +557,19 @@ def _calibrate_sysctl() -> Optional[bool]:
 def method() -> str:
     """The method the next read on this host uses: sysctl, netstat, proc, iphlpapi or none."""
     if sys.platform == "darwin":
-        with _LOCK:
+        known = _SYSCTL_OK[0]
+        if type(known) is bool or (type(known) is float and time.monotonic() < known):
+            return "sysctl" if known is True else "netstat"                      # decided: no lock to wait on
+        if not _LOCK.acquire(blocking=False):
+            return "netstat"  # another thread calibrates: this read waits on nobody (FAA-273 item 5)
+        try:
             known = _SYSCTL_OK[0]
             if known is None or (type(known) is float and time.monotonic() >= known):
                 found = _calibrate_sysctl()
                 _SYSCTL_OK[0] = time.monotonic() + RECALIBRATE_SECONDS if found is None else found
             return "sysctl" if _SYSCTL_OK[0] is True else "netstat"
+        finally:
+            _LOCK.release()
     if sys.platform.startswith("linux"):
         return "proc"
     if sys.platform == "win32":

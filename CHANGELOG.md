@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.91.3 (2026-11-15)
+
+### Fixed
+
+- On macOS, an owner check never waits on another thread's sysctl calibration: a decided calibration is read without
+  the lock, and a read that finds one in progress uses `netstat` for itself (FAA-273 item 5). The one calibrating thread
+  still pays the child interpreter once per process (item 17, recorded). peer_owner `1.3.1+kit.10`.
+
 ## 0.91.2 (2026-11-15)
 
 ### Documentation

@@ -17,6 +17,7 @@ import pathlib
 import socket
 import sys
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -826,6 +827,31 @@ class RestrictedTable(unittest.TestCase):
             self.assertIsNone(P._calibrate_sysctl(), "a child that could not be started proves nothing, either way")
         with mock.patch.object(P, "_child_listener_seen", return_value=False):
             self.assertIs(P._calibrate_sysctl(), False)
+
+    @unittest.skipUnless(sys.platform == "darwin", "sysctl on macOS")
+    def test_a_read_never_waits_on_another_threads_calibration(self):  # FAA-273 item 5
+        saved = P._SYSCTL_OK[0]
+        self.addCleanup(P._SYSCTL_OK.__setitem__, 0, saved)
+        started, release = threading.Event(), threading.Event()
+        self.addCleanup(release.set)  # a failed assertion never leaves the lock held for the next test
+
+        def slow():
+            started.set()
+            release.wait(5)
+            return True
+        P._SYSCTL_OK[0] = None
+        with mock.patch.object(P, "_calibrate_sysctl", side_effect=slow) as calibrate:
+            first = threading.Thread(target=P.method)
+            first.start()
+            self.addCleanup(lambda: (release.set(), first.join(5)))  # release before join (cleanups run last-in first)
+            self.assertTrue(started.wait(5))
+            began = time.monotonic()
+            self.assertEqual(P.method(), "netstat", "the calibration is another thread's: this read uses netstat")
+            self.assertLess(time.monotonic() - began, 0.5)
+            release.set()
+            first.join(5)
+            self.assertEqual(P.method(), "sysctl")
+            self.assertEqual(calibrate.call_count, 1)
 
     @unittest.skipUnless(sys.platform == "darwin", "sysctl on macOS")
     def test_an_unproven_calibration_is_asked_again_after_a_minute(self):  # FAA-273 item 11, the cache half
