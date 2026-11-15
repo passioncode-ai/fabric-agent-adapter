@@ -145,6 +145,37 @@ def secret_argument(value: str) -> bool:
     return False
 
 
+_ENV_ANCHOR = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/])")
+_ENV_WORD = re.compile(r"[a-z][a-z0-9_-]{2,}")
+#: A path part as long as this, mixing upper case, lower case and digits with no word in it, reads as a key (FAA-273).
+ENV_KEY_PART = 20
+
+
+def _env_key_part(part: str) -> bool:
+    if len(part) < ENV_KEY_PART or not re.fullmatch(r"[A-Za-z0-9+/=_-]+", part) or any(
+            _ENV_WORD.fullmatch(chunk) for chunk in re.split(r"[-_.]", part)):
+        return False
+    return bool(re.search(r"[a-z]", part) and re.search(r"[A-Z]", part) and re.search(r"[0-9]", part))
+
+
+def secret_env_value(value: str) -> bool:
+    """An environment value (a supervisor file's, an MCP server's), the kit's rule (FAA-266, FAA-273): a JWT, a provider
+    key or `Bearer` anywhere is one; a value that reads as a path (it starts as one and has two or more separators) is one
+    only when a part between `/`, `\\`, `:` or a space is ENV_KEY_PART characters or more, mixes upper case, lower case and
+    digits and holds no lower-case word (three or more characters, letter first) between `-`, `_` or `.`, or when it has
+    no such word as a part and is written in base64's alphabet alone and `secret_value` finds it; any other value is
+    judged by `secret_value`. Measured on 2026-11-15
+    (docs/reports/2026-11-15-faa-273-env-rule/README.md): it refuses fewer real paths and lets fewer keys through."""
+    if has_jwt(value) or SECRET_VALUE.search(value) or BEARER_INSIDE.search(value):
+        return True
+    pieces = re.split(r"[\\/]", value)
+    if not (_ENV_ANCHOR.match(value) and len(pieces) >= 3):
+        return secret_value(value)
+    if not any(_ENV_WORD.fullmatch(x) for x in pieces) and re.fullmatch(r"[A-Za-z0-9+/=]+", value) and secret_value(value):
+        return True  # a key that starts with `/` and holds two more (FAA-273 item 10)
+    return any(_env_key_part(part) for part in re.split("[\\\\/:%s]" % JS_SPACE, value))
+
+
 def _decode_keeping_plus(raw: str) -> str:
     """decodeURIComponent: a malformed escape or bytes that are not UTF-8 leave the raw text."""
     if re.search(r"%(?![0-9A-Fa-f]{2})", raw):

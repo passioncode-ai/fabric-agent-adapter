@@ -702,13 +702,8 @@ _PLUGIN_SKIP = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", 
 
 
 def _secret_env_value(value: str) -> bool:
-    """An MCP server's environment value: path-aware only when it reads as a path (it starts as one, has two separators
-    and a lower-case part of three or more characters, letter first, between them), as the kit's supervisor writers read
-    one (FAA-266); else `secret_value`."""
-    pieces = re.split(r"[\\/]", value)
-    path = bool(re.match(r"(?:[/~.]|[A-Za-z]:[\\/])", value)) and len(pieces) >= 3 and any(
-        re.fullmatch(r"[a-z][a-z0-9_-]{2,}", x) for x in pieces)
-    return _secrets.secret_argument(value) if path else _secrets.secret_value(value)
+    """An MCP server's environment value, read as the kit's supervisor writers read one (`secret_env_value`, FAA-266)."""
+    return _secrets.secret_env_value(value)
 
 
 def _plugin_problems(root: Path) -> List[str]:

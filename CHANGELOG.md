@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.91.4 (2026-11-15)
+
+### Fixed
+
+- The environment value rule of the supervisor writers and `adapt_project.py` is one rule,
+  `fabric_secrets.secret_env_value` (Node `secretEnvValue`), and judges a path-shaped value part by part (FAA-273 items
+  8, 10, 15): a release folder with no lower-case part is no longer refused, and a base64 key that starts with `/` or
+  ends a real path is no longer let through. Measured against 0.76.0's rule on random keys and this machine's folders,
+  better on every corpus (`docs/reports/2026-11-15-faa-273-env-rule/README.md`). FAA-273 is closed.
+
 ## 0.91.3 (2026-11-15)
 
 ### Fixed

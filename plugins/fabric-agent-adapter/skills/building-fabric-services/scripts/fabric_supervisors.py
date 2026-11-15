@@ -62,19 +62,10 @@ def _no_marker_argument(argv: Sequence[str]) -> None:
         raise ServiceError("%s is written by the supervisor file's writer; leave it out of the program arguments" % SUPERVISOR_ARG)
 
 
-_PATH_ANCHOR = re.compile(r"^(?:[/~.]|[A-Za-z]:[\\/])")
-_PATH_WORD = re.compile(r"[a-z][a-z0-9_-]{2,}")
-
-
 def _secret_env_value(value: str) -> bool:
-    """An environment value: read path-aware (`secret_argument`) only when it reads as a path (it starts as one, has at
-    least two separators and a lower-case part of three or more characters, letter first, between them: `_PATH_WORD`,
-    such as `example-agent`), so a release folder under Application Support is no key
-    (FAA-266) while a base64 key whose `/` splits it stays one; any other value keeps the strict `secret_value`."""
+    """An environment value, read by the kit's rule (fabric_secrets.secret_env_value, FAA-266, FAA-273)."""
     import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
-    pieces = re.split(r"[\\/]", value)
-    path = bool(_PATH_ANCHOR.match(value)) and len(pieces) >= 3 and any(_PATH_WORD.fullmatch(x) for x in pieces)
-    return fabric_secrets.secret_argument(value) if path else fabric_secrets.secret_value(value)
+    return fabric_secrets.secret_env_value(value)
 
 
 def _no_secret_in_supervisor_file(argv: Sequence[str], environment: Optional[Dict[str, str]]) -> None:
