@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.90.3 (2026-11-15)
+
+Wave 7 part two: FAA-192 closed.
+
+### Changed
+
+- Scenario evals ask what their requests describe: the two-context cloud agent records uptime A (the person's own
+  cloud machine replaces the Heroku default) and data kind U; an uptime A agent's data home is a durable store, never
+  a folder beside the checkout; a new agent's `LICENSE` holder comes from creating-fabric-agents' grill record.
+- The creating-fabric-agents card lists "agent first" among the grill's inputs.
+
+### Tests and evidence
+
+- `test_faa192_prose.py` holds the clauses 0.59.0's readings found held by no test.
+- A real-client trigger run of creating-fabric-agents (30/33) and building-fabric-services (haiku 40/50, sonnet
+  43/50): `docs/evidence/evals/2026-11-15-trigger-run.md`; building's under-trigger is FAA-336.
+- The licence question of FAA-192 (21) decided and recorded (decision 3 of the FAA-192 decisions); no text changed.
+
 ## 0.90.2 (2026-11-15)
 
 ### Fixed

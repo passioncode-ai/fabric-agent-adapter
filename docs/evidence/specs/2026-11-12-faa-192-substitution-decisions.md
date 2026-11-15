@@ -29,3 +29,20 @@ cites this file.
   (item 4 of the same row), against "a copy never connects to the other copy's data"; the platform folder is per
   user and per instance.
 - **Reversible:** a project that wants the sibling folder declares it in its `fabric.source.json` slots.
+
+## Decision 3 (item 21): which agents "keep their own licence"
+
+- **The question the fifth readings left for the operator:** does "a public product keeps its own licence" cover any
+  openly published agent, or only a PassionCode.ai repository, so that a self-built agent published openly would
+  default to all rights reserved?
+- **Taken on 2026-11-15 under the operator's rule that an open question is a decision** (recorded decisions first,
+  then the project's goal, then the safest reversible option): an agent's licence is its owner's choice, as
+  creating-fabric-agents step 2 and the operator-channel reference already say. "Keeps its own licence" means the
+  terms its owner published with it (a `LICENSE` with an open licence in an open repository is such terms); a
+  PassionCode.ai repository's terms are the organization's. Where the owner named no terms, the first commit's
+  `LICENSE` reads all rights reserved, whether the repository is private or public.
+- **Why:** the operator's recorded rules keep personal agents private unless he says otherwise and give a new agent
+  a `LICENSE` naming its holder from the first commit; an open repository with no named terms grants nothing by law,
+  so the default states that plainly instead of implying an open licence nobody chose.
+- **Reversible:** the owner relicenses by replacing the `LICENSE`; no file of the adapter changes. The text needs no
+  edit: it already says "unless the owner gives other terms". `test_faa192_prose.py` holds the clauses around it.
