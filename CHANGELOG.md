@@ -17,6 +17,10 @@
 
 - The probe's lifecycle rules move verbatim into `check_service_lifecycle.py` (class `LifecycleRules`, which `Probe`
   inherits): `check_service.py` drops from 999 to 875 lines, below the 1000-line ceiling with room. No behaviour changes.
+- The board responder's recovery (the slot kept, moved and taken back after a lost answer) moves verbatim from
+  `fabric_board_session` into a new kit module `fabric_board_recovery` (Node `fabric-board-recovery.mjs`, class
+  `Recovery`, which `Responder` extends): `fabric_board_session.py` drops from 1000 to 787 lines, the Node twin from 998
+  to 777. `TERMINAL` and `NOT_OURS` are re-exported where they were; Node now exports them too. No behaviour changes.
 
 ### Backlog
 
