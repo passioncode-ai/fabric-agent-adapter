@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.91.1 (2026-11-15)
+
+### Fixed
+
+- On macOS, a sysctl calibration whose child process proved nothing (no interpreter, no answer in time) is no longer
+  kept for the process's life as a refusal: the owner check reads `netstat` meanwhile and calibrates again after
+  `RECALIBRATE_SECONDS` (60 s); a proven or refused layout is still kept (FAA-273 item 11). peer_owner `1.3.1+kit.9`.
+
 ## 0.91.0 (2026-11-15)
 
 The repin to Fabric Agent Contract `v0.1.0+2026-11-15` (`2462c90b`, FAA-337); `ced7b292` (`v0.1.0+2026-11-14.2`) stays
