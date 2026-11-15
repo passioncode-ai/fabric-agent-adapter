@@ -68,7 +68,8 @@ _PATH_WORD = re.compile(r"[a-z][a-z0-9_-]{2,}")
 
 def _secret_env_value(value: str) -> bool:
     """An environment value: read path-aware (`secret_argument`) only when it reads as a path (it starts as one, has at
-    least two separators and a lower-case word between them), so a release folder under Application Support is no key
+    least two separators and a lower-case part of three or more characters, letter first, between them: `_PATH_WORD`,
+    such as `example-agent`), so a release folder under Application Support is no key
     (FAA-266) while a base64 key whose `/` splits it stays one; any other value keeps the strict `secret_value`."""
     import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
     pieces = re.split(r"[\\/]", value)

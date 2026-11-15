@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.91.2 (2026-11-15)
+
+### Documentation
+
+- The environment rule of the supervisor writers and `adapt_project.py` (FAA-266) is stated exactly: a value is read as a
+  path when it starts as one, has at least two separators, and one of its parts is lower-case, three or more characters,
+  letter first (`[a-z][a-z0-9_-]{2,}`, such as `example-agent`); 0.76.0's entry said "all-lower-case" without the shape
+  (FAA-273 item 22). No behaviour changes.
+
 ## 0.91.1 (2026-11-15)
 
 ### Fixed
