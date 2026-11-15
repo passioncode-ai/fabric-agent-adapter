@@ -1581,6 +1581,25 @@ test('FAA-155 seam 3: an idle renew writes nothing; a clean leave forgets the re
   assert.ok(!h.kinds().includes('board.slot.moved'));
 });
 
+test('FAA-187 (3): a move after the last renew keeps the record at a clean leave; a last look that fails changes nothing', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.render' }); // generation 2, unseen by r
+  await r.shutdown(0);
+  assert.equal(slotRecord(hub)['video.render'].generation, 1);
+  assert.equal((await h.tools()).at(-1), 'com.status', 'the last look, before the DELETE');
+  const hub2 = await fakeHub(t);
+  const h2 = harness(hub2);
+  const r2 = h2.responder();
+  await r2.step();
+  const real = r2.session.call.bind(r2.session);
+  r2.session.call = (tool, args, timeout) => (tool === 'com.status' ? Promise.reject(new Error('unreachable')) : real(tool, args, timeout));
+  await r2.shutdown(0);
+  assert.ok(!('video.render' in slotRecord(hub2)));
+});
+
 test('FAA-155 seam 4: at its own cadence an idle holder writes nothing; a lapsed holder\'s enroll is recorded; a full disk never stops a replay', async (t) => {
   let seed = 7;
   const jitter = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };

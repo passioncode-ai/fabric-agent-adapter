@@ -2170,6 +2170,26 @@ class MovedSlotTests(Conversation):
         self.assertEqual(self.board.requests[rid]["state"], "completed")
         self.assertEqual(self.moved(), [])
 
+    def test_a_move_after_the_last_renew_keeps_the_record_at_a_clean_leave(self):
+        """FAA-187 (3): another holder took the slot after this session's last renew and before its stop, with no call
+        between; the idle leave's last look at com.status sees the newer generation, so the record stays."""
+        r = self.responder()
+        r.step()
+        self.board.move("video.render")  # generation 2, unseen by r
+        r.shutdown(0)
+        self.assertEqual(self.record()["video.render"]["generation"], 1)
+        self.assertEqual([t for t, _ in self.board.calls][-1], "com.status")  # the last look, before the DELETE
+
+    def test_a_last_look_that_fails_changes_nothing(self):
+        """FAA-187 (3): a com.status that does not answer at the leave leaves the records as before the look."""
+        r = self.responder()
+        r.step()
+        real = r.session.call
+        r.session.call = lambda tool, args, timeout=None: (_ for _ in ()).throw(fb.BoardError("unreachable", "x", True)) \
+            if tool == "com.status" else real(tool, args, timeout)
+        r.shutdown(0)
+        self.assertNotIn("video.render", self.record())
+
     def test_a_clean_leave_with_work_left_keeps_the_record(self):
         _, first = self._crash_after(effect=False)
         first.shutdown(0)

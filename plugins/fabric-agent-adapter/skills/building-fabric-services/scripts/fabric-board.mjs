@@ -33,6 +33,7 @@ export {
   STOP_CODES,
   HOLD_RETRY_MAX_SECONDS,
   IDLE_LEAVE_SECONDS,
+  LAST_LOOK_SECONDS,
   BoardSession,
   Checkpoint,
   BoardRequest,

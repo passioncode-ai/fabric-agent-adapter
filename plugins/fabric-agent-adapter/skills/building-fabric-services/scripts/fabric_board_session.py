@@ -50,6 +50,7 @@ DRAIN_SECONDS = 10.0
 
 #: An idle responder's leave waits this long for the DELETE, so an idle stop ends within LC-01's 5 s (FAA-173).
 IDLE_LEAVE_SECONDS = 3.0
+LAST_LOOK_SECONDS = 1.0  # an idle leave's last look at com.status before its DELETE, within LC-01's 5 s (FAA-187 (3))
 
 EVENT_SCHEMA = "urn:fabric:schema:board-responder-event:1"
 
@@ -565,6 +566,14 @@ class Responder(SlotKeeper):
                        episode="down", reason=code)
         return wait
 
+    def _last_look(self) -> None:
+        """FAA-187 (3): an idle leave reads com.status once; a slot it names at another generation moved, so its record stays."""
+        try:
+            seen = {r.get("capability"): r.get("generation") for r in self.session.call("com.status", {}, LAST_LOOK_SECONDS).get("responders") or [] if isinstance(r, dict)}
+        except (BoardError, _hub.HubError, AttributeError):
+            return
+        self._confirmed = {c: g for c, g in self._confirmed.items() if not (_is_int(seen.get(c), 1) and seen[c] != g)}
+
     def _held(self) -> Dict[str, Any]:
         """The generations this session confirmed (held, or compared with com.status and found unmoved), paused and
         retrying slots included: only their records a clean leave may forget (0.56.0 seam r2, r3)."""
@@ -982,6 +991,8 @@ class Responder(SlotKeeper):
             except (BoardError, _hub.HubError):
                 pass  # the checkpoint keeps it
         if self.session is not None:
+            if work is None:
+                self._last_look()
             session, self.session = self.session, None
             # Only a DELETE Fabric answered released the slots (FAA-163); an idle stop waits for it 3 s (FAA-173).
             if session.close(IDLE_LEAVE_SECONDS if work is None else None):

@@ -56,6 +56,7 @@ from fabric_board_session import (  # noqa: F401
     TERMINAL,
     HOLD_RETRY_MAX_SECONDS,
     IDLE_LEAVE_SECONDS,
+    LAST_LOOK_SECONDS,
     BoardSession,
     Checkpoint,
     BoardRequest,
