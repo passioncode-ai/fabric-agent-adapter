@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { credentialName, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
+import { credentialName, secretArgument, secretEnvValue, secretUrl } from './fabric-secrets.mjs';
 import { DRAIN_SECONDS, SUPERVISOR_ENV, ServiceError, TASK, UNIT } from './fabric-base.mjs';
 import { atomicWrite, instanceDirs } from './fabric-paths.mjs';
 import { SUPERVISOR_ARG, markerArguments } from './fabric-lock.mjs';
@@ -59,15 +59,8 @@ function noMarkerArgument(argv) {
   if (markerArguments(argv).length) throw new ServiceError(`${SUPERVISOR_ARG} is written by the supervisor file's writer; leave it out of the program arguments.`);
 }
 
-// An environment value: read path-aware (secretArgument) only when it reads as a path (it starts as one, has at least two
-// separators and a lower-case part of three or more characters, letter first, between them, such as `example-agent`), so a
-// release folder under Application Support is no key (FAA-266) while a base64 key whose `/` splits it stays one; any other
-// value keeps the strict secretValue.
-export const secretEnvValue = (value) => {
-  const pieces = value.split(/[\\/]/);
-  const path = /^(?:[/~.]|[A-Za-z]:[\\/])/.test(value) && pieces.length >= 3 && pieces.some((x) => /^[a-z][a-z0-9_-]{2,}$/.test(x));
-  return path ? secretArgument(value) : secretValue(value);
-};
+// An environment value, read by the kit's rule (fabric-secrets.mjs secretEnvValue, FAA-266, FAA-273).
+export { secretEnvValue };
 
 function noSecretInSupervisorFile(argv, environment) {
   // No supervisor file carries a secret (service.md): not in an argument, an environment name or its value.

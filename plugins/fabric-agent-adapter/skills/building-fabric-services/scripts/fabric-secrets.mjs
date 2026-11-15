@@ -87,6 +87,24 @@ export const secretArgument = (value) =>
   hasJwt(value) || SECRET_VALUE.test(value) || BEARER_INSIDE.test(value) ||
   value.split(/[\s=]/).some((piece) => (pathLike(piece) ? piece.split(/[\\/]/).some((part) => longSecret(part)) : longSecret(piece)));
 
+const ENV_ANCHOR = /^(?:[/~.]|[A-Za-z]:[\\/])/;
+const ENV_WORD = /^[a-z][a-z0-9_-]{2,}$/;
+/** A path part as long as this, mixing upper case, lower case and digits with no word in it, reads as a key (FAA-273). */
+export const ENV_KEY_PART = 20;
+const envKeyPart = (part) => part.length >= ENV_KEY_PART && /^[A-Za-z0-9+/=_-]+$/.test(part) && !part.split(/[-_.]/).some((c) => ENV_WORD.test(c))
+  && /[a-z]/.test(part) && /[A-Z]/.test(part) && /[0-9]/.test(part);
+const ENV_PART_SPLIT = /[\\/:\s]/; // `\s` is JS whitespace, the Python twin's JS_SPACE
+
+/** An environment value (a supervisor file's, an MCP server's), the kit's rule (FAA-266, FAA-273): the Python twin's
+ * secret_env_value, measured in docs/reports/2026-11-15-faa-273-env-rule/README.md. */
+export const secretEnvValue = (value) => {
+  if (hasJwt(value) || SECRET_VALUE.test(value) || BEARER_INSIDE.test(value)) return true;
+  const pieces = value.split(/[\\/]/);
+  if (!(ENV_ANCHOR.test(value) && pieces.length >= 3)) return secretValue(value);
+  if (!pieces.some((x) => ENV_WORD.test(x)) && /^[A-Za-z0-9+/=]+$/.test(value) && secretValue(value)) return true; // FAA-273 item 10
+  return value.split(ENV_PART_SPLIT).some(envKeyPart);
+};
+
 const decodeKeepingPlus = (raw) => { try { return decodeURIComponent(raw); } catch { return raw; } };
 
 /** Each query or fragment piece's raw value by its decoded name, with `+` kept. */
