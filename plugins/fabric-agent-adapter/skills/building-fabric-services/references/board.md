@@ -275,8 +275,10 @@ held and not transferred). The responder keeps that move instead of undoing it:
   free, and whoever takes it next is no move. An unconfirmed record stays, since the slot may have moved while the
   service was down, and a move this session saw keeps its record, so a clean stop never undoes it. A paused or
   retrying slot reads `com.status` before each new ask. A move made after the slot's last renew or check and before
-  the stop, with no call since, is not seen at the leave: its record is forgotten, and the next start reads the slot
-  as free and may enroll it once the other holder lets it go (FAA-187). A file without the record
+  the stop, with no call since, is seen at an idle leave: it reads `com.status` once (1 s at most, `LAST_LOOK_SECONDS`)
+  before its DELETE, and a slot named there at another generation keeps its record. A look that fails or runs out, or a
+  leave with work still draining (which takes no look), changes nothing: such a move's record is forgotten, and the next
+  start reads the slot as free and may enroll it once the other holder lets it go (FAA-187 (3)). A file without the record
   reads as before; a kit before 0.53.0 reads the file, ignores the record and drops it at its first checkpoint write. So a service stopped cleanly with no request left in its checkpoint, its DELETE answered 2xx and every slot confirmed
   in that session, rolled back to 0.52 and up again starts as on a first start. Otherwise (a 404, the idle wait running
   out, a slot this session never confirmed, one left retrying before `com.status` answered for it included) its records stay, and the case is the crash case below. After a crash the record stays: if 0.52 then ran, enrolled the slot and

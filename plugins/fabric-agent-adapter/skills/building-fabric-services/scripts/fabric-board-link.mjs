@@ -51,12 +51,13 @@ export class BoardSession {
     });
   }
 
-  call(tool, args) {
+  /** One tool call; `timeout` ms above 0 bounds the whole of it (a leave's last look, FAA-187 (3)). */
+  call(tool, args, timeout = null) {
     if (!RESPOND_TOOLS.has(tool)) return Promise.reject(new BoardError('not-in-scope', `${tool} is not served to a board session; use a Project session for it.`, false, tool));
     return this.#serial(async () => {
       if (!this.mcpSession) throw new BoardError('session-ended', 'The board session is not open.', true, tool);
       this.rpc += 1;
-      const answer = await this.#send({ jsonrpc: '2.0', id: this.rpc, method: 'tools/call', params: { name: tool, arguments: args } });
+      const answer = await this.#send({ jsonrpc: '2.0', id: this.rpc, method: 'tools/call', params: { name: tool, arguments: args } }, 'POST', timeout, timeout > 0 ? timeout : 0);
       if (answer.status === 401) throw new BoardError('session-ended', 'Fabric ended the board session (it left, was revoked or expired); join again.', true, tool);
       let value;
       try {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.90.2 (2026-11-15)
+
+### Fixed
+
+- A board responder's idle leave reads `com.status` once (1 s at most, `LAST_LOOK_SECONDS`) before its DELETE: a slot
+  another holder took after the last renew or check keeps its record, so the next start reads the move instead of a
+  free slot (FAA-187 (3)). A look that fails changes nothing. Both twins; `BoardSession.call` takes a bound for the
+  whole call.
+
 ## 0.90.1 (2026-11-15)
 
 ### Fixed

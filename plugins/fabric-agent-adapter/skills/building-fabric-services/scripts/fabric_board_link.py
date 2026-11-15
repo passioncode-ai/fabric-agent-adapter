@@ -76,15 +76,26 @@ class BoardSession:
                 self.protocol_version = version
             self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
-    def call(self, tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
+    def call(self, tool: str, args: Dict[str, Any], timeout: Optional[float] = None) -> Dict[str, Any]:
+        """One tool call; `timeout` above 0 bounds the whole of it (a leave's last look, FAA-187 (3)): past it the answer
+        is `unreachable`, retryable, as an unanswered call is."""
         if tool not in RESPOND_TOOLS:
             raise BoardError("not-in-scope", "%s is not served to a board session; use a Project session for it." % tool, op=tool)
         with self._lock:
             if self.mcp_session is None:
                 raise BoardError("session-ended", "The board session is not open.", True, op=tool)
             self._rpc += 1
-            status, _, parsed = self._send({"jsonrpc": "2.0", "id": self._rpc, "method": "tools/call",
-                                            "params": {"name": tool, "arguments": args}})
+            body = {"jsonrpc": "2.0", "id": self._rpc, "method": "tools/call", "params": {"name": tool, "arguments": args}}
+            if timeout is not None and timeout > 0:
+                got: List[Any] = []
+                worker = threading.Thread(target=lambda: got.append(self._send(body, timeout=timeout)), name="board-look", daemon=True)
+                worker.start()
+                worker.join(timeout)
+                if not got:
+                    raise BoardError("unreachable", "Fabric's hub did not answer %s in time." % tool, True, op=tool)
+                status, _, parsed = got[0]
+            else:
+                status, _, parsed = self._send(body)
         if status == 401:
             raise BoardError("session-ended", "Fabric ended the board session (it left, was revoked or expired); join again.", True, op=tool)
         try:

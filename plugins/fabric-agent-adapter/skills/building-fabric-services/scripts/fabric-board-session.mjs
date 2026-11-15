@@ -21,6 +21,8 @@ export const POLL_JITTER_SECONDS = 5;
 export const DRAIN_SECONDS = 10;
 /** An idle responder's leave waits this long for the DELETE, so an idle stop ends within LC-01's 5 s (FAA-173). */
 export const IDLE_LEAVE_SECONDS = 3;
+/** An idle leave's last look at com.status before its DELETE (FAA-187 (3)), within LC-01's 5 s beside the DELETE's 3 s. */
+export const LAST_LOOK_SECONDS = 1;
 /** `board.down` is said once per outage window: said again only after the board stayed up this long (FAA-187 (22)). */
 export const DOWN_QUIET_SECONDS = 300;
 
@@ -141,6 +143,20 @@ export class Responder extends SlotKeeper {
   }
 
   /** The generations this session confirmed (held, or compared with com.status and found unmoved), paused and retrying slots included: only their records a clean leave may forget (0.56.0 seam r2, r3). */
+  /** FAA-187 (3): an idle leave reads com.status once before its DELETE; a slot it names at another generation than the one this session confirmed moved since its last renew or check, so its record stays. A read that fails changes nothing. */
+  async lastLook() {
+    let status;
+    try {
+      status = await this.session.call('com.status', {}, LAST_LOOK_SECONDS * 1000);
+    } catch {
+      return;
+    }
+    const seen = new Map((Array.isArray(status?.responders) ? status.responders : []).filter((r) => isObj(r) && typeof r.capability === 'string').map((r) => [r.capability, r.generation]));
+    for (const [capability, generation] of Object.entries(this.confirmed)) {
+      if (isInt(seen.get(capability), 1) && seen.get(capability) !== generation) delete this.confirmed[capability];
+    }
+  }
+
   heldNow() {
     // a fenced call (maybe moved) or a move withholds it
     return Object.fromEntries(Object.entries(this.confirmed).filter(([c]) => !this.suspect.has(c) && this.slots[c]?.state !== 'moved'));
@@ -970,6 +986,7 @@ export class Responder extends SlotKeeper {
       }
     }
     if (this.session) {
+      if (!work) await this.lastLook();
       const session = this.session;
       this.session = null;
       // Only a DELETE Fabric answered released the slots (FAA-163): no record of them can read as a move. An idle stop
