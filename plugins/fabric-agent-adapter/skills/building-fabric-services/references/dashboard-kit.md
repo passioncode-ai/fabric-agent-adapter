@@ -169,7 +169,8 @@ this repository: do it, keep the service's own edits (step 3), and say in your r
 In the middle of an unrelated task, finish that first or record the upgrade as a next task.
 
 1. `dashboard_kit.py status` names each copy: `current`, `older`, `changed` (edited after it was
-   copied) or `unmarked`, and the services built from this repository.
+   copied) or `unmarked`, and the services built from this repository. A checkout that holds the kit's own
+   source at the current version (`kitSource` in `--json`) uses the kit itself, so it hears no line (FAA-200 (2)).
 2. A page with no kit: move its colour, type and spacing values onto the kit's tokens (its own
    palette becomes a theme in its stylesheet: `:root[data-theme="…"]`), replace fixed widths with the
    kit's grids, put the navigation in `.fd-nav`, wrap wide tables and logs in `.fd-scroll`, remove

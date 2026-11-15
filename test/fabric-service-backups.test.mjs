@@ -277,11 +277,11 @@ test('the descriptor names its header and scheme the schema way', () => {
   assert.ok(has(k.validateDescriptor({ ...base, auth: { tokenFile: '~/t', scheme: 'Basic' } }), 'auth.scheme'));
 });
 
-test('both kits write byte-identical backup files', { skip: spawnSync('python3', ['--version']).status !== 0 && 'needs python3' }, () => {
+test('both kits write byte-identical backup files', { skip: spawnSync('python3', ['-B', '--version']).status !== 0 && 'needs python3' }, () => {
   const tables = { projects: { columns: ['id', 'name', 'note'], rows: [['p-001', 'Résumé “final”', 'line\nbreak\t\u0001 😀'], ['p-002', '', null]] },
     settings_overrides: { columns: ['key', 'value_int', 'on'], rows: [['limit', -9007199254740991, true]] } };
   const pyDir = temp(), jsDir = temp();
-  const py = spawnSync('python3', ['-c', `
+  const py = spawnSync('python3', ['-B', '-c', `
 import datetime as dt, json, sys
 from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(scripts)})

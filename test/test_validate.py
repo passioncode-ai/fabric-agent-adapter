@@ -902,6 +902,32 @@ class ShippedPatternTests(unittest.TestCase):
         self.assertEqual(validate.shipped_pattern_problems(), [])
 
 
+class PythonBytecode(unittest.TestCase):
+    """FAA-200 (23): a Node test that starts Python passes -B, so a suite run leaves no __pycache__ in the kit."""
+
+    def test_a_spawn_without_dash_b_fails(self):
+        for call in ("spawn('python3', args)", "spawnSync('python3', ['-c', 'x'])", "spawnSync(python, ['x.py'])",
+                     "spawnSync(python[0], [...python[1], '--version'])"):
+            with self.subTest(call=call):
+                tmp, root = _tree({"test/x.test.mjs": "const a = 1;\n%s;\n" % call})
+                with tmp:
+                    problems = validate.python_bytecode_problems(root)
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn("test/x.test.mjs:2 starts python without -B", problems[0])
+
+    def test_a_spawn_with_dash_b_passes(self):
+        tmp, root = _tree({"test/x.test.mjs": "spawn('python3', ['-B', ...args]);\nspawnSync(python[0], [...python[1], '-B', 'x']);\n"})
+        with tmp:
+            self.assertEqual(validate.python_bytecode_problems(root), [])
+
+    def test_validate_repo_runs_the_check(self):
+        import inspect
+        self.assertIn("python_bytecode_problems()", inspect.getsource(validate.validate_repo))
+
+    def test_the_real_tree_passes(self):
+        self.assertEqual(validate.python_bytecode_problems(), [])
+
+
 class NodeFloor(unittest.TestCase):
     KIT = "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/x.mjs"
 

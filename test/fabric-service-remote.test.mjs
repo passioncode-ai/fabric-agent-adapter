@@ -216,7 +216,7 @@ test('the sample online service over real TLS, met the way a host meets it', { s
     port = await freePort();
     out = '';
     child = spawn(process.execPath, [path.join(scripts, 'sample-remote-service.mjs'), '--origin', `https://agent.example.com:${port}`, '--port', String(port),
-      '--token-file', path.join(dir, 'token'), '--session-key-file', path.join(dir, 'session.key'), '--tls-cert', cert, '--tls-key', keyFile], { stdio: ['ignore', 'pipe', 'pipe'] });
+      '--token-file', path.join(dir, 'token'), '--session-key-file', path.join(dir, 'session.key'), '--tls-cert', cert, '--tls-key', keyFile, '--exit-with-parent'], { stdio: ['pipe', 'pipe', 'pipe'] });
     child.stdout.on('data', (b) => { out += b; });
     child.stderr.on('data', (b) => { out += b; });
     for (let i = 0; i < 50 && !out.includes('example agent on') && !out.includes('EADDRINUSE'); i++) await new Promise((r) => setTimeout(r, 100));
@@ -260,6 +260,34 @@ test('the sample online service over real TLS, met the way a host meets it', { s
     assert.equal((await ask('GET', '/', session)).status, 401, 'logout ends the session on the server');
   } finally {
     child.kill('SIGTERM');
+  }
+});
+
+test('the TLS sample started with --exit-with-parent exits when its parent closes stdin (FAA-200 (7))', { skip: spawnSync('openssl', ['version']).status !== 0 && 'needs openssl' }, async () => {
+  const dir = tempDir('faa200-7-');
+  {
+    const cert = path.join(dir, 'cert.pem'), keyFile = path.join(dir, 'key.pem');
+    const gen = spawnSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=agent.example.com',
+      '-keyout', keyFile, '-out', cert], { encoding: 'utf8' });
+    assert.equal(gen.status, 0, gen.stderr);
+    fs.writeFileSync(path.join(dir, 'token'), 'w'.repeat(40), { mode: 0o600 });
+    fs.writeFileSync(path.join(dir, 'session.key'), Buffer.alloc(32, 5), { mode: 0o600 });
+    const port = await freePort();
+    const child = spawn(process.execPath, [path.join(scripts, 'sample-remote-service.mjs'), '--origin', `https://agent.example.com:${port}`, '--port', String(port),
+      '--token-file', path.join(dir, 'token'), '--session-key-file', path.join(dir, 'session.key'), '--tls-cert', cert, '--tls-key', keyFile,
+      '--exit-with-parent'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (b) => { out += b; });
+    child.stderr.on('data', (b) => { out += b; });
+    const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
+    for (let i = 0; i < 50 && !out.includes('example agent on') && !out.includes('EADDRINUSE'); i++) await new Promise((r) => setTimeout(r, 100));
+    try {
+      child.stdin.end();
+      const code = await Promise.race([exited, new Promise((r) => setTimeout(() => r('still running'), 2000))]);
+      assert.equal(code, 0, `the sample outlived its parent's pipe: ${out}`);
+    } finally {
+      child.kill('SIGKILL');
+    }
   }
 });
 

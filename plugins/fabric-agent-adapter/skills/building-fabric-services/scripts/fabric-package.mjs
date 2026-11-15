@@ -25,10 +25,14 @@ export const PLUGIN_MANIFEST = '.claude-plugin/plugin.json';
 export const SIGNATURE_STATEMENT = 'fabric-package-signature/1';
 /** DEC-0051: ES256 joins when Fabric records its decision D2; until then a verifier refuses it as unknown-algorithm. */
 export const PACKAGE_ALGORITHMS = Object.freeze(['EdDSA']);
-// What pack refuses to list: version-control and cache litter, and files that are credentials by their name.
+// What pack refuses to list: version-control and cache litter, and files that are credentials by their name, the kit's
+// own token files (service.token, fabric-auth; board.credential, fabric-hub) among them (FAA-190 (15)).
 const JUNK = /^(\.git|__pycache__|\.DS_Store|.*\.pyc)$/;
-const SECRET_FILE = /^(\.env(\..+)?|.*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc))$/;
+const SECRET_FILE = /^(\.env(\..+)?|.*\.(pem|key|p12|pfx|jks|keystore|token|credential)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc))$/;
 const SECRET_FILE_OK = /^\.env\.(example|sample|template)$/;
+// A file holding a private JWK, whatever its name (FAA-190 (15)): a `d` member of 32 bytes or more in base64url, in JSON,
+// escaped JSON or Python, read over the file's bytes (latin1, one character a byte) as the Python twin's PRIVATE_JWK.
+const PRIVATE_JWK = /\\?["']d\\?["'][ \t]*:[ \t]*\\?["'][A-Za-z0-9_-]{43}/;
 const B64URL = /^[A-Za-z0-9_-]+$/;
 const PKCS8_ED25519 = Buffer.from('302e020100300506032b657004220420', 'hex');
 /**
@@ -104,6 +108,8 @@ export function readSigningKey(file, kid) {
   let seed;
   if (text.startsWith('{')) {
     let jwk;
+    // past MAX_NESTING no key: JSON.parse reads deeper than Python's stack, and both kits answer alike (FAA-194 (32))
+    if (nestingOf(text) > MAX_NESTING) throw new PackageError('The key file is neither a JWK nor a PEM private key.');
     try { jwk = JSON.parse(text); } catch { throw new PackageError('The key file is neither a JWK nor a PEM private key.'); }
     if (!isObject(jwk) || jwk.kty !== 'OKP' || jwk.crv !== 'Ed25519' || !isString(jwk.d)) throw new PackageError('The key file must be an Ed25519 private JWK (kty OKP, crv Ed25519, with d).');
     if ((jwk.alg ?? 'EdDSA') !== 'EdDSA') throw new PackageError(`The key names alg ${JSON.stringify(jwk.alg)}; a package signature is EdDSA (DEC-0051).`);
@@ -442,6 +448,7 @@ export function readFolder(folder) {
         let read;
         try { read = readRegular(path.join(dir, entry.name)); } catch (error) { throw unreadable(where, error); }
         if (before && moved(dir, before)) { refused.push(`${rel} (a symlink)`); return; } // read through a swapped folder
+        if (read.why === undefined && PRIVATE_JWK.test(read.bytes.toString('latin1'))) read.why = "a private key (a JWK's d)";
         if (read.why === undefined) { files.set(where, read.bytes); continue; }
         why = read.why;
       }
@@ -666,11 +673,36 @@ function packed(folder) {
 }
 
 /**
+ * Refuse a key file inside the folder being signed (FAA-190 (15)): it would ship in the package. Judged by where the key
+ * resolves to and by the folder's identity (device and inode), so a link to the key, a path through a linked folder and
+ * a case-folding file system do not hide it. A folder or key that cannot be read is judged later. The Python twin's
+ * _key_outside.
+ */
+function keyOutside(folder, keyFile) {
+  let home;
+  try { home = fs.statSync(folder, { bigint: true }); } catch { return; }
+  // a file system with no inode numbers (0, as FAT on Windows) is judged by the resolved path alone
+  const fold = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);
+  const resolved = (p) => { try { return fs.realpathSync(path.resolve(String(p))); } catch { return path.resolve(String(p)); } };
+  const where = fold(resolved(folder));
+  let place = resolved(keyFile);
+  for (;;) {
+    const parent = path.dirname(place);
+    if (parent === place) return;
+    place = parent;
+    let here;
+    try { here = fs.statSync(place, { bigint: true }); } catch { continue; }
+    if ((home.ino !== 0n && here.dev === home.dev && here.ino === home.ino) || fold(place) === where) throw new PackageError(`The key file ${keyFile} is inside the folder being signed; keep it outside the package.`);
+  }
+}
+
+/**
  * Add `role`'s Ed25519 signature over the packed digest. Only a package that is whole and matches its folder is signed.
  * The signature of the same role and kid is replaced; a publisher signature is always one.
  */
 export function sign(folder, keyFile, { role = 'publisher', kid, apply = false } = {}) {
   if (role !== 'publisher' && role !== 'organization') throw new PackageError('role is publisher or organization.');
+  keyOutside(folder, keyFile);
   const { pkg, files } = packed(folder);
   const problems = allProblems(pkg, files);
   if (problems.length) return { ok: false, applied: false, problems, notes: ['pack the folder again before it is signed'] };

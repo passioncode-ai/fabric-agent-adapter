@@ -72,12 +72,15 @@ imports a path that is not in it (FAA-190). List each link removed and review it
 folders (`node_modules`, virtual environments, which hold install paths and binaries), what `.gitignore` keeps out as
 instance (the real configuration, an instance folder in the checkout) and the files `pack` refuses by name (a
 credential-free `.npmrc` that `.fabric-source-ignore` names for the check included). `pack` does not read
-`.gitignore`, and an account id or a host is found only through the owner's list. The check is Python only (3.9+); a Node-only machine packs without it, and `pack` itself carries the kit's token files
-and a private `*.jwk` by their names: keep them in the instance.
+`.gitignore`, and an account id or a host is found only through the owner's list. The check is Python only (3.9+); a Node-only machine packs without it, and `pack` itself refuses the kit's token files by
+their names and any file holding a private JWK, whatever its name (FAA-190 (15)): keep them in the instance.
 
 It refuses to list what must not ship, and names each: a symlink, a special file, `.git`, `__pycache__`, `.DS_Store`,
 `*.pyc`, and files that are credentials by name (`.env` and `.env.*` but `.env.example|sample|template`, `*.pem`, `*.key`,
-`*.p12`, `*.pfx`, `*.jks`, `*.keystore`, `id_rsa`-style keys, `.npmrc`, `.netrc`, `.pypirc`). Pack a clean copy (above);
+`*.p12`, `*.pfx`, `*.jks`, `*.keystore`, the kit's token files `*.token` and `*.credential` such as `service.token` and
+`board.credential`, `id_rsa`-style keys, `.npmrc`, `.netrc`, `.pypirc`), and a file of any name holding a private JWK (a `d`
+member of 43 or more base64url characters, in JSON, escaped JSON or Python; a public JWK, with no `d`, ships; a test
+fixture's fake key is refused alike, so keep it out of the package). Both kits name the file and never echo the key. Pack a clean copy (above);
 remove in place only litter (`__pycache__`, `.DS_Store`, `*.pyc`) and a credential file the instance keeps elsewhere, never
 `.git`: a folder packed after deleting it would carry what `.gitignore` kept out, an instance folder among it (FAA-190). A member named twice in `fabric.package.json` is refused too. A folder swapped for a link while it is read is refused as a
 symlink. The Python kit reads each folder through an open handle, so a swap cannot redirect it. The Node kit has no
@@ -106,8 +109,10 @@ python3 scripts/fabric_package.py sign <folder> --key <key file> [--kid <kid>] [
 ```
 
 - The key is a file the person names: an Ed25519 private JWK (`kty` OKP, `crv` Ed25519, `d`, its `kid`) or a PKCS#8 PEM
-  from `openssl genpkey -algorithm ed25519` (then `--kid`). It must be mode 600. The kit never makes, keeps or prints a
-  key; where the key lives is the person's decision (contract v4 D3).
+  from `openssl genpkey -algorithm ed25519` (then `--kid`). It must be mode 600 and outside the folder being signed:
+  `sign` refuses a key that resolves inside it (through a link to the key or a linked folder alike) before it reads
+  either (FAA-190 (15)). A key file nested past 256 levels is no JWK, the same refusal in both kits (FAA-194 (32)). The
+  kit never makes, keeps or prints a key; where the key lives is the person's decision (contract v4 D3).
 - The signature covers `{"type": "fabric-package-signature/1", "role", "digest"}` in RFC 8785 form, so a publisher's
   signature never stands for a countersignature. `alg` is `EdDSA`, the one algorithm DEC-0051 admits.
 - Only a package that is whole and matches its folder is signed. A publisher signature is always one (re-signing replaces

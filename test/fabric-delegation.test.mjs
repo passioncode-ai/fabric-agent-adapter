@@ -115,6 +115,10 @@ test('JwksCache follows DL-15: ten minutes, an unknown kid re-read at most once 
   const before = calls.length; await cache.get('estate-new'); assert.equal(calls.length, before, 'a failed read waits before the next try');
   now[0] += d.JWKS_RETRY_SECONDS; await cache.get('estate-new'); assert.equal(calls.length, before + 1);
   for (const bad of ['http://hub.example/jwks.json', 'ftp://x/j', 'https://u:p@hub.example/j', 'https://h\\u:p@hub.example/j', 'https://@hub.example/j', '']) assert.throws(() => new d.JwksCache(bad), /key set/);
+  // FAA-200 (52): each credential form is refused as a credential, not by a later rule (the URL's own user, the authority as written)
+  for (const bad of ['https://u:p@hub.example/j', 'https://h\\u:p@hub.example/j', 'https://\\u:p@hub.example/j', 'https://@hub.example/j']) {
+    assert.throws(() => new d.JwksCache(bad), /a key set URL carries no credentials/, bad);
+  }
   // 0.56.0 unit r13, seam r14: the forms Python's urlsplit reads as loopback (or 3.13+ counts as one) are refused here too.
   for (const bad of ['http://[::1%3A80]/j', 'http://[::1]%2Eevil.example/j', 'http://[::1]x/j', 'http://[::ffff:127.0.0.1]/j',
     'https://hub.example:99999/j', 'http://127.0.0.1:65536/j', 'https://:443/j', 'https://', 'https://[1.2.3.4]/j']) assert.throws(() => new d.JwksCache(bad));

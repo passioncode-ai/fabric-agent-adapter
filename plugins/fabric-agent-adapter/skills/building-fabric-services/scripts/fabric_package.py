@@ -56,11 +56,16 @@ from fabric_package_schema import (  # noqa: E402,F401 - the schema reading (FAA
     _problems,
     schema_problems,
 )
-# What pack refuses to list: version-control and cache litter, and files that are credentials by their name. Matched
+# What pack refuses to list: version-control and cache litter, and files that are credentials by their name, the kit's
+# own token files (`service.token`, fabric_auth; `board.credential`, fabric_hub) among them (FAA-190 (15)). Matched
 # whole (fullmatch) and with JavaScript's `.`, so a name ending in a newline is judged as fabric-package.mjs judges it.
 JUNK = re.compile(r"\.git|__pycache__|\.DS_Store|%s*\.pyc" % _JS_DOT)
-SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)" % (_JS_DOT, _JS_DOT))
+SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore|token|credential)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)"
+                         % (_JS_DOT, _JS_DOT))
 SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
+#: A file holding a private JWK, whatever its name (FAA-190 (15)): a `d` member of 32 bytes or more in base64url, in
+#: JSON, escaped JSON or Python, as the source check's JWK_PRIVATE reads one. A public JWK (no `d`) is no refusal.
+PRIVATE_JWK = re.compile(rb"\\?[\"']d\\?[\"'][ \t]*:[ \t]*\\?[\"'][A-Za-z0-9_-]{43}")
 _B64URL = re.compile(r"[A-Za-z0-9_-]+")
 _PKCS8_ED25519 = bytes.fromhex("302e020100300506032b657004220420")
 #: How deep a document read from disk may nest. Python's recursion limit and Node's stack give out at different depths,
@@ -133,9 +138,11 @@ def read_signing_key(path: Any, kid: Optional[str] = None) -> Tuple[bytes, str]:
         raise PackageError("The key file %s is readable by others (mode %o); chmod 600 it first." % (path, stat.st_mode & 0o777))
     text = raw.decode("utf-8", "replace").strip(JS_WHITESPACE)  # as JavaScript's trim: a leading BOM goes too
     if text.startswith("{"):
-        try:
+        try:  # past MAX_NESTING no key: Node's JSON.parse reads deeper than Python's stack (FAA-194 (32))
+            if _nesting(text) > MAX_NESTING:
+                raise ValueError("nested too deeply")
             jwk = json.loads(text, parse_constant=fd._no_constant)  # NaN and Infinity are no JSON, as JSON.parse says
-        except ValueError:
+        except (ValueError, RecursionError):
             raise PackageError("The key file is neither a JWK nor a PEM private key.") from None
         if not isinstance(jwk, dict) or jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519" or not isinstance(jwk.get("d"), str):
             raise PackageError("The key file must be an Ed25519 private JWK (kty OKP, crv Ed25519, with d).")
@@ -597,6 +604,8 @@ def _walk(here: Any, rel: str, files: Dict[str, bytes], refused: List[str]) -> N
                 continue
             if why is None:
                 data, why = _read_file(entry.name if by_fd else entry.path, here if by_fd else None)
+                if why is None and PRIVATE_JWK.search(data):  # type: ignore[arg-type]
+                    why = "a private key (a JWK's d)"
                 if why is None:
                     files[where] = data  # type: ignore[assignment]
                     continue
@@ -609,7 +618,7 @@ def _walk(here: Any, rel: str, files: Dict[str, bytes], refused: List[str]) -> N
 
 def read_folder(folder: Any) -> Dict[str, bytes]:
     """Every regular file under ``folder`` by its forward-slash path. Refuses a symlink, a special file, version-control
-    or cache litter, and a file that is a credential by its name, each named, so the person can remove it or pack a
+    or cache litter, a file that is a credential by its name and a file holding a private JWK, each named, so the person can remove it or pack a
     clean copy. A file or folder it cannot read is a refusal naming it (``Cannot read <path>: EACCES.``), never
     skipped (FAA-78, finding 41); a file is opened without following a link and read only when it is a regular file
     (finding 42)."""
@@ -869,12 +878,37 @@ def _packed(root: Path) -> Tuple[Dict[str, Any], Dict[str, bytes]]:
     return _load_json(files[PACKAGE_FILE], PACKAGE_FILE), files
 
 
+def _key_outside(root: Path, key_path: Any) -> None:
+    """Refuse a key file inside the folder being signed (FAA-190 (15)): it would ship in the package. Judged by where
+    the key resolves to and by the folder's identity (device and inode), so a link to the key, a path through a linked
+    folder and a case-folding file system do not hide it. A folder or key that cannot be read is judged later."""
+    try:
+        home = os.stat(str(root))
+    except OSError:
+        return
+    # a file system with no inode numbers (0, as FAT on Windows) is judged by the resolved path alone
+    where = os.path.normcase(os.path.realpath(os.path.abspath(str(root))))
+    place = os.path.realpath(os.path.abspath(str(key_path)))
+    while True:
+        parent = os.path.dirname(place)
+        if parent == place:
+            return
+        place = parent
+        try:
+            here = os.stat(place)
+        except OSError:
+            continue
+        if (home.st_ino and (here.st_dev, here.st_ino) == (home.st_dev, home.st_ino)) or os.path.normcase(place) == where:
+            raise PackageError("The key file %s is inside the folder being signed; keep it outside the package." % key_path)
+
+
 def sign(folder: Any, key_path: Any, role: str = "publisher", kid: Optional[str] = None, apply: bool = False) -> Dict[str, Any]:
     """Add ``role``'s Ed25519 signature over the packed digest. Only a package that is whole and matches its folder is
     signed. The signature of the same role and kid is replaced; a publisher signature is always one."""
     if role not in ("publisher", "organization"):
         raise PackageError("role is publisher or organization.")
     root = Path(folder)
+    _key_outside(root, key_path)
     pkg, files = _packed(root)
     problems = _all_problems(pkg, files)
     if problems:

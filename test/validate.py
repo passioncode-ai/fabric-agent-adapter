@@ -21,7 +21,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric; observing-products builds nothing, it watches a product.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.91.5"
+VERSION = "0.92.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -477,6 +477,11 @@ def validate_skill(name: str, errors: List[str]) -> None:
         errors.append("%s: scenarios.json must name its skill" % name)
     if len(scenarios.get("scenarios", [])) < 3:
         errors.append("%s: at least three behaviour scenarios are required" % name)
+    # FAA-200 (40): every copy of the shared page-without-a-descriptor scenario describes the service the kit now
+    # requires, whose descriptor names its source.repository (refused without it since 0.62.0).
+    for scenario in scenarios.get("scenarios", []):
+        if scenario.get("id") == "page-without-a-descriptor" and "source.repository" not in json.dumps(scenario.get("expected")):
+            errors.append("%s: scenario page-without-a-descriptor must expect a descriptor naming source.repository" % name)
 
 
 # #region contract-pin — docs: README.md#contract-pin
@@ -876,6 +881,21 @@ def node_floor_problems(root: Path = ROOT) -> List[str]:
                                 % (rel, lineno, found.group(0).strip(".(")))
     return problems
 
+# FAA-200 (23): a Node test that starts Python passes -B, so a suite run leaves no __pycache__ beside the kit's scripts.
+PYTHON_SPAWN = re.compile(r"spawn(?:Sync)?\(\s*(?:'python3?'|'py'|python(?:\[0\])?)\s*,\s*(?P<args>[^)]{0,80})")
+
+
+def python_bytecode_problems(root: Path = ROOT) -> List[str]:
+    """Every python spawn in test/*.mjs names -B among its first arguments."""
+    problems: List[str] = []
+    for path in sorted((root / "test").glob("*.mjs")):
+        text = path.read_text(encoding="utf-8")
+        for found in PYTHON_SPAWN.finditer(text):
+            if "'-B'" not in found.group("args"):
+                problems.append("%s:%d starts python without -B, which leaves __pycache__ beside the scripts"
+                                % (path.relative_to(root).as_posix(), text.count("\n", 0, found.start()) + 1))
+    return problems
+
 # FAA-212: a module vendored on its own leaves references/kit-modules.md behind, so a shipped script that writes an
 # example scheme in angle brackets carries the legend itself.
 HTTPS_EXAMPLE = "<https>"
@@ -1135,6 +1155,7 @@ def validate_repo() -> List[str]:
     errors.extend(credential_url_problems())
     errors.extend(shipped_pattern_problems())
     errors.extend(node_floor_problems())
+    errors.extend(python_bytecode_problems())
     errors.extend(https_legend_problems())
     errors.extend(shipped_template_problems())
     errors.extend(private_term_problems()[0])

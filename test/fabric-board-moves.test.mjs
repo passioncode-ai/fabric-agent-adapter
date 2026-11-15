@@ -17,7 +17,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 async function fakeHub(t, capabilities) {
   const dir = tempDir('faa056-');
   const root = path.join(dir, 'fabric');
-  const child = spawn('python3', [path.join(here, 'fake_fabric_hub.py'), 'serve', '--root', root, ...capabilities.flatMap((c) => ['--capability', c])],
+  const child = spawn('python3', ['-B', path.join(here, 'fake_fabric_hub.py'), 'serve', '--root', root, ...capabilities.flatMap((c) => ['--capability', c])],
     { stdio: ['pipe', 'pipe', 'inherit'] });
   const line = await new Promise((resolve, reject) => {
     let buf = '';

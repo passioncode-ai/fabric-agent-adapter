@@ -153,7 +153,9 @@ class PackTests(unittest.TestCase):
 
     def test_pack_refuses_what_must_not_ship(self):
         write_agent(self.root)
-        for name in (".env", ".env.local", "deploy.pem", "signing.key", "id_ed25519", ".npmrc", ".DS_Store", "x.pyc"):
+        # FAA-190 (15): the kit's token files are credentials by their names too
+        for name in (".env", ".env.local", "deploy.pem", "signing.key", "id_ed25519", ".npmrc", ".DS_Store", "x.pyc",
+                     "service.token", "board.credential", ".token"):
             (self.root / name).write_text("x")
             with self.assertRaises(fp.PackageError) as caught:
                 fp.pack(self.root)
@@ -183,6 +185,29 @@ class PackTests(unittest.TestCase):
         (self.root / fp.PACKAGE_FILE).unlink()
         with self.assertRaisesRegex(fp.PackageError, "first"):
             fp.pack(self.root)
+
+    def test_pack_refuses_a_file_holding_a_private_jwk_whatever_its_name(self):
+        """FAA-190 (15): a private JWK (its `d`) is refused by what the file holds; a public one ships."""
+        write_agent(self.root)
+        k = V["keys"]["publisher"]
+        d = b64url(bytes.fromhex(k["seed"]))
+        private = json.dumps(dict(k["jwk"], d=d))
+        cases = {"k.jwk": private, "keys/signer.json": private, "notes.txt": "see " + json.dumps(json.dumps({"kty": "OKP", "d": d})),
+                 "bin/key.py": "KEY = {'kty': 'OKP', 'd': '%s'}\n" % d}
+        for rel, text in cases.items():
+            (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / rel).write_text(text)
+            with self.assertRaises(fp.PackageError) as caught:
+                fp.pack(self.root)
+            self.assertIn("%s (a private key (a JWK's d))" % rel, str(caught.exception))
+            self.assertNotIn(d, str(caught.exception), "the refusal never echoes the key")
+            (self.root / rel).unlink()
+        (self.root / "trust").mkdir()
+        (self.root / "trust" / "publisher.jwk").write_text(json.dumps(k["jwk"]))
+        (self.root / "short.json").write_text('{"d": "%s"}' % d[:42])  # under 32 bytes: no Ed25519 private key
+        answer = fp.pack(self.root)
+        self.assertTrue(answer["ok"], answer["problems"])
+        self.assertIn("trust/publisher.jwk", [f["path"] for f in answer["package"]["files"]], "a public JWK ships")
 
     def test_pack_names_every_problem_and_writes_nothing(self):
         write_agent(self.root)
@@ -419,6 +444,60 @@ class PackTests(unittest.TestCase):
             answer = fp.sign(self.root, made, kid="example-2026")
             pkg = dict(json.loads((self.root / fp.PACKAGE_FILE).read_text()), signatures=[answer["signature"]])
             self.assertTrue(fp.verify_package(pkg, {"publisher": [answer["publicKey"]]})["ok"], "a key openssl made verifies")
+
+    def test_sign_refuses_a_key_inside_the_folder(self):
+        """FAA-190 (15): a key file inside the folder being signed would ship with it; sign refuses it before reading it,
+        by its resolved place, so neither a link to it nor a path through a linked folder gets it past."""
+        write_agent(self.root)
+        fp.pack(self.root, apply=True)
+        k = V["keys"]["publisher"]
+        jwk = json.dumps(dict(k["jwk"], d=b64url(bytes.fromhex(k["seed"]))))
+        inside = self.root / "keys" / "signer"
+        inside.parent.mkdir()
+        inside.write_text(jwk)
+        inside.chmod(0o600)
+        before = (self.root / fp.PACKAGE_FILE).read_bytes()
+        with self.assertRaisesRegex(fp.PackageError, "inside the folder being signed"):
+            fp.sign(self.root, inside, apply=True)
+        with self.assertRaisesRegex(fp.PackageError, "inside the folder being signed"):
+            fp.sign(self.root / "bin" / "..", self.root / "keys" / ".." / "keys" / "signer")
+        if os.name == "posix":
+            os.symlink(inside, Path(self.tmp.name) / "outside-link")
+            with self.assertRaisesRegex(fp.PackageError, "inside the folder being signed"):
+                fp.sign(self.root, Path(self.tmp.name) / "outside-link")
+            os.symlink(self.root, Path(self.tmp.name) / "alias")
+            with self.assertRaisesRegex(fp.PackageError, "inside the folder being signed"):
+                fp.sign(Path(self.tmp.name) / "alias", inside)
+            with self.assertRaisesRegex(fp.PackageError, "inside the folder being signed"):
+                fp.sign(self.root, Path(self.tmp.name) / "alias" / "keys" / "signer")
+        self.assertEqual((self.root / fp.PACKAGE_FILE).read_bytes(), before, "a refused key writes nothing")
+        shutil.rmtree(self.root / "keys")
+        self.assertTrue(fp.sign(self.root, self.key())["ok"], "a key outside the folder still signs")
+        sibling = Path(self.tmp.name) / (self.root.name + "-keys")  # a name that starts like the folder is outside it
+        sibling.mkdir()
+        (sibling / "signer.jwk").write_text(jwk)
+        (sibling / "signer.jwk").chmod(0o600)
+        self.assertTrue(fp.sign(self.root, sibling / "signer.jwk")["ok"])
+
+    def test_a_deeply_nested_key_file_is_a_refusal_not_a_traceback(self):
+        """FAA-194 (32): past MAX_NESTING a key file is no JWK, in both kits alike, whether it ends or not."""
+        write_agent(self.root)
+        fp.pack(self.root, apply=True)
+        for name, text in (("open", '{"a":' + "[" * 200000), ("closed", '{"a":' + "[" * 5000 + "]" * 5000 + "}"),
+                           ("just-past", '{"a":' + "[" * fp.MAX_NESTING + "]" * fp.MAX_NESTING + "}")):
+            with self.subTest(name):
+                path = Path(self.tmp.name) / ("deep-%s.jwk" % name)
+                path.write_text(text)
+                path.chmod(0o600)
+                with self.assertRaisesRegex(fp.PackageError, "neither a JWK nor a PEM private key"):
+                    fp.read_signing_key(path)
+                with self.assertRaisesRegex(fp.PackageError, "neither a JWK nor a PEM private key"):
+                    fp.sign(self.root, path)
+        run = subprocess.run([sys.executable, str(SCRIPTS / "fabric_package.py"), "sign", str(self.root), "--key",
+                              str(Path(self.tmp.name) / "deep-open.jwk")], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 1, run.stderr)
+        self.assertEqual(run.stderr, "")
+        self.assertIn("neither a JWK nor a PEM private key", json.loads(run.stdout)["error"])
 
     def test_the_command_line(self):
         write_agent(self.root)

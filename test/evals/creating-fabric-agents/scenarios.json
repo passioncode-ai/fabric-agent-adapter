@@ -188,7 +188,7 @@
       "request": "example-agent shows a settings page on http://127.0.0.1:8765 and has no Fabric service descriptor.",
       "expected": [
         "does not open or link the page in a browser",
-        "makes the agent a fabric-service/0.1 service through building-fabric-services (descriptor, well-known document, login code, declared dashboard), or files a board row for that when it is not this task"
+        "makes the agent a fabric-service/0.1 service through building-fabric-services (a descriptor that names its source.repository, the well-known document, the login code route and a declared dashboard), or files a board row for that when it is not this task"
       ]
     },
     {

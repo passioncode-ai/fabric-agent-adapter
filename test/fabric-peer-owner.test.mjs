@@ -192,7 +192,7 @@ test('both ends of a real pair and the listener are this account', { skip: !['da
 test('a connection not yet accepted reads its listener\'s owner (0.74.0 unit reading 3)', { skip: !['darwin', 'linux'].includes(process.platform) }, async (t) => {
   // A listening socket nobody calls accept() on: Linux prints such a connection's server end with uid 0, inode 0.
   const { spawn } = await import('node:child_process');
-  const holder = spawn('python3', ['-c', "import socket,time\ns=socket.socket()\ns.bind(('127.0.0.1',0))\ns.listen(8)\n"
+  const holder = spawn('python3', ['-B', '-c', "import socket,time\ns=socket.socket()\ns.bind(('127.0.0.1',0))\ns.listen(8)\n"
     + "print(s.getsockname()[1],flush=True)\ntime.sleep(60)"], { stdio: ['ignore', 'pipe', 'inherit'] });
   t.after(() => holder.kill());
   const port = await new Promise((r) => holder.stdout.once('data', (d) => r(Number(String(d).trim()))));

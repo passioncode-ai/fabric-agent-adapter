@@ -191,6 +191,15 @@ def is_kit_source(path: Path) -> bool:
         return False
 
 
+def older_kit_source(path: Path, manifest: Dict[str, Any]) -> bool:
+    """Whether the kit directory holding `path` names a version older than `manifest`'s (an unreadable one counts)."""
+    try:
+        version = json.loads((path.parent / "kit.json").read_text(encoding="utf-8")).get("version")
+        return parse_version(str(version)) < parse_version(manifest["version"])
+    except (OSError, ValueError, AttributeError, TypeError, KitError):
+        return True
+
+
 class OutOfTime(Exception):
     """A shared deadline (`until`, a time.monotonic() value) passed before the answer was known."""
 
@@ -220,6 +229,12 @@ def repo_root(start: Path, until: Optional[float] = None) -> Optional[Path]:
 
 
 def find_copies(repo: Path, until: Optional[float] = None) -> List[Path]:
+    """The kit's page files in `repo` that are copies of it (the kit's own directory is not one)."""
+    return [p for p in listed_page_files(repo, until=until) if not is_kit_source(p)]
+
+
+def listed_page_files(repo: Path, until: Optional[float] = None) -> List[Path]:
+    """Every file in `repo` named as one of the kit's page files, the kit's own directory included."""
     listed = git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--",
                  "*fabric-dashboard.css", "*fabric-dashboard.js", "*fabric-button.js", until=until)
     if listed is not None:
@@ -233,7 +248,7 @@ def find_copies(repo: Path, until: Optional[float] = None) -> List[Path]:
             if len(Path(top).relative_to(repo).parts) > 6:
                 dirs[:] = []
             paths += [Path(top) / f for f in files if f in COPIED]
-    return sorted(p for p in paths if p.name in COPIED and p.is_file() and not is_kit_source(p))
+    return sorted(p for p in paths if p.name in COPIED and p.is_file())
 
 
 def copy_state(path: Path, manifest: Dict[str, Any]) -> Dict[str, Any]:
@@ -313,9 +328,14 @@ def status(repo: Path, manifest: Optional[Dict[str, Any]] = None, directory: Opt
     manifest = manifest or load_manifest()
     if services is None:
         services = services_of(repo, directory, until=until)
-    copies = [copy_state(p, manifest) for p in find_copies(repo, until=until)]
+    listed = listed_page_files(repo, until=until)
+    copies = [copy_state(p, manifest) for p in listed if not is_kit_source(p)]
+    # FAA-200 (2): a checkout of the kit's own source (this repository) serves its sample's dashboard from the kit
+    # itself: it holds no copy, yet its dashboard has the current kit. A kit directory older than the running one (an
+    # old installed copy of the plugin) is not taken for it.
+    kit_source = any(is_kit_source(p) and not older_kit_source(p, manifest) for p in listed)
     return {"repository": str(repo), "kit": "%s@%s" % (KIT_NAME, manifest["version"]), "copies": copies,
-            "services": services,
+            "kitSource": kit_source, "services": services,
             "dashboard": bool(copies) or (bool(services) and declares_dashboard(repo, until=until))}
 
 
@@ -334,7 +354,7 @@ def notice_line(report: Dict[str, Any], script: Path) -> Optional[str]:
         versions = sorted({c["version"] or "unmarked" for c in stale})
         return "[fabric-agent-adapter] %s is built from %s %s; %s is current. %s" % (
             where, KIT_NAME, " and ".join(versions), current, tail)
-    if not report["copies"] and report["dashboard"]:
+    if not report["copies"] and report["dashboard"] and not report.get("kitSource"):
         return "[fabric-agent-adapter] %s has a dashboard without %s; %s is current. %s" % (
             where, KIT_NAME, current, tail)
     return None
@@ -454,7 +474,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print("%s: current kit %s" % (report["repository"], report["kit"]))
             for c in report["copies"]:
                 print("  %-8s %s (%s)" % (c["state"], c["path"], c["version"] or "no version marker"))
-            if not report["copies"]:
+            if report["kitSource"]:
+                print("  holds the kit's own source (%s), which its dashboards use" % report["kit"])
+            elif not report["copies"]:
                 print("  no kit copy" + (" (services %s declare a dashboard)" % ", ".join(report["services"])
                                          if report["dashboard"] and report["services"] else ""))
             if report["services"]:
