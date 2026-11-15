@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.92.0 (2026-11-15)
+
+### Fixed
+
+- `pack` no longer ships a kit's credential files or a private key: `*.token` and `*.credential` join the refused names,
+  and any file holding a private JWK's `d` member is refused by its content whatever its name (a public JWK still
+  ships); `sign --key` refuses a key that sits inside the folder being signed, through links and `..` paths. Python and
+  Node answer byte for byte the same (FAA-190 item 15). The source check's token-file pattern is folded into the same
+  list. A key file nested past 256 levels is one refusal in both kits, not a Python traceback (FAA-194 item 32).
+- The SessionStart dashboard-kit notice no longer tells a checkout of the kit's own source that its sample lacks the kit
+  (FAA-200 item 2).
+- Every Python the Node tests start runs with `-B`, so a test run leaves no `__pycache__`; `test/validate.py` holds it
+  (FAA-200 item 23). The TLS sample takes `--exit-with-parent` and exits when its parent's pipe closes (item 7).
+- `working-with-fabric` `status` judges OpenClaw's registration for another user's copy; Hermes reads NOT_RUN with the
+  reason (FAA-233).
+
+### Documentation
+
+- `remote-placement.md` and `provider-entry.md` state the source-name rule the kit applies since 0.81.0 (DEC-0151):
+  `task-pipeline-dashboard.example.com` and an `sk-` word are names, an `sk-` key with a digit and an upper-case letter
+  is refused (FAA-200 item 32, `test_source_repository_prose`). `protocol.md` covers upgrading a vendored kit with
+  `source.repository` (item 42); the scenario copies name it (item 40, held by `validate.py`).
+
 ## 0.91.5 (2026-11-15)
 
 ### Fixed

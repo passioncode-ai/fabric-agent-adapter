@@ -471,7 +471,7 @@ test('FAA-190 (15), FAA-194 (32): both kits answer a key inside the folder, a pr
   k.pack(root, { apply: true });
   const tool = path.join(scripts, 'fabric_package.py');
   const both = (args) => {
-    const py = spawnSync('python3', [tool, ...args], { encoding: 'utf8' });
+    const py = spawnSync('python3', ['-B', tool, ...args], { encoding: 'utf8' });
     assert.equal(py.stderr, '', 'no traceback');
     const lines = [];
     const code = k.main(args, (line) => lines.push(line));
