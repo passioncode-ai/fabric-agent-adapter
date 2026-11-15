@@ -823,9 +823,30 @@ class RestrictedTable(unittest.TestCase):
     @unittest.skipUnless(sys.platform == "darwin", "sysctl on macOS")
     def test_sysctl_is_trusted_only_when_the_child_is_seen(self):
         with mock.patch.object(P, "_child_listener_seen", return_value=None):
-            self.assertFalse(P._calibrate_sysctl(), "a child that could not be started proves nothing")
+            self.assertIsNone(P._calibrate_sysctl(), "a child that could not be started proves nothing, either way")
         with mock.patch.object(P, "_child_listener_seen", return_value=False):
-            self.assertFalse(P._calibrate_sysctl())
+            self.assertIs(P._calibrate_sysctl(), False)
+
+    @unittest.skipUnless(sys.platform == "darwin", "sysctl on macOS")
+    def test_an_unproven_calibration_is_asked_again_after_a_minute(self):  # FAA-273 item 11, the cache half
+        saved = P._SYSCTL_OK[0]
+        self.addCleanup(P._SYSCTL_OK.__setitem__, 0, saved)
+        clock = [1000.0]
+        answers = [None, None, True]
+        with mock.patch.object(P.time, "monotonic", side_effect=lambda: clock[0]), \
+                mock.patch.object(P, "_calibrate_sysctl", side_effect=lambda: answers.pop(0)) as calibrate:
+            P._SYSCTL_OK[0] = None
+            self.assertEqual(P.method(), "netstat")
+            self.assertEqual(P.method(), "netstat")
+            self.assertEqual(calibrate.call_count, 1, "within the minute the unknown is not asked again")
+            clock[0] += P.RECALIBRATE_SECONDS
+            self.assertEqual(P.method(), "netstat")
+            self.assertEqual(calibrate.call_count, 2)
+            clock[0] += P.RECALIBRATE_SECONDS
+            self.assertEqual(P.method(), "sysctl")
+            clock[0] += 10 * P.RECALIBRATE_SECONDS
+            self.assertEqual(P.method(), "sysctl")
+            self.assertEqual(calibrate.call_count, 3, "a proven layout is kept for the process")
 
     def test_own_connection_takes_the_vouch_as_the_node_twin_does(self):
         restricted = P.Owner(P.UNKNOWN, None, None, "netstat", P.TABLE_RESTRICTED + ": netstat printed nothing")

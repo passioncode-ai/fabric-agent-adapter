@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 """peer_owner: which OS account owns each end of a loopback TCP connection.
 
-    peer_owner 1.3.1+kit.8: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
+    peer_owner 1.3.1+kit.9: Observatory's peer_owner (passioncode-ai/project-observatory-dashboard,
     `observatory/engine/peer_owner.py`, vendored at f86f0622, read against 2180235c for 1.2.0 and a69c6fee for 1.3.1),
     kit layer L0 (DEC-0154 HA-2, FAA-226, FAA-258). 1.3.1's proof from this account's own sockets (DEC-0155 RT-2) is the
     kit's `fabric_socket_proof`, asked when it sits beside this file (FAA-292, FAA-327); else this file
@@ -49,7 +49,8 @@ answer; two live rows with the same addresses are `unknown` (`several-rows`), ne
   handle (`xi_inpp` equals `so_pcb`); the `xtcpcb_n` that follows gives the TCP state. Measured on macOS 26: about 4 ms
   for 770 sockets. The layout is not an API, so the first read in a process calibrates it on a connected pair of its
   own (the listener and both ends must read back with their exact addresses, this uid and this pid); a layout that
-  fails is not used again in that process.
+  fails is not used again in that process, and a calibration child that proved nothing is asked again after
+  RECALIBRATE_SECONDS, `netstat` answering meanwhile (FAA-273 item 11).
 - macOS 27.2 shows an ad-hoc-signed interpreter (a Homebrew Python) only its own sockets: the calibration also requires
   a child's listener, and a restricted table (DEC-0155 RT-1) is `unknown` with a reason beginning `table-restricted`,
   never another account's, unless `fabric_socket_proof` finds the socket in this account's own processes (RT-2) or a
@@ -82,13 +83,9 @@ import threading
 import time
 from typing import NamedTuple, Optional, Tuple
 
-PEER_OWNER_VERSION = "1.3.1+kit.8"  # this file's own, for projects that copy it: 1.3.1 with the kit's differences above
+PEER_OWNER_VERSION = "1.3.1+kit.9"  # this file's own, for projects that copy it: 1.3.1 with the kit's differences above
 
-THIS_ACCOUNT = "this-account"
-ANOTHER_ACCOUNT = "another-account"
-SYSTEM = "system"
-UNKNOWN = "unknown"
-NONE = "none"
+THIS_ACCOUNT, ANOTHER_ACCOUNT, SYSTEM, UNKNOWN, NONE = "this-account", "another-account", "system", "unknown", "none"
 KINDS = (THIS_ACCOUNT, ANOTHER_ACCOUNT, SYSTEM, UNKNOWN, NONE)
 
 #: The most table bytes one read accepts: about 6,800 sockets at 616 bytes each, measured on macOS 26 (FAA-260).
@@ -98,9 +95,7 @@ TIMEOUT_SECONDS = 2.0
 #: `listener(port)` answers from a read at most this old (a doctor asks several times in a row).
 LISTENER_TTL = 1.0
 
-NETSTAT = "/usr/sbin/netstat"
-PS = "/bin/ps"
-LSOF = "/usr/sbin/lsof"
+NETSTAT, PS, LSOF = "/usr/sbin/netstat", "/bin/ps", "/usr/sbin/lsof"
 
 #: Why a table hides other processes' sockets (FAA-267: macOS 27.2 shows an ad-hoc-signed Python only its own).
 TABLE_RESTRICTED = "table-restricted"
@@ -418,8 +413,10 @@ def parse_windows_tcp_table(blob: bytes, family: int) -> list[Row]:
 # -- readers: the live table on this host ------------------------------------------------------------------------------
 
 _LOCK = threading.Lock()
-#: macOS: None until the first read calibrates the sysctl layout, then True or False for this process.
+#: macOS: None until the first read calibrates the sysctl layout, then True or False for this process, or the monotonic
+#: time to calibrate again after a child that proved nothing (FAA-273 item 11: an unknown is never kept for good).
 _SYSCTL_OK: list = [None]
+RECALIBRATE_SECONDS = 60.0
 
 
 def _run(argv: list[str]) -> str:
@@ -538,11 +535,11 @@ def _child_listener_seen(rows_of) -> Optional[bool]:
         child.stdout.close()
 
 
-def _calibrate_sysctl() -> bool:
+def _calibrate_sysctl() -> Optional[bool]:
     """Open a connected pair of this process's own (listen, connect, accept) and read it back
     (`calibration_holds`), then require a child process's listener in the table too: a table that shows this process
     alone (FAA-267) would pass the first check and find nobody else. A layout that does not hold is never trusted in
-    this process, and `netstat` answers instead."""
+    this process, and `netstat` answers instead; a child that proved nothing (None) is asked again later (FAA-273)."""
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client = accepted = None
     try:
@@ -554,7 +551,8 @@ def _calibrate_sysctl() -> bool:
         if not calibration_holds(rows, _address(probe.getsockname()), _address(client.getsockname()),
                                  uid=_posix_uid(), pid=os.getpid()):
             return False
-        return _child_listener_seen(lambda: parse_pcblist_n(_sysctl_blob())) is True
+        seen = _child_listener_seen(lambda: parse_pcblist_n(_sysctl_blob()))
+        return None if seen is None else seen is True
     except (TableUnreadable, OSError, struct.error, ValueError):
         return False
     finally:
@@ -567,9 +565,11 @@ def method() -> str:
     """The method the next read on this host uses: sysctl, netstat, proc, iphlpapi or none."""
     if sys.platform == "darwin":
         with _LOCK:
-            if _SYSCTL_OK[0] is None:
-                _SYSCTL_OK[0] = _calibrate_sysctl()
-            return "sysctl" if _SYSCTL_OK[0] else "netstat"
+            known = _SYSCTL_OK[0]
+            if known is None or (type(known) is float and time.monotonic() >= known):
+                found = _calibrate_sysctl()
+                _SYSCTL_OK[0] = time.monotonic() + RECALIBRATE_SECONDS if found is None else found
+            return "sysctl" if _SYSCTL_OK[0] is True else "netstat"
     if sys.platform.startswith("linux"):
         return "proc"
     if sys.platform == "win32":
