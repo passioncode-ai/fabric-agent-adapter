@@ -34,7 +34,7 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.90.4 | FAA-336: building-fabric-services' description names the topics it missed; trigger evals haiku 47/50, sonnet 48/50 (`docs/evidence/evals/2026-11-15-faa-336.md`) | PR #305, merge `2511d6d4`, tag `v0.90.4`, release run 43683592736 success (six validate jobs, release, publish through OIDC), npm `latest` 0.90.4; checks: validate, prose, eval and kit tests 61 OK, tests touching descriptions 180 OK, both plugin validations; real-client trigger runs USD 0.66 (nine runs) |
 | 0.91.0 | the repin to contract `v0.1.0+2026-11-15` (FAA-337): `FAC-SEM-176` in the kit (`agent_surface_rules`), `entitlement/2` and `org-instance/1` known revisions, vectors regenerated; the probe's login evidence; board request `55323b0f` answered | PR #306, merge `6674dfbd`, tag `v0.91.0`, release run 43685600198 success (six validate jobs, release, publish through OIDC), npm `latest` 0.91.0, GitHub release `v0.91.0`; checks on `71d63175`: unittest 2457 OK (31 skipped), Node 781 (0 failed), validate, both plugin validations; the contract (`37042845`) and the launcher (`f4f4fd19`) told |
 | 0.91.1 | wave 7 part two, FAA-273 (11), the cache half: an unproven macOS calibration is asked again after a minute; DEC-0157 recorded as FAA-338 | PR #308, merge `61c7fc21`, tag `v0.91.1`, release run 43709779817 success (six validate jobs, release, publish through OIDC; the release job queued about 25 minutes for a runner), npm `latest` 0.91.1; checks: both tests seen failing on `main` first, every module reading peer_owner 205 OK, Node peer-owner and kit 28 (0 failed), validate, both plugin validations |
-| 0.91.2 | FAA-273 (22): the env rule's lower-case part stated exactly; (21) found done | release receipts follow the merge |
+| 0.91.2 | FAA-273 (22): the env rule's lower-case part stated exactly; (21) found done | PR #309, merge `187fc708`, tag `v0.91.2`, release run 43711488440 success (six validate jobs, release, publish through OIDC), npm `latest` 0.91.2; checks: validate, kit, supervisors and adapt-project tests 87 OK, both plugin validations |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -48,13 +48,7 @@ Recorded for the operator; later builder briefs name the rule.
    (0.62.0 from `~/.passioncode/current`) until the launcher's 0.2.77 (adapter 0.86.0) and 0.2.78 (0.87.0, PR #343) are
    published; both wait on the operator's answer to the launcher's question `5f196939`.
 1a. 0.91.0 is on the contract's `v0.1.0+2026-11-15`. Next on that line: `build_well_known` refusing `FAC-SEM-176` once the services on this machine serve an agent surface (two were asked; one done, `04502c77`), and the contract's CT-316 (DEC-0169's open questions).
-2. Wave 7, part two, row by row (0.86.0 took FAA-200 (8), (13), (37), (38), (44), (56); each open item is first
-   re-measured on `main`, as 2026-11-14 did for FAA-200's): what is left is in each row's status line. The large rows: FAA-190
-   (104 items, about 90 open), FAA-200 (57, about 45), FAA-194 (40, about 30), FAA-273 ((5), (8), (10), (11) the
-   cache half, (15), (17), (21), (22); `fabric_peer_owner.py` sits at 1000 lines, so (11) needs room made first),
-   FAA-192 ((5), (19), (20), (21), (25), (26), (28), (30)), FAA-187 ((3), (10)). Sub-agents of this account hit their
-   weekly limit on 2026-11-13 and come back 2026-11-18 22:00 Europe/Warsaw: from then, one triage agent per large row
-   and two or three builders, as waves 5 and 6 ran.
+2. Wave 7, part two, row by row (each open item is first re-measured on `main`). FAA-273 has left (5) and (17), the calibration's cost under a caller's deadline (measure under load first), and (8), (10), (15), the env rule's balance of false refusals and missed keys (change it only with a sampled run beside it, as 0.76.0's record did: release paths and random keys). The large rows: FAA-190 (about 90 open), FAA-200 (about 45), FAA-194 (about 30); FAA-338 (DEC-0157's builder guidance) waits for the next repin. Sub-agents of this account come back 2026-11-18 22:00 Europe/Warsaw: from then, one triage agent per large row and two or three builders, as waves 5 and 6 ran.
 4. The three hosts the operator offered (2026-11-13): a Hermes A2A endpoint (FAA-10's live test), a Windows machine
    with Claude Code (FAA-183), a headless Mac with root for one LaunchDaemon install (FAA-286 (4)); each waits for how
    to reach it.
