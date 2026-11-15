@@ -203,8 +203,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
    leaseId, close: true}`, with the packet's body and `done[]` and `notes` added, no values in it. Without `workflowId` Observatory
    reads the write as the start of a new workflow and refuses it; the `owner` is the one the accept named. The status is
    `done` for `completed` and for a request step 3's reply answered; for
-   `failed_known` it is `blocked` with the reason in `notes` (Observatory takes `in_progress`, `done` and `blocked`;
-   OBS-323 shipped with no `failed`, FAA-215).
+   `failed_known` it is `failed` with the reason in `notes` (Observatory takes `failed` since v0.35.17, OBS-525; FAA-201).
+   An older Observatory refuses `failed` (OBS-323 shipped `in_progress`, `done` and `blocked` only, FAA-215): the run
+   writes the same checkpoint again as `blocked`. Fabric's own take-back of a workflow still closes it `blocked`.
 7. **End the run.** The one write left is the retro after work
    (`observatory_lesson` and insight/1 lines in `insights/` (the project's data folder when it has one or the repository is public, else the repository; the data folder is the one its AGENTS.md names, else `<name>-data/` beside the main checkout), or one line that there is nothing; no values; ADR-0188's
    `retro-after-work`); nothing more: no board sweep, no work claim, no
