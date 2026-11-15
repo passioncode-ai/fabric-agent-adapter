@@ -72,7 +72,7 @@ session lets it go, or at once when it restarts with accepted work for the slot.
 TAKE_BACK = {"id": "board.take-back", "title": "Take back", "tool": "board.take-back", "gate": "relayed"}
 TAKE_BACK_INPUT = {"type": "object", "properties": {"capability": {"type": "string"}}, "required": ["capability"],
                    "additionalProperties": False}
-BOARD_ITEM = '<li>{capability} <button type="button" data-take-back="{capability}">Take back</button></li>'
+BOARD_ITEM = '<li>{capability} <button class="fd-btn" type="button" data-take-back="{capability}">Take back</button></li>'
 BOARD_JS = """document.addEventListener('click', function (e) {
   var cap = e.target && e.target.getAttribute && e.target.getAttribute('data-take-back');
   if (!cap) return;

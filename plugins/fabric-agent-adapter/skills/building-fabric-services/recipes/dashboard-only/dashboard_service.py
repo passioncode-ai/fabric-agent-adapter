@@ -102,8 +102,11 @@ def render_sections(snapshot: Dict[str, Any]) -> str:
         head = "".join("<th>%s</th>" % _cell(c) for c in columns)
         body = "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % _cell(c) for c in (r if isinstance(r, list) else [r]))
                        for r in rows[:500])
-        out.append('<section><h2>%s</h2><p class="fd-hint">From %s.</p><table><thead><tr>%s</tr></thead><tbody>%s</tbody>'
-                   "</table></section>" % (_cell(section.get("title", "")), _cell(section.get("source", "")), head, body))
+        # A wide table scrolls in its own box (ED-4), so the page never scrolls sideways on a narrow panel (ED-1).
+        title = _cell(section.get("title", ""))
+        out.append('<section><h2>%s</h2><p class="fd-hint">From %s.</p><div class="fd-scroll" data-fd-label="%s table">'
+                   '<table class="fd-table"><thead><tr>%s</tr></thead><tbody>%s</tbody></table></div></section>'
+                   % (title, _cell(section.get("source", "")), title, head, body))
     return "".join(out)
 
 

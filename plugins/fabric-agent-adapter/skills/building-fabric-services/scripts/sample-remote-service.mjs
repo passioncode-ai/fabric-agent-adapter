@@ -103,7 +103,7 @@ function handler(req, res) {
   }
   if (req.method === 'GET' && url.pathname === '/') {
     if (!codes.sessionValid(k.cookieValue(req.headers.cookie, k.REMOTE_SESSION_COOKIE))) return send(res, 401, 'Sign in from Fabric Dashboards.', { 'Content-Type': 'text/plain; charset=utf-8' });
-    return send(res, 200, '<!doctype html><meta charset="utf-8"><title>Example Agent</title><h1>Example Agent</h1>', { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'" });
+    return send(res, 200, '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Example Agent</title><h1>Example Agent</h1></html>', { 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'" });
   }
   return send(res, 404, null);
 }
