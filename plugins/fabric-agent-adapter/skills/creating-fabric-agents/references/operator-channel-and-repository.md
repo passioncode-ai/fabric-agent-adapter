@@ -13,7 +13,9 @@ its stops with buttons: `fabric-operator-channel/0.1` (contract DEC-0034,
 steps:
 
 1. create a bot with @BotFather (for an agent that answers people on Telegram, a bot of its own, never
-   the bot that answers people: the contract's channel-agent.md);
+   the bot that answers people: the contract's channel-agent.md; the bot that answers people binds the
+   operator's numeric id too, by a link code typed in its own private chat, whose message it consumes with
+   no reply and no ticket, counted as `not_a_ticket`, so the operator's word reaches it there: CA-8);
 2. put its token into the operator's secret store (Project Observatory where it is installed) under
    the name the agent reads (for example `EXAMPLE_AGENT_OPERATOR_BOT_TOKEN`), never into a chat, a
    file or the bundle;

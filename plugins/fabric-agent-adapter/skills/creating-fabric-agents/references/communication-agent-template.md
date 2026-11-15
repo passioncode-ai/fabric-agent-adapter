@@ -26,8 +26,8 @@ repositories and not reproducible from this one, never a forecast for yours.
 
 The template is a folder in the format of an organization agent template (fabric-workspace
 `knowledge/system/templates.md`, S2, readable by the organization's members; the format: [agent-templates.md](agent-templates.md)):
-the prompt in `TEMPLATE.md` (role and duties in sections 1 and 4, connections and data in 5, learning in 6, the contract and
-its doors in 8, checks in 9), and beside it the manifest, the connections, the access levels and data rooms (the brief's
+the prompt in `TEMPLATE.md` (role and duties in sections 1 and 4, placement in 0 and 8, connections and data in 5,
+learning in 6, the contract, its doors and the turn record with each route's outcome in 8, checks in 9), and beside it the manifest, the connections, the access levels and data rooms (the brief's
 section 0 names them per organization), the acceptance check, the assembly and the changelog. S2's operating rules A1 to
 A12 apply by reference.
 

@@ -5,12 +5,14 @@ agent that answers people, not that agent: see the paragraph after the table. Un
 template (`templates/communication-agent/`, read through `references/communication-agent-template.md`) the plan-and-draft call writes the draft, not this recipe's `answer()`:
 the draft carries a `[KB:<id>]` marker for each knowledge id the plan used, and the agent runs `check_reply(draft,
 question, prompt_ids, max_chars=..., sources=...)` on it for the code checks. `prompt_ids` are the ids of the items
-placed in the plan's prompt, never the plan's own list (an id the plan names outside them is held as a suspected
-injection); each tool result of the turn enters both under an id of its own, with its system-of-record fields only, never one
+placed in the plan's prompt, never the plan's own list (an id the plan names outside them is held by the code's
+evidence hold, named apart from the plan's own injection verdict); each tool result of the turn enters both under an id of its own, with its system-of-record fields only, never one
 a customer wrote (`tool.order`; the citation takes letters,
 digits, dot, dash and underscore, no colon; knowledge ids too, so map one that does not). Every template turn that went through the plan runs
 `check_reply` on its final text, except an off-topic plan, a plan whose only actions are ask_clarification or handoff,
-and a triage reply: the route decides, never the draft's markers. The final pass keeps the markers. A handle
+a triage reply and the operator's decision in a chat: the route decides, never the draft's markers. The operator's
+decision skips `check_reply` (its claims rule would read an empty source) and keeps the false-state, language and
+script, length and dash gates, the agent's link, handle and number gate reading the operator's message as its source. The final pass keeps the markers. A handle
 (`@name`) is not one of `check_reply`'s claims: it is the agent's own gate. Repair of a plan draft, and the
 checker of another vendor, stay the agent's own (agents-that-answer-people.md): the recipe's `repair=` reruns only its
 own `answer()` draft, and it has no checker. Built only on the service

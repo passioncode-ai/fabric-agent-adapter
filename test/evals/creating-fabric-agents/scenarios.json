@@ -349,6 +349,18 @@
         "gives the edit and the approval tools with the same effect, checks, audit record and idempotency key, declared as actions (DEC-0121 AP-1)",
         "keeps the inventory of the person's functions beside their capabilities in the repository and builds any missing row before the release"
       ]
+    },
+    {
+      "id": "the-communication-template-gives-each-route-its-outcome-and-its-guards",
+      "request": "We are building our support bot from the Fabric communication agent template. Which turn outcome does each route record (a clarifying question, an injection hold, a partly covered answer), what happens to my link-code message on the bot and to a channel with replies switched off, and what keeps spend and promises in check?",
+      "expected": [
+        "maps every route of the pipeline to one turn outcome from the support quality standard's A1 list in one table (a partly covered answer is general guidance), and names the routes with no A1 entry of their own (a clarifying question from the plan, the code's evidence hold) as recorded provisionally and asked of the standard's owner",
+        "consumes the operator's link-code message on the answering bot in step 0: no reply, no ticket, counted in `not_a_ticket` volume (CA-8), and audits every operator word with the message quoted and its sender id, apart from the logs",
+        "asks the one clarifying question only where the channel's `clarifying_question` is true, and on a channel with `replies_enabled: false` hands every ticket on arrival to its queue",
+        "runs one ordered list of pre-send gates: check_reply is skipped only by route, and a skipped route keeps the code's own link, handle and number gate",
+        "keeps a daily guard under the monthly stop, refuses to go live when the catalogue has no open-vendor row for a lane that reads people, and writes a commitments-ledger row for every holding line",
+        "gives every adversarial batch of the acceptance its expected route and turn outcome"
+      ]
     }
   ]
 }
