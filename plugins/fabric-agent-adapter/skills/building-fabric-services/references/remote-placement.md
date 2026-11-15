@@ -48,12 +48,15 @@ platform's secrets, set from Observatory or the person's secret manager, never O
   (since 0.49.3; a new registration without it is refused since 0.62.0, before the token file is written, and a
   rotation that passes none keeps the installed one, FAA-198); the
   kit checks it as the schema's URI (RFC 3986 characters, a host and a valid port when it names an
-  authority) and refuses a `user:password@`, a user outside a URL's authority (an scp form), and a value shaped like a
-  credential in its user, query or fragment or as a path segment; a path segment in lower case, or of letters with no
-  digit, is the repository's name unless a key's shape starts it or follows a `.`, `_` or `-` in it (since 0.62.0, so
-  `task-pipeline-dashboard` and `Task-Pipeline-Dashboard` are accepted, a name that starts with `sk-` and 16 more
-  characters is not, in any case, nor `%73k-` and the rest; a host is read for a key's shape anywhere in it, inside a word too, so
-  `task-pipeline-dashboard.example.com` is refused, FAA-200 (32)). A path and a user information are read as written and with
+  authority) and refuses a `user:password@`, a user outside a URL's authority (an scp form), and a credential in its
+  user, host, query or fragment or as a path segment, read with the contract's detector (DEC-0151 at the pin, since
+  0.81.0, FAA-258): a provider key's prefix (`sk-`, `ghp_`, `xoxb-`, `AKIA`, `glpat-`) counts only in its canonical case
+  and at a word's start (the value's start, a character that is no ASCII letter or digit, or an escape), and an `sk-`
+  key only with a digit and an upper-case letter in 16 or more characters or a digit in 32 or more; a JWT and a long
+  run mixing upper case, lower case and digits count too. So `task-pipeline-dashboard`, `Task-Pipeline-Dashboard` and
+  the host `task-pipeline-dashboard.example.com` (an `sk-` inside a word), `sk-learn-tutorial-notebooks` (no digit)
+  and an upper-case `SK-` are names, while an `sk-` key with a digit and an upper-case letter is refused as a path
+  segment, after a `.`, `_` or `-` in one, written `%73k-`, or as a host label (FAA-200 (32)). A path and a user information are read as written and with
   their ASCII escapes decoded, and a password as written and as the URL standard reads it (`<https>://h\u:pw@x/r` is
   refused). A checkout's origin in scp form (`git@host:owner/name.git`) is refused: write it `https://host/owner/name`,
   the repository's own page with no path below it, no query and no fragment, which the estate's readers join.

@@ -31,7 +31,7 @@ async function fakeHub(t, capabilities = ['video.render']) {
   const dir = tempDir('faa12b-');
   const root = path.join(dir, 'fabric');
   const args = [path.join(here, 'fake_fabric_hub.py'), 'serve', '--root', root, ...capabilities.flatMap((c) => ['--capability', c])];
-  const child = spawn('python3', args, { stdio: ['pipe', 'pipe', 'inherit'] });
+  const child = spawn('python3', ['-B', ...args], { stdio: ['pipe', 'pipe', 'inherit'] });
   const line = await new Promise((resolve, reject) => {
     let buf = '';
     child.stdout.on('data', (c) => {
@@ -447,7 +447,7 @@ test('the Python and Node kits write a checkpoint each other reads', async () =>
   const file = path.join(dir, 'cp.json');
   const cp = new fb.Checkpoint(file);
   cp.put({ request: 'req_000000001', step: 'claimed', keys: {} });
-  const py = spawn('python3', ['-c', `import sys; sys.path.insert(0, ${JSON.stringify(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts'))}); import fabric_board as fb; print(fb.Checkpoint(${JSON.stringify(file)}).entries["req_000000001"]["step"])`]);
+  const py = spawn('python3', ['-B', '-c', `import sys; sys.path.insert(0, ${JSON.stringify(path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts'))}); import fabric_board as fb; print(fb.Checkpoint(${JSON.stringify(file)}).entries["req_000000001"]["step"])`]);
   let out = '';
   py.stdout.on('data', (c) => { out += c; });
   await new Promise((resolve) => py.on('exit', resolve));
@@ -1912,7 +1912,7 @@ test('FAA-155: the Python and Node kits read each other\'s slot record', async (
   cp.put({ request: 'req_000000001', step: 'lapsed', keys: {} });
   cp.slot('video.render', { project: 'p', generation: 3, moved: 4 });
   const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
-  const py = spawnSync('python3', ['-c', `import sys, json; sys.path.insert(0, ${JSON.stringify(scripts)}); import fabric_board as fb
+  const py = spawnSync('python3', ['-B', '-c', `import sys, json; sys.path.insert(0, ${JSON.stringify(scripts)}); import fabric_board as fb
 c = fb.Checkpoint(${JSON.stringify(file)}); print(json.dumps(c.slots, sort_keys=True)); c.slot("text.write", {"project": "p", "generation": 1})`], { encoding: 'utf8' });
   assert.equal(py.status, 0, py.stderr);
   assert.deepEqual(JSON.parse(py.stdout), { 'video.render': { generation: 3, moved: 4, project: 'p' } });

@@ -15,7 +15,7 @@ const scripts = path.join(here, '../plugins/fabric-agent-adapter/skills/building
 const VECTORS = JSON.parse(fs.readFileSync(path.join(here, 'fixtures/contract/package-vectors.json'), 'utf8'));
 const V = VECTORS.vectors;
 const PEM_LABEL = `PRIVATE ${'KEY'}`; // split, so no scanner mistakes this test for a key
-const hasPython = spawnSync('python3', ['--version']).status === 0;
+const hasPython = spawnSync('python3', ['-B', '--version']).status === 0;
 
 function tempDir(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fabric-package-'));
@@ -449,15 +449,15 @@ test('both kits pack and sign the same folder to the same bytes', { skip: !hasPy
   assert.ok(k.sign(node, key, { apply: true }).ok);
   const tool = path.join(scripts, 'fabric_package.py');
   for (const args of [['pack', py, '--apply'], ['sign', py, '--key', key, '--apply']]) {
-    const r = spawnSync('python3', [tool, ...args], { encoding: 'utf8' });
+    const r = spawnSync('python3', ['-B', tool, ...args], { encoding: 'utf8' });
     assert.equal(r.status, 0, r.stdout + r.stderr);
   }
   assert.equal(fs.readFileSync(path.join(py, k.PACKAGE_FILE), 'utf8'), fs.readFileSync(path.join(node, k.PACKAGE_FILE), 'utf8'));
-  const pyDry = spawnSync('python3', [tool, 'pack', py], { encoding: 'utf8' });
+  const pyDry = spawnSync('python3', ['-B', tool, 'pack', py], { encoding: 'utf8' });
   const { package: _p, ...nodeDry } = k.pack(node);
   const { package: _q, ...pyAnswer } = JSON.parse(pyDry.stdout);
   assert.deepEqual(pyAnswer, nodeDry, 'the same answer, notes and problems included');
-  const pyRefusal = spawnSync('python3', [tool, 'pack', path.join(dir, 'nowhere')], { encoding: 'utf8' });
+  const pyRefusal = spawnSync('python3', ['-B', tool, 'pack', path.join(dir, 'nowhere')], { encoding: 'utf8' });
   const lines = [];
   k.main(['pack', path.join(dir, 'nowhere')], (line) => lines.push(line));
   assert.equal(pyRefusal.stdout.trim(), lines.join('\n'));
@@ -516,7 +516,7 @@ test('FAA-261: pack writes secrets[] and state[] from fabric.source.json, as the
   assert.deepEqual(k.sourcePackageFindings(source, pkg).map((f) => f.instancePath), ['/package/secrets/1/optional']);
   if (hasPython) {
     const py = make('py');
-    const r = spawnSync('python3', [path.join(scripts, 'fabric_package.py'), 'pack', py, '--apply'], { encoding: 'utf8' });
+    const r = spawnSync('python3', ['-B', path.join(scripts, 'fabric_package.py'), 'pack', py, '--apply'], { encoding: 'utf8' });
     assert.equal(r.status, 0, r.stdout + r.stderr);
     assert.equal(fs.readFileSync(path.join(py, k.PACKAGE_FILE), 'utf8'), fs.readFileSync(path.join(node, k.PACKAGE_FILE), 'utf8'));
   }
@@ -531,7 +531,7 @@ test('FAA-261: pack writes secrets[] and state[] from fabric.source.json, as the
   assert.deepEqual(refused.package.secrets.map((s) => s.name), ['MAIL_OAUTH', 'OTHER_KEY', 'THIRD_KEY']);
   assert.equal(readPkg(node).secrets[1].name, 'OTHER_KEY');
   if (hasPython) {
-    const r = spawnSync('python3', [path.join(scripts, 'fabric_package.py'), 'pack', node], { encoding: 'utf8' });
+    const r = spawnSync('python3', ['-B', path.join(scripts, 'fabric_package.py'), 'pack', node], { encoding: 'utf8' });
     const { package: _p, ...pyAnswer } = JSON.parse(r.stdout);
     const { package: _q, ...nodeAnswer } = refused;
     assert.deepEqual(pyAnswer, nodeAnswer, 'the same refusal from both twins');

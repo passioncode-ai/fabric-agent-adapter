@@ -590,7 +590,16 @@
       "expected": [
         "a job's input request is an action (id its key, tool fabric.job.get, gate relayed) whose decision rides in the _meta of the fabric.job.get call that carries inputResponses, one call per key",
         "the kit gates them only with McpToolServer(input_actions=True), off by default in 0.50.0 because Fabric's hub forwards no decision before CT-125 (decision D8); turning it on is a later change",
-        "nothing is applied when the gate refuses an answer",
+        "nothing is applied when the gate refuses an answer"
+      ]
+    },
+    {
+      "id": "comparison-step-as-an-action",
+      "trap": "the service declared a step where two people compare a code as a relayed action an agent could answer, or declared humanStep comparison to readers pinned before DEC-0142, which then refused every action it declared",
+      "request": "example-agent pairs a second machine: the operator compares a six-digit code shown on both screens and confirms it. Declare that confirm button as a Fabric action.",
+      "expected": [
+        "declares it with gate human and humanStep comparison (a comparison of codes between two people, DEC-0142), never relayed or none: the step stays the person's",
+        "a call without the person answers human-step-required with data.humanStep comparison and data.url, the direct link to that step",
         "an action whose humanStep is comparison is declared only to readers at or after DEC-0142: a 0.56.0 or older kit and Fabric Dashboards before 0.8.9 refuse the whole declaration"
       ]
     },

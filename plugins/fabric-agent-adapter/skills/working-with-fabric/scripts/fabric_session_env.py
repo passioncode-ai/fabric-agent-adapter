@@ -563,6 +563,30 @@ def pi_registration(cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional
     return found
 
 
+def openclaw_registration(env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
+    """OpenClaw's `mcp.servers.fabric` (or `fabric-mcp`) in its strict-JSON config, the file host_hooks.py edits
+    (`$OPENCLAW_CONFIG_PATH`, else `openclaw.json` in `$OPENCLAW_STATE_DIR`, default `~/.openclaw`): its command, the file
+    and the entry's name, or None; an entry turned off or a remote one names none, a JSON5 file is not read (FAA-233)."""
+    env = os.environ if env is None else env
+    state = Path(env.get("OPENCLAW_STATE_DIR") or str(_home(env) / ".openclaw"))
+    path = Path(env.get("OPENCLAW_CONFIG_PATH") or str(state / "openclaw.json"))
+    servers = _member(_json_file(path), "mcp", "servers")
+    for name in ("fabric", "fabric-mcp"):
+        entry = servers.get(name) if isinstance(servers, dict) else None
+        command = entry.get("command") if isinstance(entry, dict) else None
+        if isinstance(command, str) and command.strip() and entry.get("enabled") is not False:
+            return {"command": command, "file": str(path), "name": name}
+    return None
+
+
+def hermes_config(env: Optional[Dict[str, str]] = None) -> Optional[Path]:
+    """Hermes' config.yaml when it exists (`$HERMES_HOME`, default `~/.hermes`), else None. It is YAML, which the standard
+    library does not read, so its `mcp_servers.fabric` is never judged here (FAA-233: NOT_RUN)."""
+    env = os.environ if env is None else env
+    path = Path(env.get("HERMES_HOME") or str(_home(env) / ".hermes")) / "config.yaml"
+    return path if a_file(path) else None
+
+
 def registered_command(host: str, cwd: Path, env: Optional[Dict[str, str]] = None) -> Optional[str]:
     """The command the host runs as `fabric` (FAA-232, FAA-233): Claude Code's entry for this folder, Codex's
     config.toml, Kimi Code's mcp.json, OpenCode's opencode.json, Pi's mcp.json; None when the host registers none, or

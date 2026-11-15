@@ -9,7 +9,9 @@
 //     `x-forwarded-proto` must say https or the request is refused.
 //
 //   node sample-remote-service.mjs --origin https://agent.example.com --port 8443 \
-//     --token-file service.token --session-key-file session.key [--tls-cert c.pem --tls-key k.pem]
+//     --token-file service.token --session-key-file session.key [--tls-cert c.pem --tls-key k.pem] [--exit-with-parent]
+// --exit-with-parent: exit when the parent closes this process's stdin (a pipe it holds), so a test runner that is
+// killed leaves no sample behind (FAA-200 (7)). Never under a supervisor, whose stdin is empty from the start.
 // (service.token, as the Python sample names it: the source check reads a *.token file as a credential, FAA-190.)
 //
 // Secrets come from files (or from the platform as FABRIC_SERVICE_TOKEN / FABRIC_SESSION_KEY),
@@ -113,3 +115,8 @@ const server = tlsSelf
   : http.createServer(handler);
 server.listen(port, tlsSelf ? '127.0.0.1' : '0.0.0.0', () => console.log(`example agent on ${origin} (listening on ${port}${tlsSelf ? ', TLS' : ', behind a TLS router'})`));
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => server.close(() => process.exit(0)));
+if ('exit-with-parent' in args) {
+  // The parent holds the other end of stdin; its end, or an error reading it, means the parent is gone.
+  for (const event of ['end', 'error', 'close']) process.stdin.on(event, () => process.exit(0));
+  process.stdin.resume();
+}

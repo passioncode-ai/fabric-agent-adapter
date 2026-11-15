@@ -573,12 +573,11 @@ def register(args: argparse.Namespace) -> int:
         # DEC-0061: who installed it, by role and never by name — a person runs this register command.
         "installedAt": fs.now_iso(), "installedBy": {"by": "person", "role": "operator", "tool": "sample_service.py register %s" % VERSION},
     }
-    # A refused descriptor leaves no manifest naming it (0.62.0 unit reading 1).
+    # A refused descriptor leaves no manifest naming it (0.62.0 unit reading 1). Its source.repository is always set and
+    # validated here (None or "" is no URI), so the kit's source_refusal can never refuse it (FAA-200 (53)).
     problems = fs.validate_descriptor(descriptor)
-    refusal = ("Descriptor is invalid: %s." % "; ".join(problems) if problems
-               else fs.source_refusal(descriptor, Path(args.services_dir) if args.services_dir else None))
-    if refusal:
-        print(refusal, file=sys.stderr)
+    if problems:
+        print("Descriptor is invalid: %s." % "; ".join(problems), file=sys.stderr)
         return 1
     services = Path(args.services_dir) if args.services_dir else None
     installed = fs.descriptor_path(args.id, args.instance, services)
