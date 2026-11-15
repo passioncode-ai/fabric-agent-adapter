@@ -160,7 +160,7 @@ DISPATCH_IF = (
     " Other values: no run; say so in the request's thread and stop. The run:")
 #: The conditional contract at its longest (a 64-character handoff and a session id) is held under Hermes' 4000
 #: characters by test_a_native_bridge_is_always_told_the_contract_and_writes_no_record; measure before adding words
-#: (3996 in 0.68.0 and in 0.69.0, 3999 in 0.71.0, 3996 in 0.72.0, 3994 in 0.79.0, 3996 with FAA-311: a new rule takes its characters back from the text around it).
+#: (3996 in 0.68.0 and in 0.69.0, 3999 in 0.71.0, 3996 in 0.72.0, 3994 in 0.79.0, 3996 with FAA-311, 3994 with FAA-201's `failed`: a new rule takes its characters back from the text around it).
 DISPATCH_CONTRACT = (
     " Do that "
     "request and end; never wait for a person. 1. `fabric_whoami`, then the packet "
@@ -178,9 +178,9 @@ DISPATCH_CONTRACT = (
     "`com.reconcile` and an observed result. After the lease, claim and reply: an in_progress checkpoint (`workflowId`, "
     "`leaseId`). Every checkpoint repeats `goal`, `constraints`, `artifacts` and `credentials` of "
     "`checkpoint.body` (not the answer's top-level `credentials` or the accept's "
-    "`pack`) unchanged (add `open`, `done` or `notes`; no value). 4. Do the work; renew (`com.renew`/`com.progress`) every 20 s; "
-    "work that cannot end by run-ends-at posts its state (`com.progress`); "
-    "if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known (observed: true) saying so and steps 6 and 7; "
+    "`pack`) unchanged (add `open`, `done` or `notes`; no value). 4. Work; renew (`com.renew`/`com.progress`) every 20 s; "
+    "work outlasting run-ends-at posts its state (`com.progress`); "
+    "if it called `com.effect_begin`, or when the request's deadline is not after run-ends-at plus 10 minutes, `com.complete` failed_known (observed: true) saying so, then 6 and 7; "
     "otherwise it is left accepted for the next run: skip 5 and 6, an in_progress checkpoint, no `close`."
     " Money, deletion, publication: `fabric_effect_request`; a sign-in, one-time code, secret "
     "typed in or handed out, or payment is a person's (none is in this chat), and so is a production step unless the operator's "
@@ -188,7 +188,7 @@ DISPATCH_CONTRACT = (
     "the answer. 5. `com.reply`, then "
     "`com.complete` (observed: true): completed, or failed_known with the reason. 6. Once the board took it, "
     "`observatory_checkpoint_write` with `workflowId` {workflow}, a `stepId`, "
-    "the `leaseId`, `close: true`, `status` done if completed, blocked if failed_known (reason in notes), the "
+    "the `leaseId`, `close: true`, `status` done if completed, failed if failed_known (reason in notes; refused: blocked), the "
     "packet's body plus `done` and `notes`. 7. Write the retro "
     "(`observatory_lesson` and insight/1 lines in `insights/`, or one line that there is nothing; no "
     "values), then end: no board sweep, work claim or watch-mail. On an error you cannot get past: complete the request failed_known if you hold its fence; close the workflow "

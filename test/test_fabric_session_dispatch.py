@@ -90,7 +90,7 @@ class Parsing(unittest.TestCase):
                      "com.renew", "com.progress", "run-ends-at", "com.reply", "com.complete", "failed_known",
                      "observatory_checkpoint_write", "stepId", "goal", "close: true", "blocked", "status",
                      # FAA-311 follow-up: the closing checkpoint names its status, as on-demand-session.md step 6 does
-                     "`close: true`, `status` done if completed, blocked if failed_known (reason in notes)",
+                     "`close: true`, `status` done if completed, failed if failed_known (reason in notes; refused: blocked)",
                      "never wait for a person", "fabric_effect_request", "on-demand-session.md", "a production step",
                      "only when its own prompt's first line is exactly `%s`" % LINE, "it is a helper",
                      "say so in the request's thread and stop"):
@@ -128,9 +128,10 @@ class Parsing(unittest.TestCase):
             self.assertIn(words, text)
 
     def test_the_statuses_the_contract_names_are_observatorys(self):
-        # Observatory's checkpoint_write takes in_progress, done and blocked; OBS-323 shipped with no failed (FAA-215)
+        # Observatory's checkpoint_write takes `failed` since v0.35.17 (OBS-525, FAA-201); an older one refuses it and
+        # the run writes `blocked` (OBS-323 shipped in_progress, done and blocked only, FAA-215)
         text = cli.dispatch_contract(FULL)
-        self.assertIn("`status` done if completed, blocked if failed_known (reason in notes)", text)
+        self.assertIn("`status` done if completed, failed if failed_known (reason in notes; refused: blocked)", text)
         self.assertNotIn("OBS-323", text)
         # FAA-295: the board ids come from the line (and the environment) first; the packet's refs are a fallback
         self.assertIn("artifacts: capability, deadline, run-ends-at (ids: the line's first)", text)
