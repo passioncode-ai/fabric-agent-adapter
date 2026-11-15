@@ -35,11 +35,14 @@ door to one. There is no function a person can reach and an agent cannot: not to
    route the page calls.
 3. A view with no read capability gets a read tool over the query the page already runs. A control with no tool gets
    its tool and its action declaration with a gate.
-4. Run the probe (`check_service.py`): `dashboard.agent-surface` fails a dashboard with no agent surface, or one whose
-   MCP surface serves no tool, and `interop.action-tools` fails a declared action whose tool is not served.
+4. Run the probe (`check_service.py`): `dashboard.agent-surface` fails a dashboard with no agent surface, one whose
+   MCP surface serves no tool, or an empty declared `surfaces.mcp.capabilities`, and `interop.action-tools` fails a declared action whose tool is not served.
 
 ## What the contract says today
 
 DEC-0121 AP-1 makes write parity normative for a service's actions. Read parity and the design order are the
-operator's rule, carried by these skills; the contract took it as its row CT-311 (a DEC extending AP-1 to
-reads, with its own rule code and vectors, follows) (FAA-332).
+operator's rule, carried by these skills, and since the contract's DEC-0169 (row CT-311, `main` `6adeecf3`) its
+normative text too: RP-1 (an agent reads what a person sees, with the same data, filters and paging), RP-2 (a function
+is built for the agent first) and RP-3 (`FAC-SEM-176`: a dashboard needs `surfaces.mcp` or `surfaces.a2a`, and a
+present `surfaces.mcp.capabilities` is never empty), which the probe's `dashboard.agent-surface` reads as the contract
+does (FAA-332, FAA-335). It binds a service at its next pin past that commit.

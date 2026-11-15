@@ -337,10 +337,26 @@ class ProbeActionsRuleTests(unittest.TestCase):
         for words in ("no agent surface", "AS-2", "DEC-0121 AP-1"):
             self.assertIn(words, evidence)
         self.assertEqual(self.rules.dashboard_agent_surface_verdict(page_only, None, remote=True)[0], "FAIL")
+        self.assertIn("surfaces.a2a", evidence)  # either door answers it (DEC-0169 RP-3)
         a2a = {"surfaces": {"dashboard": {"path": "/"}, "a2a": {"path": "/a2a", "protocolVersion": "1.0"}}}
         verdict, evidence = self.rules.dashboard_agent_surface_verdict(a2a, None, remote=True)
         self.assertEqual(verdict, "PASS", evidence)
         self.assertIn("A2A", evidence)
+
+    def test_the_rule_reads_as_fac_sem_176(self):  # FAA-335: contract DEC-0169 RP-3, agentSurfaceRules
+        a2a_local = {"surfaces": {"dashboard": {"path": "/"}, "a2a": {"path": "/a2a", "protocolVersion": "1.0"}}}
+        verdict, evidence = self.rules.dashboard_agent_surface_verdict(a2a_local, None)
+        self.assertEqual(verdict, "PASS", evidence)  # a card counts at any placement
+        empty = {"surfaces": {"dashboard": {"path": "/"}, "mcp": {"path": "/mcp", "capabilities": []}}}
+        verdict, evidence = self.rules.dashboard_agent_surface_verdict(empty, None)
+        self.assertEqual(verdict, "FAIL")  # an empty declared list fails without tools/list
+        for words in ("capabilities", "FAC-SEM-176"):
+            self.assertIn(words, evidence)
+        no_page = {"surfaces": {"mcp": {"path": "/mcp", "capabilities": []}}}
+        self.assertEqual(self.rules.dashboard_agent_surface_verdict(no_page, None)[0], "FAIL")  # with or without a dashboard
+        self.assertEqual(self.rules.dashboard_agent_surface_verdict({"surfaces": {"mcp": {"path": "/mcp"}}}, None)[0], "NOT_RUN")
+        listed = {"surfaces": {"dashboard": {"path": "/"}, "mcp": {"path": "/mcp", "capabilities": ["sample.echo"]}}}
+        self.assertEqual(self.rules.dashboard_agent_surface_verdict(listed, None)[0], "PASS")
 
     def test_a_dashboard_with_a_valid_declaration_passes_and_an_invalid_one_fails(self):
         ok = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}])
