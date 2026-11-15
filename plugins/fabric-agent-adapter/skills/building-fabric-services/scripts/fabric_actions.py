@@ -12,6 +12,7 @@ extensions/actions/0.1 (DEC-0121, FAC-SEM-142). Part of the service kit (layer L
   ``strictTime``).
 - ``actions_view(well_known)``: the host reader of the declaration, as the contract's ``actionsView``.
 - ``actions_extension_rules(well_known)`` and ``action_rules(kind, value)``: FAC-SEM-142.
+- ``agent_surface_rules(well_known)``: FAC-SEM-176 (DEC-0169 RP-3), as the contract's ``agentSurfaceRules``.
 - ``actions_extension(actions, capabilities)``: the ``extensions`` entry a service declares; it refuses a declaration
   FAC-SEM-142 would find, so a service never publishes one.
 - ``operator_decision(action, instruction, ..., source=None)``: the decision an agent relays in ``_meta.decision``
@@ -463,6 +464,22 @@ def authority_view(well_known: Any) -> Dict[str, Any]:
         if name in value:
             view[name] = value[name]
     return view
+
+
+def agent_surface_rules(well_known: Any) -> List[Dict[str, str]]:
+    """FAC-SEM-176 (DEC-0169 RP-3), as the contract's agentSurfaceRules: a service that serves a dashboard serves an agent
+    surface beside it (`surfaces.mcp` or `surfaces.a2a`), and a present `surfaces.mcp.capabilities` names a tool."""
+    surfaces = get(well_known, "surfaces")
+    surfaces = surfaces if isinstance(surfaces, dict) else {}
+    findings: List[Dict[str, str]] = []
+    if "dashboard" in surfaces and "mcp" not in surfaces and "a2a" not in surfaces:
+        findings.append({"code": "FAC-SEM-176", "instancePath": "/surfaces", "message": "a service that serves a dashboard "
+                         "serves an agent surface beside it: surfaces.mcp, or surfaces.a2a (DEC-0169 RP-3)"})
+    mcp = surfaces.get("mcp") if isinstance(surfaces.get("mcp"), dict) else {}
+    if isinstance(mcp.get("capabilities"), list) and not mcp["capabilities"]:
+        findings.append({"code": "FAC-SEM-176", "instancePath": "/surfaces/mcp/capabilities", "message": "an MCP surface "
+                         "serves at least one tool: an empty list is an agent surface an agent cannot use (DEC-0169 RP-3)"})
+    return findings
 
 
 def authority_extension_rules(well_known: Any) -> List[Dict[str, str]]:

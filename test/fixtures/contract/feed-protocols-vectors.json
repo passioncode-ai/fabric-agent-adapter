@@ -36,7 +36,8 @@
       "1"
     ],
     "entitlement": [
-      "1"
+      "1",
+      "2"
     ],
     "entitlement-key-set": [
       "1"
@@ -169,6 +170,9 @@
       "1"
     ],
     "org-key-set-draft": [
+      "1"
+    ],
+    "org-instance": [
       "1"
     ],
     "org-membership": [

@@ -343,6 +343,14 @@ class ProbeActionsRuleTests(unittest.TestCase):
         self.assertEqual(verdict, "PASS", evidence)
         self.assertIn("A2A", evidence)
 
+    def test_a_login_code_answer_that_is_not_json_says_so(self):  # FAA-337: the brand agent's Worker behind Access
+        self.assertEqual(self.rules.login_code_url(200, b'{"url": "/fabric/v1/login?code=x"}'), "/fabric/v1/login?code=x")
+        for body, words in ((b"<html>Access</html>", "not JSON"), (b"[]", "names no url"), (b'{"url": ""}', "names no url")):
+            with self.assertRaises(ValueError) as caught:
+                self.rules.login_code_url(200, body)
+            self.assertIn(words, str(caught.exception))
+            self.assertIn("HTTP 200", str(caught.exception))
+
     def test_the_rule_reads_as_fac_sem_176(self):  # FAA-335: contract DEC-0169 RP-3, agentSurfaceRules
         a2a_local = {"surfaces": {"dashboard": {"path": "/"}, "a2a": {"path": "/a2a", "protocolVersion": "1.0"}}}
         verdict, evidence = self.rules.dashboard_agent_surface_verdict(a2a_local, None)

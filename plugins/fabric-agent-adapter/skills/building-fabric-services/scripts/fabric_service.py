@@ -193,6 +193,7 @@ from fabric_actions import (  # noqa: F401
     actions_extension,
     actions_extension_rules,
     actions_view,
+    agent_surface_rules,
     decision_shape,
 )
 from fabric_connections import (  # noqa: F401

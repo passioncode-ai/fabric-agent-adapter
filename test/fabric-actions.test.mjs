@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import {
-  ACTIONS_EXTENSION_KEY as KEY, AUTHORITY_EXTENSION_KEY, authorityExtensionRules, authorityView, actionCaller, actionCallRules, actionDecision, operatorDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
+  ACTIONS_EXTENSION_KEY as KEY, AUTHORITY_EXTENSION_KEY, authorityExtensionRules, agentSurfaceRules, authorityView, actionCaller, actionCallRules, actionDecision, operatorDecision, actionRules, actionsExtension, actionsExtensionRules, actionsView, decisionShape,
 } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-actions.mjs';
 import { PRIMARY_CAPABILITY, ServiceError } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-base.mjs';
 import { buildWellKnown } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-descriptor.mjs';
@@ -60,6 +60,17 @@ test('the well-known fixtures', () => {
     assert.deepEqual(viewOf(actionsView(c.document)), c.view, c.name);
     assert.deepEqual(paths(actionsExtensionRules(c.document)), c.findings, c.name);
   }
+});
+
+test('the agent-surface fixtures', () => { // DEC-0169 RP-3, FAC-SEM-176 (FAA-337)
+  assert.equal(V.agentSurfaces.length, 4);
+  for (const c of V.agentSurfaces) {
+    const findings = agentSurfaceRules(c.document);
+    assert.deepEqual(paths(findings), c.findings, c.name);
+    assert.ok(findings.every((f) => f.code === 'FAC-SEM-176'), c.name);
+  }
+  assert.deepEqual(agentSurfaceRules({}), []);
+  assert.deepEqual(agentSurfaceRules({ surfaces: [] }), []);
 });
 
 test('the authority fixtures', () => { // DEC-0162 LV-5, LV-7

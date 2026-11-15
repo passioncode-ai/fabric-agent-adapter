@@ -364,6 +364,20 @@ export function authorityView(wellKnown) {
   return { declared: true, valid: true, ...(levels === undefined ? {} : { levels }), ...(actionLevels === undefined ? {} : { actionLevels }), ...(standing === undefined ? {} : { standing }) };
 }
 
+/** FAC-SEM-176 (DEC-0169 RP-3), as the contract's agentSurfaceRules: a dashboard needs surfaces.mcp or surfaces.a2a beside it, and a present surfaces.mcp.capabilities names a tool. */
+export function agentSurfaceRules(wellKnown) {
+  const surfaces = isObject(wellKnown) && isObject(wellKnown.surfaces) ? wellKnown.surfaces : {};
+  const findings = [];
+  if (Object.hasOwn(surfaces, 'dashboard') && !Object.hasOwn(surfaces, 'mcp') && !Object.hasOwn(surfaces, 'a2a')) {
+    findings.push({ code: 'FAC-SEM-176', instancePath: '/surfaces', message: 'a service that serves a dashboard serves an agent surface beside it: surfaces.mcp, or surfaces.a2a (DEC-0169 RP-3)' });
+  }
+  const mcp = isObject(surfaces.mcp) ? surfaces.mcp : {};
+  if (Array.isArray(mcp.capabilities) && mcp.capabilities.length === 0) {
+    findings.push({ code: 'FAC-SEM-176', instancePath: '/surfaces/mcp/capabilities', message: 'an MCP surface serves at least one tool: an empty list is an agent surface an agent cannot use (DEC-0169 RP-3)' });
+  }
+  return findings;
+}
+
 /** FAC-SEM-142 on the authority key of a well-known document (DEC-0162 LV-5, LV-7): a value that is not its schema's, an
  * organization named twice in `levels`, a level for an id that is not a relayed action of the actions declaration. */
 export function authorityExtensionRules(wellKnown) {

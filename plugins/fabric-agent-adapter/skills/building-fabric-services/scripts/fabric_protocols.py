@@ -14,7 +14,7 @@ if str(_Path(__file__).resolve().parent) not in _sys.path:  # the kit loads from
 #: Each contract protocol's published revisions, oldest first (the contract's `PROTOCOL_REVISIONS`, DEC-0067); the
 #: adapter's own test holds it equal to the contract's register at the adapter's pin, not in a vendored copy.
 PROTOCOL_REVISIONS: Dict[str, Tuple[str, ...]] = {
-    "access-log": ("1",), "activity-unit": ("1",), "approval": ("1",), "activity-summary": ("1",), "agent-directory": ("1",), "call-record": ("1",), "channel-agent-standard": ("1",), "coding-agents": ("1",), "credential-decision": ("1",), "credential-request": ("1",), "credential-revocation": ("1",), "enroll-token": ("1",), "entitlement": ("1",),
+    "access-log": ("1",), "activity-unit": ("1",), "approval": ("1",), "activity-summary": ("1",), "agent-directory": ("1",), "call-record": ("1",), "channel-agent-standard": ("1",), "coding-agents": ("1",), "credential-decision": ("1",), "credential-request": ("1",), "credential-revocation": ("1",), "enroll-token": ("1",), "entitlement": ("1", "2"),
     "entitlement-key-set": ("1",), "estate-record": ("1",), "execution-packet": ("1",),
     "fabric-actions": ("0.1",), "fabric-activity": ("0.1",), "fabric-agent-call": ("1",), "fabric-connections": ("0.1",), "fabric-credential-envelope": ("1",), "fabric-load": ("0.1",), "fabric-dashboard": ("0.1",), "fabric-delegation": ("0.1",), "fabric-device": ("0.1",),
     "fabric-interop": ("0.1", "0.2"), "fabric-local-channel": ("0.1",), "fabric-local-runner": ("0.1",), "fabric-machine-report": ("1",), "fabric-ops-digest": ("0.1",),
@@ -23,7 +23,7 @@ PROTOCOL_REVISIONS: Dict[str, Tuple[str, ...]] = {
     "fabric-provider": ("0.1",), "fabric-relay": ("0.1",), "fabric-secret-envelope": ("1",), "fabric-service": ("0.1",),
     "fabric-settings-backup": ("1",), "fabric-source": ("1",), "heartbeat": ("1",), "learning-note": ("1",), "levels": ("1",), "machine-report": ("1",), "mandate": ("1",), "memory": ("0.1",), "node-summary": ("1",),
     "operator-source": ("1",), "org-adaptation": ("1",), "org-adaptation-receipt": ("1",), "org-authority": ("1",), "org-authority-draft": ("1",), "org-key-set": ("1",), "org-key-set-draft": ("1",),
-    "org-membership": ("1", "2"), "org-root-registration": ("1",), "pairing-message": ("1",),
+    "org-instance": ("1",), "org-membership": ("1", "2"), "org-root-registration": ("1",), "pairing-message": ("1",),
     "peer-share-deletion": ("1",), "peer-share-frame": ("1",), "peer-share-revocation": ("1",),
     "pipeline": ("0.1",), "repair-request": ("1",), "repair-result": ("1",), "revocation-delta": ("1",), "session-handoff": ("1",), "standing": ("1",), "service-load": ("1",), "share-registration": ("1",),
     "share-registration-receipt": ("1",), "support-quality-daily": ("1",), "window-lease": ("1",),

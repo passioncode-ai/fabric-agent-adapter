@@ -4733,6 +4733,241 @@
    ]
   }
  ],
+ "agentSurfaces": [
+  {
+   "name": "service-well-known-agent-surface-a2a-only",
+   "description": "A dashboard beside an A2A surface and no MCP surface: an agent surface, no finding (FAC-SEM-176, DEC-0169).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     },
+     "a2a": {
+      "path": "/.well-known/agent-card.json",
+      "protocolVersion": "1.0"
+     }
+    },
+    "update": {
+     "available": null
+    }
+   },
+   "findings": []
+  },
+  {
+   "name": "service-well-known-agent-surface-dashboard-only",
+   "description": "A dashboard with no agent surface: a function only a person reaches (FAC-SEM-176, DEC-0169 RP-3).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     }
+    },
+    "update": {
+     "available": null
+    }
+   },
+   "findings": [
+    "/surfaces"
+   ]
+  },
+  {
+   "name": "service-well-known-agent-surface-no-tools",
+   "description": "An MCP surface that lists no tool (FAC-SEM-176, DEC-0169 RP-3).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "mcp": {
+      "path": "/mcp",
+      "transport": "streamable-http",
+      "capabilities": []
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     }
+    },
+    "update": {
+     "available": null
+    }
+   },
+   "findings": [
+    "/surfaces/mcp/capabilities"
+   ]
+  },
+  {
+   "name": "service-well-known-agent-surface-ok",
+   "description": "A dashboard and an MCP surface that serves tools: no finding (FAC-SEM-176, DEC-0169).",
+   "document": {
+    "protocol": "fabric-service/0.1",
+    "service": {
+     "id": "example-agent",
+     "instance": "default",
+     "name": "Example Agent",
+     "version": "0.2.0",
+     "build": {
+      "commit": "8b80be9",
+      "dirty": false,
+      "builtAt": "2026-09-28T17:40:00Z"
+     }
+    },
+    "process": {
+     "pid": 51234,
+     "startedAt": "2026-09-28T17:41:02Z"
+    },
+    "status": "degraded",
+    "degraded": [
+     {
+      "source": "llm",
+      "reason": "No model key: drafting is paused."
+     }
+    ],
+    "summary": [
+     {
+      "label": "Jobs running",
+      "value": 2
+     },
+     {
+      "label": "Awaiting you",
+      "value": 1,
+      "attention": true
+     }
+    ],
+    "surfaces": {
+     "dashboard": {
+      "path": "/dashboard",
+      "login": true
+     },
+     "mcp": {
+      "path": "/mcp",
+      "transport": "streamable-http",
+      "capabilities": [
+       "copy.write",
+       "research.topics"
+      ]
+     },
+     "events": {
+      "path": "/fabric/v1/events"
+     }
+    },
+    "update": {
+     "available": null
+    }
+   },
+   "findings": []
+  }
+ ],
  "fixtures": [
   {
    "name": "service-well-known-actions",
