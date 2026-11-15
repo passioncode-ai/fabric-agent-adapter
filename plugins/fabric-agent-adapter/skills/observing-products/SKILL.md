@@ -12,7 +12,7 @@ compatibility: >-
   from Project Observatory's vault by slot name when it is installed.
 metadata:
   author: PassionCode.ai
-  version: "0.91.1"
+  version: "0.91.2"
 ---
 
 # Observing products
