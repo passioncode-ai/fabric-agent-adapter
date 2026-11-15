@@ -1,6 +1,6 @@
 {
  "about": "Authority levels (DEC-0162) at the pin: the contract's fixtures/vectors/levels.json, each answer re-checked here by verifyOrgMembership and actionDecision. Written by make_levels_vectors.mjs, never by hand.",
- "commit": "ced7b29265c424688602dda998c0ea4db2ba46a9",
+ "commit": "2462c90b4108e56d35be6a275d9043059c95d5d0",
  "source": "fixtures/vectors/levels.json, src/levels.ts, src/org-membership.ts, src/actions.ts, src/mandate.ts",
  "keySet": {
   "type": "org-key-set/1",

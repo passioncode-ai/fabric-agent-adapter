@@ -89,6 +89,16 @@ class Vectors(unittest.TestCase):
         self.assertEqual(fa.authority_view({}), {"declared": False})
         self.assertEqual(fa.authority_extension_rules({"extensions": {fa.AUTHORITY_EXTENSION_KEY: []}})[0]["code"], "FAC-SEM-142")
 
+    def test_the_agent_surface_fixtures(self):  # DEC-0169 RP-3, FAC-SEM-176 (FAA-337)
+        self.assertEqual(len(V["agentSurfaces"]), 4)
+        for case in V["agentSurfaces"]:
+            with self.subTest(case["name"]):
+                findings = fa.agent_surface_rules(case["document"])
+                self.assertEqual(paths(findings), case["findings"])
+                self.assertTrue(all(f["code"] == "FAC-SEM-176" for f in findings))
+        self.assertEqual(fa.agent_surface_rules({}), [])
+        self.assertEqual(fa.agent_surface_rules({"surfaces": []}), [])
+
     def test_the_decision_and_extension_fixtures(self):
         self.assertEqual(len(V["fixtures"]), 19)  # DEC-0162: two decision fixtures, three of the authority extension
         for case in V["fixtures"]:

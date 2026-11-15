@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.91.0 (2026-11-15)
+
+The repin to Fabric Agent Contract `v0.1.0+2026-11-15` (`2462c90b`, FAA-337); `ced7b292` (`v0.1.0+2026-11-14.2`) stays
+supported for bundles issued under it.
+
+### Added
+
+- The kit reads DEC-0169's `FAC-SEM-176`: `agent_surface_rules(well_known)` / `agentSurfaceRules` (a dashboard beside
+  `surfaces.mcp` or `surfaces.a2a`, a present `surfaces.mcp.capabilities` never empty), held to the contract's four
+  fixtures in both twins. A service's own `build_well_known` does not refuse it yet; the probe reports it.
+- `entitlement/2` (DEC-0168) and `org-instance/1` (DEC-0170) are known protocol revisions.
+
+### Fixed
+
+- The probe's `login.single-use` names what came back when the login-code answer is not JSON or names no url
+  (`login_code_url`), instead of a bare JSON parse error; asked on the board for a dashboard behind an identity proxy.
+
+### Vectors
+
+- Regenerated on a clean tree of the pin: `feed-protocols-vectors.json` (the register), `actions-vectors.json`
+  (`agentSurfaces`), and the recorded commit of the levels, load, source and channel-agent vectors. Impact map:
+  `docs/evidence/specs/2026-11-15-faa-337-repin-2462c90b-impact-map.md`.
+
 ## 0.90.4 (2026-11-15)
 
 ### Changed

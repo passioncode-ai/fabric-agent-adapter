@@ -85,7 +85,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L2 | `fabric_package_schema` | the reading of `fabric-package.schema.json` with JavaScript's pattern and format semantics (FAA-92) |
 | L2 | `fabric_package` | `fabric-package/1`: pack, sign, verify; re-exports `schema_problems` (DEC-0050, DEC-0051) |
 | L3 | `fabric_protocols` | protocol revisions (DEC-0067) and feed data (DEC-0070) |
-| L3 | `fabric_actions` | every action a person has and its agent tool, `fabric-actions/0.1`: the gate a tool runs (`action_decision`), the reader and FAC-SEM-142, the declaration (DEC-0121) |
+| L3 | `fabric_actions` | every action a person has and its agent tool, `fabric-actions/0.1`: the gate a tool runs (`action_decision`), the reader and FAC-SEM-142, the declaration (DEC-0121), the agent surface beside a dashboard (FAC-SEM-176, DEC-0169) |
 | L3 | `fabric_connections` | what an agent uses, `fabric-connections/0.1`: the reference reading and the declaration (DEC-0096, FAC-SEM-127) |
 | L3 | `fabric_a2a` | the reading side of an A2A Agent Card: `surfaces.a2a` as the schema reads it, and what a public card must not carry (DEC-0122) |
 | L3 | `fabric_page_links` | a service's pages as Fabric Dashboards' open_link: build and read it, a raw local address, FAC-SEM-143 on a link and on a URL-mode input request (DEC-0123); the Python twin reads URLs as WHATWG does by hand |

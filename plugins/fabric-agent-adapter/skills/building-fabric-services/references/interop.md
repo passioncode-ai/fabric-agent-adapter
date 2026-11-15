@@ -213,7 +213,7 @@ with the same filters and paging, under the caller's grant as the page answers u
 an agent to open the page. The probe's `dashboard.agent-surface` fails a dashboard whose service has no agent surface
 (neither `surfaces.mcp` nor `surfaces.a2a`, at any placement), whose MCP surface serves no tool, or whose declared
 `surfaces.mcp.capabilities` is empty, as the contract's `FAC-SEM-176` reads it. AP-1 below is the contract's half for
-actions; read parity is the contract's DEC-0169 (RP-1 to RP-3, row CT-311) (FAA-332, FAA-335).
+actions; read parity is the contract's DEC-0169 (RP-1 to RP-3, row CT-311) (FAA-332, FAA-335). The kit reads `FAC-SEM-176` as the contract does: `agent_surface_rules(well_known)` / `agentSurfaceRules` (FAA-337).
 
 **Parity (AP-1).** Every action the dashboard, app or page lets a person take (approve, reject, choose, edit, pause,
 resume, cancel, retry, send, publish, restore, set a policy, any other) has a tool on the MCP surface with the same

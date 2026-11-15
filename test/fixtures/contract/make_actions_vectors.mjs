@@ -30,7 +30,7 @@ const src = (file) => import(pathToFileURL(path.join(args['contract-src'], file)
 const read = (file) => JSON.parse(fs.readFileSync(path.join(args.contract, file), 'utf8'));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-const { actionDecision, actionsView, actionsExtensionRules, actionRules, authorityView, authorityExtensionRules } = await src('actions.ts');
+const { actionDecision, actionsView, actionsExtensionRules, actionRules, authorityView, authorityExtensionRules, agentSurfaceRules } = await src('actions.ts');
 const { createValidatorSync } = await src('validator.ts');
 const { SCHEMA_PREFIX } = await src('contract.ts');
 const validator = createValidatorSync();
@@ -83,6 +83,13 @@ const authorities = semanticFiles(/^service-well-known-(authority-.*|actions-lev
   return { name: file.replace(/\.json$/, ''), description: fixture.description, document: fixture.input, authority: authorityOf(fixture.input), findings: paths(authorityExtensionRules(fixture.input)) };
 });
 
+// DEC-0169 RP-3: FAC-SEM-176, a dashboard beside an agent surface and a present MCP capability list never empty.
+const agentSurfaces = semanticFiles(/^service-well-known-agent-surface-.*\.json$/).map((file) => {
+  const fixture = read(`fixtures/semantic/${file}`);
+  const findings = agentSurfaceRules(fixture.input);
+  if (same(findings.length > 0, fixture.expect.includes('FAC-SEM-176')) === false) throw new Error(`${file}: FAC-SEM-176 is not the fixture's expect`);
+  return { name: file.replace(/\.json$/, ''), description: fixture.description, document: fixture.input, findings: paths(findings) };
+});
 const SCHEMAS = ['decision.schema.json', 'service-actions-extension.schema.json', 'service-authority-extension.schema.json'];
 const fixtures = read('fixtures/catalogue.json')
   .filter((e) => SCHEMAS.includes(e.schema) || e.path === 'positive/service-well-known-actions.json')
@@ -95,9 +102,9 @@ const fixtures = read('fixtures/catalogue.json')
 fs.writeFileSync(out, `${JSON.stringify({
   about: "fabric-actions/0.1 (DEC-0121) at the pin: actionDecision's cases and jobSteps (DEC-0141 MJ-1), FAC-SEM-142 over declarations (instance paths), the action-call and service-well-known-actions semantic fixtures, the authority extension's (DEC-0162: authorityView and authorityExtensionRules), and every decision, service-actions-extension and service-authority-extension fixture as fixtures/catalogue.json lists it, each answered by the contract's functions and validator. Written by make_actions_vectors.mjs, never by hand.",
   source: 'fixtures/vectors/actions.json, fixtures/semantic/action-call-*.json, fixtures/semantic/service-well-known-actions-*.json, fixtures/semantic/service-well-known-authority-*.json, fixtures/catalogue.json, src/actions.ts',
-  cases: vectors.cases, jobSteps: vectors.jobSteps, declarations: vectors.declarations, actionCalls, wellKnowns, authorities, fixtures,
+  cases: vectors.cases, jobSteps: vectors.jobSteps, declarations: vectors.declarations, actionCalls, wellKnowns, authorities, agentSurfaces, fixtures,
 }, null, 1)}\n`);
-console.log(`${vectors.cases.length} cases, ${vectors.jobSteps.length} job steps, ${vectors.declarations.length} declarations, ${actionCalls.length} action calls, ${wellKnowns.length} well-known documents, ${authorities.length} authority documents, ${fixtures.length} fixtures`);
+console.log(`${vectors.cases.length} cases, ${vectors.jobSteps.length} job steps, ${vectors.declarations.length} declarations, ${actionCalls.length} action calls, ${wellKnowns.length} well-known documents, ${authorities.length} authority documents, ${agentSurfaces.length} agent-surface documents, ${fixtures.length} fixtures`);
 
 if (args.extra) {
   const extra = JSON.parse(fs.readFileSync(args.extra, 'utf8'));

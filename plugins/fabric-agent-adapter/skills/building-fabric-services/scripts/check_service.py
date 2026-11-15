@@ -96,7 +96,7 @@ from check_service_rules import _semver  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import usage_problems  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import same_repository  # noqa: E402,F401 - moved (FAA-65)
 from check_service_rules import merge_headers, session_cookie  # noqa: E402,F401 - FAA-115
-from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict, dashboard_agent_surface_verdict  # noqa: E402,E501 - DEC-0121, FAA-332
+from check_service_rules import well_known_actions_verdict, action_tools_verdict, actions_declared_verdict, dashboard_agent_surface_verdict, login_code_url  # noqa: E402,E501 - DEC-0121, FAA-332, FAA-337
 from check_service_rules import opens_in_host_verdict, service_checkout, declared_limits, holds_verdict  # noqa: E402 - FAA-118, FAA-298
 from check_service_rules import well_known_a2a_verdict, a2a_card_verdict  # noqa: E402 - DEC-0122
 import fabric_a2a as fa2  # noqa: E402 - DEC-0122
@@ -539,12 +539,11 @@ class Probe:
             return
         try:
             status, _, body = self.request("POST", "/fabric/v1/login-code", self.auth_headers())
-            code = json.loads(body)
-            url = code["url"]
+            url = login_code_url(status, body)
             status1, headers1, _ = self.request("GET", url)
             status2, _, _ = self.request("GET", url)
         except (OSError, ValueError, KeyError) as exc:
-            self.add("login.single-use", "FAIL", "login-code flow broke: %s" % exc)
+            self.add("login.single-use", "FAIL", "login-code flow broke: %s (a dashboard signed in by a proxy declares no login)" % exc)
             return
         cookie = session_cookie(headers1.get("set-cookie", ""), self.remote)
         ok = status1 in (302, 303) and "HttpOnly" in cookie and "SameSite=Strict" in cookie and status2 not in (302, 303)

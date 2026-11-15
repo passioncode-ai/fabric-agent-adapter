@@ -562,6 +562,18 @@ def dashboard_agent_surface_verdict(wk: Any, tools: Optional[Dict[str, Any]], re
                     "(DEC-0121 AP-1)")
 
 
+def login_code_url(status: int, body: bytes) -> str:
+    """The redeem URL of a `POST /fabric/v1/login-code` answer; ValueError naming what came back instead (FAA-337: a proxy's
+    page or a route the service does not serve answered with HTML, which read as a bare JSON error)."""
+    try:
+        code = json.loads(body)
+    except ValueError:
+        raise ValueError("HTTP %d, the login-code answer is not JSON" % status) from None
+    if not isinstance(code, dict) or not isinstance(code.get("url"), str) or not code["url"]:
+        raise ValueError("HTTP %d, the login-code answer names no url" % status)
+    return code["url"]
+
+
 # A2A (DEC-0122; decisions D4 to D6 of the 0.51.0 brief) -------------------------------------------------------------
 def well_known_a2a_verdict(wk: Any) -> Tuple[str, str]:
     """`well-known.a2a`: a present `surfaces.a2a` is the schema's (`{path, protocolVersion: "1.0"}`, nothing else). No
