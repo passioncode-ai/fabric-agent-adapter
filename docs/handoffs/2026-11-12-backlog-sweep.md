@@ -32,7 +32,7 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.90.2 | wave 7 part two, FAA-187 (3): an idle board leave's last look at `com.status` keeps a moved slot's record; (10) found done since FAA-186 (2); FAA-187 now waits only on the contract owner (20) and Fabric Dashboards (29) | PR #303, merge `74305139`, tag `v0.90.2`, release run 43676143342 success (six validate jobs, release, publish through OIDC), npm `latest` 0.90.2, GitHub release `v0.90.2`; checks on the branch: both new tests seen failing on `main` first, board, kit, service and session modules 612 OK, Node 780 (0 failed), validate and both plugin validations |
 | 0.90.3 | wave 7 part two, FAA-192 closed: scenarios (19), (25), (26), prose tests (20), decision (21), (28) found done, card (30), real-client trigger run (5) with building's under-trigger filed as FAA-336 | PR #304, merge `ae91205a`, tag `v0.90.3`, release run 43677319296 success (six validate jobs, release, publish through OIDC), npm `latest` 0.90.3; checks: validate, prose, eval and kit tests 66 OK, both plugin validations; real-client trigger runs USD 0.33 |
 | 0.90.4 | FAA-336: building-fabric-services' description names the topics it missed; trigger evals haiku 47/50, sonnet 48/50 (`docs/evidence/evals/2026-11-15-faa-336.md`) | PR #305, merge `2511d6d4`, tag `v0.90.4`, release run 43683592736 success (six validate jobs, release, publish through OIDC), npm `latest` 0.90.4; checks: validate, prose, eval and kit tests 61 OK, tests touching descriptions 180 OK, both plugin validations; real-client trigger runs USD 0.66 (nine runs) |
-| 0.91.0 | the repin to contract `v0.1.0+2026-11-15` (FAA-337): `FAC-SEM-176` in the kit (`agent_surface_rules`), `entitlement/2` and `org-instance/1` known revisions, vectors regenerated; the probe's login evidence; board request `55323b0f` answered | release receipts follow the merge |
+| 0.91.0 | the repin to contract `v0.1.0+2026-11-15` (FAA-337): `FAC-SEM-176` in the kit (`agent_surface_rules`), `entitlement/2` and `org-instance/1` known revisions, vectors regenerated; the probe's login evidence; board request `55323b0f` answered | PR #306, merge `6674dfbd`, tag `v0.91.0`, release run 43685600198 success (six validate jobs, release, publish through OIDC), npm `latest` 0.91.0, GitHub release `v0.91.0`; checks on `71d63175`: unittest 2457 OK (31 skipped), Node 781 (0 failed), validate, both plugin validations; the contract (`37042845`) and the launcher (`f4f4fd19`) told |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -42,10 +42,10 @@ Recorded for the operator; later builder briefs name the rule.
 
 ## Next task
 
-1. 0.90.0 is on npm (OIDC, no token). This machine's Claude Code still loads the adapter the PassionCode launcher pins
+1. 0.91.0 is on npm (OIDC, no token); the launcher takes it as PC-228. This machine's Claude Code still loads the adapter the PassionCode launcher pins
    (0.62.0 from `~/.passioncode/current`) until the launcher's 0.2.77 (adapter 0.86.0) and 0.2.78 (0.87.0, PR #343) are
    published; both wait on the operator's answer to the launcher's question `5f196939`.
-1a. 0.90.0 closed the level line on this side (FAA-334). Next on it is Fabric's: the hub writing `mem` and an organization server issuing `org-membership/2`.
+1a. 0.91.0 is on the contract's `v0.1.0+2026-11-15`. Next on that line: `build_well_known` refusing `FAC-SEM-176` once the services on this machine serve an agent surface (two were asked; one done, `04502c77`), and the contract's CT-316 (DEC-0169's open questions).
 2. Wave 7, part two, row by row (0.86.0 took FAA-200 (8), (13), (37), (38), (44), (56); each open item is first
    re-measured on `main`, as 2026-11-14 did for FAA-200's): what is left is in each row's status line. The large rows: FAA-190
    (104 items, about 90 open), FAA-200 (57, about 45), FAA-194 (40, about 30), FAA-273 ((5), (8), (10), (11) the
