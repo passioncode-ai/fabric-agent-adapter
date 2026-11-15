@@ -68,6 +68,8 @@ from fabric_session_env import (  # noqa: F401
     kimi_registered,
     kimi_registration,
     opencode_registration,
+    openclaw_registration,
+    hermes_config,
     pi_registration,
     branch_off,
     NO_BRANCH_ENV,

@@ -29,7 +29,9 @@ from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     codex_command,
     codex_registered,
     foreign_command,
+    hermes_config,
     kimi_registration,
+    openclaw_registration,
     opencode_registration,
     pi_registration,
     registered_command,
@@ -808,10 +810,12 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     # FAA-237: root's copy runs, and the launcher calls it the administrator's and does not update it
     report["administratorsCopy"] = bool(binary) and administrators_copy(binary, platform, env)
     report["registeredCopy"] = "another user's" if foreign else "ok"
-    # FAA-233: Codex, Kimi Code, OpenCode and Pi register fabric-mcp too
-    native = {"opencode": opencode_registration(cwd, env), "pi": pi_registration(cwd, env)}
-    hosts = {"codex": codex_command(env), "kimi": (kimi_registration(env) or {}).get("command"),
-             "opencode": (native["opencode"] or {}).get("command"), "pi": (native["pi"] or {}).get("command")}
+    # FAA-233: Codex, Kimi Code, OpenCode, Pi and OpenClaw register fabric-mcp too; Hermes' YAML is not read (NOT_RUN)
+    native = {"opencode": opencode_registration(cwd, env), "pi": pi_registration(cwd, env),
+              "openclaw": openclaw_registration(env)}
+    hosts = dict({"codex": codex_command(env), "kimi": (kimi_registration(env) or {}).get("command")},
+                 **{host: (entry or {}).get("command") for host, entry in native.items()})
+    report["hermesConfig"] = str(hermes_config(env) or "") or None
     report["hostCommands"] = {host: found for host, found in hosts.items() if found}
     report["hostCopies"] = {host: "another user's" if foreign_command(found, platform, env) else "ok"
                             for host, found in report["hostCommands"].items()}
@@ -864,10 +868,11 @@ def status(cwd: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.
     elif foreign_host == "kimi":
         report["next"] = ("The fabric-mcp Kimi Code has registered is another user's copy: %sin ~/.kimi-code/mcp.json, "
                           "set mcpServers.fabric.command to %s" % (first, own))
-    elif foreign_host in ("opencode", "pi"):
+    elif foreign_host in native:
         report["next"] = ("The fabric-mcp %s has registered is another user's copy: %sin %s, set %s to %s" % (
-            HOSTS[foreign_host], first, native[foreign_host]["file"],
-            "mcp.fabric.command[0]" if foreign_host == "opencode" else "mcpServers.fabric.command", own))
+            HOSTS[foreign_host], first, native[foreign_host]["file"], {
+                "opencode": "mcp.fabric.command[0]", "pi": "mcpServers.fabric.command",
+                "openclaw": "mcp.servers.%s.command" % native[foreign_host].get("name")}[foreign_host], own))
     elif hub["state"] == "not-a-hub":
         report["next"] = "Fabric's hub could not be verified (%s): open Fabric; send it nothing until it can." % hub["reason"]
     elif hub["state"] != "running":
@@ -917,10 +922,13 @@ def print_status(report: Dict[str, Any]) -> None:
         if report.get("registeredOutsideLauncherFolder") else "") if claude else "not registered"))
     commands, copies = report.get("hostCommands") or {}, report.get("hostCopies") or {}
     for host, registered in (("codex", report["codex"]), ("kimi", "kimi" in commands), ("opencode", "opencode" in commands),
-                             ("pi", "pi" in commands)):
+                             ("pi", "pi" in commands), ("openclaw", "openclaw" in commands)):
         print("%s: %s" % (HOSTS[host], "fabric registered%s%s" % (
             " -> %s" % commands[host] if host in commands else "",
             " (another user's copy)" if copies.get(host) == "another user's" else "") if registered else "not registered"))
+    if report.get("hermesConfig"):
+        print("Hermes: NOT_RUN: %s is YAML, which this reader (standard library only) does not parse; check that "
+              "mcp_servers.fabric.command there is your own fabric-mcp" % report["hermesConfig"])
     print("Session hooks: %s" % ("active" if report["sessionHooks"] == "active"
                                  else "inert (this Fabric does not advertise %s)" % HOOK_FEATURE))
     print("Repositories of a turn: %s" % {

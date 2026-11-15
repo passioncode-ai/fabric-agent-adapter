@@ -167,11 +167,52 @@ class Notice(unittest.TestCase):
         self.assertEqual((done.returncode, done.stdout), (0, ""), "out of time: nothing half-measured is said")
         self.assertLess(elapsed, 5.0, "the hook's timeout in hooks.json is 5 s")
 
+    def kit_source(self, version):
+        (self.repo / "web/fabric-dashboard.css").unlink()
+        kit = self.repo / "assets/dashboard-kit"
+        kit.mkdir(parents=True)
+        (kit / "kit.json").write_text(json.dumps({"name": "fabric-dashboard-kit", "version": version}))
+        (kit / "fabric-dashboard.css").write_text("/* fabric-dashboard-kit@%s */\n" % version)
+
+    def test_a_checkout_of_the_kits_own_source_hears_nothing(self):
+        # FAA-200 (2): the kit's source serves its sample's dashboard from the kit itself, the current one
+        self.kit_source(dk.load_manifest()["version"])
+        self.own()
+        done, _ = self.notice()
+        self.assertEqual((done.returncode, done.stdout), (0, ""))
+        report = dk.status(self.repo, directory=self.services)
+        self.assertEqual((report["copies"], report["kitSource"]), ([], True))
+
+    def test_an_older_kit_directory_is_not_taken_for_the_current_kit(self):
+        self.kit_source("0.9.0")
+        self.own()
+        done, _ = self.notice()
+        self.assertIn("example-agent.default (this repository) has a dashboard without fabric-dashboard-kit", done.stdout)
+
     def test_the_walk_stops_at_the_deadline(self):
         for n in range(50):
             (self.repo / ("d%d" % n)).mkdir()
         with self.assertRaises(dk.OutOfTime):
             dk.find_copies(self.repo, until=time.monotonic() - 1)
+
+
+@unittest.skipIf(not REAL_GIT, "git")
+class KitSourceCheckout(unittest.TestCase):
+    """FAA-200 (2), as the triage measured it: a services folder naming this checkout's origin, then the notice."""
+
+    def test_this_checkout_of_the_kit_hears_nothing(self):
+        origin = subprocess.run([REAL_GIT, "-C", str(ROOT), "config", "--get", "remote.origin.url"],
+                                capture_output=True, text=True).stdout.strip()
+        if not origin:
+            self.skipTest("this checkout has no origin")
+        with tempfile.TemporaryDirectory() as temp:
+            (Path(temp) / "sample.default.json").write_text(json.dumps(
+                {"id": "sample", "instance": "default", "source": {"repository": origin}}))
+            env = dict(os.environ, FABRIC_SERVICES_DIR=temp, PYTHONDONTWRITEBYTECODE="1")
+            env.pop("FABRIC_DISPATCH_WORKFLOW", None)
+            done = subprocess.run([sys.executable, "-B", str(SCRIPT), "notice"], input=json.dumps({"cwd": str(ROOT)}),
+                                  capture_output=True, text=True, env=env, timeout=30)
+        self.assertEqual((done.returncode, done.stdout), (0, ""))
 
 
 if __name__ == "__main__":

@@ -154,6 +154,27 @@ class RemotePlacement(unittest.TestCase):
         self.assertNotIn("source", json.loads(path.read_text(encoding="utf-8")))
         self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning])
 
+    def test_a_rotation_over_an_installed_file_that_is_no_json_or_no_object_drops_its_source(self):
+        """FAA-200 (52): register_remote's installed read takes `[]` (no object) and `{bad` (no JSON) as no source to
+        keep: the rotation goes through, warned, and never raises."""
+        import shutil
+        import warnings
+        for installed in ("[]", "{bad"):
+            with self.subTest(installed=installed):
+                temp = Path(tempfile.mkdtemp())
+                self.addCleanup(shutil.rmtree, temp, True)
+                root = temp / "services"
+                fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                   token="t" * 40, directory=root, source={"repository": "https://github.com/example/agent"})
+                path = fs.descriptor_path("example-agent", "default", root)
+                path.write_text(installed)
+                with warnings.catch_warnings(record=True) as seen:
+                    warnings.simplefilter("always")
+                    fs.register_remote(service_id="example-agent", name="Example Agent", origin="https://agent.example.com",
+                                       token="n" * 40, directory=root)
+                self.assertNotIn("source", json.loads(path.read_text(encoding="utf-8")))
+                self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning])
+
     def test_a_rotation_over_a_deeply_nested_descriptor_drops_it(self):
         # FAA-200 (10): a hand-edited installed descriptor nested thousands deep is no source to keep, never a RecursionError
         import shutil
@@ -326,7 +347,8 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
             self.origin = "https://agent.example.com:%d" % self.port
             self.child = subprocess.Popen(["node", str(SCRIPTS / "sample-remote-service.mjs"), "--origin", self.origin, "--port", str(self.port),
                                            "--token-file", str(self.dir / "token"), "--session-key-file", str(self.dir / "session.key"),
-                                           "--tls-cert", str(self.cert), "--tls-key", str(self.key)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                                           "--tls-cert", str(self.cert), "--tls-key", str(self.key), "--exit-with-parent"],
+                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             deadline = time.time() + 5
             seen = b""
             while time.time() < deadline and b"example agent on" not in seen and b"EADDRINUSE" not in seen:
@@ -339,6 +361,7 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
             self.child.terminate()
             self.child.wait(timeout=5)
             self.child.stdout.close()
+            self.child.stdin.close()
         self.assertIn(b"example agent on", seen)
         self.services = self.dir / "services"
         fs.register_remote(service_id="example-agent", name="Example Agent", origin=self.origin, token=token, directory=self.services,
@@ -348,6 +371,7 @@ class ProbeAgainstTheTlsSample(unittest.TestCase):
         self.child.terminate()
         self.child.wait(timeout=5)
         self.child.stdout.close()
+        self.child.stdin.close()
 
     def run_probe(self):
         import io

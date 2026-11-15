@@ -233,6 +233,28 @@ class Writers(unittest.TestCase):
         self.assertEqual(sample.register(args), 0, "another --id still runs this sample's code, so it names this repository")
         self.assertEqual(json.loads((services / "example-own.default.json").read_text())["source"], {"repository": sample.SAMPLE_REPOSITORY})
 
+    def test_a_new_install_whose_manifest_and_removal_both_fail_says_so_in_one_line(self):
+        """FAA-200 (16): the new-install arm of the sample's undo: no traceback, the removal's failure in the same line."""
+        from unittest import mock
+        sample = load("sample_service")
+        services = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, services, True)
+        args = sample.build_parser().parse_args(["register", "--port", "47289", "--id", "example-new", "--data-dir",
+                                                 str(services / "data"), "--services-dir", str(services)])
+
+        def no_manifest(*_args, **_kwargs):
+            raise PermissionError(13, "Permission denied")
+
+        def no_removal(*_args, **_kwargs):
+            raise PermissionError(13, "Operation not permitted")
+        err = io.StringIO()
+        with mock.patch.object(sample, "write_manifest", no_manifest), \
+                mock.patch.object(sample.fs, "remove_descriptor", no_removal), contextlib.redirect_stderr(err):
+            self.assertEqual(sample.register(args), 1, "a ServiceError line, never a traceback")
+        self.assertIn("cannot be written: Permission denied", err.getvalue())
+        self.assertIn("example-new.default.json could not be removed either: Operation not permitted", err.getvalue())
+        self.assertEqual(len(err.getvalue().strip().splitlines()), 1)
+
     def test_the_sample_declares_what_it_uses(self):
         """FAA-199: the sample's well-known document lists its connections; --degraded marks the demo source failing."""
         sample = load("sample_service")

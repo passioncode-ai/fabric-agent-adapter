@@ -225,9 +225,9 @@ test('the Windows command line quotes the way the C runtime parses it', () => {
   assert.equal(k.windowsCommandLine(['plain', 'two words', 'a"b', 'c\\ d\\', '', 'x\\\\"y']), 'plain "two words" a\\"b "c\\ d\\\\" "" x\\\\\\\\\\"y');
 });
 
-test('both kits write byte-identical unit and task files', { skip: spawnSync('python3', ['--version']).status !== 0 && 'needs python3' }, () => {
+test('both kits write byte-identical unit and task files', { skip: spawnSync('python3', ['-B', '--version']).status !== 0 && 'needs python3' }, () => {
   const argv = ['/usr/bin/env', 'two words', '100%', '$HOME', 'q"uote\\', 'C:\\x y\\'];
-  const py = spawnSync('python3', ['-c', `
+  const py = spawnSync('python3', ['-B', '-c', `
 import json, sys
 from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(scripts)})

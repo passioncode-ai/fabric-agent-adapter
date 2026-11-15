@@ -28,7 +28,7 @@ const body = (...blocks) => `Render the teaser.\n\n${blocks.map((b) => `\`\`\`js
 async function fakeHub(t) {
   const dir = tempDir('faa135-');
   const root = path.join(dir, 'fabric');
-  const child = spawn('python3', [path.join(here, 'fake_fabric_hub.py'), 'serve', '--root', root, '--capability', 'video.render'],
+  const child = spawn('python3', ['-B', path.join(here, 'fake_fabric_hub.py'), 'serve', '--root', root, '--capability', 'video.render'],
     { stdio: ['pipe', 'pipe', 'inherit'] });
   const line = await new Promise((resolve, reject) => {
     let buf = '';

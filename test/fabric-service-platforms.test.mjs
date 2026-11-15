@@ -17,7 +17,7 @@ const noLinuxLock = process.platform === 'linux' && (await abstractNames()) !== 
 
 const kit = path.join(path.dirname(fileURLToPath(import.meta.url)), '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts');
 const python = process.platform === 'win32' ? 'python' : 'python3';
-const hasPython = spawnSync(python, ['--version']).status === 0;
+const hasPython = spawnSync(python, ['-B', '--version']).status === 0;
 
 // The contract's fixtures at the pin (fixtures/positive/service-descriptor-task-scheduler.json, -systemd.json),
 // reduced to the fields these rules read.
@@ -127,7 +127,7 @@ test('the lock name: an abstract socket on Linux, a named pipe on Windows, none 
 
 test('the Python kit holds the same name', { skip: !hasPython && 'needs python' }, () => {
   const cases = [['/home/example/.local/share/example-agent/service.lock', 'linux'], ['C:\\Users\\Example\\AppData\\Local\\x\\service.lock', 'win32']];
-  const py = spawnSync(python, ['-c', `
+  const py = spawnSync(python, ['-B', '-c', `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(kit)})
 import fabric_service as fs
@@ -145,7 +145,7 @@ test('a Python copy is refused while a Node copy holds the lock, and the probe s
   const dir = temp();
   const lock = await new k.InstanceLock(dir).acquire();
   try {
-    const py = spawnSync(python, ['-c', `
+    const py = spawnSync(python, ['-B', '-c', `
 import sys; from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(kit)})
 import fabric_service as fs
@@ -162,7 +162,7 @@ except fs.AlreadyRunning as e:
 
 test('a Node copy is refused while a Python copy holds the lock', { skip: onLinuxOrWindows || noLinuxLock || (!hasPython && 'needs python') }, async () => {
   const dir = temp();
-  const holder = spawn(python, ['-c', `
+  const holder = spawn(python, ['-B', '-c', `
 import sys, time; from pathlib import Path
 sys.path.insert(0, ${JSON.stringify(kit)})
 import fabric_service as fs

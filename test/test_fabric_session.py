@@ -142,7 +142,8 @@ class Base(unittest.TestCase):
                                  "FABRIC_DISPATCH_HANDOFF", "FABRIC_DISPATCH_REQUEST",
                                  "FABRIC_DISPATCH_ID", "SWITCHBOARD_LAUNCH_ID", "PASSIONCODE_APPLICATIONS",
                                  "CLAUDE_CONFIG_DIR", "SWITCHBOARD_CLAUDE_SOURCE_DIR", "XDG_CONFIG_HOME",
-                                 "OPENCODE_CONFIG", "PI_CODING_AGENT_DIR")}
+                                 "OPENCODE_CONFIG", "PI_CODING_AGENT_DIR", "OPENCLAW_CONFIG_PATH",
+                                 "OPENCLAW_STATE_DIR", "HERMES_HOME")}
         self.env["HOME"] = str(self.home)
         self.root = fs.fabric_root(env=self.env)
         self.repo = self.base / "work"
@@ -2616,6 +2617,51 @@ class Status(Base):
         (self.home / ".codex" / "config.toml").write_text('[mcp_servers.fabric]\nargs = []\n')
         self.assertIsNone(fs.codex_command(self.env))
         self.assertTrue(fs.codex_registered(self.env))
+
+    @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
+    def test_openclaw_registration_is_checked_and_hermes_is_not_run(self):
+        # FAA-233: OpenClaw's strict-JSON openclaw.json (`mcp.servers.fabric.command`, the file host_hooks.py edits) is
+        # judged like the other hosts; Hermes' config.yaml is YAML, which the standard library cannot read: NOT_RUN
+        shared = self.base / "Shared" / "fabric-mcp"
+        shared.parent.mkdir()
+        shared.write_text("")
+        own = self.base / "no-fabric" / "fabric-mcp"
+        own.parent.mkdir()
+        own.write_text("")
+        config = self.home / ".openclaw" / "openclaw.json"
+        config.parent.mkdir()
+        config.write_text(json.dumps({"mcp": {"servers": {"fabric-mcp": {"command": str(shared), "args": ["--runner", "openclaw"]}}}}))
+        self.hub()
+        self.register(command=str(own))
+        theirs = os.path.realpath(str(shared))
+        self.env_module._owner_uid = lambda path: os.getuid() + (1 if str(path) == theirs else 0)
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["hostCopies"], {"openclaw": "another user's"})
+        self.assertIsNone(report["hermesConfig"], "no Hermes here: no line")
+        self.assertEqual(report["next"], "The fabric-mcp OpenClaw has registered is another user's copy: in %s, set "
+                         'mcp.servers.fabric-mcp.command to "%s"' % (config, own))
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("OpenClaw: fabric registered -> %s (another user's copy)" % shared, printed.getvalue())
+        self.assertNotIn("Hermes", printed.getvalue())
+        for off in ({"command": str(shared), "enabled": False}, {"url": "https://h.example/mcp"}):
+            config.write_text(json.dumps({"mcp": {"servers": {"fabric": off}}}))
+            self.assertIsNone(fs.openclaw_registration(self.env), off)
+        config.write_text("{mcp: {servers: {fabric: {command: 'x'}}}}")  # JSON5 is not read
+        self.assertIsNone(fs.openclaw_registration(self.env))
+        moved = self.base / "elsewhere.json"
+        moved.write_text(json.dumps({"mcp": {"servers": {"fabric": {"command": str(own)}}}}))
+        self.assertEqual(fs.openclaw_registration(dict(self.env, OPENCLAW_CONFIG_PATH=str(moved)))["command"], str(own))
+        hermes = self.home / ".hermes" / "config.yaml"
+        hermes.parent.mkdir()
+        hermes.write_text("mcp_servers:\n  fabric:\n    command: %s\n" % shared)
+        report = fs.status(self.repo, self.env, "darwin")
+        self.assertEqual(report["hermesConfig"], str(hermes))
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            fs.print_status(report)
+        self.assertIn("Hermes: NOT_RUN: %s is YAML" % hermes, printed.getvalue())
 
     @unittest.skipUnless(hasattr(os, "getuid"), "POSIX owners")
     def test_opencode_and_pi_registrations_are_checked_for_another_users_copy(self):

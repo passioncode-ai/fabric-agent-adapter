@@ -127,10 +127,10 @@ test('the plist escapes markup', () => {
   assert.ok(text.includes('<string>a&lt;b&gt;&amp;c</string>'));
 });
 
-test('both kits write byte-identical plists', { skip: spawnSync('python3', ['--version']).status !== 0 && 'needs python3' }, () => {
+test('both kits write byte-identical plists', { skip: spawnSync('python3', ['-B', '--version']).status !== 0 && 'needs python3' }, () => {
   const argv = ['/usr/bin/env', 'two words', '100%', '$HOME', 'q"uote\\', 'a<b>&c', 'ünï'];
   const env = { EXAMPLE_MODE: 'a & b', EXAMPLE_TOKEN_FILE: '/tmp/t', A_FIRST: '1' };
-  const py = spawnSync('python3', ['-c', `
+  const py = spawnSync('python3', ['-B', '-c', `
 import json, sys
 from pathlib import PurePosixPath as Path  # launchd paths are POSIX on every OS the test runs on
 sys.path.insert(0, ${JSON.stringify(scripts)})
@@ -451,14 +451,14 @@ test('FAA-278: a plist in /Library/LaunchDaemons is the system domain', () => {
   assert.throws(() => k.launchdDomain(null, { domain: 'system', platform: 'linux' }), /macOS only/);
 });
 
-test('FAA-278: the plist names its user, the same bytes in both kits', { skip: spawnSync('python3', ['--version']).status !== 0 && 'needs python3' }, () => {
+test('FAA-278: the plist names its user, the same bytes in both kits', { skip: spawnSync('python3', ['-B', '--version']).status !== 0 && 'needs python3' }, () => {
   const node = k.launchdPlist('a.b', ['/bin/echo'], { workingDirectory: '/', stdoutPath: '/l', userName: 'agentuser' });
   assert.ok(node.includes('<key>UserName</key>\n\t<string>agentuser</string>'));
   assert.ok(!k.launchdPlist('a.b', ['/bin/echo'], { workingDirectory: '/', stdoutPath: '/l' }).includes('UserName'));
   for (const bad of ['Root User', '', 'a'.repeat(40), 'x;y', '../x']) {
     assert.throws(() => k.launchdPlist('a.b', ['/bin/echo'], { workingDirectory: '/', stdoutPath: '/l', userName: bad }), /UserName must be/);
   }
-  const py = spawnSync('python3', ['-c', `
+  const py = spawnSync('python3', ['-B', '-c', `
 import sys
 from pathlib import PurePosixPath as Path
 sys.path.insert(0, ${JSON.stringify(scripts)})

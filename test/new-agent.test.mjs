@@ -11,8 +11,8 @@ import { tempDir } from './temp-dir.mjs';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cli = path.join(root, 'bin', 'fabric-agent-adapter.js');
 const python = process.platform === 'win32' ? ['py', ['-3']] : ['python3', []];
-const hasPython = spawnSync(python[0], [...python[1], '--version']).status === 0;
-const run = (...args) => spawnSync(process.execPath, [cli, 'new', ...args], { encoding: 'utf8', timeout: 120_000 });
+const hasPython = spawnSync(python[0], [...python[1], '-B', '--version']).status === 0;
+const run = (...args) => spawnSync(process.execPath, [cli, 'new', ...args], { encoding: 'utf8', timeout: 120_000, env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } });
 const last = (out) => JSON.parse(out.trim().split('\n').at(-1));
 
 test('new makes an agent project, answers JSON last and repeats without a change', { skip: !hasPython && 'needs Python 3' }, () => {

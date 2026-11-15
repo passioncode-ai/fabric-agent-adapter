@@ -201,7 +201,7 @@ test('a close that fails too still lets the lock go, the first error standing (0
 test('the Node lock and the Python lock exclude each other', { skip: process.platform !== 'darwin' }, async () => {
   const dir = temp();
   const lock = await new k.InstanceLock(dir).acquire();
-  const py = spawnSync('python3', ['-c', `
+  const py = spawnSync('python3', ['-B', '-c', `
 import sys; sys.path.insert(0, ${JSON.stringify(scripts)})
 import fabric_service as fs
 try:
