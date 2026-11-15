@@ -43,7 +43,11 @@ python3 $K/fabric_kit.py build [--check]                            # maintainer
 ```
 
 - `install` copies the closure of the named modules and nothing else. It refuses to overwrite a file it does not
-  recognise (`modified`: someone edited the copy) unless `--force`, and says which.
+  recognise (`modified`: someone edited the copy) unless `--force`, and says which. It also names a copy already in
+  the folder that imports a module it installs but is not `current` itself (an `older` `fabric_board_session` beside
+  a new `fabric_board_slots`, whose slot methods the responder takes): `older      fabric_board_session.py (0.59.0) imports
+  fabric_board_slots.py; install it too: --module fabric_board_session`. That copy is left unchanged and the exit code
+  stays 0 (FAA-194 (40), `test_a_partial_install_names_an_older_module_that_imports_it`).
 - `status` names each kit file in the folder as `current`, `older` with the release it came from, or `modified`, and
   prints `missing <file>, which <file> imports` for every module the folder lacks, read from what each copy itself
   imports and followed through the modules it would install: that copy would fail when that code path runs. A folder

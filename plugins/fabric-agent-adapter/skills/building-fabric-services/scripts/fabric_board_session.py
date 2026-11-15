@@ -151,6 +151,7 @@ class Responder(Recovery):
         self.shutting_down, self.draining = threading.Event(), None  # shutdown began; it found work to drain (FAA-186)
         self.claim_keys: Dict[str, str] = {}
         self._probing: set = set()  # moved slots whose move-back claim lost its answer: asked again under the same key
+        self._lost_answer = False  # this tick lost a move-back answer: no success (FAA-194 (13))
         self._said: Dict[str, str] = {}
         self._up_since: Optional[float] = None  # when the board was last seen up after a fault (FAA-187 (22))
         self._rr = 0
@@ -316,7 +317,10 @@ class Responder(Recovery):
         try:
             if self.session is None:
                 self._connect()
+            self._lost_answer = False
             self._tick()
+            if self._lost_answer:  # a lost move-back answer, kept from the fault, is no success either (FAA-194 (13))
+                return self.interval()
             self.backoff.reset()
             if self.state == "down":  # a lost call was sent again and answered: the session held throughout
                 self.state = "ready"

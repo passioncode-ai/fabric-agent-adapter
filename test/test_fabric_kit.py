@@ -315,6 +315,29 @@ class Install(unittest.TestCase):
             copy.write_bytes(b"# an earlier release\n# a local edit\n")
             self.assertEqual(fabric_kit.state_of(copy, manifest), {"state": "modified", "version": None})
 
+    def test_a_partial_install_names_an_older_module_that_imports_it(self):
+        """FAA-194 (40): installing one module beside an older copy of a module that imports it (fabric_board_slots under
+        an older fabric_board_session) left a pair that fails when a code path joins them; install names the importer
+        and the module to install with it, and changes nothing else."""
+        import hashlib
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            old = tmp / "fabric_board_session.py"
+            old.write_text("from fabric_board_slots import SlotKeeper\n", encoding="utf-8")
+            manifest = json.loads(json.dumps(KIT))
+            manifest["history"] = {"0.59.0": {"fabric_board_session.py": hashlib.sha256(old.read_bytes()).hexdigest()}}
+            with mock.patch.object(fabric_kit, "load_manifest", return_value=manifest):
+                result = fabric_kit.install(tmp, "python", ["fabric_board_slots"], dry_run=True)
+            self.assertEqual(result["stale"], [{"file": "fabric_board_session.py", "module": "fabric_board_session",
+                                                "state": "older", "version": "0.59.0", "imports": ["fabric_board_slots.py"]}])
+            self.assertEqual(old.read_text(encoding="utf-8"), "from fabric_board_slots import SlotKeeper\n")
+            result = fabric_kit.install(tmp, "python", ["fabric_board_session"], dry_run=True)
+            self.assertEqual(result.get("stale"), [], "the importer installed with it is no warning")
+            ran = self.run_kit("install", tmp, "--module", "fabric_board_slots", "--dry-run")
+            self.assertIn("fabric_board_session.py", ran.stdout)
+            self.assertIn("--module fabric_board_session", ran.stdout)
+
     def test_an_older_release_and_an_edited_copy_are_told_apart(self):
         shown = subprocess.run(["git", "show", "v0.39.1:plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_share.py"],
                                capture_output=True, cwd=ROOT)
