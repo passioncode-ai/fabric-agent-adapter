@@ -163,7 +163,9 @@ test('NaN and Infinity are no JSON in any file the kit reads (0.60.0 seam readin
 test('pack refuses what must not ship', (t) => {
   const root = tempDir(t);
   writeAgent(root);
-  for (const name of ['.env', '.env.local', 'deploy.pem', 'signing.key', 'id_ed25519', '.npmrc', '.DS_Store', 'x.pyc']) {
+  // FAA-190 (15): the kit's token files are credentials by their names too
+  for (const name of ['.env', '.env.local', 'deploy.pem', 'signing.key', 'id_ed25519', '.npmrc', '.DS_Store', 'x.pyc',
+    'service.token', 'board.credential', '.token']) {
     fs.writeFileSync(path.join(root, name), 'x');
     assert.throws(() => k.pack(root), (e) => e instanceof k.PackageError && e.message.includes(name), name);
     fs.rmSync(path.join(root, name));
@@ -187,6 +189,28 @@ test('pack refuses what must not ship', (t) => {
   assert.throws(() => k.pack(root), /twice/);
   fs.rmSync(path.join(root, k.PACKAGE_FILE));
   assert.throws(() => k.pack(root), /first/);
+});
+
+test('FAA-190 (15): pack refuses a file holding a private JWK whatever its name; a public one ships', (t) => {
+  const root = tempDir(t);
+  writeAgent(root);
+  const key = V.keys.publisher;
+  const d = Buffer.from(key.seed, 'hex').toString('base64url');
+  const priv = JSON.stringify({ ...key.jwk, d });
+  const cases = { 'k.jwk': priv, 'keys/signer.json': priv, 'notes.txt': `see ${JSON.stringify(JSON.stringify({ kty: 'OKP', d }))}`,
+    'bin/key.py': `KEY = {'kty': 'OKP', 'd': '${d}'}\n` };
+  for (const [rel, text] of Object.entries(cases)) {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), text);
+    assert.throws(() => k.pack(root), (e) => e instanceof k.PackageError && e.message.includes(`${rel} (a private key (a JWK's d))`) && !e.message.includes(d), rel);
+    fs.rmSync(path.join(root, rel));
+  }
+  fs.mkdirSync(path.join(root, 'trust'));
+  fs.writeFileSync(path.join(root, 'trust', 'publisher.jwk'), JSON.stringify(key.jwk));
+  fs.writeFileSync(path.join(root, 'short.json'), `{"d": "${d.slice(0, 42)}"}`); // under 32 bytes: no Ed25519 private key
+  const answer = k.pack(root);
+  assert.ok(answer.ok, JSON.stringify(answer.problems));
+  assert.ok(answer.package.files.some((f) => f.path === 'trust/publisher.jwk'), 'a public JWK ships');
 });
 
 test('pack names every problem and writes nothing', (t) => {
@@ -329,6 +353,55 @@ test('the key file: mode, kid, x, alg, PEM, and a key openssl makes', (t) => {
   }
 });
 
+test('FAA-190 (15): sign refuses a key inside the folder, by its resolved place', (t) => {
+  const dir = tempDir(t);
+  const root = path.join(dir, 'pkg');
+  fs.mkdirSync(root);
+  writeAgent(root);
+  k.pack(root, { apply: true });
+  const key = V.keys.publisher;
+  const jwk = JSON.stringify({ ...key.jwk, d: Buffer.from(key.seed, 'hex').toString('base64url') });
+  const inside = path.join(root, 'keys', 'signer');
+  fs.mkdirSync(path.dirname(inside));
+  fs.writeFileSync(inside, jwk);
+  fs.chmodSync(inside, 0o600);
+  const before = fs.readFileSync(path.join(root, k.PACKAGE_FILE));
+  const refusal = /inside the folder being signed/;
+  assert.throws(() => k.sign(root, inside, { apply: true }), (e) => e instanceof k.PackageError && refusal.test(e.message));
+  assert.throws(() => k.sign(path.join(root, 'bin', '..'), path.join(root, 'keys', '..', 'keys', 'signer')), refusal);
+  if (process.platform !== 'win32') {
+    fs.symlinkSync(inside, path.join(dir, 'outside-link'));
+    assert.throws(() => k.sign(root, path.join(dir, 'outside-link')), refusal);
+    fs.symlinkSync(root, path.join(dir, 'alias'));
+    assert.throws(() => k.sign(path.join(dir, 'alias'), inside), refusal);
+    assert.throws(() => k.sign(root, path.join(dir, 'alias', 'keys', 'signer')), refusal);
+  }
+  assert.deepEqual(fs.readFileSync(path.join(root, k.PACKAGE_FILE)), before, 'a refused key writes nothing');
+  fs.rmSync(path.join(root, 'keys'), { recursive: true });
+  assert.ok(k.sign(root, keyFile(dir)).ok, 'a key outside the folder still signs');
+  const sibling = path.join(dir, 'pkg-keys'); // a name that starts like the folder is outside it
+  fs.mkdirSync(sibling);
+  fs.writeFileSync(path.join(sibling, 'signer.jwk'), jwk);
+  fs.chmodSync(path.join(sibling, 'signer.jwk'), 0o600);
+  assert.ok(k.sign(root, path.join(sibling, 'signer.jwk')).ok);
+});
+
+test('FAA-194 (32): a deeply nested key file is the Python twin\'s refusal, ended or not', (t) => {
+  const dir = tempDir(t);
+  const root = path.join(dir, 'pkg');
+  fs.mkdirSync(root);
+  writeAgent(root);
+  k.pack(root, { apply: true });
+  for (const [name, text] of [['open', `{"a":${'['.repeat(200000)}`], ['closed', `{"a":${'['.repeat(5000)}${']'.repeat(5000)}}`],
+    ['just-past', `{"a":${'['.repeat(k.MAX_NESTING)}${']'.repeat(k.MAX_NESTING)}}`]]) {
+    const file = path.join(dir, `deep-${name}.jwk`);
+    fs.writeFileSync(file, text);
+    fs.chmodSync(file, 0o600);
+    assert.throws(() => k.readSigningKey(file), (e) => e instanceof k.PackageError && e.message === 'The key file is neither a JWK nor a PEM private key.', name);
+    assert.throws(() => k.sign(root, file), /neither a JWK nor a PEM private key/, name);
+  }
+});
+
 test('the command line answers JSON and exits 0, 1 or 2', (t) => {
   const dir = tempDir(t);
   const root = path.join(dir, 'pkg');
@@ -388,6 +461,34 @@ test('both kits pack and sign the same folder to the same bytes', { skip: !hasPy
   const lines = [];
   k.main(['pack', path.join(dir, 'nowhere')], (line) => lines.push(line));
   assert.equal(pyRefusal.stdout.trim(), lines.join('\n'));
+});
+
+test('FAA-190 (15), FAA-194 (32): both kits answer a key inside the folder, a private JWK and a deep key alike', { skip: !hasPython && 'needs python3' }, (t) => {
+  const dir = tempDir(t);
+  const root = path.join(dir, 'pkg');
+  fs.mkdirSync(root);
+  writeAgent(root);
+  k.pack(root, { apply: true });
+  const tool = path.join(scripts, 'fabric_package.py');
+  const both = (args) => {
+    const py = spawnSync('python3', [tool, ...args], { encoding: 'utf8' });
+    assert.equal(py.stderr, '', 'no traceback');
+    const lines = [];
+    const code = k.main(args, (line) => lines.push(line));
+    assert.equal(py.status, code, args.join(' '));
+    assert.equal(py.stdout.trim(), lines.join('\n'), args.join(' '));
+    return JSON.parse(lines.join('\n'));
+  };
+  const deep = path.join(dir, 'deep.jwk');
+  fs.writeFileSync(deep, `{"a":${'['.repeat(200000)}`);
+  fs.chmodSync(deep, 0o600);
+  assert.match(both(['sign', root, '--key', deep]).error, /neither a JWK nor a PEM/);
+  const inside = keyFile(root);
+  assert.match(both(['sign', root, '--key', inside]).error, /inside the folder being signed/);
+  assert.match(both(['pack', root]).error, /publisher\.jwk \(a private key \(a JWK's d\)\)/);
+  fs.rmSync(inside);
+  fs.writeFileSync(path.join(root, 'service.token'), 'x');
+  assert.match(both(['pack', root]).error, /service\.token \(a credential file\)/);
 });
 
 test('FAA-261: pack writes secrets[] and state[] from fabric.source.json, as the Python kit does', (t) => {
