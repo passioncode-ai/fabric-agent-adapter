@@ -163,13 +163,25 @@ def _authority_ok(netloc: str) -> bool:
     return not any(c in "[]:" for c in host + port) and re.fullmatch(r"[0-9]*", port) is not None
 
 
+#: An http or https URL whose authority as written holds `?` or `#` and then `@` before any slash or backslash.
+_USER_PAST_QUERY = re.compile(r"(?:https?):[/\\]*[^/\\]*?[?#][^/\\]*@", re.IGNORECASE | re.ASCII)
+
+
 def redact_url(url: str) -> str:
     """The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or
-    fragment, which is where keys and tokens ride."""
+    fragment, which is where keys and tokens ride. A scheme shaped like a key prints as `<redacted>:<redacted>`, and an
+    http or https URL whose authority holds `?` or `#` before an `@` (a token as user) as `<unparseable url>`."""
     # What WHATWG URL parsing does first, as `new URL` does in the Node twin: trim C0 controls and space from the ends,
     # then remove every tab, CR and LF, so ` <https>://u:pw@h` and `<ht\ttps>:u:pw@h` lose their password too (0.56.0
     # seam r10; Python 3.9's urlsplit keeps a leading space in the scheme).
     url = re.sub(r"[\t\n\r]", "", str(url).strip("".join(map(chr, range(0x21)))))
+    named = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):", url)
+    if named and fabric_secrets.secret_argument(named.group(1)):
+        return "<redacted>:<redacted>"  # a scheme shaped like a key is never printed, read as written (FAA-200 (33))
+    if _USER_PAST_QUERY.match(url):
+        # `<https>://tok?en@host` reads to the URL standard as host `tok`, the rest of a token used as a user: no host is
+        # printed, in either twin (FAA-200 (15))
+        return "<unparseable url>"
     # The user information as written goes first, as git and urllib read it, where WHATWG reads a backslash as a slash:
     # `<https>://h\\u:pw@x/r` would print `pw` in its path (0.62.0 seam reading 11). The Node twin does the same.
     written = re.match(r"([A-Za-z][A-Za-z0-9+.-]*:[/\\]*)([^/?#]*)", url)  # after any run of slashes (seam reading 13)

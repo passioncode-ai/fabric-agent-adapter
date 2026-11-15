@@ -118,7 +118,7 @@ untracked ones that are not ignored, as they are in the work tree; a staged copy
 | Kind | Finds |
 |---|---|
 | `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name holds a space, a dash, a dot, an underscore or an apostrophe (each a dash in the dashed form; a slashed name also ends at a space) declares it with `home: <name>` in the owner's list, which reads it whole in every form, and one whose home name is not ASCII, or holds another character, lists it as a plain string (a typographic apostrophe a keyboard typed, which the folder's name does not hold, is written as `'` in `home:`; a folder whose name holds `’` is listed as a plain string with `’` kept and declared too with `home: <name>` written with `'`, which reads the dashed forms; its URL-encoded `’` is not read; a name outside ASCII of one or two characters cannot be checked) |
-| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (a run of 40 or more characters mixing upper case, lower case and digits, so a shorter key under `X_API_KEY=` is not read; but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`) |
+| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (a run of 40 or more characters mixing upper case, lower case and digits, so a shorter key under `X_API_KEY=` is not read; but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`); and a folder named so anywhere in a file's path (`k.pem/a.txt`), which `pack` refuses too (FAA-190, `test_a_folder_named_like_a_credential_file_is_a_finding`) |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
 ```bash
@@ -126,13 +126,14 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 ```
 
 Run it by path, with its scripts folder whole: it loads its siblings (`fabric_source_ignore.py`,
-`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_check_cli.py`, `fabric_source_tree.py` and the
-contract's detector `fabric_secrets.py`) and refuses with exit `2` when one is missing or from another version, a
+`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_check_cli.py`, `fabric_source_tree.py`, the
+way it runs Git `fabric_git.py` and the contract's detector `fabric_secrets.py`) and refuses with exit `2` when one is missing or from another version, a
 detector without one of the public names it reads included (FAA-190). `python3 -m fabric_source_check` writes its own
 `.pyc` before the check turns bytecode off; run by path, it writes nothing. `ROOT` defaults to the current folder.
 `--json` prints one object: `mode` (`git` or a walk), `files`, `findings` (`path`, `line`, `kind`, `rule`),
-`notRead`, `skipped`, `dependencies`, `instanceStrings`, `ownerHomes`, `instanceList`, `blocking` (a finding) and
-`complete` (every file read); `--help` names each option.
+`notRead`, `skipped`, `dependencies`, `unmatched` (the ignore lines that match no file, by their place),
+`instanceStrings`, `ownerHomes`, `instanceList`, `blocking` (a finding) and `complete` (every file read); `--help`
+names each option.
 
 - It **never repeats** a value it found: no value, no line holding one, no entry of the owner's list and not the
   folder it checks reaches its output. A file's path is checked like its text (line `0` of a finding), and printed
@@ -144,7 +145,9 @@ detector without one of the public names it reads included (FAA-190). `python3 -
   path, inside a word too (`qzone` prints `<home>one`); found nowhere, it is not masked.
 - It **changes nothing.** Exit `0`: no finding and every file read; `1`: at least one finding (the step is not done);
   `2`: the check could not run, or a file was not read: an unreadable file, a nested repository, or a binary file the
-  ignore file does not name as source (the summary counts each, and how many files were left out by name). A finding
+  ignore file does not name as source (the summary counts each, and how many files were left out by name); or it
+  found no file at all, read or left out by name, as in a submodule not checked out, which is an empty folder (the
+  summary says `no file read`; `test_a_tree_with_no_file_read_is_incomplete`). A finding
   sets `1` even when a file was not read too; the files not read are still listed, so fixing the findings can leave `2`.
 - **What it reads.** A text file of any size is read whole, and the summary counts every text file read; a binary file (a NUL byte in its first 8 KiB) or one that
   cannot be read is listed by its path as not read, and the summary counts it. A database or another binary of
@@ -192,9 +195,17 @@ detector without one of the public names it reads included (FAA-190). `python3 -
   folders, so `vectors/*` takes the files in `vectors` and none in its subfolders. A line ending in `/`, or a path
   with no wildcard, takes that folder and all it holds; only such a line leaves out a nested repository or a
   submodule (`vendor/sub/`), never a wildcard line without the `/` (`vendor/*`). A wildcard folder line (`vendor/*/`)
-  takes every nested repository it reaches, checked or not, so name each one by its path. In Git mode a nested
+  takes every nested repository it reaches, checked or not, so name each one by its path. A submodule that is not
+  checked out (no folder) is still a folder to these lines: `vendor/sub/` and `vendor/sub` take it, `vendor/*` does
+  not (`test_an_absent_submodule_named_with_a_slash_is_left_out`). In Git mode a nested
   repository is not read; `--every-file` and a folder outside Git read its files, its `.git` left out. An exception line (`!`) is refused, since what it would
-  bring back would go unread. Name the files, or a folder that holds
+  bring back would go unread. A line that matches no file is named in the summary by its place (`line 3 of
+  .fabric-source-ignore matches no file`), never by what it holds, and is no failure: a reason written after a glob on
+  the same line makes the line match nothing, so the reason goes on the line above. A line costs time in proportion to
+  the path it is matched against, however many `*` and `**` it holds, as Git's own matching does
+  (`test_many_stars_in_a_segment_stay_fast`, `test_many_double_stars_on_a_deep_path_stay_fast`). On macOS a name and a
+  line are matched in their composed form (NFC), so a folder stored decomposed is taken by the same line in Git mode
+  and with `--every-file` (`test_an_nfd_folder_matches_the_same_ignore_line_in_both_modes`). Name the files, or a folder that holds
   only synthetic vectors, never a whole source folder (a nested repository checked in its own tree is the one
   exception), and say why on the line above. The one owner's file named this way is the `LICENSE` (a file, never a
   folder exception): its copyright line names the holder, which is
@@ -225,6 +236,19 @@ before it, a provider's key the contract's names do not cover) passes it. It is 
 secret scanner, never a replacement for either.
 
 The check finds the repository from the folder it checks: a Git location the caller exports (`GIT_DIR`,
-`GIT_INDEX_FILE`, as a hook in a linked worktree has) is not passed to Git. The check reads the tree, not Git history. A value that was committed once is still in the history after the tree is
+`GIT_WORK_TREE`, `GIT_INDEX_FILE` and the rest, as a hook in a linked worktree has two) is not passed to Git. So a work
+tree Git finds only through those variables (a bare repository with a separate work tree) is read with the walk, every
+file but the dependency folders; give that folder a `.git` file (`gitdir: <the repository>`) for Git mode. In a
+pre-commit hook the check reads the repository's own index, not the one the commit is building: a file deleted with
+`rm` and committed with `git commit -a` is still listed there and reads as not in the work tree (exit `2`), so stage a
+deletion with `git rm` first. Git runs through `fabric_git.py`, as every script of the adapter runs it: from PATH's
+absolute folders but never one inside the checked tree (`npm run` puts `<root>/node_modules/.bin` there,
+`test_a_git_inside_the_checked_tree_is_not_run`), with `core.fsmonitor` empty and Git for Windows'
+`core.useBuiltinFSMonitor` false, so no command the tree's configuration names runs and Git's own daemon is not started
+(`test_git_runs_no_command_the_checked_tree_configures`, `test_the_builtin_fsmonitor_daemon_is_not_started`), and
+with `GIT_TRACE*` not passed and the trace2 targets off, so it writes no trace (`test_git_trace_is_not_passed`). An
+empty `core.fsmonitor` is boolean false from Git 2.36 and no hook before it (Git's `config.c`); the suite runs on the
+Git the machine has, and no hosted job pins one older than 2.36. The caller's own Git configuration still applies: its
+global excludes file decides what is ignored, as it does for what that caller would commit. The check reads the tree, not Git history. A value that was committed once is still in the history after the tree is
 clean: handing such a source over needs a fresh history, which is the owner's act, never the agent's (no history
 rewrite, no force-push).

@@ -47,7 +47,9 @@ atomic, mode 0600) and the uninstaller removes it; a running service never write
 or `task`; none for `node` and `person`), the `origin` `http://127.0.0.1:<port>` (a port is a claim: an installer
 refuses a port another instance declares, and one another OS account listens on, read with the kit's
 `fabric_peer_owner`, FAA-225; the recorded port per account and its claim file wait on contract DEC-0160), the service's directories, and commands as argument arrays that never
-carry a credential. Only `doctor` and `update` are commands a host may run.
+carry a credential (the validators refuse one, FAC-SEM-057, a URL inside an argument read as a URL, FAA-200 (28)). Only
+`doctor` and `update` are commands a host may run. A problem names a member shaped like a credential as `<redacted>`,
+never as written (FAA-200 (39)).
 
 **Started is not ready.** Readiness is the well-known document, `GET /.well-known/fabric-service`: answered without
 authentication, from memory, in under 100 ms, with `service.id` and `service.instance` equal to the descriptor's,

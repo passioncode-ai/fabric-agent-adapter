@@ -474,6 +474,62 @@ def _url_credential(value: str, hosts: bool) -> bool:
     return False
 
 
+_SCHEME_LETTERS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+_SCHEME_CHARS = _SCHEME_LETTERS | frozenset("0123456789+.-")
+_PIECES = re.compile("[%s]+" % JS_SPACE)
+#: What ends a sentence after a URL: closing brackets, quotes and punctuation; `]` may close an IPv6 host, so one of
+#: them is put back as a second reading (URL_TRIED_BACK).
+URL_CLOSING = ")]}>\"'.,;:!?"
+URL_TRIED_BACK = 1
+
+
+def scheme_spans(piece: str) -> List[Tuple[int, int]]:
+    """The (start, end) of each URL scheme and its `://` in a piece, where `[a-z][a-z0-9+.-]*://` (case-insensitive,
+    ASCII) finds them left to right, read in linear time (FAA-322: the pattern tried every letter of a long run with no
+    `://`). From each `://` the run of scheme characters before it is read back, and the match starts at its first
+    letter at or after where the last match ended. Moved here from fabric_connections (FAA-200 (28)); the Node twin is
+    schemeSpans."""
+    spans: List[Tuple[int, int]] = []
+    after, at = 0, piece.find("://")
+    while at >= 0:
+        start = at
+        while start > after and piece[start - 1] in _SCHEME_CHARS:
+            start -= 1
+        while start < at and piece[start] not in _SCHEME_LETTERS:
+            start += 1
+        if start < at:
+            spans.append((start, at + 3))
+            after = at + 3
+        at = piece.find("://", at + 1)
+    return spans
+
+
+def urls_in(value: str) -> List[str]:
+    """The URLs a value may hold, from every scheme in each whitespace-delimited piece, without the closing brackets,
+    quotes and punctuation that end a sentence, and with URL_TRIED_BACK of them put back (`]` closes an IPv6 host)."""
+    urls: List[str] = []
+    for piece in _PIECES.split(value):
+        for start, _end in scheme_spans(piece):
+            url = piece[start:]
+            end = len(url)
+            while end > 0 and url[end - 1] in URL_CLOSING:
+                end -= 1
+            back = 0
+            while back <= URL_TRIED_BACK and end + back <= len(url):
+                urls.append(url[:end + back])
+                back += 1
+    return urls
+
+
+def secret_launch_argument(value: str) -> bool:
+    """A launch argument (a provider entry's command, a descriptor's commands, a manifest's MCP arguments) that carries
+    a credential (LC-21): anything secret_argument finds, or a URL inside it that carries one (`--remote=<https>://u:pw@h/r`,
+    FAA-200 (28)): its password as repository_password reads one, its parameters as repository_credential reads them,
+    whatever its host, since a process listing shows the argument whether or not `new URL` would parse it. The Node
+    twin is secretLaunchArgument."""
+    return secret_argument(value) or any(repository_password(url) or _url_credential(url, hosts=False) for url in urls_in(value))
+
+
 _REPOSITORY_URI = re.compile(r"\A([A-Za-z][A-Za-z0-9+.-]*:(?://[^/?#]*)?)([^?#]*)(.*)\Z", re.S)
 _REPOSITORY_NAME = re.compile(r"(?:[a-z0-9._-]+|[A-Za-z._-]+)\Z")  # lower case, or letters with no digit (readings 8)
 _REPOSITORY_AUTHORITY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")
@@ -536,7 +592,8 @@ def repository_credential(value: str) -> bool:
     user), in its query or fragment as secret_url reads them, or as a path segment shaped like a key. A path segment in
     lower case, or of letters with no digit (task-pipeline-dashboard, Task-Pipeline-Dashboard), is the repository's
     name, never a key, though it reads as an `sk-` shape, unless a key's shape starts it or follows a `.`, `_` or `-` in
-    it (repository_name); a segment is read as written and ascii_decoded. A
+    it (repository_name); a segment is read as written and ascii_decoded, the scheme, authority, query and fragment
+    too, and the user ascii_decoded as one run (a `%2F` in it splits no token, FAA-200 (31)). A
     user outside a URL's authority (an scp form, `https:user@host/path`) counts as one: a user is an authority's."""
     if "@" in value and not _REPOSITORY_AUTHORITY.match(value):
         return True
@@ -548,5 +605,10 @@ def repository_credential(value: str) -> bool:
         return True
     odd = [piece for written in (path, ascii_decoded(path)) for piece in re.split(r"[/\\:]", written)
            if piece and not repository_name(piece)]
-    # the scheme and authority decoded too: git sends `https://%67hp_...@h` with its user decoded (unit reading 12)
-    return _url_credential(head + tail, hosts=False) or secret_argument(ascii_decoded(head)) or any(secret_argument(piece) for piece in odd)
+    user = head.partition("//")[2].rpartition("@")[0]
+    # the scheme and authority decoded too: git sends `https://%67hp_...@h` with its user decoded (unit reading 12); the
+    # query and fragment decoded too, so `#%73k-...` is the key `#sk-...` is (FAA-200 (29)); and the user decoded as one
+    # run, so a `%2F` inside a base64 token is no path separator (FAA-200 (31))
+    return (_url_credential(head + tail, hosts=False) or secret_argument(ascii_decoded(head))
+            or secret_argument(ascii_decoded(head + tail)) or long_secret(ascii_decoded(user))
+            or any(secret_argument(piece) for piece in odd))

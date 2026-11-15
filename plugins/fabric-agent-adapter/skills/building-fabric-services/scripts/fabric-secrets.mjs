@@ -2,6 +2,7 @@
 // The contract's one credential detector (Fabric Agent Contract DEC-0044, `src/secret-shape.ts` at the pin): a name
 // that can only carry a credential, a value shaped like one, a launch argument that carries one, and a URL that does
 // (LC-21). A port held to the contract's own answers by test/fixtures/contract/profile-vectors.json. No dependencies.
+// Example URLs write their scheme in angle brackets: read `<https>` as `https` (FAA-212).
 
 /** A name's words: split at `.`, `_`, `-` and camelCase humps, lowercased (`APIKey` is `api key`). */
 export function nameWords(name) {
@@ -205,7 +206,66 @@ export function repositoryCredential(value) {
   if (!match) return secretArgument(value);
   const [, head, path, tail] = match;
   const odd = [path, asciiDecoded(path)].flatMap((written) => written.split(/[/\\:]/)).filter((piece) => piece && !repositoryName(piece));
-  if (repositoryPassword(value) || secretArgument(head + tail) || secretArgument(asciiDecoded(head)) || odd.some((piece) => secretArgument(piece))) return true; // the authority decoded too (unit reading 12)
-  return repositoryParts(head, tail).some((part) => [...rawValues(part)].some(([name, values]) =>
-    values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))));
+  const authority = head.includes('//') ? head.slice(head.indexOf('//') + 2) : '';
+  const user = authority.slice(0, Math.max(authority.lastIndexOf('@'), 0));
+  // the authority decoded too (unit reading 12); the query and fragment decoded too, so `#%73k-...` is the key `#sk-...`
+  // is (FAA-200 (29)); the user decoded as one run, so a `%2F` inside a base64 token is no path separator (FAA-200 (31))
+  if (repositoryPassword(value) || secretArgument(head + tail) || secretArgument(asciiDecoded(head)) || secretArgument(asciiDecoded(head + tail))
+    || longSecret(asciiDecoded(user)) || odd.some((piece) => secretArgument(piece))) return true;
+  return parametersCredential(head, tail);
+}
+
+// A repository's query or fragment parameter named for a credential with a value, or shaped like one (secretUrl's rule,
+// read by hand as repositoryParts reads them).
+const parametersCredential = (head, tail) => repositoryParts(head, tail).some((part) => [...rawValues(part)].some(([name, values]) =>
+  values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))));
+
+const SCHEME_CHAR = /[a-z0-9+.-]/i;
+const SCHEME_LETTER = /[a-z]/i;
+/**
+ * The [start, end] of each URL scheme and its `://` in a piece, where `/[a-z][a-z0-9+.-]*:\/\//gi` finds them left to
+ * right, read in linear time (FAA-322: the pattern tried every letter of a long run with no `://`). From each `://` the
+ * run of scheme characters before it is read back, and the match starts at its first letter at or after where the last
+ * match ended. The twin of fabric_secrets.scheme_spans; moved here from fabric-connections (FAA-200 (28)).
+ */
+export function schemeSpans(piece) {
+  const spans = [];
+  let after = 0;
+  for (let at = piece.indexOf('://'); at >= 0; at = piece.indexOf('://', at + 1)) {
+    let start = at;
+    while (start > after && SCHEME_CHAR.test(piece[start - 1])) start -= 1;
+    while (start < at && !SCHEME_LETTER.test(piece[start])) start += 1;
+    if (start < at) {
+      spans.push([start, at + 3]);
+      after = at + 3;
+    }
+  }
+  return spans;
+}
+const URL_CLOSING = /[)\]}>"'.,;:!?]/;
+const URL_TRIED_BACK = 1;
+/** The URLs a value may hold, from every scheme in each whitespace-delimited piece, without the closing brackets,
+ * quotes and punctuation that end a sentence, and with URL_TRIED_BACK of them put back (`]` closes an IPv6 host). */
+export function urlsIn(value) {
+  const urls = [];
+  for (const piece of value.split(/\s+/)) {
+    for (const [start] of schemeSpans(piece)) {
+      const url = piece.slice(start);
+      let end = url.length;
+      while (end > 0 && URL_CLOSING.test(url[end - 1])) end -= 1;
+      for (let back = 0; back <= URL_TRIED_BACK && end + back <= url.length; back += 1) urls.push(url.slice(0, end + back));
+    }
+  }
+  return urls;
+}
+
+/** A launch argument that carries a credential (LC-21): anything secretArgument finds, or a URL inside it that carries
+ * one (`--remote=<https>://u:pw@h/r`, FAA-200 (28)): its password as repositoryPassword reads one, its parameters by
+ * hand, whatever its host (fabric_secrets.secret_launch_argument). */
+export function secretLaunchArgument(value) {
+  return secretArgument(value) || urlsIn(value).some((url) => {
+    if (secretArgument(url) || repositoryPassword(url)) return true;
+    const match = REPOSITORY_URI.exec(url);
+    return match !== null && parametersCredential(match[1], match[3]);
+  });
 }

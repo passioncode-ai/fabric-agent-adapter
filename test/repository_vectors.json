@@ -1,5 +1,5 @@
 {
-  "note": "0.62.0 readings 7 to 11: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY and the upper-case marks (SKLETTERS, RUN40, ...) are replaced at run time by a made-up key shape, never written here. FAA-258 (the contract's DEC-0151 at the pin): an `sk-` inside a word, a digit-free or upper-case `sk-` and a name an `sk-` starts are no keys, so their nine vectors moved to `name`; SKSTRONG (a digit and an upper-case letter) and SKREST read as keys DEC-0151 reads.",
+  "note": "0.62.0 readings 7 to 11: one rule for a repository's credential, read by Python (both copies of fabric_secrets) and Node. KEY and the upper-case marks (SKLETTERS, RUN40, ...) are replaced at run time by a made-up key shape, never written here. FAA-258 (the contract's DEC-0151 at the pin): an `sk-` inside a word, a digit-free or upper-case `sk-` and a name an `sk-` starts are no keys, so their nine vectors moved to `name`; SKSTRONG (a digit and an upper-case letter) and SKREST read as keys DEC-0151 reads. FAA-200 (29), (31): a key with one character percent-encoded in the query or fragment, and a base64 run split by a percent-encoded `/` in the user (B64A and B64B), are read decoded.",
   "credential": [
     "https://bot:pw@github.com/example-org/r",
     "https://KEY@github.com/example-org/r",
@@ -48,7 +48,10 @@
     "ssh:///u:fixture@x.example/o/r",
     "https:///h\\u:fixture@x.example/o/r",
     "ssh://\\/u:fixture@x.example/o/r",
-    "https://github.com/example-org/.SKSTRONG"
+    "https://github.com/example-org/.SKSTRONG",
+    "https://github.com/example-org/r#%73SKREST",
+    "https://github.com/example-org/r?%73SKREST",
+    "https://B64A%2FB64B@github.com/example-org/r"
   ],
   "name": [
     "https://github.com/example-org/example-agent",

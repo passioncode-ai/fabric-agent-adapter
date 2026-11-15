@@ -20,9 +20,10 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
-from fabric_secrets import ascii_decoded, repository_name, secret_argument  # noqa: E402
+from fabric_secrets import ascii_decoded, repository_name, repository_password, secret_argument  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
 import fabric_supervisors as _sup  # noqa: E402 - where a LaunchDaemon's plist lives (FAA-278)
+import fabric_git  # noqa: E402 - git from no folder of the checkout, no fsmonitor, no caller's GIT_DIR (FAA-190)
 import socket  # noqa: E402
 
 
@@ -117,24 +118,34 @@ _URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the val
 _OTHER_URL = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*)://(?P<authority>[^/?#]*)(?P<path>[^?#]*)")
 
 
+_SHAPED = "<a repository shaped like a credential>"
+
+
 def shown_repository(value: str) -> str:
     """A repository or git origin as evidence: a URL through redact_url, which drops its user information as written
     first (git's reading, `<https>://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
     `\\` or a drive) by its name; an scp form (user[:password]@host:path) from its host, its user and password dropped
-    whatever they hold, up to the last `@` that a host and `:` follow; anything else by its name. Then a query and a
+    whatever they hold, up to the last `@` that a host and `:` follow, or the last `@` of all when repository_password
+    reads a password (one may hold `@x:`, FAA-200 (34), (21)); anything else by its name. A scheme shaped like a key is
+    not printed (FAA-200 (33)). Then a query and a
     fragment. A value with a piece shaped like a credential that is no name (fabric_secrets.repository_name) is not
     printed (0.62.0 readings 2 to 11). Read first as redact_url reads it: C0 controls and space off its ends, every tab,
     CR and LF out, so `<https>://u:pw@h` with a tab between its two slashes is the URL it is (unit reading 11)."""
     value = re.sub(r"[\t\n\r]", "", value.strip("".join(map(chr, range(0x21)))))
+    named = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):", value)
+    if named and secret_argument(named.group(1)):  # a scheme shaped like a key, read as written (FAA-200 (33))
+        return _SHAPED
     other = _OTHER_URL.match(value) if not _SPECIAL.match(value) else None
     if other:
         # A scheme the URL standard does not treat as special (ssh, git): redact_url keeps only its name, so the
         # repository compared would be lost from the evidence (FAA-200 (8)). Its user information as written goes, up to
-        # the last `@` of the authority; a port of digits and a path holding no `@` stay, else only the scheme.
+        # the last `@` of the authority; a port of digits and a path holding no `@` stay, else only the scheme. An
+        # authority holding `?` or `#` before an `@` (a token as user) keeps only the scheme too (FAA-200 (15)).
         host, path = other.group("authority").rpartition("@")[2], other.group("path")
         name = other.group("scheme").lower()
         port_ok = re.fullmatch(r"(?:\[[0-9A-Fa-f:.]+\]|[^:\[\]\\]+)(?::[0-9]{0,5})?", host)
-        shown = "%s://%s%s" % (name, host.lower(), path) if host and port_ok and "@" not in path else name + ":<redacted>"
+        past = re.match(r"[^/\\]*?[?#][^/\\]*@", value[other.end("scheme") + 3:])
+        shown = "%s://%s%s" % (name, host.lower(), path) if host and port_ok and "@" not in path and not past else name + ":<redacted>"
     elif _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
         shown = redact_url(value)  # which drops the user information as written first (seam readings 10 and 11)
     else:
@@ -143,12 +154,37 @@ def shown_repository(value: str) -> str:
             ats = [i for i, c in enumerate(value) if c == "@"]
             hosts = [at for at in ats if _SCP_HOST.match(value, at + 1)]
             cut = (hosts or ats or [-1])[-1] + 1  # the last `@` a host and `:` follow, else the last `@` (unit reading 8)
+            if repository_password(value):  # a password may hold `@x:` itself: cut after the last `@` (FAA-200 (34), (21))
+                cut = (ats or [-1])[-1] + 1
         shown = re.split(r"[?#]", value[cut:], maxsplit=1)[0]
     pieces = [piece for written in (shown, ascii_decoded(shown)) for piece in re.split(r"[/\\:]", written)
               if piece and not repository_name(piece)]  # as written and decoded, `%73k-` being `sk-` (readings 11)
-    return "<a repository shaped like a credential>" if any(secret_argument(piece) for piece in pieces) else shown
+    return _SHAPED if any(secret_argument(piece) for piece in pieces) else shown
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
+
+
+_GITHUB_CANONICAL = re.compile(r"https://(?:[^/?#@]*@)?github\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+\Z")
+_GITHUB_ANY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:/*(?:[^/?#@]*@)?(?:www\.)?github\.com(?::[0-9]*)?/([A-Za-z0-9-]+)/"
+                         r"([A-Za-z0-9._-]+?)(?:\.git)?/*(?:[/?#]|\Z)", re.I | re.ASCII)
+
+
+def source_repository_verdict(value: str) -> Tuple[str, str]:
+    """descriptor.source-repository on a source both validators accept: a source with no host names no project (`x:y`,
+    `urn:...`, FAA-200 (54)), and a github.com source is `https://github.com/<owner>/<name>` with `.git` at most, or the
+    estate's readers cannot join it to one (`/tree/main`, `www.`, a port, a query, a fragment, `.git/`, FAA-200 (35)):
+    both NOT_RUN, naming the spelling to write. The validators still accept them (refusing is the contract's call)."""
+    authority = re.match(r"[A-Za-z][A-Za-z0-9+.-]*://([^/?#]*)", value)
+    host = re.sub(r":[0-9]*\Z", "", authority.group(1).rpartition("@")[2]).lower() if authority else ""
+    if not host:
+        return "NOT_RUN", "source.repository %s names no host, so no reader joins it to a project: write the repository's " \
+                          "URL, such as https://github.com/owner/name" % shown_repository(value)
+    if host.rstrip(".") in ("github.com", "www.github.com") and not _GITHUB_CANONICAL.match(value):
+        found = _GITHUB_ANY.match(value)
+        canonical = "https://github.com/%s/%s" % found.groups() if found else "https://github.com/owner/name"
+        return "NOT_RUN", "source.repository %s is a GitHub spelling the estate's readers do not join to a project: write " \
+                          "%s" % (shown_repository(value), canonical)
+    return "PASS", "names %s" % shown_repository(value)
 
 
 def other_domain_copy(label: object, domain: str, user_name: object = None) -> Optional[str]:
@@ -775,7 +811,7 @@ def opens_in_host_verdict(repo: Path, port: int, origin: Optional[str], dashboar
     """`dashboard.opens-in-host` over one checkout: FAIL with the places a tracked text file opens a browser at the
     service's pages, PASS when none does, NOT_RUN when the checkout or git cannot be read or the budget runs out."""
     until = time.monotonic() + max(0.0, budget)
-    if not shutil.which("git"):
+    if not fabric_git.executable([repo]):
         return "NOT_RUN", "git is not installed"
 
     def left() -> float:
@@ -784,20 +820,20 @@ def opens_in_host_verdict(repo: Path, port: int, origin: Optional[str], dashboar
     if left() <= 0:
         return "NOT_RUN", "the %.1f s budget ran out before the checkout was read" % budget
     try:
-        top = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                             timeout=max(0.05, left()))
-        if top.returncode != 0 or not top.stdout.strip():
+        top = fabric_git.run(repo, ["rev-parse", "--show-toplevel"], timeout=max(0.05, left()), capture_output=True,
+                             text=True)
+        if top is None or top.returncode != 0 or not top.stdout.strip():
             return "NOT_RUN", "%s is not a Git checkout" % repo
         root = Path(top.stdout.strip())
         if left() <= 0:
             return "NOT_RUN", "the %.1f s budget ran out before the checkout was read" % budget
-        listed = subprocess.run(["git", "-C", str(root), "grep", "-I", "-l", "-z", "-E", _COARSE], capture_output=True,
-                                timeout=max(0.05, left()))
+        listed = fabric_git.run(root, ["grep", "-I", "-l", "-z", "-E", _COARSE], timeout=max(0.05, left()),
+                                capture_output=True)
     except subprocess.TimeoutExpired:
         return "NOT_RUN", "the %.1f s budget ran out while git read %s" % (budget, repo)
     except OSError as exc:
         return "NOT_RUN", "git could not read %s: %s" % (repo, exc)
-    if listed.returncode not in (0, 1):  # 1: nothing matched
+    if listed is None or listed.returncode not in (0, 1):  # 1: nothing matched
         return "NOT_RUN", "git grep could not read %s" % root
     candidates = [p for p in listed.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
     if len(candidates) > _MAX_CANDIDATES:
@@ -822,10 +858,10 @@ def opens_in_host_verdict(repo: Path, port: int, origin: Optional[str], dashboar
 
 def _git_out(cwd: Path, *args: str) -> Optional[str]:
     try:
-        done = subprocess.run(["git", "-C", str(cwd)] + list(args), capture_output=True, text=True, timeout=2.0)
+        done = fabric_git.run(cwd, list(args), timeout=2.0, capture_output=True, text=True)
     except (OSError, subprocess.SubprocessError):
         return None
-    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
+    return done.stdout.strip() if done is not None and done.returncode == 0 and done.stdout.strip() else None
 
 
 def service_checkout(descriptor: Any, repo: Optional[str]) -> Tuple[Optional[Path], str]:
@@ -909,17 +945,16 @@ def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
         return "NOT_RUN", "the service declares no limits (a load declaration's limits, a usage report's budget or budgets)"
     if repo is None:
         return "NOT_RUN", why
-    if not shutil.which("git"):
+    if not fabric_git.executable([repo]):
         return "NOT_RUN", "git is not installed"
     try:
-        listed = subprocess.run(["git", "-C", str(repo), "grep", "-I", "-l", "-z", "-E", _HOLD_USE, "--"]
-                                + list(_HOLD_CODE), capture_output=True,
-                                timeout=max(0.05, budget))
+        listed = fabric_git.run(repo, ["grep", "-I", "-l", "-z", "-E", _HOLD_USE, "--"] + list(_HOLD_CODE),
+                                timeout=max(0.05, budget), capture_output=True)
     except subprocess.TimeoutExpired:
         return "NOT_RUN", "the %.1f s budget ran out while git read %s" % (budget, repo)
     except OSError as exc:
         return "NOT_RUN", "git could not read %s: %s" % (repo, exc)
-    if listed.returncode not in (0, 1):
+    if listed is None or listed.returncode not in (0, 1):
         return "NOT_RUN", "git grep could not read %s" % repo
     users = [p for p in listed.stdout.decode("utf-8", "surrogateescape").split("\0")
              if p and p.rsplit("/", 1)[-1] not in _HOLD_KIT_FILES and not _TEST_PATH.search(p)]

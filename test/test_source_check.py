@@ -61,8 +61,7 @@ def run(argv):
 
 # reading 43, seam: a Git location the runner exports (any hook in a linked worktree has GIT_DIR and GIT_INDEX_FILE)
 # would point the tests' own `git init` and `git config` at that repository; the tests find theirs from their folder
-for _name in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR",
-              "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX"):
+for _name in sc._GIT_LOCATION:  # FAA-190 (99): the module's own list, never a second copy of it
     os.environ.pop(_name, None)
 
 
@@ -670,6 +669,114 @@ class WhatIsRead(Tree):
             self.assertIn("notes/a.txt:1: home-path", out)
 
     @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_an_exported_git_work_tree_is_not_passed(self):
+        # FAA-190 (99): with another folder as GIT_WORK_TREE, Git listed that folder's files against ROOT's index
+        self.git("init", "-q")
+        self.write("notes/a.txt", MAC_HOME + "\n")
+        other = self.tmp / "other"
+        other.mkdir()
+        (other / "x.txt").write_text("x\n")
+        with mock.patch.dict(os.environ, {"GIT_WORK_TREE": str(other)}):
+            code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 1, out[-300:])
+        self.assertIn("notes/a.txt:1: home-path", out)
+        self.assertNotIn("x.txt", out)
+
+    @unittest.skipIf(os.name == "nt" or shutil.which("git") is None, "a POSIX script as git")
+    def test_a_git_inside_the_checked_tree_is_not_run(self):
+        # FAA-190 (67): `npm run` puts <root>/node_modules/.bin on PATH as an absolute folder; a `git` there is the tree's
+        marker = self.tmp / "tree-git-ran"
+        self.git("init", "-q")
+        self.write("src/app.py", "path = %s\n" % MAC_HOME)
+        tool = self.root / "node_modules" / ".bin"
+        tool.mkdir(parents=True)
+        (tool / "git").write_text("#!/bin/sh\necho ran >> '%s'\nexit 0\n" % marker)
+        (tool / "git").chmod(0o755)
+        real = shutil.which("git")
+        path = os.pathsep.join([str(tool), os.path.dirname(real)])
+        with mock.patch.dict(os.environ, {"PATH": path}):
+            self.assertEqual(sc._git(self.root), real)
+            code, out, err = run(["check", str(self.root)])
+        self.assertFalse(marker.exists(), "the tree's own git ran")
+        self.assertEqual(code, 1, out[-300:])
+        self.assertIn("src/app.py:1: home-path", out)
+        self.assertIn("what Git would commit", out)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_git_trace_is_not_passed(self):
+        # FAA-190 (103): GIT_TRACE* made Git write a trace file, and a trace2 target in the caller's own configuration did too
+        self.git("init", "-q")
+        self.write("src/app.py", "print('hi')\n")
+        traces = {name: self.tmp / (name.lower() + ".log") for name in ("GIT_TRACE", "GIT_TRACE_SETUP", "GIT_TRACE2",
+                                                                         "GIT_TRACE2_EVENT", "GIT_TRACE2_PERF")}
+        config = self.tmp / "global.gitconfig"
+        target = self.tmp / "trace2-from-config.log"
+        config.write_text("[trace2]\n\teventTarget = %s\n\tnormalTarget = %s\n" % (target, target))
+        env = {name: str(path) for name, path in traces.items()}
+        env["GIT_CONFIG_GLOBAL"] = str(config)  # Git 2.32 and later: the caller's own configuration file
+        with mock.patch.dict(os.environ, env):
+            code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 0, out[-300:])
+        self.assertIn("what Git would commit", out)
+        self.assertEqual([p.name for p in list(traces.values()) + [target] if p.exists()], [])
+
+    def test_every_git_call_turns_both_fsmonitors_off(self):
+        # FAA-190 (44): Git for Windows' core.useBuiltinFSMonitor is not core.fsmonitor; both are overridden
+        seen = []
+
+        def fake(argv, **kwargs):
+            seen.append((list(argv), kwargs.get("env")))
+            return subprocess.CompletedProcess(argv, 0, b"a.txt\0", b"")
+
+        with mock.patch.object(sc, "_git", return_value="git"), mock.patch.object(sc.subprocess, "run", fake), \
+                mock.patch.dict(os.environ, {"GIT_DIR": "/elsewhere", "GIT_TRACE": "/t"}):
+            self.assertEqual(sc._git_files(self.root), ["a.txt"])
+        argv, env = seen[0]
+        self.assertEqual(argv[1:5], ["-c", "core.fsmonitor=", "-c", "core.useBuiltinFSMonitor=false"])
+        self.assertNotIn("GIT_DIR", env)
+        self.assertNotIn("GIT_TRACE", env)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_the_builtin_fsmonitor_daemon_is_not_started(self):
+        # FAA-190 (49): `core.fsmonitor true` starts Git's own daemon on `ls-files --others`; the empty value keeps it off
+        self.git("init", "-q")
+        probe = subprocess.run(["git", "-C", str(self.root), "-c", "core.fsmonitor=", "fsmonitor--daemon", "status"],
+                               capture_output=True, text=True)
+        if "not watching" not in probe.stdout + probe.stderr:
+            self.skipTest("no builtin fsmonitor daemon in this Git on this platform")
+        self.git("config", "core.fsmonitor", "true")
+        self.addCleanup(subprocess.run, ["git", "-C", str(self.root), "-c", "core.fsmonitor=", "fsmonitor--daemon",
+                                         "stop"], capture_output=True)
+        self.write("src/app.py", "print('hi')\n")
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 0, out[-300:])
+        status = subprocess.run(["git", "-C", str(self.root), "-c", "core.fsmonitor=", "fsmonitor--daemon", "status"],
+                                capture_output=True, text=True)
+        self.assertIn("not watching", status.stdout + status.stderr)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_an_absent_submodule_named_with_a_slash_is_left_out(self):
+        # FAA-190 (46): a submodule not checked out has no folder, so `vendor/sub/` did not take it while `vendor/sub` did
+        self.git("init", "-q")
+        self.write("src/app.py", "print('hi')\n")
+        self.git("update-index", "--add", "--cacheinfo", "160000,%s,vendor/sub" % ("1" * 40))
+        for line in ("vendor/sub/", "vendor/sub", "vendor/*/"):
+            self.write(sc.IGNORE_FILE, line + "\n")
+            code, out, err = run(["check", str(self.root)])
+            self.assertEqual(code, 0, (line, out[-300:]))
+            self.assertIn("1 left out by name", out)
+        self.write(sc.IGNORE_FILE, "vendor/*\n")  # a wildcard line takes files, never a submodule
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 2, out[-300:])
+        self.write("gone.txt", "x\n")
+        self.git("add", "gone.txt")
+        (self.root / "gone.txt").unlink()
+        self.write(sc.IGNORE_FILE, "gone.txt/\nvendor/sub/\n")  # a deleted file is no folder: still not in the work tree
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 2, out[-300:])
+        self.assertIn("gone.txt: not read (not in the work tree)", out)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
     def test_a_submodule_named_as_a_folder_in_the_ignore_file_is_left_out(self):
         self.git("init", "-q")
         self.write("src/app.py", "print('hi')\n")
@@ -732,6 +839,111 @@ class WhatIsRead(Tree):
             line = sc._line(glob, "a line")
             self.assertTrue(sc._ignored(left_out, [line]), (glob, left_out))
             self.assertFalse(sc._ignored(kept, [line]), (glob, kept))
+
+    def test_many_double_stars_on_a_deep_path_stay_fast(self):
+        # FAA-190 (56): each `**/` was `(?:.*/)?`, and three of them backtracked polynomially on a deep path
+        line = sc._line("**/a/**/a/**/b", "a line")
+        self.assertTrue(sc._ignored("x/a/y/a/z/b", [line]))
+        self.assertTrue(sc._ignored("a/a/b", [line]))
+        self.assertFalse(sc._ignored("a/b", [line]))
+        folder = sc._line("**/a/**/a/**/", "a line")
+        self.assertTrue(sc._ignored("a/x/a/y/z.txt", [folder]))
+        self.assertFalse(sc._ignored("a/x/a", [folder]))
+        ratio = growth(lambda n: (sc._ignored("a/" * n + "c", [line]), sc._ignored("a/" * n + "c", [folder])), 300, 1200)
+        self.assertLess(ratio, 8, "four times the depth must cost about four times as much, not the cube")
+
+    @unittest.skipUnless(sys.platform == "darwin", "macOS keeps a decomposed name as written; Git lists it composed")
+    def test_an_nfd_folder_matches_the_same_ignore_line_in_both_modes(self):
+        # FAA-190 (64): Git (core.precomposeunicode) lists `café/` composed, os.walk gives it as stored (decomposed), so
+        # one line took the folder in Git mode and not with --every-file
+        decomposed, composed = unicodedata.normalize("NFD", "caf\u00e9"), "caf\u00e9"
+        (self.root / decomposed).mkdir()
+        (self.root / decomposed / "a.txt").write_text(MAC_HOME + "\n")
+        if shutil.which("git"):
+            subprocess.run(["git", "-C", str(self.root), "init", "-q"], check=True, capture_output=True)
+        for line in (composed + "/", decomposed + "/", composed + "/*.txt"):
+            self.write(sc.IGNORE_FILE, line + "\n")
+            for extra in ([], ["--every-file"]):
+                code, out, err = run(["check", str(self.root), *extra])
+                self.assertEqual(code, 0, (line.startswith(composed), extra, out[-300:]))
+                self.assertIn("1 left out by name", out)
+
+    def test_a_folder_named_like_a_credential_file_is_a_finding(self):
+        # FAA-190 (74): only the last segment was read, so `k.pem/a.txt` passed and `pack` refused it later
+        for folder in ("k.pem", ".env", "keys/id_rsa", "svc.token"):
+            tree = self.tmp / ("tree-" + folder.replace("/", "-"))
+            (tree / folder).mkdir(parents=True)
+            (tree / folder / "a.txt").write_text("plain\n")
+            code, out, err = run(["check", str(tree)])
+            self.assertEqual(code, 1, (folder, out[-300:]))
+            self.assertIn("%s/a.txt:0: secret (a folder in the path that is a credential by its name" % folder, out)
+        tree = self.tmp / "tree-ok"
+        (tree / ".env.example").mkdir(parents=True)
+        (tree / ".env.example" / "a.txt").write_text("plain\n")
+        self.assertEqual(run(["check", str(tree)])[0], 0)
+
+    def test_an_ignore_line_matching_nothing_is_named(self):
+        # FAA-190 (50): a line that matches no path (a reason written after it on the same line, a typo) gave no sign
+        self.write("test/vectors/v1.json", "{}\n")
+        self.write("notes.txt", "plain\n")
+        self.write(sc.IGNORE_FILE, "# vectors\ntest/vectors/*.json\nnothing/here.json   # reason\n")
+        code, out, err = run(["check", str(self.root), "--exclude", "absent/*"])
+        self.assertEqual(code, 0, out[-300:])  # a sign, never a failure
+        self.assertIn("line 3 of %s matches no file" % sc.IGNORE_FILE, out)
+        self.assertIn("--exclude glob 1 matches no file", out)
+        self.assertNotIn("line 2 of", out)
+        self.assertNotIn("nothing/here", out)  # named by its place, never by what it holds
+        code, out, err = run(["check", str(self.root), "--json"])
+        self.assertEqual(json.loads(out)["unmatched"], ["line 3 of %s" % sc.IGNORE_FILE])
+        self.write(sc.IGNORE_FILE, "test/**\ntest/vectors/\n")  # a line whose files an earlier line took matches them too
+        self.assertNotIn("matches no file", run(["check", str(self.root)])[1])
+
+    def test_a_tree_with_no_file_read_is_incomplete(self):
+        # FAA-190 (61): an uninitialised submodule is an empty folder; --every-file read 0 files and exited 0
+        empty = self.tmp / "submodule"
+        empty.mkdir()
+        for extra in ([], ["--every-file"], ["--json"]):
+            code, out, err = run(["check", str(empty), *extra])
+            self.assertEqual(code, 2, (extra, out[-300:]))
+            if extra == ["--json"]:
+                self.assertFalse(json.loads(out)["complete"])
+            else:
+                self.assertIn("no file read", out)
+        self.write("a.txt", "plain\n")
+        self.assertEqual(run(["check", str(self.root)])[0], 0)
+
+    def test_the_linear_matcher_agrees_with_the_expression(self):
+        # FAA-190 (56), (60): a line with two or more runs is matched by positions, never by its expression; on short
+        # names, where the expression is quick, both answer alike, whole and for a folder above
+        import random
+        rnd = random.Random(190)
+        parts = ("a", "b", "/", "*", "**", "?", "[ab]", "[!a]", "**/")
+        compared = 0
+        for _ in range(3000):
+            try:
+                line = sc._line("".join(rnd.choice(parts) for _ in range(rnd.randint(2, 7))), "a line")
+            except sc.CheckError:
+                continue
+            glob = sc._glob(line)
+            if glob.parts is None:
+                continue
+            for _ in range(4):
+                name = "".join(rnd.choice("ab/") for _ in range(rnd.randint(0, 10)))
+                above = any(glob.regex.match(name[:i]) for i, c in enumerate(name) if c == "/")
+                self.assertEqual((glob.match(name), glob.folder_above(name)),
+                                 (glob.regex.match(name) is not None, above), (line, name))
+                compared += 1
+        self.assertGreater(compared, 1000)
+
+    def test_many_stars_in_a_segment_stay_fast(self):
+        # FAA-190 (60): each `*` was `[^/]*`, and five in one segment backtracked as the fifth power of the name's length;
+        # Git's wildmatch does not
+        line = sc._line("v/*a*a*a*a*b", "a line")
+        self.assertTrue(sc._ignored("v/xaayaaab", [line]))
+        self.assertFalse(sc._ignored("v/aaab", [line]))
+        self.assertFalse(sc._ignored("v/aaaa/b", [line]))  # a star never crosses a folder
+        ratio = growth(lambda n: sc._ignored("v/" + "a" * n, [line]), 60, 240)
+        self.assertLess(ratio, 8, "four times the name must cost about four times as much")
 
     def test_a_folder_line_takes_what_its_folders_hold_never_a_file_beside_them(self):
         for glob, path, left_out in (("src/**/", "src/main.py", False), ("src/**/", "src/pkg/x.py", True),
@@ -844,7 +1056,7 @@ class WhatIsRead(Tree):
         tools = self.root / "tools"
         tools.mkdir()
         for name in ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py", "fabric_source_homes.py",
-                     "fabric_source_restart.py", "fabric_secrets.py"):
+                     "fabric_source_restart.py", "fabric_secrets.py", "fabric_git.py"):
             shutil.copy(SCRIPTS / name, tools / name)
         self.git("init", "-q")
         self.git("add", "-A")
@@ -1493,7 +1705,7 @@ class Refusals(Tree):
 
     def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
         siblings = ("fabric_source_ignore.py", "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py",
-                    "fabric_source_tree.py", "fabric_source_check_cli.py")  # 0.81.0 seam: the tree module, imported only when a manifest is there
+                    "fabric_source_tree.py", "fabric_source_check_cli.py", "fabric_git.py")  # 0.81.0 seam: the tree module, imported only when a manifest is there
         (self.root / "fabric.source.json").write_text("{}\n", encoding="utf-8")
         for missing in siblings:  # reading 38, seam: each sibling left behind in turn
             tools = self.tmp / ("tools-" + missing)
@@ -1898,7 +2110,7 @@ class TheDetectorIsReadByItsPublicNames(unittest.TestCase):
         tools.mkdir()
         root.mkdir()
         for name in ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py",
-                     "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py"):
+                     "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py", "fabric_git.py"):
             shutil.copy(SCRIPTS / name, tools / name)
         older = (tools / "fabric_secrets.py").read_text(encoding="utf-8") + "\ndel BEARER_INSIDE  # as before 0.83.0\n"
         (tools / "fabric_secrets.py").write_text(older, encoding="utf-8")

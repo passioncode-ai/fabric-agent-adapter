@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.93.0 (2026-11-16)
+
+### Added
+
+- A new kit module `fabric_git` (Node `fabric-git.mjs`, layer L0), copied byte for byte into the adapting, creating and
+  working-with-fabric scripts: every script that runs Git runs it through one environment. It turns both fsmonitors off
+  (`core.fsmonitor` and Git for Windows' `core.useBuiltinFSMonitor`), never takes the caller's `GIT_DIR` or
+  `GIT_WORK_TREE`, drops `GIT_TRACE*` and forces the trace2 targets off, and skips a Git binary found inside the checked
+  tree (FAA-190 items 44, 49, 66, 67, 99, 100, 103). A guard test fails on a script that calls Git directly.
+
+### Fixed
+
+- The source check matches an ignore line with two or more `*` in time linear in the path (it backtracked polynomially:
+  ratios of 64 and 773 measured, under 8 after); on macOS names and lines compare in composed form; a line that matches
+  no file is named by its position, never its text, and `--json` lists them; a folder named like a credential file is a
+  finding; a tree where nothing was found exits 2; an absent submodule named `dir/` is left out like `dir` (FAA-190 items
+  46, 50, 56, 60, 61, 64, 74).
+- What the kit and the probe print no longer shows part of a secret: a repository with a password prints nothing after
+  its last `@`; a member name shaped like a credential prints `<redacted>`; a scheme shaped like a key prints
+  `<redacted>`; a URL whose user part holds `?` or `#` prints `<unparseable url>` (FAA-200 items 15, 21, 33, 34, 39).
+- `repository_credential` reads a query and a fragment decoded and a decoded user as one run (items 29, 31); a URL inside
+  a launch argument is read as a URL (`secret_launch_argument`), and a descriptor command that carries a credential is
+  refused as FAC-SEM-057 says (item 28).
+- The probe reads a source with no host, and a github.com source spelled other than `https://github.com/<owner>/<name>`,
+  as `descriptor.source-repository` NOT_RUN, naming the spelling to write (items 35, 54).
+
 ## 0.92.0 (2026-11-15)
 
 ### Fixed

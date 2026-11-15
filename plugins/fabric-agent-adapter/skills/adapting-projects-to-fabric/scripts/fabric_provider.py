@@ -246,7 +246,7 @@ def _run_problems(run: Any) -> List[str]:
         problems.append("run.mcp.stdio.command is an argument array of 1 to %d non-empty strings, never a shell string" % ARGV_MAX_ITEMS)
     elif any(len(a) > ARGV_MAX_ITEM for a in command):
         problems.append("run.mcp.stdio.command has an argument over %d characters" % ARGV_MAX_ITEM)
-    elif any(_secrets.secret_argument(a) for a in command):
+    elif any(_secrets.secret_launch_argument(a) for a in command):  # a URL inside an argument too (FAA-200 (28))
         problems.append("run.mcp.stdio.command carries a credential in an argument; argv is visible to every process (LC-21, FAC-SEM-057): pass it as a secret reference in env")
     env = stdio.get("env", {})
     if not isinstance(env, dict):

@@ -23,6 +23,7 @@
 import http from 'node:http';
 import net from 'node:net';
 import { CheckedAgent, ListenerRefused, TABLE_RESTRICTED, UNKNOWN, method as tableMethod, owner as ownerOf, refusal, serverEnd } from './fabric-peer-owner.mjs';
+import { secretArgument } from './fabric-secrets.mjs';
 import { loopbackHost } from './fabric-socket-proof.mjs';
 
 export const RETRY_STATUSES = Object.freeze([408, 425, 429, 500, 502, 503, 504]);
@@ -62,9 +63,17 @@ export class Response {
   json() { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(this.body)); }
 }
 
-// The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or fragment.
+// An http or https URL whose authority as written holds `?` or `#` and then `@` before any slash or backslash.
+const USER_PAST_QUERY = /^https?:[/\\]*[^/\\]*?[?#][^/\\]*@/i;
+
+// The URL as it may appear in an error or a log line: scheme, host, port and path; no userinfo, query or fragment. A
+// scheme shaped like a key prints as `<redacted>:<redacted>`, and an http or https URL whose authority holds `?` or `#`
+// before an `@` (a token as user) as `<unparseable url>` (FAA-200 (33), (15)), as the Python twin does.
 export function redactUrl(url) {
   let text = String(url).replace(/^[\x00-\x20]+|[\x00-\x20]+$/g, '').replace(/[\t\n\r]/g, '');
+  const named = /^([A-Za-z][A-Za-z0-9+.-]*):/.exec(text);
+  if (named && secretArgument(named[1])) return '<redacted>:<redacted>'; // read as written, before new URL lower-cases it
+  if (USER_PAST_QUERY.test(text)) return '<unparseable url>'; // `<https>://tok?en@host` reads as host `tok`
   // The user information as written goes first, as the Python twin drops it: `<https>://h\\u:pw@x/r` would print `pw` in
   // its path, a backslash being a slash to WHATWG (0.62.0 seam reading 11).
   const written = /^([A-Za-z][A-Za-z0-9+.-]*:[/\\]*)([^/?#]*)/.exec(text); // after any run of slashes (seam reading 13)

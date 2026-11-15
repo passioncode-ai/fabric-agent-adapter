@@ -53,10 +53,12 @@ _KEY_SHAPE = re.compile(
     r"(?:^|[^A-Za-z0-9])(?:sk-(?=[A-Za-z0-9_-]*[0-9])(?:(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{16,}|[A-Za-z0-9_-]{32,})"
     r"|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}"
     r"|(?:bot)?[0-9]{6,12}:(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[a-z])[A-Za-z0-9_-]{34,35}(?![A-Za-z0-9_-]))")
-_SCHEME_LETTERS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-_SCHEME_CHARS = _SCHEME_LETTERS | frozenset("0123456789+.-")
-_CLOSING = ")]}>\"'.,;:!?"
-_TRIED_BACK = 1
+# The URL finder lives in fabric_secrets since FAA-200 (28), where a launch argument's URLs are read with it; the names
+# stay here for code and tests that reached them.
+from fabric_secrets import (  # noqa: E402,F401
+    URL_CLOSING as _CLOSING, URL_TRIED_BACK as _TRIED_BACK, _SCHEME_CHARS, _SCHEME_LETTERS,
+    scheme_spans as _scheme_spans, urls_in as _urls_in,
+)
 
 
 def _date(value: str) -> bool:
@@ -139,43 +141,6 @@ def _shape_problems(value: Any) -> List[str]:
             if item["kind"] == "service" and "target" in text and not _SERVICE_TARGET.fullmatch(text["target"]):
                 problems.append("%s/target pattern: a service target is an id.instance key or a product id" % at)
     return problems
-
-
-def _scheme_spans(piece: str) -> List[Tuple[int, int]]:
-    """The (start, end) of each URL scheme and its `://` in a piece, where `[a-z][a-z0-9+.-]*://` (case-insensitive,
-    ASCII) finds them left to right, read in linear time (FAA-322: the pattern tried every letter of a long run with no
-    `://`). From each `://` the run of scheme characters before it is read back, and the match starts at its first
-    letter at or after where the last match ended."""
-    spans: List[Tuple[int, int]] = []
-    after, at = 0, piece.find("://")
-    while at >= 0:
-        start = at
-        while start > after and piece[start - 1] in _SCHEME_CHARS:
-            start -= 1
-        while start < at and piece[start] not in _SCHEME_LETTERS:
-            start += 1
-        if start < at:
-            spans.append((start, at + 3))
-            after = at + 3
-        at = piece.find("://", at + 1)
-    return spans
-
-
-def _urls_in(value: str) -> List[str]:
-    """The URLs a member may hold, from every scheme in each whitespace-delimited piece, without the closing brackets,
-    quotes and punctuation that end a sentence, and with _TRIED_BACK of them put back (`]` closes an IPv6 host)."""
-    urls: List[str] = []
-    for piece in _SPACES.split(value):
-        for start, _end in _scheme_spans(piece):
-            url = piece[start:]
-            end = len(url)
-            while end > 0 and url[end - 1] in _CLOSING:
-                end -= 1
-            back = 0
-            while back <= _TRIED_BACK and end + back <= len(url):
-                urls.append(url[:end + back])
-                back += 1
-    return urls
 
 
 def _long_run(value: str) -> bool:

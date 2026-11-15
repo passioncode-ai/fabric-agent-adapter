@@ -2,6 +2,14 @@
  "about": "FAA-65 REQ-06: one set of cases for fabric_http.py and fabric-http.mjs. Scenarios run with rand() = 0.5 (no jitter) and a clock that moves only when the client sleeps.",
  "redact": [
   [
+   "https://tok?en@host.example/o/r",
+   "<unparseable url>"
+  ],
+  [
+   "https://tok#en@host.example/o/r",
+   "<unparseable url>"
+  ],
+  [
    "file://h:1/x",
    "file:<redacted>"
   ],

@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { credentialName, repositoryCredential, secretArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
+import { credentialName, repositoryCredential, secretArgument, secretLaunchArgument, secretUrl, secretValue } from './fabric-secrets.mjs';
 import { ID, INSTANCE, LOCAL_PATH, PRIMARY_CAPABILITY, PROTOCOL, ServiceError, TASK, UNIT, expand } from './fabric-base.mjs';
 import { atomicWrite, ensurePrivateDir, servicesDir } from './fabric-paths.mjs';
 import { ANOTHER_ACCOUNT, SYSTEM, THIS_ACCOUNT, UNKNOWN, normHost, owner as peerOwnerOf, peer as peerOfSocket } from './fabric-peer-owner.mjs'; // L0: who listens on a port and who connected (DEC-0154 HA-2, FAA-225, FAA-227)
@@ -130,9 +130,12 @@ export function validateDescriptor(d) {
   }
   problems.push(...descriptorMemberProblems(d));
   for (const [name, argv] of Object.entries(d.commands ?? {})) {
-    if (!['doctor', 'update'].includes(name)) problems.push(`unknown command ${name}`);
+    if (!['doctor', 'update'].includes(name)) problems.push(`unknown command ${shownMember(name)}`);
     else if (!Array.isArray(argv) || !argv.length || !argv.every((a) => typeof a === 'string')) problems.push(`command ${name} must be an argument array`);
-    else if (!LOCAL_PATH.test(argv[0])) problems.push(`command ${name} must start with an absolute or ~/ executable`);
+    else {
+      if (!LOCAL_PATH.test(argv[0])) problems.push(`command ${name} must start with an absolute or ~/ executable`);
+      if (argv.some(secretLaunchArgument)) problems.push(`FAC-SEM-057: command ${name} carries a credential in an argument; a process listing shows it: have the program read it from a file it is pointed at (LC-21)`); // a URL inside an argument too (FAA-200 (28))
+    }
   }
   return problems;
 }
@@ -207,6 +210,8 @@ const textOfLength = (v, low = 1, high = 200) => typeof v === 'string' && v.leng
 
 /** A JSON Pointer token (RFC 6901 §4). */
 const pointer = (name) => String(name).replace(/~/g, '~0').replace(/\//g, '~1');
+/** A member name as a problem prints it: `<redacted>` when it is shaped like a credential (FAA-200 (39), fabric_descriptor._shown_member). */
+const shownMember = (name) => (secretArgument(String(name)) ? '<redacted>' : String(name));
 
 /**
  * DEC-0061 and DEC-0069 on a descriptor's `installedBy`, `runner` and `peer`, as the schema shapes them, with FAC-SEM-085
@@ -222,27 +227,27 @@ export function descriptorMemberProblems(d) {
     if (!textOfLength(by)) problems.push('installedBy is the installer and its version, 1 to 200 characters');
     places.push(['/installedBy', by]);
   } else if (isObj(by)) {
-    for (const k of Object.keys(by)) if (!['by', 'role', 'tool'].includes(k)) problems.push(`installedBy has no member ${k}`);
+    for (const k of Object.keys(by)) if (!['by', 'role', 'tool'].includes(k)) problems.push(`installedBy has no member ${shownMember(k)}`);
     if (!['person', 'node', 'organization'].includes(by.by)) problems.push('installedBy.by is person, node or organization');
     if (by.by === 'person' && !['operator', 'administrator'].includes(by.role)) problems.push('installedBy.role is operator or administrator for a person');
     if (by.by !== 'person' && 'role' in by) problems.push('installedBy.role belongs to a person only');
     if (!textOfLength(by.tool)) problems.push('installedBy.tool is the installer and its version, 1 to 200 characters');
-    for (const [k, v] of Object.entries(by)) places.push([`/installedBy/${pointer(k)}`, v]);
+    for (const [k, v] of Object.entries(by)) places.push([`/installedBy/${pointer(shownMember(k))}`, v]);
   } else problems.push("installedBy is the installer's name or {by, role?, tool}");
   if (life.manager === 'person' && !(isObj(by) && by.by === 'person')) problems.push("an app's descriptor names who installed it as a person: installedBy {by: person, role, tool} (DEC-0069)");
   let runner = d.runner;
   if ('runner' in d) {
     if (!isObj(runner)) { problems.push('runner is {kind?, credentialKind}'); runner = {}; }
-    for (const k of Object.keys(runner)) if (!['kind', 'credentialKind'].includes(k)) problems.push(`runner has no member ${k}`);
+    for (const k of Object.keys(runner)) if (!['kind', 'credentialKind'].includes(k)) problems.push(`runner has no member ${shownMember(k)}`);
     if (!CREDENTIAL_KINDS.includes(runner.credentialKind)) problems.push('runner.credentialKind is subscription, key, platform-metered or none');
     if ('kind' in runner && !(typeof runner.kind === 'string' && RUNNER_KIND_NAME.test(runner.kind))) problems.push("runner.kind is a runner kind's name");
     if (runner.credentialKind === 'subscription' && !(typeof runner.kind === 'string' && Object.hasOwn(SUBSCRIPTION_RUNNERS, runner.kind))) problems.push("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex");
-    for (const [k, v] of Object.entries(runner)) places.push([`/runner/${pointer(k)}`, v]);
+    for (const [k, v] of Object.entries(runner)) places.push([`/runner/${pointer(shownMember(k))}`, v]);
   }
   if ('source' in d) {
     const source = isObj(d.source) ? d.source : {};
     if (!isObj(d.source)) problems.push('source is {repository?}');
-    for (const k of Object.keys(source)) if (k !== 'repository') problems.push(`source has no member ${k}`);
+    for (const k of Object.keys(source)) if (k !== 'repository') problems.push(`source has no member ${shownMember(k)}`);
     if ('repository' in source) {
       const repository = source.repository;
       if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
@@ -255,7 +260,7 @@ export function descriptorMemberProblems(d) {
   if ('peer' in d) {
     let peer = d.peer;
     if (!isObj(peer)) { problems.push('peer is {endpoint, custody, residency, maxDataClass}'); peer = {}; }
-    for (const k of Object.keys(peer)) if (!['endpoint', 'custody', 'residency', 'maxDataClass'].includes(k)) problems.push(`peer has no member ${k}`);
+    for (const k of Object.keys(peer)) if (!['endpoint', 'custody', 'residency', 'maxDataClass'].includes(k)) problems.push(`peer has no member ${shownMember(k)}`);
     const m = typeof peer.endpoint === 'string' && peer.endpoint.length <= 2048 ? PEER_ENDPOINT.exec(peer.endpoint) : null;
     if (!m) problems.push('peer.endpoint is https://<dns-name>[:<port>][/<path>], no query, fragment, userinfo or IP literal');
     else if (RESERVED_HOST.test(m[1])) problems.push(`FAC-SEM-085: a service offered to others cannot be reached at the reserved name ${m[1]}`);
@@ -561,7 +566,7 @@ const MODEL_ID = /^[a-z0-9][a-z0-9._-]{0,63}\/[a-z0-9][a-z0-9._:-]{0,127}$/;
 /** DEC-0046: the well-known `configuration` — {slots, resolved} as service-well-known.schema.json types it. */
 export function configurationProblems(doc) {
   if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) return ['configuration is an object'];
-  const problems = Object.keys(doc).filter((k) => k !== 'slots' && k !== 'resolved').map((k) => `configuration has no member ${k}`);
+  const problems = Object.keys(doc).filter((k) => k !== 'slots' && k !== 'resolved').map((k) => `configuration has no member ${shownMember(k)}`);
   const { slots, resolved } = doc;
   if (!Array.isArray(slots) || slots.length > 2 || new Set(slots).size !== slots.length || !slots.every((s) => s === 'runner' || s === 'model')) problems.push('slots is a list of runner and model, each once');
   if (resolved === null || typeof resolved !== 'object' || Array.isArray(resolved)) return [...problems, 'resolved is an object'];
@@ -574,7 +579,7 @@ export function configurationProblems(doc) {
     models: (x) => Array.isArray(x) && x.length <= 16 && x.every((m) => typeof m === 'string' && MODEL_ID.test(m)),
   };
   for (const [k, v] of Object.entries(resolved)) {
-    if (!Object.hasOwn(checks, k)) problems.push(`resolved has no member ${k}`);
+    if (!Object.hasOwn(checks, k)) problems.push(`resolved has no member ${shownMember(k)}`);
     else if (!checks[k](v)) problems.push(`resolved.${k} is not valid`);
   }
   return problems;

@@ -35,6 +35,7 @@ from fabric_base import (
     now_iso,
 )
 import fabric_peer_owner  # noqa: E402 - L0: who listens on a port (DEC-0154 HA-2, FAA-225)
+import fabric_git  # noqa: E402 - L0: git from no folder of the checkout, no fsmonitor, no caller's GIT_DIR (FAA-190)
 from fabric_paths import (
     atomic_write,
     ensure_private_dir,
@@ -298,12 +299,29 @@ def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
     problems.extend(descriptor_member_problems(descriptor))
     for name, argv in (descriptor.get("commands") or {}).items():
         if name not in ("doctor", "update"):
-            problems.append("unknown command %s" % name)
+            problems.append("unknown command %s" % _shown_member(name))
         elif not isinstance(argv, list) or not argv or not all(isinstance(a, str) for a in argv):
             problems.append("command %s must be an argument array" % name)
-        elif not _LOCAL_PATH.match(argv[0]):
-            problems.append("command %s must start with an absolute or ~/ executable" % name)
+        else:
+            if not _LOCAL_PATH.match(argv[0]):
+                problems.append("command %s must start with an absolute or ~/ executable" % name)
+            if any(_secret_launch_argument(a) for a in argv):  # FAC-SEM-057; a URL inside an argument too (FAA-200 (28))
+                problems.append("FAC-SEM-057: command %s carries a credential in an argument; a process listing shows it: have "
+                                "the program read it from a file it is pointed at (LC-21)" % name)
     return problems
+
+
+def _shown_member(name: Any) -> str:
+    """A member name as a problem prints it: `<redacted>` when it is shaped like a credential, since a hand-edited
+    descriptor may carry a key as a member name (FAA-200 (39)). The Node twin is shownMember."""
+    import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
+    return "<redacted>" if fabric_secrets.secret_argument(str(name)) else str(name)
+
+
+def _secret_launch_argument(value: str) -> bool:
+    """A command argument that carries a credential, a URL inside it read as a URL (FAC-SEM-057, FAA-200 (28))."""
+    import fabric_secrets  # noqa: E402 - beside this file
+    return fabric_secrets.secret_launch_argument(value)
 
 
 #: The organization edition's data classes, least sensitive first (DEC-0061, DEC-0053).
@@ -419,7 +437,7 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("installedBy is the installer and its version, 1 to 200 characters")
         places.append(("/installedBy", by))
     elif isinstance(by, dict):
-        problems += ["installedBy has no member %s" % k for k in by if k not in ("by", "role", "tool")]
+        problems += ["installedBy has no member %s" % _shown_member(k) for k in by if k not in ("by", "role", "tool")]
         if by.get("by") not in ("person", "node", "organization"):
             problems.append("installedBy.by is person, node or organization")
         if by.get("by") == "person" and by.get("role") not in ("operator", "administrator"):
@@ -428,7 +446,7 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("installedBy.role belongs to a person only")
         if not _text(by.get("tool")):
             problems.append("installedBy.tool is the installer and its version, 1 to 200 characters")
-        places += [("/installedBy/%s" % _pointer(k), v) for k, v in by.items()]
+        places += [("/installedBy/%s" % _pointer(_shown_member(k)), v) for k, v in by.items()]
     else:
         problems.append("installedBy is the installer's name or {by, role?, tool}")
     if life.get("manager") == "person" and not (isinstance(by, dict) and by.get("by") == "person"):
@@ -438,7 +456,7 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
         if not isinstance(runner, dict):
             problems.append("runner is {kind?, credentialKind}")
             runner = {}
-        problems += ["runner has no member %s" % k for k in runner if k not in ("kind", "credentialKind")]
+        problems += ["runner has no member %s" % _shown_member(k) for k in runner if k not in ("kind", "credentialKind")]
         if runner.get("credentialKind") not in CREDENTIAL_KINDS:
             problems.append("runner.credentialKind is subscription, key, platform-metered or none")
         if "kind" in runner and not (isinstance(runner["kind"], str) and _RUNNER_KIND_NAME.match(runner["kind"])):
@@ -447,13 +465,13 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
         if runner.get("credentialKind") == "subscription" and not (isinstance(runner.get("kind"), str)
                                                                     and runner["kind"] in SUBSCRIPTION_RUNNERS):
             problems.append("a subscription runs only in its vendor's runner: runner.kind claude-code, kimi-code or codex")
-        places += [("/runner/%s" % _pointer(k), v) for k, v in runner.items()]
+        places += [("/runner/%s" % _pointer(_shown_member(k)), v) for k, v in runner.items()]
     if "source" in descriptor:
         source = descriptor.get("source")
         if not isinstance(source, dict):
             problems.append("source is {repository?}")
             source = {}
-        problems += ["source has no member %s" % k for k in source if k != "repository"]
+        problems += ["source has no member %s" % _shown_member(k) for k in source if k != "repository"]
         if "repository" in source:
             repository = source["repository"]
             if not (isinstance(repository, str) and _SOURCE_URI.match(_IP_LITERAL.sub(r"\1h", repository, count=1))):
@@ -472,7 +490,7 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
         if not isinstance(peer, dict):
             problems.append("peer is {endpoint, custody, residency, maxDataClass}")
             peer = {}
-        problems += ["peer has no member %s" % k for k in peer if k not in ("endpoint", "custody", "residency", "maxDataClass")]
+        problems += ["peer has no member %s" % _shown_member(k) for k in peer if k not in ("endpoint", "custody", "residency", "maxDataClass")]
         endpoint = peer.get("endpoint")
         match = _PEER_ENDPOINT.match(endpoint) if isinstance(endpoint, str) and len(endpoint) <= 2048 else None
         if not match:
@@ -709,11 +727,12 @@ def build_info(repo_root: Optional[Path] = None, package_file: Optional[Path] = 
     dirty: Optional[bool] = None
     if not commit and repo_root is not None:
         try:
-            commit = subprocess.run(["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
-                                    capture_output=True, text=True, timeout=5, check=True).stdout.strip()
-            status = subprocess.run(["git", "-C", str(repo_root), "status", "--porcelain", "--untracked-files=no"],
-                                    capture_output=True, text=True, timeout=5, check=True).stdout
-            dirty = bool(status.strip())
+            head = fabric_git.run(repo_root, ["rev-parse", "--short=12", "HEAD"], timeout=5, capture_output=True,
+                                  text=True, check=True)
+            status = fabric_git.run(repo_root, ["status", "--porcelain", "--untracked-files=no"], timeout=5,
+                                    capture_output=True, text=True, check=True)
+            commit = head.stdout.strip() if head is not None and status is not None else None
+            dirty = bool(status.stdout.strip()) if commit else None
         except (OSError, subprocess.SubprocessError):
             commit = None
     info: Dict[str, Any] = {"builtAt": now_iso()}
@@ -792,7 +811,7 @@ def configuration_problems(doc: Any) -> List[str]:
     """DEC-0046: the well-known `configuration` — {slots, resolved} as service-well-known.schema.json types it."""
     if not isinstance(doc, dict):
         return ["configuration is an object"]
-    problems = ["configuration has no member %s" % k for k in doc if k not in ("slots", "resolved")]
+    problems = ["configuration has no member %s" % _shown_member(k) for k in doc if k not in ("slots", "resolved")]
     slots = doc.get("slots")
     if not isinstance(slots, list) or len(slots) > 2 or len(set(map(str, slots))) != len(slots) or not all(s in ("runner", "model") for s in slots):
         problems.append("slots is a list of runner and model, each once")
@@ -807,7 +826,7 @@ def configuration_problems(doc: Any) -> List[str]:
               "route": lambda x: x in ROUTES,
               "models": lambda x: isinstance(x, list) and len(x) <= 16 and all(isinstance(m, str) and _MODEL_ID.match(m) for m in x)}.get(k)
         if ok is None:
-            problems.append("resolved has no member %s" % k)
+            problems.append("resolved has no member %s" % _shown_member(k))
         elif not ok(v):
             problems.append("resolved.%s is not valid" % k)
     return problems

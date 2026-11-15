@@ -56,10 +56,15 @@ platform's secrets, set from Observatory or the person's secret manager, never O
   run mixing upper case, lower case and digits count too. So `task-pipeline-dashboard`, `Task-Pipeline-Dashboard` and
   the host `task-pipeline-dashboard.example.com` (an `sk-` inside a word), `sk-learn-example-notebooks` (no digit)
   and an upper-case `SK-` are names, while an `sk-` key with a digit and an upper-case letter is refused as a path
-  segment, after a `.`, `_` or `-` in one, written `%73k-`, or as a host label (FAA-200 (32)). A path and a user information are read as written and with
-  their ASCII escapes decoded, and a password as written and as the URL standard reads it (`<https>://h\u:pw@x/r` is
-  refused). A checkout's origin in scp form (`git@host:owner/name.git`) is refused: write it `https://host/owner/name`,
-  the repository's own page with no path below it, no query and no fragment, which the estate's readers join.
+  segment, after a `.`, `_` or `-` in one, written `%73k-`, or as a host label (FAA-200 (32)). A path, a user
+  information, a query and a fragment are read as written and with their ASCII escapes decoded (`#%73k-...` is refused
+  as `#sk-...` is, FAA-200 (29)), the user as one run, so a `%2F` inside a token splits nothing (FAA-200 (31)), and a
+  password as written and as the URL standard reads it (`<https>://h\u:pw@x/r` is refused). A checkout's origin in scp
+  form (`git@host:owner/name.git`) is refused: write it `https://host/owner/name`, the repository's own page with no
+  path below it, no query and no fragment, which the estate's readers join. The probe reads a source with no host
+  (`x:y`, `urn:...`), and a github.com source spelled other than `https://github.com/<owner>/<name>` with `.git` at most
+  (`/tree/main`, `www.`, a port, a query, a fragment, `.git/`), as `descriptor.source-repository` `NOT_RUN`, naming the
+  spelling to write; the validators still accept them (FAA-200 (54), (35)).
 - `installedBy` is the installer's name and version as a string (`"example-installer 1.2.0"`), or
   `{by, role?, tool}` where `by` is `person`, `node` or `organization` and `role` (`operator`, `administrator`) is a
   person's only. There is no `agent` kind: an agent that registers a service writes the string form, or

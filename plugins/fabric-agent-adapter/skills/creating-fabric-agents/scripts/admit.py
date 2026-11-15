@@ -28,6 +28,9 @@ import subprocess
 import sys
 from typing import Dict, List, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fabric_git  # noqa: E402 - beside this file: git from no folder of the tree, no fsmonitor, no GIT_DIR (FAA-190)
+
 SKILLS = Path(__file__).resolve().parent.parent.parent
 SOURCE_CHECK = SKILLS / "adapting-projects-to-fabric/scripts/fabric_source_check.py"
 PROBE = SKILLS / "building-fabric-services/scripts/check_service.py"
@@ -115,9 +118,9 @@ def listed_files(root: Path) -> List[str]:
     work tree, or where git cannot run, every file but the usual generated folders, never nothing."""
     if (root / ".git").exists():
         try:
-            listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            listed = fabric_git.run(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
                                     capture_output=True, check=False)
-        except OSError:
+        except (OSError, subprocess.SubprocessError):
             listed = None
         if listed is not None and listed.returncode == 0:
             return sorted({rel for rel in listed.stdout.decode("utf-8", "replace").split("\0") if rel})

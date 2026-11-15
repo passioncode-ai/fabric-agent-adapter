@@ -47,7 +47,9 @@ const answer = await request('GET', 'https://api.example/v1/items', { headers, d
 Every answer comes back as a `Response`, whatever its status; `HttpError` means no usable answer came, with `kind`
 `connection`, `timeout`, `too-large`, `refused` or `foreign-user`, the status when there was one, and the URL redacted to scheme,
 host, port and path (`redact_url`); a URL that is not http or https keeps only its scheme (`htps:<redacted>`, and `ssh:<redacted>`
-for `ssh://h:99999/r` too), and an http, https, ws, wss or ftp URL that does not parse (Node reads it with `new URL`;
+for `ssh://h:99999/r` too), a scheme shaped like a key keeps nothing (`<redacted>:<redacted>`, FAA-200 (33)), an http or
+https URL whose authority holds `?` or `#` before an `@` (a token used as the user, which the URL standard would print as
+the host) is `<unparseable url>` (FAA-200 (15)), and an http, https, ws, wss or ftp URL that does not parse (Node reads it with `new URL`;
 Python reads its own special-scheme form and prints what it finds, never the user information), or a value with no
 scheme, is `<unparseable url>`. The path is not redacted (Node writes it as `new URL`
 normalises it, Python as given), so a key never belongs in it. Python's `check_url` refuses a host
