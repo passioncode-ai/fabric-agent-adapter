@@ -4,7 +4,7 @@
 // connectionsExtension builds the `extensions` entry a service declares, `state` from its own checks and its degraded[].
 // Part of the Node service kit (FAA-62, layer L3); the twin of fabric_connections.py. Node 20+, no dependency.
 import { ServiceError } from './fabric-base.mjs';
-import { BEARER_INSIDE, hasJwt, longSecret, secretUrl } from './fabric-secrets.mjs';
+import { BEARER_INSIDE, hasJwt, longSecret, schemeSpans, secretUrl, urlsIn } from './fabric-secrets.mjs';
 import { isObject } from './fabric-jsvalue.mjs';
 
 export const CONNECTIONS_EXTENSION_KEY = 'https://fabric.passioncode.ai/agent-contract/extensions/connections/0.1';
@@ -89,44 +89,8 @@ function shapeProblems(value) {
 // The contract's KEY_SHAPE (src/connections.ts): a provider key where it starts a word, case-sensitive prefixes, the
 // `sk-` rules and a Telegram bot token.
 const KEY_SHAPE = /(?:^|[^A-Za-z0-9])(?:sk-(?=[A-Za-z0-9_-]*\d)(?:(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{16,}|[A-Za-z0-9_-]{32,})|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}|(?:bot)?\d{6,12}:(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[a-z])[A-Za-z0-9_-]{34,35}(?![A-Za-z0-9_-]))/;
-const SCHEME_CHAR = /[a-z0-9+.-]/i;
-const SCHEME_LETTER = /[a-z]/i;
-/**
- * The [start, end] of each URL scheme and its `://` in a piece, where `/[a-z][a-z0-9+.-]*:\/\//gi` finds them left to
- * right, read in linear time (FAA-322: the pattern tried every letter of a long run with no `://`). From each `://` the
- * run of scheme characters before it is read back, and the match starts at its first letter at or after where the last
- * match ended. The twin of fabric_connections._scheme_spans.
- */
-export function schemeSpans(piece) {
-  const spans = [];
-  let after = 0;
-  for (let at = piece.indexOf('://'); at >= 0; at = piece.indexOf('://', at + 1)) {
-    let start = at;
-    while (start > after && SCHEME_CHAR.test(piece[start - 1])) start -= 1;
-    while (start < at && !SCHEME_LETTER.test(piece[start])) start += 1;
-    if (start < at) {
-      spans.push([start, at + 3]);
-      after = at + 3;
-    }
-  }
-  return spans;
-}
-const CLOSING = /[)\]}>"'.,;:!?]/;
-const TRIED_BACK = 1;
-/** The URLs a member may hold, from every scheme in each whitespace-delimited piece, without the closing brackets,
- * quotes and punctuation that end a sentence, and with TRIED_BACK of them put back (`]` closes an IPv6 host). */
-function urlsIn(value) {
-  const urls = [];
-  for (const piece of value.split(/\s+/)) {
-    for (const [start] of schemeSpans(piece)) {
-      const url = piece.slice(start);
-      let end = url.length;
-      while (end > 0 && CLOSING.test(url[end - 1])) end -= 1;
-      for (let back = 0; back <= TRIED_BACK && end + back <= url.length; back += 1) urls.push(url.slice(0, end + back));
-    }
-  }
-  return urls;
-}
+// The URL finder lives in fabric-secrets since FAA-200 (28); schemeSpans stays exported here for code that reached it.
+export { schemeSpans };
 /** A long secret-shaped run in a piece read whole; in a piece that holds a URL, the text before its first scheme's `://`. */
 const longRun = (value) =>
   value.split(/\s+/).some((piece) => {

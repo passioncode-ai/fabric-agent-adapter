@@ -41,7 +41,8 @@ when the server itself takes an option of that name. `--env` belongs to a stdio 
 `run.mcp.stdio.scope` (DEC-0044): `project` (started for the sessions of a project that binds it) or `on-demand`;
 `session` (a server in every coding session) is refused (FAC-SEM-056, LC-19). The validator accepts the field; the
 writer does not set it until Fabric reads it. An argument that carries a credential is refused
-(LC-21, FAC-SEM-057): a key goes in `env` as a `secret-ref:<name>`, never in argv.
+(LC-21, FAC-SEM-057), a URL inside an argument read as a URL (`--remote=<https>://u:pw@h/r`, FAA-200 (28)): a key goes in
+`env` as a `secret-ref:<name>`, never in argv.
 
 It refuses, with one sentence that never quotes a credential (it names the path and the URIs at fault):
 

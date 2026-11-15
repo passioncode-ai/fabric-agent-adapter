@@ -20,7 +20,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402 - beside this file
 from fabric_http import redact_url  # noqa: E402
-from fabric_secrets import ascii_decoded, repository_name, secret_argument  # noqa: E402
+from fabric_secrets import ascii_decoded, repository_name, repository_password, secret_argument  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
 import fabric_supervisors as _sup  # noqa: E402 - where a LaunchDaemon's plist lives (FAA-278)
 import socket  # noqa: E402
@@ -117,24 +117,34 @@ _URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://")  # a scheme that starts the val
 _OTHER_URL = re.compile(r"(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*)://(?P<authority>[^/?#]*)(?P<path>[^?#]*)")
 
 
+_SHAPED = "<a repository shaped like a credential>"
+
+
 def shown_repository(value: str) -> str:
     """A repository or git origin as evidence: a URL through redact_url, which drops its user information as written
     first (git's reading, `<https>://h\\u:pw@x/r`); a local path (one that starts with `/`, `~`, `.`,
     `\\` or a drive) by its name; an scp form (user[:password]@host:path) from its host, its user and password dropped
-    whatever they hold, up to the last `@` that a host and `:` follow; anything else by its name. Then a query and a
+    whatever they hold, up to the last `@` that a host and `:` follow, or the last `@` of all when repository_password
+    reads a password (one may hold `@x:`, FAA-200 (34), (21)); anything else by its name. A scheme shaped like a key is
+    not printed (FAA-200 (33)). Then a query and a
     fragment. A value with a piece shaped like a credential that is no name (fabric_secrets.repository_name) is not
     printed (0.62.0 readings 2 to 11). Read first as redact_url reads it: C0 controls and space off its ends, every tab,
     CR and LF out, so `<https>://u:pw@h` with a tab between its two slashes is the URL it is (unit reading 11)."""
     value = re.sub(r"[\t\n\r]", "", value.strip("".join(map(chr, range(0x21)))))
+    named = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):", value)
+    if named and secret_argument(named.group(1)):  # a scheme shaped like a key, read as written (FAA-200 (33))
+        return _SHAPED
     other = _OTHER_URL.match(value) if not _SPECIAL.match(value) else None
     if other:
         # A scheme the URL standard does not treat as special (ssh, git): redact_url keeps only its name, so the
         # repository compared would be lost from the evidence (FAA-200 (8)). Its user information as written goes, up to
-        # the last `@` of the authority; a port of digits and a path holding no `@` stay, else only the scheme.
+        # the last `@` of the authority; a port of digits and a path holding no `@` stay, else only the scheme. An
+        # authority holding `?` or `#` before an `@` (a token as user) keeps only the scheme too (FAA-200 (15)).
         host, path = other.group("authority").rpartition("@")[2], other.group("path")
         name = other.group("scheme").lower()
         port_ok = re.fullmatch(r"(?:\[[0-9A-Fa-f:.]+\]|[^:\[\]\\]+)(?::[0-9]{0,5})?", host)
-        shown = "%s://%s%s" % (name, host.lower(), path) if host and port_ok and "@" not in path else name + ":<redacted>"
+        past = re.match(r"[^/\\]*?[?#][^/\\]*@", value[other.end("scheme") + 3:])
+        shown = "%s://%s%s" % (name, host.lower(), path) if host and port_ok and "@" not in path and not past else name + ":<redacted>"
     elif _URL.match(value) or _SPECIAL.match(value):  # `https:user@host/x` is a URL too, as the URL standard reads it
         shown = redact_url(value)  # which drops the user information as written first (seam readings 10 and 11)
     else:
@@ -143,12 +153,37 @@ def shown_repository(value: str) -> str:
             ats = [i for i, c in enumerate(value) if c == "@"]
             hosts = [at for at in ats if _SCP_HOST.match(value, at + 1)]
             cut = (hosts or ats or [-1])[-1] + 1  # the last `@` a host and `:` follow, else the last `@` (unit reading 8)
+            if repository_password(value):  # a password may hold `@x:` itself: cut after the last `@` (FAA-200 (34), (21))
+                cut = (ats or [-1])[-1] + 1
         shown = re.split(r"[?#]", value[cut:], maxsplit=1)[0]
     pieces = [piece for written in (shown, ascii_decoded(shown)) for piece in re.split(r"[/\\:]", written)
               if piece and not repository_name(piece)]  # as written and decoded, `%73k-` being `sk-` (readings 11)
-    return "<a repository shaped like a credential>" if any(secret_argument(piece) for piece in pieces) else shown
+    return _SHAPED if any(secret_argument(piece) for piece in pieces) else shown
 import fabric_actions as fa  # noqa: E402 - beside this file (DEC-0121)
 import fabric_a2a as fa2  # noqa: E402 - beside this file (DEC-0122)
+
+
+_GITHUB_CANONICAL = re.compile(r"https://(?:[^/?#@]*@)?github\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+\Z")
+_GITHUB_ANY = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*:/*(?:[^/?#@]*@)?(?:www\.)?github\.com(?::[0-9]*)?/([A-Za-z0-9-]+)/"
+                         r"([A-Za-z0-9._-]+?)(?:\.git)?/*(?:[/?#]|\Z)", re.I | re.ASCII)
+
+
+def source_repository_verdict(value: str) -> Tuple[str, str]:
+    """descriptor.source-repository on a source both validators accept: a source with no host names no project (`x:y`,
+    `urn:...`, FAA-200 (54)), and a github.com source is `https://github.com/<owner>/<name>` with `.git` at most, or the
+    estate's readers cannot join it to one (`/tree/main`, `www.`, a port, a query, a fragment, `.git/`, FAA-200 (35)):
+    both NOT_RUN, naming the spelling to write. The validators still accept them (refusing is the contract's call)."""
+    authority = re.match(r"[A-Za-z][A-Za-z0-9+.-]*://([^/?#]*)", value)
+    host = re.sub(r":[0-9]*\Z", "", authority.group(1).rpartition("@")[2]).lower() if authority else ""
+    if not host:
+        return "NOT_RUN", "source.repository %s names no host, so no reader joins it to a project: write the repository's " \
+                          "URL, such as https://github.com/owner/name" % shown_repository(value)
+    if host.rstrip(".") in ("github.com", "www.github.com") and not _GITHUB_CANONICAL.match(value):
+        found = _GITHUB_ANY.match(value)
+        canonical = "https://github.com/%s/%s" % found.groups() if found else "https://github.com/owner/name"
+        return "NOT_RUN", "source.repository %s is a GitHub spelling the estate's readers do not join to a project: write " \
+                          "%s" % (shown_repository(value), canonical)
+    return "PASS", "names %s" % shown_repository(value)
 
 
 def other_domain_copy(label: object, domain: str, user_name: object = None) -> Optional[str]:

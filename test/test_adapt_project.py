@@ -276,6 +276,23 @@ class LifecycleRuleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp, self.assertRaises(ADAPTER.AdaptationError):
             self.scaffold(Path(temp), mcp_mode="stdio", runtime_arg=["--key=" + "Zk9yZ2V0VGhp" + "c0lzQVNlY3JldEtleTEyMzQ1Njc4OTA"])
 
+    def test_a_url_inside_an_argument_is_read_as_a_url(self):
+        """FAA-200 (28): `--remote=<https>://u:pw@h/r` carries a password; argv shows it to every process."""
+        remote = "--remote=https://" + "u:" + "fixture9pw" + "@h.example/r"  # made up, built here
+        with tempfile.TemporaryDirectory() as temp, self.assertRaises(ADAPTER.AdaptationError):
+            self.scaffold(Path(temp), mcp_mode="stdio", runtime_arg=[remote])
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.scaffold(root, mcp_mode="stdio", runtime_arg=["--remote=https://h.example/r"])
+            self.assertEqual(self.receipts(root)["status"], "PASS")
+            manifest = json.loads((root / "fabric-agent.json").read_text())
+            manifest["capabilities"][0]["profile"]["connection"]["args"] = [remote]
+            (root / "fabric-agent.json").write_text(json.dumps(manifest))
+            gate = self.receipts(root)
+            self.assertEqual(gate["status"], "FAIL")
+            self.assertTrue(any("LC-21" in r and "launch argument" in r for r in gate["receipts"]), gate)
+            self.assertFalse(any("fixture9pw" in r for r in gate["receipts"]))
+
     def test_check_refuses_a_credential_in_an_argument_or_a_url(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

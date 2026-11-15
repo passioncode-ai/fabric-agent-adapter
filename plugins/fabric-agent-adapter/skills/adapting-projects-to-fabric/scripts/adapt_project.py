@@ -275,7 +275,7 @@ def _generated_files(args: argparse.Namespace) -> Dict[str, str]:
         lowered = runtime_arg.lower().replace("_", "").replace("-", "")
         if any(term in lowered for term in ("password", "apikey", "accesstoken", "clientsecret")):
             raise AdaptationError("runtime arguments must not contain secret-like values or names")
-        if _secrets.secret_argument(runtime_arg):
+        if _secrets.secret_launch_argument(runtime_arg):
             raise AdaptationError("a runtime argument carries a credential; argv is visible to every process (LC-21): read it from a secret reference instead")
 
     defaulted: List[str] = []
@@ -690,7 +690,7 @@ def _credential_problems(manifest: Dict[str, Any]) -> List[str]:
         if not isinstance(connection, dict):
             continue
         for arg in connection.get("args") or []:
-            if isinstance(arg, str) and _secrets.secret_argument(arg):
+            if isinstance(arg, str) and _secrets.secret_launch_argument(arg):
                 problems.append("LC-21: capability[%d] passes a credential in a launch argument; argv is visible to every process" % index)
         for field in ("url", "agentCardUrl"):
             if isinstance(connection.get(field), str) and _stored_url_credential(connection[field]):
@@ -731,7 +731,7 @@ def _plugin_problems(root: Path) -> List[str]:
             if "command" in entry:
                 problems.append("LC-19: plugin %s declares the stdio MCP server %s, which starts in every session that enables the plugin; serve it over HTTP from one resident process or register it at project scope" % (name, server))
             argv = [entry.get("command")] + list(entry.get("args") or [])
-            if any(isinstance(a, str) and _secrets.secret_argument(a) for a in argv) or (isinstance(entry.get("url"), str) and _stored_url_credential(entry["url"])):
+            if any(isinstance(a, str) and _secrets.secret_launch_argument(a) for a in argv) or (isinstance(entry.get("url"), str) and _stored_url_credential(entry["url"])):
                 problems.append("LC-21: plugin %s's MCP server %s carries a credential in its argv or URL" % (name, server))
             env = entry.get("env") if isinstance(entry.get("env"), dict) else {}
             if any(isinstance(v, str) and _secret_env_value(v) for v in env.values()):  # path-aware for a path (FAA-266)

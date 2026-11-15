@@ -75,7 +75,7 @@ from typing import Any, Dict, List, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_service as fs  # noqa: E402
 import fabric_connections as fcn  # noqa: E402
-from check_service_rules import shown_repository, _member  # noqa: E402 - a repository in evidence carries no userinfo or query
+from check_service_rules import source_repository_verdict, _member  # noqa: E402 - a repository in evidence carries no userinfo or query
 from check_service_lifecycle import LifecycleRules  # noqa: E402 - the lifecycle rules (split at the line ceiling)
 import fabric_interop as fi  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
@@ -220,7 +220,8 @@ class Probe(LifecycleRules):
                 {k: v for k, v in self.d.items() if k != "source"}))):  # its own problem (a member name it names is the descriptor's own, FAA-200 (39))
             self.add("descriptor.source-repository", "NOT_RUN", "source is refused: %s" % added[0])
         else:
-            self.add("descriptor.source-repository", "PASS", "names %s" % shown_repository(self.d["source"]["repository"]))
+            # no host, or a GitHub spelling the estate's readers cannot join, is no pass (FAA-200 (54), (35))
+            self.add("descriptor.source-repository", *source_repository_verdict(self.d["source"]["repository"]))
         if _member(self.d, "lifecycle").get("manager") == "person":
             # DEC-0069: installed, never running — a reader checks the app is still there; liveness is the app's own file.
             present = fs.app_present(self.d)

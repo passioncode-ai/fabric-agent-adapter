@@ -11,6 +11,7 @@ const LETTERS = { // made up, no digit
   SKUPPER: `SK-${'AbCd'.repeat(10)}`, JWTLETTERS: ['eyJabcd', 'eyJefgh', 'ijkl'].join('.'), RUN40: 'AbCd'.repeat(10),
   SKNAME: `sk-${'learn-tutorial-notebooks'}`, SKWORD: `sk-${'dictionary-extension'}`,
   GHREST: `hp_${'AbCd'.repeat(6)}`, SKREST: `k-${'Ab1d'.repeat(4)}`, GLREST: `lpat-${'AbCd'.repeat(6)}`, // a real-looking name a key's shape starts (FAA-200 (24))
+  B64A: 'aB3x'.repeat(6), B64B: 'Qz9Y'.repeat(7), // one base64 run split by `%2F` (FAA-200 (31))
 };
 const made = (value) => Object.entries(LETTERS).reduce((text, [mark, key]) => text.replaceAll(mark, key), value).replaceAll('KEY', KEY);
 
