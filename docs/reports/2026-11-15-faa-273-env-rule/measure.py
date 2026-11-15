@@ -6,13 +6,17 @@ folders of the machine it runs on. Prints counts only, never a path. Run from th
     python3 -I docs/reports/2026-11-15-faa-273-env-rule/measure.py
 """
 import base64
+import importlib.util
 import os
 import random
 import re
 import sys
 
-sys.path.insert(0, "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts")
-import fabric_secrets as s  # noqa: E402
+KIT = "plugins/fabric-agent-adapter/skills/building-fabric-services/scripts"
+sys.path.insert(0, KIT)  # the kit's modules import their neighbours by name
+_spec = importlib.util.spec_from_file_location("fabric_secrets", KIT + "/fabric_secrets.py")
+s = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(s)
 
 
 def old_rule(value):
