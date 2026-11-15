@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | `0.90.2` |
+| Version | `0.90.3` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `ced7b29265c424688602dda998c0ea4db2ba46a9` |
 | Purpose | Adapt an existing stable agent/API/CLI surface into a proposed Fabric provider bundle |
@@ -25,11 +25,11 @@ a provider because those actions require a real Fabric host/runtime.
 
 | Field | Value |
 |---|---|
-| Version | `0.90.2` |
+| Version | `0.90.3` |
 | Plugin | `fabric-agent-adapter` |
 | Contract | Fabric Agent Contract `0.1.0` at `ced7b29265c424688602dda998c0ea4db2ba46a9` |
 | Purpose | Design a new agent so Fabric compatibility is a property of its first commit |
-| Inputs | capability, named consumer, workflow-or-agent decision, profile, effect declarations, where it runs and in which contexts, models per lane, who pays, how it learns, knowledge sources, whether it writes text for people and whether it answers people, whether it runs around the clock (uptime A or B), whose data it keeps (kind U or O) and who holds the copyright; for the source check, the owner's list of instance strings, kept outside the tree |
+| Inputs | capability, named consumer, workflow-or-agent decision, profile, every function with its agent route (agent first, AS-1 to AS-6), effect declarations, where it runs and in which contexts, models per lane, who pays, how it learns, knowledge sources, whether it writes text for people and whether it answers people, whether it runs around the clock (uptime A or B), whose data it keeps (kind U or O) and who holds the copyright; for the source check, the owner's list of instance strings, kept outside the tree |
 | Outputs | intake-grill record, knowledge pack with trap-derived fixtures, project skeleton laid out as source and instance with its data home and, for a private agent, a `LICENSE` naming the holder, provider bundle via the sibling scaffolder, the sibling's source check report, conformance report with the canary expectation, the template it was built from (the agents database's id and version, the communication template prompt, or none) |
 | Mutations | new project files plus the sibling scaffolder's documented target paths; `new_agent.py` (`npx @passioncode-ai/fabric-agent-adapter new`) writes a new project folder (the bundle, `fabric.source.json`, the placement guard, and with `--service` the kit's sample) and refuses a folder holding other files without `--force`; collisions refused by default; when the owner's own home needs declaring, a `home: <name>` line in the owner's list outside the tree |
 | Network | not required for structural mode; a contract checkout (public repository) required for exact schema validation; it asks the agents database through Fabric's board (`com.submit`) and never waits on its reply |
@@ -48,7 +48,7 @@ canary-binding expectation: checker plus budget cap until a recorded promotion.
 
 | Field | Value |
 |---|---|
-| Version | `0.90.2` |
+| Version | `0.90.3` |
 | Plugin | `fabric-agent-adapter` |
 | Extension | `fabric-service/0.1` (DEC-0015) and `fabric-interop/0.1` (DEC-0016), Fabric Agent Contract at `ced7b29265c424688602dda998c0ea4db2ba46a9`; the remote placement (DEC-0019); the embedded dashboard `fabric-dashboard/0.1` (DEC-0036); dashboard action parity `fabric-actions/0.1` (DEC-0121); the operator's mandate `mandate/1` (DEC-0125); the operator's `source` and `operator-source/1` (DEC-0126); a hub key per organization context (DEC-0128) |
 | Purpose | Build or migrate a long-lived local agent service with a dashboard that is always alive, runs once, keeps its state and is discoverable |
@@ -69,7 +69,7 @@ using Fabric (working-with-fabric) or the Fabric Dashboards app.
 
 | Field | Value |
 |---|---|
-| Version | `0.90.2` |
+| Version | `0.90.3` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | the desktop app v0.3.5 or later (`fabric-mcp`, `fabric_work_list`, `fabric_work_claim`, `fabric_work_release`); older Fabric falls back to the `fabric_task_*` tools |
 | Purpose | A coding agent opened outside Fabric works in a project through it: find Fabric, have the lifecycle broker start it, register `fabric-mcp` with no secret, `fabric_whoami` first, read the project board and ask other Projects only through `com.submit`, relay the operator's own decision on a service's action, or the mandate he gave another of his agents (DEC-0125), coordinate, report, link backlog rows, release |
@@ -88,7 +88,7 @@ contract, Fabric's own code, or agent-sync leases.
 
 | Field | Value |
 |---|---|
-| Version | `0.90.2` |
+| Version | `0.90.3` |
 | Plugin | `fabric-agent-adapter` |
 | Fabric | optional: inside Fabric its observer-mode project switch (Fabric CO-546) starts the cycle as a routine; without Fabric the agent's own scheduler runs the same procedure |
 | Purpose | An agent takes a standing watch over one product (observer mode): sets up every channel the product reports through with a proven read from each, then every interval reads them from their cursors, triages what changed (S0 to S3) and fixes it within the project's authority (`observe`, `fix`, `ship`), on the machine or as a cloud routine for `remote` channels |

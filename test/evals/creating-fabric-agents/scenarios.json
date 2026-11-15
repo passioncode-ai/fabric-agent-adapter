@@ -158,7 +158,9 @@
         "asks 'How does it learn?': decisions with reasons, one trace per turn, failures turned into planted fixtures before fixes, learnings proposed and not self-approved",
         "names which capabilities need the person's machine and what they answer when it is off",
         "reads references/where-agents-run.md, models-and-providers.md, orchestration-and-learning.md and practices.md before scaffolding",
-        "records the grill's Step 0 'Does it answer people?' row and loads references/agents-that-answer-people.md, since the agent answers customer messages"
+        "records the grill's Step 0 'Does it answer people?' row and loads references/agents-that-answer-people.md, since the agent answers customer messages",
+        "asks the uptime row and records category A, since it answers while the laptop is closed: the host is the person's own cloud machine joined to the estate, the reason that replaces the Heroku default, built as an online service",
+        "asks the data row and records kind U, since it keeps customer messages and screenshots: the source holds the schema and synthetic fixtures, each context's instance has its own durable store, and a copy starts with an empty one"
       ]
     },
     {
@@ -224,7 +226,7 @@
       "expected": [
         "asks the grill's uptime row and records category A: the digest must go out while the owner's machine is off, so a cloud host from the first release (Heroku unless a reason names another: the person's or an organization's cloud, or PassionCode's for a paid agent), with its data in a durable store, never the host's own folder, built as an online service and started from the cloud Fabric-server template, whose address it never takes from the public skill: it reads its repository from the instance's settings or the estate's agent map",
         "asks the grill's data row and records kind U: the reviews are data of people outside the owner's team, so the source holds only the schema and synthetic fixtures, and a copy starts with an empty store of its own",
-        "gives the data a home of its own in the first commit, <agent>-data (a folder beside the checkout or a private repository of that name), read through a named variable, never inside the source's repository",
+        "gives the data a home of its own in the first commit, named by <AGENT>_DATA_DIR or the variable of its store: on the cloud host the digest needs, a durable store (a database, an object store or a private repository named <agent>-data), never a folder beside the checkout, which the host does not keep across a restart, and never inside the source's repository",
         "asks who holds the copyright and commits a LICENSE naming that holder; when the holder is on the owner's list, names LICENSE in .fabric-source-ignore with the reason that authorship travels with the source, and no other file",
         "names the data kind and the uptime category in the README",
         "runs fabric_source_check.py check in Git mode on the checkout and with --every-file on a clean copy of what Git would commit as the transfer audit before each release, each exit 0, without repeating a value it found",
