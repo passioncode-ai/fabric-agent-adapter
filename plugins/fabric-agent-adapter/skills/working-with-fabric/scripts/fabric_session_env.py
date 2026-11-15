@@ -13,6 +13,10 @@ from typing import Any
 from typing import Dict
 from typing import Callable, List, Optional, Tuple
 
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fabric_git  # noqa: E402 - beside this file: git from no folder of the checkout, no fsmonitor, no GIT_DIR (FAA-190)
+
 
 HUB_PROTOCOL = "fabric-hub/0.1"
 
@@ -666,12 +670,11 @@ def _repository_key(url: str) -> str:
 
 def _origin(root: Path) -> str:
     try:
-        done = subprocess.run(["git", "--no-optional-locks", "-C", str(root), "config", "--get", "remote.origin.url"],
-                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                              timeout=GIT_TIMEOUT_S, check=False)
+        done = fabric_git.run(root, ["config", "--get", "remote.origin.url"], timeout=GIT_TIMEOUT_S, check=False,
+                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
         return ""
-    return done.stdout.decode("utf-8", "replace").strip() if done.returncode == 0 else ""
+    return done.stdout.decode("utf-8", "replace").strip() if done is not None and done.returncode == 0 else ""
 
 
 def owns_a_service(root: Path, env: Optional[Dict[str, str]] = None, platform: str = sys.platform) -> bool:

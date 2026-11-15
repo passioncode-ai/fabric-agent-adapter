@@ -35,6 +35,7 @@ from fabric_base import (
     now_iso,
 )
 import fabric_peer_owner  # noqa: E402 - L0: who listens on a port (DEC-0154 HA-2, FAA-225)
+import fabric_git  # noqa: E402 - L0: git from no folder of the checkout, no fsmonitor, no caller's GIT_DIR (FAA-190)
 from fabric_paths import (
     atomic_write,
     ensure_private_dir,
@@ -726,11 +727,12 @@ def build_info(repo_root: Optional[Path] = None, package_file: Optional[Path] = 
     dirty: Optional[bool] = None
     if not commit and repo_root is not None:
         try:
-            commit = subprocess.run(["git", "-C", str(repo_root), "rev-parse", "--short=12", "HEAD"],
-                                    capture_output=True, text=True, timeout=5, check=True).stdout.strip()
-            status = subprocess.run(["git", "-C", str(repo_root), "status", "--porcelain", "--untracked-files=no"],
-                                    capture_output=True, text=True, timeout=5, check=True).stdout
-            dirty = bool(status.strip())
+            head = fabric_git.run(repo_root, ["rev-parse", "--short=12", "HEAD"], timeout=5, capture_output=True,
+                                  text=True, check=True)
+            status = fabric_git.run(repo_root, ["status", "--porcelain", "--untracked-files=no"], timeout=5,
+                                    capture_output=True, text=True, check=True)
+            commit = head.stdout.strip() if head is not None and status is not None else None
+            dirty = bool(status.stdout.strip()) if commit else None
         except (OSError, subprocess.SubprocessError):
             commit = None
     info: Dict[str, Any] = {"builtAt": now_iso()}

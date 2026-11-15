@@ -23,6 +23,7 @@ from fabric_http import redact_url  # noqa: E402
 from fabric_secrets import ascii_decoded, repository_name, repository_password, secret_argument  # noqa: E402
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
 import fabric_supervisors as _sup  # noqa: E402 - where a LaunchDaemon's plist lives (FAA-278)
+import fabric_git  # noqa: E402 - git from no folder of the checkout, no fsmonitor, no caller's GIT_DIR (FAA-190)
 import socket  # noqa: E402
 
 
@@ -810,7 +811,7 @@ def opens_in_host_verdict(repo: Path, port: int, origin: Optional[str], dashboar
     """`dashboard.opens-in-host` over one checkout: FAIL with the places a tracked text file opens a browser at the
     service's pages, PASS when none does, NOT_RUN when the checkout or git cannot be read or the budget runs out."""
     until = time.monotonic() + max(0.0, budget)
-    if not shutil.which("git"):
+    if not fabric_git.executable([repo]):
         return "NOT_RUN", "git is not installed"
 
     def left() -> float:
@@ -819,20 +820,20 @@ def opens_in_host_verdict(repo: Path, port: int, origin: Optional[str], dashboar
     if left() <= 0:
         return "NOT_RUN", "the %.1f s budget ran out before the checkout was read" % budget
     try:
-        top = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                             timeout=max(0.05, left()))
-        if top.returncode != 0 or not top.stdout.strip():
+        top = fabric_git.run(repo, ["rev-parse", "--show-toplevel"], timeout=max(0.05, left()), capture_output=True,
+                             text=True)
+        if top is None or top.returncode != 0 or not top.stdout.strip():
             return "NOT_RUN", "%s is not a Git checkout" % repo
         root = Path(top.stdout.strip())
         if left() <= 0:
             return "NOT_RUN", "the %.1f s budget ran out before the checkout was read" % budget
-        listed = subprocess.run(["git", "-C", str(root), "grep", "-I", "-l", "-z", "-E", _COARSE], capture_output=True,
-                                timeout=max(0.05, left()))
+        listed = fabric_git.run(root, ["grep", "-I", "-l", "-z", "-E", _COARSE], timeout=max(0.05, left()),
+                                capture_output=True)
     except subprocess.TimeoutExpired:
         return "NOT_RUN", "the %.1f s budget ran out while git read %s" % (budget, repo)
     except OSError as exc:
         return "NOT_RUN", "git could not read %s: %s" % (repo, exc)
-    if listed.returncode not in (0, 1):  # 1: nothing matched
+    if listed is None or listed.returncode not in (0, 1):  # 1: nothing matched
         return "NOT_RUN", "git grep could not read %s" % root
     candidates = [p for p in listed.stdout.decode("utf-8", "surrogateescape").split("\0") if p]
     if len(candidates) > _MAX_CANDIDATES:
@@ -857,10 +858,10 @@ def opens_in_host_verdict(repo: Path, port: int, origin: Optional[str], dashboar
 
 def _git_out(cwd: Path, *args: str) -> Optional[str]:
     try:
-        done = subprocess.run(["git", "-C", str(cwd)] + list(args), capture_output=True, text=True, timeout=2.0)
+        done = fabric_git.run(cwd, list(args), timeout=2.0, capture_output=True, text=True)
     except (OSError, subprocess.SubprocessError):
         return None
-    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
+    return done.stdout.strip() if done is not None and done.returncode == 0 and done.stdout.strip() else None
 
 
 def service_checkout(descriptor: Any, repo: Optional[str]) -> Tuple[Optional[Path], str]:
@@ -944,17 +945,16 @@ def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
         return "NOT_RUN", "the service declares no limits (a load declaration's limits, a usage report's budget or budgets)"
     if repo is None:
         return "NOT_RUN", why
-    if not shutil.which("git"):
+    if not fabric_git.executable([repo]):
         return "NOT_RUN", "git is not installed"
     try:
-        listed = subprocess.run(["git", "-C", str(repo), "grep", "-I", "-l", "-z", "-E", _HOLD_USE, "--"]
-                                + list(_HOLD_CODE), capture_output=True,
-                                timeout=max(0.05, budget))
+        listed = fabric_git.run(repo, ["grep", "-I", "-l", "-z", "-E", _HOLD_USE, "--"] + list(_HOLD_CODE),
+                                timeout=max(0.05, budget), capture_output=True)
     except subprocess.TimeoutExpired:
         return "NOT_RUN", "the %.1f s budget ran out while git read %s" % (budget, repo)
     except OSError as exc:
         return "NOT_RUN", "git could not read %s: %s" % (repo, exc)
-    if listed.returncode not in (0, 1):
+    if listed is None or listed.returncode not in (0, 1):
         return "NOT_RUN", "git grep could not read %s" % repo
     users = [p for p in listed.stdout.decode("utf-8", "surrogateescape").split("\0")
              if p and p.rsplit("/", 1)[-1] not in _HOLD_KIT_FILES and not _TEST_PATH.search(p)]

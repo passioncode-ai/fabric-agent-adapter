@@ -26,6 +26,9 @@ import sys
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fabric_git  # noqa: E402 - beside this file: git from no folder of the repository, no fsmonitor, no GIT_DIR (FAA-190)
+
 KIT_DIR = Path(__file__).resolve().parent.parent / "assets" / "dashboard-kit"
 KIT_NAME = "fabric-dashboard-kit"
 COPIED = ("fabric-dashboard.css", "fabric-dashboard.js", "fabric-button.js")  # fabric-button.js: DEC-0040, FB-7
@@ -213,14 +216,14 @@ def git(repo: Path, *args: str, timeout: float = 2.0, until: Optional[float] = N
             raise OutOfTime()
         timeout = min(timeout, left)
     try:
-        done = subprocess.run(["git", "-C", str(repo)] + list(args), capture_output=True, text=True, timeout=timeout)
+        done = fabric_git.run(repo, list(args), timeout=timeout, capture_output=True, text=True)
     except subprocess.TimeoutExpired:
         if until is not None and time.monotonic() >= until - 0.05:
             raise OutOfTime()
         return None
     except (OSError, subprocess.SubprocessError):
         return None
-    return done.stdout if done.returncode == 0 else None
+    return done.stdout if done is not None and done.returncode == 0 else None
 
 
 def repo_root(start: Path, until: Optional[float] = None) -> Optional[Path]:

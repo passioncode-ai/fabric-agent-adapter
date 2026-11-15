@@ -78,7 +78,7 @@ import fabric_connections as fcn  # noqa: E402
 from check_service_rules import source_repository_verdict, _member  # noqa: E402 - a repository in evidence carries no userinfo or query
 from check_service_lifecycle import LifecycleRules  # noqa: E402 - the lifecycle rules (split at the line ceiling)
 import fabric_interop as fi  # noqa: E402
-import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
+import fabric_peer_owner as po, fabric_git  # noqa: E402 - DEC-0154 HA-2: the listener's owner first; git (FAA-190)
 from check_service_rules import ForeignUser, PORT_RULES_UNREAD, in_launch_daemons, listener_owner_verdict, other_domain_copy, port_claim_verdict  # noqa: E402 - DEC-0154 HA-2
 
 Result = Dict[str, str]

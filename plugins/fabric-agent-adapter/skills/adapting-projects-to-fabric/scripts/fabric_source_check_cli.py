@@ -135,7 +135,10 @@ def run_check(argv: Optional[List[str]], check: Callable[..., Dict[str, object]]
     listed = sum(1 for e in entries if e and not e.startswith(home_entry))
     homes = sum(1 for e in entries if e.startswith(home_entry))
     # a binary file is not read either: it is complete only when every one is named as source in the ignore file
-    complete = not (skipped["unreadable"] or skipped["binary"] or skipped["nested"])  # type: ignore[index]
+    # and a run that found no file at all, read or left out by name, checked nothing: an uninitialised submodule is an
+    # empty folder (FAA-190 (61))
+    found_none = not (result["files"] or skipped["excluded"] or result["notRead"])  # type: ignore[index]
+    complete = not (found_none or skipped["unreadable"] or skipped["binary"] or skipped["nested"])  # type: ignore[index]
     result.update({"instanceStrings": listed, "ownerHomes": homes, "instanceList": list_path is not None, "blocking": bool(findings),
                    "complete": complete})
     if args.json:
@@ -147,6 +150,11 @@ def run_check(argv: Optional[List[str]], check: Callable[..., Dict[str, object]]
             _print("%s: not read (%s)" % (n["path"], n["why"]))
         for folder in result["dependencies"]:  # type: ignore[union-attr]
             _print("%s: not read (a dependency folder; --every-file reads it)" % folder)
+        for line in result.get("unmatched", []):  # type: ignore[union-attr]
+            _print("%s matches no file (a reason goes on the line above it, never after it)" % line)
+        if found_none:
+            _print("no file read: nothing here was checked (a submodule not checked out is an empty folder: `git submodule "
+                   "update --init` first)")
         if skipped["dependencies"]:  # type: ignore[index]
             _print("%d dependency folder(s) not read (node_modules, virtual environments, caches); --every-file reads "
                    "them" % skipped["dependencies"])  # type: ignore[index]

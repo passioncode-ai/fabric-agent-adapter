@@ -473,7 +473,7 @@ class ContractRunnerTests(unittest.TestCase):
 
             def fake_run(argv, **kwargs):
                 calls.append(list(argv))
-                out = ADAPTER.CONTRACT_COMMIT + "\n" if argv[:2] == ["git", "rev-parse"] else ""
+                out = ADAPTER.CONTRACT_COMMIT + "\n" if "rev-parse" in argv else ""  # git runs through fabric_git
                 return sp.CompletedProcess(argv, 0, stdout=out, stderr="")
 
             with mock.patch.object(ADAPTER.subprocess, "run", side_effect=fake_run):

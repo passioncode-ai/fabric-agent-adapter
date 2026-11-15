@@ -16,6 +16,7 @@ import sys
 from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import fabric_git  # noqa: E402 - every git call through one environment (FAA-190 (66))
 import fabric_service as fs  # noqa: E402
 from check_service_rules import (  # noqa: E402
     _member, in_launch_daemons, marker_problem, other_domain_copy, plist_problems, priority_problems, same_repository,
@@ -32,7 +33,7 @@ class LifecycleRules:
             return
         life = _member(self.d, "lifecycle")
         data = fs.expand(str(_member(self.d, "paths").get("data", "~/")))
-        inside = subprocess.run(["git", "-C", str(data), "rev-parse", "--show-toplevel"], capture_output=True, text=True) if data.is_dir() and shutil.which("git") else None
+        inside = fabric_git.run(data, ["rev-parse", "--show-toplevel"], capture_output=True, text=True) if data.is_dir() else None
         self.state_rule(data, inside)
         self.lock_rule(data)
         if life.get("manager") != "launchd":
@@ -90,12 +91,12 @@ class LifecycleRules:
             self.add(rule, "PASS", "%s is not inside a repository" % data)
             return
         top = inside.stdout.strip()
-        remote = subprocess.run(["git", "-C", top, "remote", "get-url", "origin"], capture_output=True, text=True)
+        remote = fabric_git.run(top, ["remote", "get-url", "origin"], trees=[data, top], capture_output=True, text=True)
         own = self.d.get("source")
         source = str(own.get("repository") or "") if isinstance(own, dict) else ""
         if not source:
             self.add(rule, "NOT_RUN", "data is inside repository %s and the descriptor names no source.repository to tell code from data" % top)
-        elif remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
+        elif remote is not None and remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
             self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, shown_repository(source)))
         else:
             self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, shown_repository(remote.stdout.strip()) or "no remote"))

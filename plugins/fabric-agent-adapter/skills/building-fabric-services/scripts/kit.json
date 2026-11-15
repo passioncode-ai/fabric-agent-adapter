@@ -34,6 +34,13 @@
    "sha256": "579b3a6c0c1d90fffd7d37007387bec7c7b15236907f1146002cdd1ffa52de89"
   },
   {
+   "module": "fabric_git",
+   "file": "fabric_git.py",
+   "layer": "L0",
+   "imports": [],
+   "sha256": "0683759311f9e0bc592f7c5feb1f913972f77b35fb96c2d8acdbf553abc6cf1a"
+  },
+  {
    "module": "fabric_socket_proof",
    "file": "fabric_socket_proof.py",
    "layer": "L0",
@@ -327,13 +334,14 @@
     "fabric_actions",
     "fabric_base",
     "fabric_connections",
+    "fabric_git",
     "fabric_paths",
     "fabric_peer_owner",
     "fabric_protocols",
     "fabric_secrets",
     "fabric_usage"
    ],
-   "sha256": "4633fc554b39bd53ea7608e11eed520037c8232e68fdb76cd57c2ef00e2fa812"
+   "sha256": "69801e5b061a3153776099e1ef6ce61d25abe69ba5bc2724cacdf362ccf484dc"
   },
   {
    "module": "fabric_context",
@@ -648,6 +656,13 @@
    "layer": "L0",
    "imports": [],
    "sha256": "709a6d0d8c2e2ae45e0080eb5b2c6202345e7775827b70d8abc9ae7f1515676c"
+  },
+  {
+   "module": "fabric-git",
+   "file": "fabric-git.mjs",
+   "layer": "L0",
+   "imports": [],
+   "sha256": "8b3e9e10c53eb62e7eef6d0f451c3761b062e84e8902703db2069a74f38333d7"
   },
   {
    "module": "fabric-socket-proof",
@@ -9623,6 +9638,7 @@
    "fabric_time.py": "b17bfc379a16b642398f6a45683acaeee610284ee2d417fa0ceb728289983e69",
    "fabric_identifiers.py": "f8475b62b7a64957e7ac4d11a75db1f9cb12a6fd855658dfc3a0e7084fbcd27a",
    "fabric_secrets.py": "579b3a6c0c1d90fffd7d37007387bec7c7b15236907f1146002cdd1ffa52de89",
+   "fabric_git.py": "0683759311f9e0bc592f7c5feb1f913972f77b35fb96c2d8acdbf553abc6cf1a",
    "fabric_socket_proof.py": "3b798ca92d87e07da21b65ec6832877a5ee3f5222116ab7688c4c8e0b3342b63",
    "fabric_peer_owner.py": "e48b577a023e63a403aac882e703e43fc587b4ab28f9c91cbc9be33b32365f84",
    "fabric_tailnet.py": "785bba5ff1d87cda2cd6c416c6cf4adca053b30adb0be6b1a6e92d25e8da21ea",
@@ -9649,7 +9665,7 @@
    "fabric_lock.py": "0c53b3a6537d248be35ca7be6c8be0a5fc6858c6f6ef1f406467a2783d67cfd4",
    "fabric_usage.py": "86acbae7aeda00754efbc9406dcf44417c9f2f9b0bdf626a1bf274df1b1ba64e",
    "fabric_backups.py": "0d9f775c9c7bb138cbb954a96d07521b1172717660337098c507d8e782f72530",
-   "fabric_descriptor.py": "4633fc554b39bd53ea7608e11eed520037c8232e68fdb76cd57c2ef00e2fa812",
+   "fabric_descriptor.py": "69801e5b061a3153776099e1ef6ce61d25abe69ba5bc2724cacdf362ccf484dc",
    "fabric_context.py": "a44cb7969e9c4c49dd1aa6f457312cad106331d428cc73e08551c4ea1602f911",
    "fabric_auth.py": "f2302938884ca29e3ea56e3412621d13f8c73180ab00fab54b21ac189825a1ba",
    "fabric_events.py": "122360164fb2a36677c6ce21344d2dafd56e4b1e708ba6ea85398d06997e64cd",
@@ -9676,6 +9692,7 @@
    "fabric-time.mjs": "a2ea5b8d138aa740ac3abdddb700455a900f9008cc8d2be5912d58ae47b134a1",
    "fabric-identifiers.mjs": "b9e738561498cf4dd8ae1479d9bf9fe29314b2ebb2c55d4665a59b5fe5d87204",
    "fabric-secrets.mjs": "709a6d0d8c2e2ae45e0080eb5b2c6202345e7775827b70d8abc9ae7f1515676c",
+   "fabric-git.mjs": "8b3e9e10c53eb62e7eef6d0f451c3761b062e84e8902703db2069a74f38333d7",
    "fabric-socket-proof.mjs": "3c8e168faf468080f806b8726d4a313dc0e4f3ac82773c0d475a22541292a8e5",
    "fabric-peer-owner.mjs": "3490897792b928e56401ff1b512af7d1fc81e348ea77f592aef7cc860efd67ae",
    "fabric-tailnet.mjs": "a55ac45da1fe4d230040211d7e3301c2a74a58caedbc52f6b762f642ab68a4b6",

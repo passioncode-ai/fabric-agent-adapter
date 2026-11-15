@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044, LC-21), beside this file
+import fabric_git  # noqa: E402 - git from no folder of the project, no fsmonitor, no caller's GIT_DIR (FAA-190)
 
 
 CONTRACT_VERSION = "0.1.0"
@@ -557,9 +558,9 @@ def _top_level(root: Path) -> List[str]:
     a trailing /. Instance data by its name is left out."""
     names: List[str] = []
     try:
-        listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                                capture_output=True, timeout=60)
-        if listed.returncode == 0:
+        listed = fabric_git.run(root, ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], timeout=60,
+                                capture_output=True)
+        if listed is not None and listed.returncode == 0:
             names = [os.fsdecode(n) for n in listed.stdout.split(b"\0") if n]
     except (OSError, subprocess.SubprocessError):
         names = []
@@ -625,19 +626,18 @@ def _contract_shape(manifest: Path, contract: Path, selected_commit: str) -> Tup
     if not contract.is_dir():
         return "NOT_RUN", ["contract checkout is not a directory: %s" % contract]
     try:
-        head = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=str(contract), check=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-        ).stdout.strip()
+        done = fabric_git.run(contract, ["rev-parse", "HEAD"], check=True, capture_output=True, text=True)
+        if done is None:
+            raise OSError("git is not found in PATH's absolute folders")
+        head = done.stdout.strip()
     except (OSError, subprocess.CalledProcessError) as exc:
         return "NOT_RUN", ["cannot read contract commit: %s" % exc]
     if head != selected_commit:
         return "FAIL", ["contract checkout is %s; selected lock requires %s" % (head, selected_commit)]
     try:
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=normal"], cwd=str(contract), check=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-        ).stdout.strip()
+        done = fabric_git.run(contract, ["status", "--porcelain", "--untracked-files=normal"], check=True,
+                              capture_output=True, text=True)
+        dirty = done.stdout.strip() if done is not None else "git is not found"
     except (OSError, subprocess.CalledProcessError) as exc:
         return "NOT_RUN", ["cannot verify clean contract checkout: %s" % exc]
     if dirty:
