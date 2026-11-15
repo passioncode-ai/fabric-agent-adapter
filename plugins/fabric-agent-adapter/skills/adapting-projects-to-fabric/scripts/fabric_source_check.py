@@ -16,7 +16,8 @@ the source would carry and reports, by path, line and kind, each place where the
   assigned to a name that can only carry a credential (a bare long run, such as an integrity hash, is not; a whole
   Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, is public); or a private key: a PEM, OpenSSH or PGP
   block, or a JWK's `d`; a URL that carries a password or a credential in its query; a file that is a credential by
-  its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit credential file (`*.token`, `board.credential`). A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
+  its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit credential file (`*.token`, `board.credential`),
+  or a folder so named anywhere in its path (FAA-190 (74)). A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
   not a finding;
 - `instance-string`: a string from the owner's list of instance strings (names, accounts, hosts), kept outside the tree.
 
@@ -33,8 +34,9 @@ The files read are those Git would commit (`git ls-files --cached --others --exc
 work tree (a staged copy that differs is not read). With `--every-file`, every file but `.git`, `__pycache__`,
 `.DS_Store` and `*.pyc`, which `pack` refuses as litter (what `pack` reads). When ROOT is not in a Git checkout or Git lists nothing in it, every file outside `.git`,
 `__pycache__`, `node_modules`, virtual environments and caches; the dependency folders it leaves are named (so too
-when no `git` is found in PATH's absolute folders, or with PATH unset in `/bin` and `/usr/bin`; on Windows with PATH
-unset the walk is used). A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
+when no `git` is found in PATH's absolute folders outside ROOT, or with PATH unset in `/bin` and `/usr/bin`; on
+Windows with PATH unset the walk is used). Git runs through fabric_git.py: no fsmonitor, no caller's Git location or
+trace (FAA-190). A committed symbolic link is checked by the path it names, never followed. A binary file (a NUL byte in
 its first 8 KiB) is not read; it is listed. Globs in ROOT's `.fabric-source-ignore` (one per line, `#`
 comments) and `--exclude` leave matching paths out. The owner's list is `--instance-strings`, else the file
 `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
@@ -108,6 +110,8 @@ try:
     _STEP = "fabric_source_homes"
     from fabric_source_homes import (  # noqa: E402,F401 - how a declared home is read, beside this file
         HOME_ENTRY, _NAME_JOIN, _NAME_START, _SEP, _dashed_home, _name_parts, _owner_homes, _spellings)
+    _STEP = "fabric_git"
+    import fabric_git as _gitrun  # noqa: E402 - how Git runs on the tree (FAA-190 (66)), beside this file
     _STEP = "fabric_source_check_cli"
     from fabric_source_check_cli import (  # noqa: E402,F401 - the command line, beside this file (FAA-190 (104))
         LIST_NAME, _Parser, _absolute, _list_path, _print, default_list, run_check)
@@ -595,38 +599,27 @@ def redact(path: str, entries: List[str], seen: Optional["_Seen"] = None) -> str
     return "".join(out) + path[last:]
 
 
-def _git() -> Optional[str]:
-    """`git` from PATH's absolute folders only. On Windows CreateProcess looks in the current folder first (and
-    shutil.which there puts the current folder first too), and on POSIX an empty or relative PATH element (a trailing
-    `:`) is the current folder: a tree checked from inside could run its own `git`."""
-    name = "git.exe" if os.name == "nt" else "git"  # never a .cmd or .bat: cmd.exe would read the arguments
-    # with PATH unset, POSIX's default folders (`/bin`, `/usr/bin`); Windows' default (`.;C:\\bin`) is a folder any
-    # user may create, so there no PATH means no git and the walk
-    folders = os.get_exec_path() if os.name != "nt" else os.environ.get("PATH", "").split(os.pathsep)
-    for folder in folders:
-        if folder and os.path.isabs(folder):
-            candidate = os.path.join(folder, name)
-            if os.path.isfile(candidate) and (os.name == "nt" or os.access(candidate, os.X_OK)):
-                return candidate
-    return None
+def _git(root: Optional[Path] = None) -> Optional[str]:
+    """`git` from PATH's absolute folders only, never one inside the checked tree (fabric_git.executable): on Windows
+    CreateProcess looks in the current folder first, on POSIX an empty or relative PATH element is the current folder,
+    and `npm run` puts `<root>/node_modules/.bin` on PATH (FAA-190 (67)): a tree checked from inside could run its own
+    `git`."""
+    return _gitrun.executable([root] if root is not None else [])
 
 
-_GIT_LOCATION = frozenset(("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR",
-                           "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX"))
+_GIT_LOCATION = _gitrun.LOCATION
 
 
 def _git_files(root: Path) -> Optional[List[str]]:
-    git = _git()
+    git = _git(root)
     if git is None:
         return None
     try:
-        # `core.fsmonitor` off: `--others` would run a command the checked tree's own configuration names. Empty, not
-        # `false`: Git before 2.36 reads the value as a hook and would run a program named `false` from PATH
-        # the repository is found from ROOT: a Git location the caller exports (every hook in a linked worktree gets
-        # GIT_DIR and GIT_INDEX_FILE) would list another repository's files and leave ROOT's own unread
-        env = {k: v for k, v in os.environ.items() if k.upper() not in _GIT_LOCATION}
-        result = subprocess.run([git, "-c", "core.fsmonitor=", "-C", str(root), "ls-files", "-z", "--cached",
-                                 "--others", "--exclude-standard"], capture_output=True, timeout=60, env=env)
+        # fabric_git: both fsmonitors off (`--others` would run a command the checked tree's configuration names, or
+        # start Git's own daemon), the caller's Git location and traces not passed (a hook in a linked worktree has
+        # GIT_DIR and GIT_INDEX_FILE, which would list another repository's files), nothing written
+        result = subprocess.run([git, *_gitrun.NO_COMMANDS, "-C", str(root), "ls-files", "-z", "--cached", "--others",
+                                 "--exclude-standard"], capture_output=True, timeout=60, env=_gitrun.environment())
     except (OSError, subprocess.SubprocessError):
         return None
     if result.returncode != 0:
@@ -643,6 +636,29 @@ def _git_files(root: Path) -> Optional[List[str]]:
         except UnicodeDecodeError:
             names.add(raw.decode("utf-8", "surrogateescape"))
     return sorted(names)
+
+
+def _gitlinks(root: Path) -> Set[str]:
+    """The submodules Git's index lists (mode 160000): `ls-files -s` prefixes each name, so none is read as another."""
+    git = _git(root)
+    if git is None:
+        return set()
+    try:
+        result = subprocess.run([git, *_gitrun.NO_COMMANDS, "-C", str(root), "ls-files", "-z", "-s"], capture_output=True,
+                                timeout=60, env=_gitrun.environment())
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    found = set()
+    for entry in result.stdout.split(b"\0") if result.returncode == 0 else []:
+        head, tab, raw = entry.partition(b"\t")
+        if tab and head.startswith(b"160000 "):
+            found.add(raw.decode("utf-8", "surrogatepass") if os.name == "nt" else os.fsdecode(raw))
+    return found
+
+
+def _credential_name(name: str) -> bool:
+    """A name `pack` refuses as a credential file, or a kit credential file (`*.token`, `board.credential`)."""
+    return bool((SECRET_FILE.fullmatch(name) and not SECRET_FILE_OK.fullmatch(name)) or TOKEN_FILE.fullmatch(name))
 
 
 def _walk_files(root: Path, unreadable: List[str], skip: Iterable[str] = WALK_SKIP,
@@ -760,15 +776,32 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
     def add(path: str, line: int, kind: str, rule: str) -> None:
         findings.append({"path": path, "line": line, "kind": kind, "rule": rule})
 
+    links: List[Set[str]] = []  # the submodules Git lists, read once and only when a listed path is absent
+
+    def absent_submodule(path: str) -> bool:
+        """A submodule not checked out has no folder: asked with the `/` Git's listing lacks, it is a folder still, so
+        `vendor/sub/` takes it and `vendor/*` does not, as when it is checked out (FAA-190 (46))."""
+        if mode != "git" or os.path.lexists(str(root / path)):
+            return False
+        if not links:
+            links.append(_gitlinks(root))
+        return path in links[0]
+
+    unmatched = dict(enumerate(globs))  # the lines no path matched yet, by their place (FAA-190 (50))
     for path in files:
-        if _ignored(path, globs, root):
+        asked = path + "/" if absent_submodule(path) else path
+        if _ignored(asked, globs, root):
             skipped["excluded"] += 1
+            for index in [i for i, line in unmatched.items() if _ignored(asked, [line], root)]:
+                del unmatched[index]
             continue
         for kind, rule in _text_findings(path, entries, seen):  # a name carries instance data as a line does
             add(path, 0, kind, rule + " in the file's path")
-        name = path.rsplit("/", 1)[-1]
-        if (SECRET_FILE.fullmatch(name) and not SECRET_FILE_OK.fullmatch(name)) or TOKEN_FILE.fullmatch(name):
+        *folders, name = path.split("/")  # a nested repository is listed as `vendor/sub/`: its name is a folder's
+        if _credential_name(name):
             add(path, 0, "secret", "a file that is a credential by its name")
+        if any(_credential_name(folder) for folder in folders):  # `pack` refuses it as well (FAA-190 (74))
+            add(path, 0, "secret", "a folder in the path that is a credential by its name, which pack refuses")
         full = root / path
         # os.path.islink, not Path.is_symlink: on Python 3.9 the latter raises on a folder it cannot search
         if any(os.path.islink(str(root / parent)) for parent in Path(path).parents if str(parent) != "."):
@@ -819,8 +852,10 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         entry["path"] = shown(str(entry["path"]))
     for entry in not_read:
         entry["path"] = shown(entry["path"])
+    where = getattr(globs, "where", None)
     return {"mode": mode, "files": read, "skipped": skipped, "notRead": not_read, "findings": findings,
-            "dependencies": [shown(d) for d in dependencies]}
+            "dependencies": [shown(d) for d in dependencies],
+            "unmatched": [where[i] if where else "glob %d" % (i + 1) for i in sorted(unmatched)]}
 
 
 def run(argv: Optional[List[str]] = None) -> int:

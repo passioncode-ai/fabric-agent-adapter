@@ -10,8 +10,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import re
+import sys
+import unicodedata
 import warnings
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 IGNORE_FILE = ".fabric-source-ignore"
 
@@ -20,7 +22,15 @@ class CheckError(Exception):
     pass
 
 
-_GLOBS: Dict[str, "re.Pattern[str]"] = {}
+_GLOBS: Dict[str, "_Glob"] = {}
+
+
+def _composed(text: str) -> str:
+    """On macOS a name in its composed form (NFC), a line too: Git lists a name composed (core.precomposeunicode), while
+    the file system keeps a decomposed one as written and os.walk gives it so, and both name one file there; matching
+    both in one form keeps a line taking the same files in Git mode and with --every-file (FAA-190 (64)). Elsewhere two
+    forms are two files, and a name is matched as it is."""
+    return unicodedata.normalize("NFC", text) if sys.platform == "darwin" else text
 
 
 def _as_bytes(text: str) -> str:
@@ -46,7 +56,102 @@ def _name_bytes(name: str) -> str:
         return _as_bytes(name)
 
 
-def _glob(glob: str) -> "re.Pattern[str]":
+#: The parts of a line that match a run of any length; with two or more, a regular expression backtracks
+#: polynomially (FAA-190 (56), (60)), so such a line is matched by `_Glob._states`, linear in the name.
+_RUNS = ("star", "all", "dirs")
+
+
+class _Glob:
+    """A line as it is matched. `match(name)` is a whole match; `folder_above(name)` whether a folder above the name
+    (a prefix ending before one of its `/`) matches. A line with at most one run (`*`, `**`) is matched by its regular
+    expression; one with more by a set of positions in its parts, read once along the name, as Git's wildmatch never
+    backtracks into a polynomial: a `*` takes no `/`, a trailing `**` takes anything, a `**/` takes none or any run of
+    folders."""
+
+    __slots__ = ("regex", "parts")
+
+    def __init__(self, regex: "re.Pattern[str]", parts: List[Tuple[str, object]]) -> None:
+        self.regex = regex
+        self.parts = parts if sum(kind in _RUNS for kind, _ in parts) > 1 else None
+
+    def match(self, name: str) -> bool:
+        if self.parts is None:
+            return self.regex.match(name) is not None
+        end = len(self.parts)
+        states = self._closed({0})
+        for c in name:
+            states = self._step(states, c)
+            if not states:
+                return False
+        return end in states
+
+    def folder_above(self, name: str) -> bool:
+        if self.parts is None:
+            return any(self.regex.match(name[:i]) for i, c in enumerate(name) if c == "/")
+        end = len(self.parts)
+        states = self._closed({0})
+        for c in name:
+            if c == "/" and end in states:
+                return True
+            states = self._step(states, c)
+            if not states:
+                return False
+        return False
+
+    def _closed(self, states: Set[int]) -> Set[int]:
+        """The positions reachable without reading a byte: a run can match none."""
+        stack, parts = list(states), self.parts
+        while stack:
+            i = stack.pop()
+            if 0 <= i < len(parts) and parts[i][0] in _RUNS and i + 1 not in states:
+                states.add(i + 1)
+                stack.append(i + 1)
+        return states
+
+    def _step(self, states: Set[int], c: str) -> Set[int]:
+        """The positions after reading one byte. A negative position is inside a `**/` that has read a byte: it ends
+        only on a `/`."""
+        parts, out = self.parts, set()
+        for i in states:
+            if i < 0:
+                out.add(i)
+                if c == "/":
+                    out.add(-i)
+                continue
+            if i >= len(parts):
+                continue
+            kind, value = parts[i]
+            if kind == "lit":
+                if c == value:
+                    out.add(i + 1)
+            elif kind == "one":
+                if c != "/":
+                    out.add(i + 1)
+            elif kind == "class":
+                if value.match(c):  # type: ignore[union-attr]
+                    out.add(i + 1)
+            elif kind == "star":
+                if c != "/":
+                    out.add(i)
+            elif kind == "all":
+                out.add(i)
+            else:  # dirs: inside it now, and a `/` may end it here
+                out.add(-(i + 1))
+                if c == "/":
+                    out.add(i + 1)
+        return self._closed(out)
+
+
+def _compiled(pattern: str) -> "re.Pattern[str]":
+    with warnings.catch_warnings():  # a FutureWarning (`--` in a class) would print the script's own path
+        warnings.simplefilter("error")
+        try:
+            return re.compile(pattern)
+        except Warning:
+            raise re.error("a class Python may read as a set operation")
+
+
+def _glob(glob: str) -> _Glob:
     """A line of the ignore file read from the tree's root: `*`, `?` and `[...]` stay inside one folder, and `**` as a
     whole segment crosses folders (`**/` also matches none); any other run of stars is one `*`. Not a `.gitignore`
     line: a line with no `/` matches at the root only, and `\\` or `//` is refused (`_line`).
@@ -54,8 +159,10 @@ def _glob(glob: str) -> "re.Pattern[str]":
     for a class Python cannot read (`[9-0]`)."""
     key = glob
     if key not in _GLOBS:
-        glob = _as_bytes(glob)  # Git matches bytes: `?` and a class read one byte of a UTF-8 name, never a letter
-        out, i = [], 0
+        glob = _as_bytes(_composed(glob))  # Git matches bytes: `?` and a class read one byte of a UTF-8 name
+        out: List[str] = []
+        parts: List[Tuple[str, object]] = []
+        i = 0
         while i < len(glob):
             c = glob[i]
             if c == "*":
@@ -65,13 +172,16 @@ def _glob(glob: str) -> "re.Pattern[str]":
                 whole = end - i >= 2 and (i == 0 or glob[i - 1] == "/") and (end == len(glob) or glob[end] == "/")
                 if whole and end < len(glob):
                     out.append("(?:.*/)?")
+                    parts.append(("dirs", None))
                     end += 1
                 else:
                     out.append(".*" if whole else "[^/]*")
+                    parts.append(("all" if whole else "star", None))
                 i = end
                 continue
             elif c == "?":
                 out.append("[^/]")
+                parts.append(("one", None))
             elif c == "[":
                 j = i + 1 + (glob[i + 1:i + 2] in ("!", "^"))
                 j += glob[j:j + 1] == "]"
@@ -87,17 +197,15 @@ def _glob(glob: str) -> "re.Pattern[str]":
                         body = "\\" + body
                     for mark in "&~|":  # literals, never the set operations a later Python may read there
                         body = body.replace(mark, "\\" + mark)
-                    out.append("(?!/)[%s%s]" % ("^" if negated else "", body))
+                    one = "(?!/)[%s%s]" % ("^" if negated else "", body)
+                    out.append(one)
+                    parts.append(("class", _compiled("(?s:%s)" % one)))
                     i = end
             else:
                 out.append(re.escape(c))
+                parts.append(("lit", c))
             i += 1
-        with warnings.catch_warnings():  # a FutureWarning (`--` in a class) would print the script's own path
-            warnings.simplefilter("error")
-            try:
-                _GLOBS[key] = re.compile("(?s:%s)\\Z" % "".join(out))
-            except Warning:
-                raise re.error("a class Python may read as a set operation")
+        _GLOBS[key] = _Glob(_compiled("(?s:%s)\\Z" % "".join(out)), parts)
     return _GLOBS[key]
 
 
@@ -125,8 +233,16 @@ def _line(glob: str, where: str) -> str:
     return glob
 
 
+class Lines(list):
+    """The lines read, in order, with `where` naming each by its place (`line 3 of .fabric-source-ignore`, `--exclude
+    glob 1`), so a line that matches no file is named without repeating what it holds (FAA-190 (50))."""
+
+    where: List[str]
+
+
 def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
-    globs = [_line(g.rstrip(" "), "an --exclude glob") for g in extra]
+    globs = Lines(_line(g.rstrip(" "), "an --exclude glob") for g in extra)
+    globs.where = ["--exclude glob %d" % n for n in range(1, len(globs) + 1)]
     ignore = root / IGNORE_FILE
     try:
         present = ignore.is_file()
@@ -142,6 +258,7 @@ def ignore_globs(root: Path, extra: Iterable[str]) -> List[str]:
             glob = (line[:-1] if line.endswith("\r") else line).rstrip(" ")
             if glob and not glob.startswith("#"):
                 globs.append(_line(glob, "line %d of %s" % (number, IGNORE_FILE)))
+                globs.where.append("line %d of %s" % (number, IGNORE_FILE))
     return globs
 
 
@@ -154,8 +271,7 @@ def _takes_folder(glob: str) -> bool:
 def _under(path: str, glob: str) -> bool:
     """Whether a folder above the path matches the line, read as a folder: `src/**/` takes `src/pkg/x`, never
     `src/main.py` (joining the line with `/**` would read `**/` as no folder at all)."""
-    folder = _glob(glob.rstrip("/"))
-    return any(folder.match(path[:i]) for i, c in enumerate(path) if c == "/")
+    return _glob(glob.rstrip("/")).folder_above(path)
 
 
 def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
@@ -165,7 +281,7 @@ def _ignored(path: str, globs: List[str], root: Optional[Path] = None) -> bool:
     without the `/` takes files, so `vendor/*` reports a nested repository until it is checked in its own tree and
     named. A line ending in `/` never takes a file of that name."""
     on_disk = path.rstrip("/")
-    name = _name_bytes(on_disk)  # matched as Git matches: byte by byte, the bytes on disk
+    name = _name_bytes(_composed(on_disk))  # matched as Git matches: byte by byte, the bytes on disk (composed on macOS)
     known: List[bool] = []
 
     def folder() -> bool:

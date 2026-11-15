@@ -17,6 +17,7 @@ from typing import Optional
 from typing import Tuple
 
 from fabric_session_paths import _windows_path, bash_paths  # noqa: E402,F401 - read by turn_paths and the tests
+import fabric_git  # noqa: E402 - beside this file (FAA-190)
 from fabric_session_env import (  # noqa: E402 - the kit (FAA-65)
     BOARD_STATUS_TOOL,
     GIT_TIMEOUT_S,
@@ -68,12 +69,11 @@ def _git(cwd: Any, args: Tuple[str, ...], until: Optional[float]) -> Optional[st
     if timeout <= 0:
         return None
     try:
-        done = subprocess.run(["git", "--no-optional-locks", "-C", str(cwd)] + list(args),
-                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                              timeout=timeout, check=False)
+        done = fabric_git.run(cwd, list(args), timeout=timeout, check=False,  # GIT_OPTIONAL_LOCKS=0 in its environment
+                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
         return None
-    return done.stdout.decode("utf-8", "replace") if done.returncode == 0 else None
+    return done.stdout.decode("utf-8", "replace") if done is not None and done.returncode == 0 else None
 
 
 def git_facts(cwd: Path, budget_s: Optional[float] = None, until: Optional[float] = None) -> Dict[str, Optional[int]]:
@@ -93,7 +93,7 @@ def git_facts(cwd: Path, budget_s: Optional[float] = None, until: Optional[float
     if status is not None:
         facts["filesChanged"] = _count_status(status)
     if facts["head"]:
-        numstat = git("diff", "--numstat", "HEAD")
+        numstat = git("diff", "--no-ext-diff", "--no-textconv", "--numstat", "HEAD")  # no command the tree names
         if numstat is not None:
             added = removed = 0
             for line in numstat.splitlines():

@@ -79,7 +79,7 @@ import fabric_service as fs  # noqa: E402
 import fabric_connections as fcn  # noqa: E402
 from check_service_rules import shown_repository  # noqa: E402 - a repository in evidence carries no userinfo or query
 import fabric_interop as fi  # noqa: E402
-import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2: the listener's owner before any credential
+import fabric_peer_owner as po, fabric_git  # noqa: E402 - DEC-0154 HA-2: the listener's owner first; git (FAA-190)
 from check_service_rules import ForeignUser, PORT_RULES_UNREAD, in_launch_daemons, listener_owner_verdict, other_domain_copy, port_claim_verdict  # noqa: E402 - DEC-0154 HA-2
 
 Result = Dict[str, str]
@@ -805,7 +805,7 @@ class Probe:
             return
         life = _member(self.d, "lifecycle")
         data = fs.expand(str(_member(self.d, "paths").get("data", "~/")))
-        inside = subprocess.run(["git", "-C", str(data), "rev-parse", "--show-toplevel"], capture_output=True, text=True) if data.is_dir() and shutil.which("git") else None
+        inside = fabric_git.run(data, ["rev-parse", "--show-toplevel"], capture_output=True, text=True) if data.is_dir() else None
         self.state_rule(data, inside)
         self.lock_rule(data)
         if life.get("manager") != "launchd":
@@ -863,12 +863,12 @@ class Probe:
             self.add(rule, "PASS", "%s is not inside a repository" % data)
             return
         top = inside.stdout.strip()
-        remote = subprocess.run(["git", "-C", top, "remote", "get-url", "origin"], capture_output=True, text=True)
+        remote = fabric_git.run(top, ["remote", "get-url", "origin"], trees=[data, top], capture_output=True, text=True)
         own = self.d.get("source")
         source = str(own.get("repository") or "") if isinstance(own, dict) else ""
         if not source:
             self.add(rule, "NOT_RUN", "data is inside repository %s and the descriptor names no source.repository to tell code from data" % top)
-        elif remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
+        elif remote is not None and remote.returncode == 0 and same_repository(remote.stdout.strip(), source):
             self.add(rule, "FAIL", "data lives in the service's own code checkout %s (%s)" % (top, shown_repository(source)))
         else:
             self.add(rule, "PASS", "data is in repository %s, which is not the service's code (%s)" % (top, shown_repository(remote.stdout.strip()) or "no remote"))

@@ -23,9 +23,15 @@ dk = importlib.util.module_from_spec(spec)
 sys.path.insert(0, str(SCRIPTS))
 spec.loader.exec_module(dk)
 
-# A git that writes each subcommand to GIT_LOG; GIT_SLOW lists the subcommands that sleep GIT_SLEEP seconds first.
+# A git that writes each subcommand to GIT_LOG; GIT_SLOW lists the subcommands that sleep GIT_SLEEP seconds first. The
+# subcommand is the first argument past Git's own options (`-c k=v`, `-C dir`), which fabric_git puts first (FAA-190).
 FAKE_GIT = """#!/bin/sh
-sub="$3"
+sub=""
+skip=""
+for a in "$@"; do
+  if [ -n "$skip" ]; then skip=""; continue; fi
+  case "$a" in -c|-C) skip=1;; -*) ;; *) sub="$a"; break;; esac
+done
 printf '%%s\\n' "$sub" >> "$GIT_LOG"
 case " $GIT_SLOW " in *" $sub "*) sleep "$GIT_SLEEP";; esac
 exec %s "$@"

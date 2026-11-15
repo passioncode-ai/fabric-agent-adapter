@@ -125,7 +125,17 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   `node_modules/.bin/tsx` and installs nothing. `fabric_provider.py write` writes one
   entry (0600) in the providers directory. `fabric_source_check.py check` reads the files of a
   tree (credential values included, in memory only), the owner's list (the file `--instance-strings` or
-  `FABRIC_INSTANCE_STRINGS` names, else the one in the user's configuration folder), and runs `git ls-files` (without the caller's `GIT_DIR` or other Git
-  location variables) and nothing else, except that under a locale whose
+  `FABRIC_INSTANCE_STRINGS` names, else the one in the user's configuration folder), and runs `git ls-files` (and
+  `git ls-files -s` once when Git lists a path the work tree lacks) and nothing else, except that under a locale whose
   file-system encoding is not UTF-8 it restarts itself once with the same interpreter in Python's
   UTF-8 mode; it writes nothing and prints no value it finds.
+- Every script of the skills runs `git` through `fabric_git.py` (FAA-190; `test/test_fabric_git.py`,
+  `test_no_reader_runs_git_but_through_the_module`): Git comes from PATH's absolute folders, never from a folder inside
+  the tree it reads (`<root>/node_modules/.bin`); `core.fsmonitor` is empty and Git for Windows'
+  `core.useBuiltinFSMonitor` false, so no command the tree's configuration names runs and Git's own fsmonitor daemon is
+  not started; the caller's Git location (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and the rest) and `GIT_TRACE*`
+  are not passed, the trace2 targets are off (`GIT_TRACE2*=0`, which wins over a `trace2.*Target` in the caller's own
+  configuration) and `GIT_OPTIONAL_LOCKS=0` keeps `git status` from refreshing the index. The caller's own Git
+  configuration still applies (its global excludes file decides what is ignored, as it does for what the caller would
+  commit), and `git status` (a service's build identity, a session's counts) still runs a clean filter that the
+  repository's own `.gitattributes` and configuration name, as any `git status` there does.

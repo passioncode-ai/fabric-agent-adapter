@@ -65,11 +65,13 @@ def load_manifest() -> Dict:
 def _released(version: str) -> bool:
     """Whether the checkout the kit sits in carries the release tag `v<version>` (False outside a Git checkout)."""
     try:
-        listed = subprocess.run(["git", "-C", str(HERE), "tag", "--list", "v%s" % version],
-                                capture_output=True, text=True, timeout=10)
+        if str(HERE) not in sys.path:
+            sys.path.insert(0, str(HERE))
+        import fabric_git  # noqa: E402 - beside this file: no fsmonitor, no caller's GIT_DIR (FAA-190)
+        listed = fabric_git.run(HERE, ["tag", "--list", "v%s" % version], timeout=10, capture_output=True, text=True)
     except (OSError, subprocess.SubprocessError):
         return False
-    return listed.returncode == 0 and bool(listed.stdout.strip())
+    return listed is not None and listed.returncode == 0 and bool(listed.stdout.strip())
 
 
 def build(check: bool = False) -> List[str]:
