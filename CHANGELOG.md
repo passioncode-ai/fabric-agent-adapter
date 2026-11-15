@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.90.1 (2026-11-15)
+
+### Fixed
+
+- The probe's `dashboard.agent-surface` reads as the contract's `FAC-SEM-176` (DEC-0169 RP-3, FAA-335): a dashboard
+  whose agent surface is an A2A card passes at any placement (it failed a local one), and an empty declared
+  `surfaces.mcp.capabilities` fails with or without a dashboard, without reading tools/list (it passed one).
+- `references/agent-surface.md` and `interop.md` cite the contract's DEC-0169 (RP-1 to RP-3) for read parity and the
+  design order, in place of row CT-311's pending DEC.
+
 ## 0.90.0 (2026-11-14)
 
 The kit's gate reads levels and a place's profile by itself (FAA-334; contract DEC-0162 LV-5, LV-7, DEC-0166 AU-3).

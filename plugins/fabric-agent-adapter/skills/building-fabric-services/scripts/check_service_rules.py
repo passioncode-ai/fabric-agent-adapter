@@ -534,26 +534,32 @@ def actions_declared_verdict(wk: Any) -> Tuple[str, str]:
 
 
 def dashboard_agent_surface_verdict(wk: Any, tools: Optional[Dict[str, Any]], remote: bool = False) -> Tuple[str, str]:
-    """`dashboard.agent-surface` (FAA-332, the operator's rule of 2026-11-14): a service that shows a person a dashboard
-    has an agent surface too, so nothing the page shows or does is out of an agent's reach (AS-2, AS-3). No dashboard
-    is NOT_RUN. A dashboard with `surfaces.mcp` passes unless its tools/list was read and serves no tool; a remote one
-    may serve its agent surface over A2A instead. Read parity row by row is the repository's inventory (AS-6), which a
-    probe cannot see: this rule catches only the page with no agent door at all."""
+    """`dashboard.agent-surface` (FAA-332, the operator's rule of 2026-11-14; contract DEC-0169 RP-3, FAC-SEM-176 as
+    agentSurfaceRules reads it, FAA-335): a service that shows a person a dashboard serves an agent surface beside it,
+    `surfaces.mcp` or `surfaces.a2a` at any placement, and a present `surfaces.mcp.capabilities` is never empty, with or
+    without a dashboard. A dashboard with `surfaces.mcp` also fails when its tools/list was read and serves no tool.
+    Neither a dashboard nor an empty list is NOT_RUN. Read parity row by row is the repository's inventory (AS-6), which
+    a probe cannot see: this rule catches only the page with no agent door at all. `remote` is kept for callers."""
     surfaces = wk.get("surfaces") if isinstance(wk, dict) else None
-    if not (isinstance(surfaces, dict) and surfaces.get("dashboard")):
+    surfaces = surfaces if isinstance(surfaces, dict) else {}
+    mcp = surfaces.get("mcp") if isinstance(surfaces.get("mcp"), dict) else {}
+    if isinstance(mcp.get("capabilities"), list) and not mcp["capabilities"]:
+        return "FAIL", ("surfaces.mcp.capabilities is empty: an MCP surface serves at least one tool (FAC-SEM-176, "
+                        "DEC-0169 RP-3; read parity AS-2)")
+    if "dashboard" not in surfaces:
         return "NOT_RUN", "no surfaces.dashboard"
-    if surfaces.get("mcp"):
+    if "mcp" in surfaces:
         if tools is not None and not tools:
             return "FAIL", ("the MCP surface serves no tool: everything the dashboard shows and does is the person's alone "
                             "(read parity AS-2, DEC-0121 AP-1)")
         if tools is None:
             return "PASS", "the dashboard has an agent surface (surfaces.mcp); tools/list was not read"
         return "PASS", "the dashboard has an agent surface: surfaces.mcp serves %d tool(s)" % len(tools)
-    if remote and surfaces.get("a2a"):
+    if "a2a" in surfaces:
         return "PASS", "the dashboard has an agent surface over A2A (surfaces.a2a)"
-    return "FAIL", ("a dashboard with no agent surface (no surfaces.mcp%s): everything it shows and does is the person's "
-                    "alone; serve each view as a read tool (AS-2) and each control as a tool (DEC-0121 AP-1)"
-                    % (" or surfaces.a2a" if remote else ""))
+    return "FAIL", ("a dashboard with no agent surface (no surfaces.mcp or surfaces.a2a, FAC-SEM-176): everything it shows "
+                    "and does is the person's alone; serve each view as a read tool (AS-2) and each control as a tool "
+                    "(DEC-0121 AP-1)")
 
 
 # A2A (DEC-0122; decisions D4 to D6 of the 0.51.0 brief) -------------------------------------------------------------
