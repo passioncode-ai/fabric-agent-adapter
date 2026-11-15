@@ -109,7 +109,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
 | L4 | `fabric_board_link` | the board's link: the MCP session over the hub, the fsynced checkpoint, a claimed request as data, and the operator's mandate a request carries (FAA-135, imports `fabric_mandate` and `fabric_interop_rules` for the FAA-139 reading) |
 | L4 | `fabric_board_slots` | the responder's slot records: the generation held, a move, its take-back and a move back (FAA-165), one capability's refusal retried alone (FAA-163) |
-| L4 | `fabric_board_session` | the board responder: the work context, the fenced request, transfer and recovery |
+| L4 | `fabric_board_recovery` | the responder's restart recovery: a checkpoint read back from the board, accepted work transferred by `com.responder_replace` and resumed, an unknown outcome reconciled from what the service observed (`Recovery`, a `SlotKeeper`; `TERMINAL` and `NOT_OURS`, re-exported by `fabric_board_session`) |
+| L4 | `fabric_board_session` | the board responder: the work context, the fenced request; restart recovery comes from `fabric_board_recovery` |
 | L4 | `fabric_board_fixture` | the scripted board the probe runs a responder against |
 | L4 | `fabric_board` | the facade of the board connector ([board](board.md)) |
 | L4 | `fabric_http` | outbound HTTP: deadline, bounded retries, `Retry-After`, size cap ([connectors](connectors.md)) |

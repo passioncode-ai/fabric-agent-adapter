@@ -2559,7 +2559,8 @@ class SampleWiringTests(unittest.TestCase):
         fabric_events = importlib.import_module("fabric_events")
         scripts = Path(importlib.import_module("fabric_board").__file__).parent
         found = []
-        for name in ("fabric_board_session.py", "fabric_board_slots.py", "fabric-board-session.mjs", "fabric-board-slots.mjs"):
+        for name in ("fabric_board_session.py", "fabric_board_slots.py", "fabric_board_recovery.py", "fabric-board-session.mjs",
+                     "fabric-board-slots.mjs", "fabric-board-recovery.mjs"):
             text = (scripts / name).read_text(encoding="utf-8")
             found += [(name, level) for level in re.findall(r"emit\(\s*[\"']board\.[a-z._]+[\"']\s*,\s*[\"']([a-z]+)[\"']", text)]
         self.assertGreater(len(found), 20)
