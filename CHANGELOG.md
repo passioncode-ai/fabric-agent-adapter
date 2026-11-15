@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.93.1 (2026-11-16)
+
+0.93.0 was tagged and never published: its Windows job failed on one new test, so the release workflow stopped before
+npm. 0.93.1 carries 0.93.0's changes unchanged, with that test fixed.
+
+### Fixed
+
+- `test_git_trace_is_not_passed` writes the trace2 targets into its Git configuration with forward slashes: Git reads
+  the `\U` of a Windows path in a configuration value as a bad escape, refused the file, and the source check fell back
+  to its walk, so the test failed on Windows only. The check itself was right (release run 43775169379).
+
 ## 0.93.0 (2026-11-16)
 
 ### Added

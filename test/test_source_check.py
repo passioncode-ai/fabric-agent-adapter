@@ -711,7 +711,8 @@ class WhatIsRead(Tree):
                                                                          "GIT_TRACE2_EVENT", "GIT_TRACE2_PERF")}
         config = self.tmp / "global.gitconfig"
         target = self.tmp / "trace2-from-config.log"
-        config.write_text("[trace2]\n\teventTarget = %s\n\tnormalTarget = %s\n" % (target, target))
+        # forward slashes: Git reads `\U` of a Windows path in a configuration value as a bad escape and refuses the file
+        config.write_text("[trace2]\n\teventTarget = %s\n\tnormalTarget = %s\n" % (target.as_posix(), target.as_posix()))
         env = {name: str(path) for name, path in traces.items()}
         env["GIT_CONFIG_GLOBAL"] = str(config)  # Git 2.32 and later: the caller's own configuration file
         with mock.patch.dict(os.environ, env):
