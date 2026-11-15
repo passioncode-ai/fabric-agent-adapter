@@ -63,7 +63,7 @@ It refuses, with one sentence that never quotes a credential (it names the path 
   in its user, host, query or fragment or as a path segment, read as written and percent-decoded with the contract's
   detector (DEC-0151, since 0.81.0): a key's prefix counts only in its canonical case and at a word's start, and an
   `sk-` key only with a digit and an upper-case letter in 16 or more characters or a digit in 32 or more, so
-  `task-pipeline-dashboard.example.com`, `sk-learn-tutorial-notebooks` and `SK-...` are names, FAA-200 (32)): it names the
+  `task-pipeline-dashboard.example.com`, `sk-learn-example-notebooks` and `SK-...` are names, FAA-200 (32)): it names the
   repository, never reaches it (since 0.49.3; one rule with the service kit's descriptor check since 0.62.0);
 - a manifest whose name follows a backslash (`C:\Agents\example\fabric-agent.json`). The reader,
   `validate_provider_entry`, accepts it since DEC-0145 (`MANIFEST_PATTERN`, the schema's), but a reader that has not

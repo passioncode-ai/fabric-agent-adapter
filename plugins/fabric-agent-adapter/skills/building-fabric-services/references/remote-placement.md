@@ -54,7 +54,7 @@ platform's secrets, set from Observatory or the person's secret manager, never O
   and at a word's start (the value's start, a character that is no ASCII letter or digit, or an escape), and an `sk-`
   key only with a digit and an upper-case letter in 16 or more characters or a digit in 32 or more; a JWT and a long
   run mixing upper case, lower case and digits count too. So `task-pipeline-dashboard`, `Task-Pipeline-Dashboard` and
-  the host `task-pipeline-dashboard.example.com` (an `sk-` inside a word), `sk-learn-tutorial-notebooks` (no digit)
+  the host `task-pipeline-dashboard.example.com` (an `sk-` inside a word), `sk-learn-example-notebooks` (no digit)
   and an upper-case `SK-` are names, while an `sk-` key with a digit and an upper-case letter is refused as a path
   segment, after a `.`, `_` or `-` in one, written `%73k-`, or as a host label (FAA-200 (32)). A path and a user information are read as written and with
   their ASCII escapes decoded, and a password as written and as the URL standard reads it (`<https>://h\u:pw@x/r` is

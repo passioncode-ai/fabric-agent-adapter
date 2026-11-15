@@ -22,7 +22,7 @@ COPIES = [SKILLS / skill / "scripts/fabric_secrets.py" for skill in ("building-f
 STRONG = "sk-" + "Ab1d" * 10  # made up at run time: an `sk-` shape with a digit and an upper-case letter, never a key
 
 NAMES = ["https://task-pipeline-dashboard.example.com/o/r", "https://github.com/example-org/task-pipeline-dashboard",
-         "https://github.com/Example-Org/Task-Pipeline-Dashboard", "https://github.com/example-org/sk-learn-tutorial-notebooks",
+         "https://github.com/Example-Org/Task-Pipeline-Dashboard", "https://github.com/example-org/sk-learn-example-notebooks",
          "https://github.com/example-org/SK-" + "AbCd" * 10]
 CREDENTIALS = ["https://github.com/example-org/" + STRONG, "https://github.com/example-org/x-" + STRONG,
                "https://github.com/example-org/%73k-" + STRONG[3:], "https://" + STRONG + ".example.com/o/r"]
@@ -43,7 +43,7 @@ class RepositoryProse(unittest.TestCase):
             self.assertIn("DEC-0151", flat)
             self.assertNotIn("task-pipeline-dashboard.example.com` is refused", flat)
             self.assertNotIn("16 more characters is not", flat)
-        self.assertIn("`sk-learn-tutorial-notebooks` (no digit)", " ".join(REMOTE.split()))
+        self.assertIn("`sk-learn-example-notebooks` (no digit)", " ".join(REMOTE.split()))
 
     def test_each_python_copy_reads_the_examples_as_the_pages_say(self):
         for path in COPIES:
