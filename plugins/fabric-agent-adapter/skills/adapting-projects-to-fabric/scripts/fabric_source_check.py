@@ -162,13 +162,13 @@ PROVIDER_KEY = re.compile("(" + "|".join(KEY_SHAPE_SOURCES) + ")", re.IGNORECASE
 URL_SECRET_VALUE = re.compile("(^bearer[" + _secrets.JS_SPACE + "]" + _secrets.NOT_LINE_END + "+|" + "|".join(KEY_SHAPE_SOURCES) + ")",
                               re.IGNORECASE | re.ASCII)
 #: Files that are credentials by their name: pack's own rule (fabric_package.SECRET_FILE and SECRET_FILE_OK, held
-#: equal by test_source_check), and the kit's token files (`service.token`, fabric_auth; `board.credential`, fabric_hub).
+#: equal by test_source_check), the kit's token files among them (`service.token`, fabric_auth; `board.credential`,
+#: fabric_hub): pack refuses them too since FAA-190 (15), so the check's own TOKEN_FILE is folded in.
 _JS_DOT = "[^\n\r\u2028\u2029]"
-SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)"
+SECRET_FILE = re.compile(r"\.env(\.%s+)?|%s*\.(pem|key|p12|pfx|jks|keystore|token|credential)|id_(rsa|dsa|ecdsa|ed25519)|\.(npmrc|netrc|pypirc)"
                          % (_JS_DOT, _JS_DOT))
 SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
 _PACK_JUNK_FILE = re.compile(r"\.DS_Store|%s*\.pyc" % _JS_DOT)  # held to fabric_package.JUNK by test_source_check
-TOKEN_FILE = re.compile(r".+\.(token|credential)")  # the kit's service.token and board.credential
 #: An absolute URL in a line, read whole by `_url_secret`: a password in it, a credential in its query.
 URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]{0,63}://[^\s\"'<>`]+")  # a bounded scheme: linear, and `${X:-pg://..}`
 #: `NAME = value`, `NAME: value` or `"name": "value"`: the long-run rule applies only where the name carries a credential.
@@ -767,7 +767,7 @@ def check(root: Path, entries: List[str], globs: List[str], every_file: bool = F
         for kind, rule in _text_findings(path, entries, seen):  # a name carries instance data as a line does
             add(path, 0, kind, rule + " in the file's path")
         name = path.rsplit("/", 1)[-1]
-        if (SECRET_FILE.fullmatch(name) and not SECRET_FILE_OK.fullmatch(name)) or TOKEN_FILE.fullmatch(name):
+        if SECRET_FILE.fullmatch(name) and not SECRET_FILE_OK.fullmatch(name):
             add(path, 0, "secret", "a file that is a credential by its name")
         full = root / path
         # os.path.islink, not Path.is_symlink: on Python 3.9 the latter raises on a folder it cannot search
