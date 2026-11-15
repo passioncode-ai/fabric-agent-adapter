@@ -117,7 +117,7 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L4 | `fabric_a2a_server` | A2A 1.0 serving and calling: the Agent Card from capabilities, the JSON-RPC binding over the interop job store, a bounded client with the operator's origin allowlist (FAA-10); its reference is [a2a.md](a2a.md) |
 
 Beside the kit, not in `kit.json`: the probe (`check_service.py`, `check_service_rules.py`,
-`check_service_channel_agent.py`, `check_service_channel_agent_schema.py` and the
+`check_service_lifecycle.py` (its lifecycle rules), `check_service_channel_agent.py`, `check_service_channel_agent_schema.py` and the
 `service-channel-agent-extension.schema.json` it reads at run time), the sample
 (`sample_service.py`, `sample-remote-service.mjs`), `fabric_kit.py` itself and the dashboard tools. Recipes built on
 the kit live in `../recipes/` ([the draft-and-check step of a support agent](../recipes/support-agent/README.md), [a service that is only a

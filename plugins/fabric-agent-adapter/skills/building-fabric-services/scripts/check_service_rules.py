@@ -37,6 +37,12 @@ class ForeignUser(ConnectionError):
     was sent on it. A ConnectionError, so every rule that reads the port reports it as no answer."""
 
 
+def _member(descriptor: Dict[str, Any], key: str) -> Dict[str, Any]:
+    """An object member of the descriptor, or {} when a hand-edited one holds another type: descriptor.valid names that,
+    and no later rule raises on it (FAA-200 (38))."""
+    value = descriptor.get(key)
+    return value if isinstance(value, dict) else {}
+
 def listener_owner_verdict(port: int) -> Tuple[str, str]:
     """`listener.owner` for a local service: (verdict, evidence). `down`, then `foreign-user`, then everything the
     listener answers: a local service is read only when this OS account's process holds its port. The owner is the
