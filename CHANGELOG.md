@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.95.0 (2026-11-16)
+
+### Fixed
+
+- The source check prints no part of what it found (FAA-190): a printed path is checked again after its marks are
+  filled in; a found home is masked in its ligature spelling, without a trailing `.` or `_`, and by its dotted parts;
+  a name of three characters or fewer is masked only as a word; any 8 characters of a found owner's string print as
+  its line mark; a key cut by `/` masks its rest in the next folder (items 19, 25, 28, 39, 53, 55, 59, 76, 88). A URL
+  finding masks other paths only by its credential, not its host (45, 54). Two new modules hold the list and the
+  printed path: `fabric_source_list.py` and `fabric_source_redact.py`.
+- The plain check reads more forms beside the contract's (whose shapes stay unchanged): a home path in JSON escaping,
+  after `file://host/`, in `vscode://file/`, after an encoded drive colon or a doubled `C:\Users\` prefix; credential
+  URLs without `//`, fully percent-encoded, nested in another URL's path or up to four levels deep; a JWK `d` or `k`
+  under an unquoted key with `kty` on the line; a value with `=` under a credential name; a folder holding `pyvenv.cfg`
+  is a dependency folder; a value only in a file's staged copy (read from Git's stored blob, no filter run) (items 8,
+  11, 16, 17, 18, 40, 48, 52, 68, 78, 85).
+- Cost: the masks find their folders by binary search, declared homes are tried only on lines holding their parts and
+  decided once, and a long non-ASCII line keeps its position map in arrays (119 MB to 4.5 MB for a million letters)
+  (items 58, 79, 84, 87).
+- An owner's string with an invisible character inside is refused and file text is compared without them (90, 93, 94);
+  a non-UTF-8 tracked name on Windows is listed as not read (71); `GIT_CEILING_DIRECTORIES` and
+  `GIT_DISCOVERY_ACROSS_FILESYSTEM` are not passed to Git (98); an owner's list inside ROOT spelled in another case is
+  refused (47); a variable-length key prefix is refused (33); a Latin-1 file name prints as its own byte (83); the
+  release smoke step runs the installed check (4); the adapter's own check runs on a copy of its tracked files and
+  every ignore line must match one (3, 41).
+- The Node mandate reader never throws on a JSON-shaped spend (an own `toString`, arrays nested past 100, cycles); it
+  refuses it as the Python twin does (FAA-196 item 22). working-with-fabric names the `-not-for-this-call` hand-on and
+  a client without `_meta` (item 6).
+- A rewrite of an installed descriptor that drops its `source.repository` says so in its warning (FAA-200 item 41);
+  `repository_from_origin` / `repositoryFromOrigin` spell a git origin, scp form included, as `https://host/owner/name`,
+  a port of the contract's `normalizeOrigin` held to its 28 vendored vectors (item 45); a dead branch is gone (57).
+- `test_the_branch_goes_with_a_turn_only_where_fabric_takes_it` holds under load (FAA-341).
+
+### Documentation
+
+- `source-and-instance.md` names the false findings the contract's own shapes give (items 7, 9, 11, 13, 37, 43, a
+  one-letter BEM block), the Unicode word start (32), and how org-index's `check_private.py` differs (63, 80); nested
+  repositories are checked with `check <clean>/<nested> --every-file` (70).
+
+### Upgrading
+
+- A package made before 0.58.0 may carry its instance data: check it again with this release's
+  `fabric_source_check.py check` before you ship it (FAA-190 item 29).
+
 ## 0.94.0 (2026-11-16)
 
 ### Fixed

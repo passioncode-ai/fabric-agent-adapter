@@ -165,7 +165,8 @@
         "enables only on a first install (no override recorded) or when the operator asks for it explicitly",
         "still rewrites the plist so the new release is what starts once the operator turns it back on",
         "proves it with a throwaway label or a fake launchctl: install, disable, upgrade, still disabled",
-        "does not run the test against the operator's real launchd jobs"
+        "does not run the test against the operator's real launchd jobs",
+        "the rewritten descriptor keeps naming its source.repository; a rewrite without one warns (NoSourceRepositoryWarning) and says when it drops the one the installed descriptor names (FAA-200 (41))"
       ]
     },
     {
@@ -313,7 +314,7 @@
         "never puts a secret in a unit or a task: the writers refuse a credential-shaped argument, environment name or value; the token stays in the protected token file (0600, or on Windows an ACL of the user, SYSTEM and Administrators only)",
         "stops the operator's way: systemd_uninstall / systemdUninstall (disable --now, then remove) and task_uninstall / taskUninstall (/End, then /Delete), plus remove_descriptor",
         "checks one copy with check_service.py: the instance lock is held (a Node service holds an abstract socket on Linux or a named pipe on Windows, and the probe sees it)",
-        "the descriptor it writes names source.repository, the repository its code is built from (FAA-198)"
+        "the descriptor it writes names source.repository, the repository its code is built from (FAA-198); from the checkout's git origin, scp form included, it spells it with repository_from_origin / repositoryFromOrigin (https://host/owner/name, no credential of the origin; none when the origin names no repository the kit takes)"
       ]
     },
     {

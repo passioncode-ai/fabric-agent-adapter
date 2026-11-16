@@ -114,6 +114,12 @@ class WorkingWithFabricCarriesTheMandate(unittest.TestCase):
                            (board, "with four agents in the chain already, restate")):
             self.assertNotIn(gone, text, gone)
 
+    def test_the_wrong_id_and_a_client_without_meta(self):  # FAA-196 (6): outside-mandate-asks-once-for-that-part,
+        # lead-hands-on-a-narrowed-mandate: the two hints project-board.md gives, in the skill itself
+        (row,) = [line for line in text("working-with-fabric/SKILL.md").splitlines() if line.startswith("| `decision-invalid` |")]
+        self.assertIn("`-not-for-this-call`: hand it on again to the service's id (`hand_on`)", row)
+        self.assertIn("in your message to an agent and by Step 5's routes toward a service (CT-125)", " ".join(self.rule.split()))
+
     def test_only_the_lead_asks(self):  # outside-mandate-asks-once-for-that-part (MD-4)
         self.assertIn("pass the refusal to the agent that called you", self.rule)
 

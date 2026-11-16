@@ -65,6 +65,60 @@ export function readDescriptors(dir = servicesDir()) {
   });
 }
 
+/** Why a value is no `source.repository` the kit takes, or null: validateDescriptor's reading (FAA-198). */
+export function sourceRepositoryProblem(repository) {
+  if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) return 'source.repository is a URI (RFC 3986), such as https://github.com/owner/name';
+  if (URI_PASSWORD.test(repository)) return 'source.repository carries no password: it names the repository, never a credential'; // before the host
+  if (repository.includes('@') && !HIERARCHICAL.test(repository)) return 'source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'; // readings 7, before the authority (0.86.0)
+  if (!authorityOk(repository)) return 'source.repository names a host, and a port of digits up to 65535 when it has one';
+  if (repositoryCredential(repository)) return "FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one"; // its name is no key (seam 6)
+  return null;
+}
+
+const ORIGIN_SCHEMES = ['http', 'https', 'ssh', 'git', 'git+ssh', 'git+https']; // normalizeOrigin's (DEC-0089 item 2)
+const asciiLower = (value) => value.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+
+/** A remote's repository identity `host/path`, or null: the contract's normalizeOrigin (DEC-0089 item 2), held to its
+ * origin vectors (test/fixtures/contract/origin-vectors.json). Never throws. */
+export function originIdentity(raw) {
+  if (typeof raw !== 'string' || [...raw.slice(0, 8193)].length > 4096) return null;
+  const value = raw.trim();
+  let host;
+  let path;
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(value);
+  if (scheme) {
+    if (!ORIGIN_SCHEMES.includes(scheme[1].toLowerCase())) return null;
+    const rest = value.slice(scheme[0].length).split(/[?#]/)[0];
+    const slash = rest.indexOf('/');
+    if (slash < 0) return null;
+    host = rest.slice(0, slash);
+    path = rest.slice(slash + 1);
+  } else {
+    if (value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith('.')) return null;
+    const scp = /^(?:[^@/\s]+@)?([^:/\s]+):([^\s]+)$/.exec(value);
+    if (!scp) return null;
+    host = scp[1];
+    path = scp[2].split(/[?#]/)[0];
+  }
+  host = asciiLower(host.slice(host.lastIndexOf('@') + 1).replace(/:[0-9]*$/, ''));
+  let [start, end] = [0, path.length]; // the outer `/` trimmed in linear time, as the contract's trimSlashes
+  while (start < end && path[start] === '/') start += 1;
+  while (end > start && path[end - 1] === '/') end -= 1;
+  path = asciiLower(path.slice(start, end));
+  if (path.endsWith('.git')) path = path.slice(0, -4);
+  const segments = path.split('/');
+  if (!/^[a-z0-9.-]+$/.test(host) || !host.includes('.') || segments.length < 2 || segments.some((segment) => segment === '' || /\s/.test(segment))) return null;
+  return `${host}/${segments.join('/')}`;
+}
+
+/** An installer's git origin (scp form included) as the `https://host/owner/name` source.repository takes, or null
+ * (no identity, or one the kit's rules refuse: no URI, a key's shape); no credential of it travels (FAA-200 (45)). */
+export function repositoryFromOrigin(origin) {
+  const identity = originIdentity(origin);
+  const repository = identity === null ? null : `https://${identity}`;
+  return repository === null || sourceRepositoryProblem(repository) ? null : repository;
+}
+
 export function validateDescriptor(d) {
   const problems = [];
   const remote = placementOf(d) === 'remote';
@@ -248,14 +302,8 @@ export function descriptorMemberProblems(d) {
     const source = isObj(d.source) ? d.source : {};
     if (!isObj(d.source)) problems.push('source is {repository?}');
     for (const k of Object.keys(source)) if (k !== 'repository') problems.push(`source has no member ${shownMember(k)}`);
-    if ('repository' in source) {
-      const repository = source.repository;
-      if (!(typeof repository === 'string' && SOURCE_URI.test(repository.replace(IP_LITERAL, '$1h')))) problems.push('source.repository is a URI (RFC 3986), such as https://github.com/owner/name');
-      else if (URI_PASSWORD.test(repository)) problems.push('source.repository carries no password: it names the repository, never a credential'); // before the host
-      else if (repository.includes('@') && !HIERARCHICAL.test(repository)) problems.push('source.repository with a user is a URL with an authority (https://user@host/path), never an scp form'); // readings 7, before the authority (0.86.0)
-      else if (!authorityOk(repository)) problems.push('source.repository names a host, and a port of digits up to 65535 when it has one');
-      else if (repositoryCredential(repository)) problems.push("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one"); // its name is no key (seam 6)
-    }
+    const problem = 'repository' in source ? sourceRepositoryProblem(source.repository) : null;
+    if (problem) problems.push(problem);
   }
   if ('peer' in d) {
     let peer = d.peer;
@@ -274,7 +322,8 @@ export function descriptorMemberProblems(d) {
     else if (isObj(runner) && runner.credentialKind === 'subscription') problems.push('a service offered to others never runs on a subscription (DEC-0061)');
   }
   for (const [place, value] of places) {
-    if (typeof value === 'string' && secretArgument(value)) problems.push(`FAC-SEM-086: ${place} holds a value shaped like a credential; it names ${place.startsWith('/source/') ? 'a repository' : 'a kind, a role or an installer'}`);
+    // places are /installedBy and /runner alone: /source/repository has its own check above (FAA-200 (57))
+    if (typeof value === 'string' && secretArgument(value)) problems.push(`FAC-SEM-086: ${place} holds a value shaped like a credential; it names a kind, a role or an installer`);
   }
   return problems;
 }
@@ -480,22 +529,38 @@ export function portListenerRefusal(port, reader = portOwner) {
   return `Port ${port} is listened on by another OS account${uid}: choose a port no other account holds (DEC-0154, FAA-225).`;
 }
 
+/** FAA-200 (41): the clause the rewrite warning adds when the installed descriptor names a source.repository it drops. */
+export const DROPS_INSTALLED_SOURCE = 'the installed descriptor names one, which this rewrite drops';
+
+/** Whether the installed descriptor of id.instance names a source.repository: an unreadable, absent, non-UTF-8 or
+ * non-JSON file names none (FAA-200 (41)). Never throws. */
+export function installedNamesRepository(id, instance, dir = servicesDir()) {
+  try {
+    return namesRepository(readDescriptorJson(descriptorPath(id, instance, dir)));
+  } catch {
+    return false;
+  }
+}
+
+/** The rewrite warning of a descriptor that names no source.repository (FAA-198); with `dropped`, it names the
+ * installed source.repository the rewrite drops (FAA-200 (41)). The repository itself is never in it. */
+export function warnNoSource(d, dropped = false) {
+  const drop = dropped ? `; ${DROPS_INSTALLED_SOURCE}` : '';
+  process.emitWarning(`Descriptor ${d.id}.${d.instance} ${NO_SOURCE_REPOSITORY}${drop}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
+}
+
 /** Installer-only. Refuses a port or id.instance another descriptor claims (a port is a claim), and a port another OS
  * account listens on (FAA-225; `portOwner(port) -> [kind, uid] | null` reads it, the kit's own by default).
  * FAA-198: a new descriptor names its source.repository; rewriting one already installed without it only warns
- * (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY), so an installed agent's update keeps working. */
-/** The rewrite warning of a descriptor that names no source.repository (FAA-198). */
-export function warnNoSource(d) {
-  process.emitWarning(`Descriptor ${d.id}.${d.instance} ${NO_SOURCE_REPOSITORY}; a new install is refused without it.`, { code: 'FABRIC_NO_SOURCE_REPOSITORY' });
-}
-
+ * (process.emitWarning, code FABRIC_NO_SOURCE_REPOSITORY, naming an installed source.repository it drops: FAA-200
+ * (41)), so an installed agent's update keeps working. */
 export function writeDescriptor(d, dir = servicesDir(), { portOwner: reader = portOwner, warned = false } = {}) {
   const problems = validateDescriptor(d);
   if (problems.length) throw new ServiceError(`Descriptor is invalid: ${problems.join('; ')}.`);
   const me = `${d.id}.${d.instance}`;
   const refusal = sourceRefusal(d, dir);
   if (refusal) throw new ServiceError(refusal);
-  if (!namesRepository(d) && !warned) warnNoSource(d); // registerRemote warns itself, before its token (FAA-200 (1))
+  if (!namesRepository(d) && !warned) warnNoSource(d, installedNamesRepository(d.id, d.instance, dir)); // registerRemote warns itself, before its token (FAA-200 (1))
   // DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
   const port = placementOf(d) === 'remote' || d.origin === undefined ? null : portOf(d.origin);
   for (const [file, other] of readDescriptors(dir)) {

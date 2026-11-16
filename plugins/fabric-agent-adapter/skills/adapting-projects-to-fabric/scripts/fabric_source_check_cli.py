@@ -60,15 +60,47 @@ def _list_path(given: Optional[str]) -> Tuple[Optional[Path], bool]:
     return default, True
 
 
+def _same_folder_above(path: Path, root: Path) -> bool:
+    """Whether a folder above the path is ROOT by its device and inode: on a case-insensitive file system a list inside
+    ROOT may be named in another case, which a comparison of the names misses (FAA-190 (47))."""
+    try:
+        here = os.stat(str(root))
+    except OSError:
+        return False
+    for parent in path.parents:
+        try:
+            st = os.stat(str(parent))
+        except OSError:
+            continue
+        if (st.st_dev, st.st_ino) == (here.st_dev, here.st_ino) and st.st_ino:
+            return True
+    return False
+
+
 class _Parser(argparse.ArgumentParser):
     def error(self, message: str) -> NoReturn:  # argparse would repeat the arguments it could not read
         self.print_usage(sys.stderr)
         self.exit(2, "fabric_source_check.py: the arguments cannot be read; see the usage above\n")
 
 
+_ESCAPED_BYTE = re.compile("([\udc80-\udcff]+)")
+
+
 def _print(text: str) -> None:
-    """Print a line the console may not encode (a name in another script, a byte Git kept as a surrogate)."""
+    """Print a line the console may not encode (a name in another script, a byte Git kept as a surrogate). A byte of a
+    name that is not UTF-8 (kept as a surrogate since the UTF-8 restart) is written back as that byte, so a Latin-1
+    name prints as the console's own locale shows it, never spelled out (`caf\\udce9`, FAA-190 (83)); Windows names
+    are UTF-16 and keep the text route."""
     encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    buffer = getattr(sys.stdout, "buffer", None)
+    if buffer is not None and os.name != "nt" and _ESCAPED_BYTE.search(text):
+        data = b"".join(part.encode("utf-8", "surrogateescape") if i % 2 else
+                        part.encode(encoding, "backslashreplace")
+                        for i, part in enumerate(_ESCAPED_BYTE.split(text)))
+        sys.stdout.flush()
+        buffer.write(data + b"\n")
+        buffer.flush()
+        return
     print(text.encode(encoding, "backslashreplace").decode(encoding, "replace"))
 
 
@@ -106,7 +138,7 @@ def run_check(argv: Optional[List[str]], check: Callable[..., Dict[str, object]]
                 resolved = list_path.resolve()
             except (OSError, RuntimeError):  # RuntimeError: Python 3.9's symlink loop
                 raise CheckError("the owner's list cannot be read")
-            if resolved == root or root in resolved.parents:
+            if resolved == root or root in resolved.parents or _same_folder_above(resolved, root):
                 raise CheckError("the owner's list is inside the tree it checks, where it would travel with the source; "
                                  "keep it in your configuration folder (passioncode-fabric/%s)" % LIST_NAME)
             try:

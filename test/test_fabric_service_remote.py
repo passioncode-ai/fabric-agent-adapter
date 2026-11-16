@@ -134,6 +134,8 @@ class RemotePlacement(unittest.TestCase):
                                token="n" * 40, directory=root)
         self.assertEqual([w.category for w in seen], [fs.NoSourceRepositoryWarning], "warned once, not twice")
         self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the installer's call")
+        self.assertIn(fs.DROPS_INSTALLED_SOURCE, str(seen[0].message), "it names the drop (FAA-200 (41))")
+        self.assertNotIn("git@github.com", str(seen[0].message), "never the repository itself")
         self.assertEqual(token_file.read_text(), "n" * 40)
 
     def test_a_rotation_reads_an_installed_descriptor_that_is_no_utf8_as_none(self):

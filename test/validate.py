@@ -21,7 +21,7 @@ SKILL_NAMES = ("adapting-projects-to-fabric", "building-fabric-services", "creat
 # nothing, it teaches a coding agent to work through Fabric; observing-products builds nothing, it watches a product.
 BUILDER_SKILLS = ("adapting-projects-to-fabric", "building-fabric-services", "creating-fabric-agents")
 SKILLS = {name: PLUGIN / "skills" / name for name in SKILL_NAMES}
-VERSION = "0.94.0"
+VERSION = "0.95.0"
 # Fabric ADR-0092. The three files are byte for byte the templates in fabric-workspace
 # knowledge/templates/ (LICENSE-AGPL-3.0.txt, COMMERCIAL-LICENSE.md, CLA.md); the hashes pin them
 # here because that repository is not readable from this one's CI.
@@ -72,6 +72,8 @@ STDLIB_IMPORTS = {
     "inspect", "functools",  # the board responder reads whether a service's emit takes a subject (0.56.0 seam r31)
     "unicodedata",  # the page-link port maps a host that is not ASCII as UTS 46 does (DEC-0123, FAA-132)
     "pwd",  # a LaunchDaemon's UserName to its uid, the job's proof (DEC-0161, FAA-278); POSIX only, guarded
+    "array",  # the source check's folded text keeps its map in arrays, not a list a character (FAA-190 (79))
+    "tracemalloc",  # the test that holds that map's memory to a few times the line's size (FAA-190 (79))
 }
 RECIPES = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes"
 KIT_MODULES = {e["module"] for e in json.loads(

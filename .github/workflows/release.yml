@@ -123,6 +123,13 @@ jobs:
           test -f "$HOME/.agents/skills/building-fabric-services/scripts/fabric_interop.py"
           test -f "$HOME/.agents/skills/adapting-projects-to-fabric/scripts/fabric_provider.py"
           test -f "$HOME/.agents/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py"
+          # It must run from the install, its siblings beside it (FAA-190 (4)): a folder outside Git with one plain
+          # file and an empty owner's list exits 0 (every file read, nothing found); a missing sibling exits 2.
+          SMOKE="$(mktemp -d)"
+          printf 'plain\n' > "$SMOKE/readme.txt"
+          : > "$SMOKE.list"
+          python3 -B "$HOME/.agents/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py" check "$SMOKE" \
+            --instance-strings "$SMOKE.list"
           test ! -e "$HOME/.claude/skills"
           # The installed copies must survive a strict YAML reader, not only Claude Code.
           python3 "$REPO/test/validate.py" --frontmatter "$HOME"/.agents/skills/*/SKILL.md
