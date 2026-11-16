@@ -18,7 +18,7 @@ the source would carry and reports, by path, line and kind, each place where the
   assigned to a name that can only carry a credential (a bare long run, such as an integrity hash, is not; a whole
   Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, is public); or a private key: a PEM, OpenSSH or PGP
   block, or a JWK's `d`; a URL that carries a password or a credential in its query; a file that is a credential by
-  its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit credential file (`*.token`, `board.credential`),
+  its name (pack's rule: `.env`, `*.pem`, `*.key`, `.npmrc` ...) or a kit credential file (`*.token`, `*.credential`, such as `service.token` and `board.credential`),
   or a folder so named anywhere in its path (FAA-190 (74)). A value that says it is synthetic (`EXAMPLE`, `not-a-key`, `fake`, `dummy`) is
   not a finding;
 - `instance-string`: a string from the owner's list of instance strings (names, accounts, hosts), kept outside the tree.

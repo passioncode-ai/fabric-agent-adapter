@@ -27,8 +27,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   them: a launchd plist in `~/Library/LaunchAgents` (macOS), a systemd user unit (Linux) or
   a per-user Scheduled Task (Windows), plus one descriptor in the services directory. A LaunchDaemon in
   `/Library/LaunchDaemons` (FAA-278) is written only by an installer running as root, which the kits never become:
-  without root they refuse before writing and name the command, and refuse a plist without `UserName` (except one written
-  there with an explicit `domain="gui"`, not refused yet, FAA-286 item 21); the job runs as the account its `UserName`
+  without root they refuse before writing and name the command, and refuse a plist without `UserName`, and a gui-domain plist placed
+  in `/Library/LaunchDaemons` (FAA-286 item 21); the job runs as the account its `UserName`
   names. The installer accepts the job's answer only on a connection launchd's own job accepted
   (its pid from `launchctl print system/<label>`) or, where the socket table is restricted, on a port that pid listens
   on (`lsof -p`, the weaker vouch below, DEC-0155 RT-3). The
@@ -53,7 +53,8 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   -anv -p tcp` and `/bin/ps -o uid= -p <pid>` (the Node twin always); Linux
   `/proc/net/tcp` and `/proc/net/tcp6`; Windows `GetExtendedTcpTable` and the process
   token (Python), or `netstat -ano` and one PowerShell `GetOwnerSid` query per new connection,
-  with `whoami /user` once a process (Node). On macOS the Python reader calibrates once per process with a
+  with `whoami /user` once a process (Node). On macOS the Python reader calibrates once per process (asked again
+  after a minute when the child proved nothing; a read that finds a calibration in progress uses netstat) with a
   short-lived child of its own interpreter listening on a random `127.0.0.1` port; when the
   table is restricted (macOS 27.2, FAA-267) the launchd installers also run `/usr/sbin/lsof
   -nP -a -p <pid> -i4TCP -sTCP:LISTEN -Fn` on their own job's pid. That vouch shows the job listens on the port, not that it accepted
@@ -125,8 +126,9 @@ bounded and non-publishing until explicit scoped grants exist in a project bindi
   `node_modules/.bin/tsx` and installs nothing. `fabric_provider.py write` writes one
   entry (0600) in the providers directory. `fabric_source_check.py check` reads the files of a
   tree (credential values included, in memory only), the owner's list (the file `--instance-strings` or
-  `FABRIC_INSTANCE_STRINGS` names, else the one in the user's configuration folder), and runs `git ls-files` (and
-  `git ls-files -s` once when Git lists a path the work tree lacks) and nothing else, except that under a locale whose
+  `FABRIC_INSTANCE_STRINGS` names, else the one in the user's configuration folder), and runs `git ls-files`, `git ls-files -s`
+  (for submodules, and to name staged blobs), and, when the index differs from the last commit, `git diff --cached
+  --name-only` and `git cat-file --batch` to read the staged copies as stored (no filter runs), and nothing else, except that under a locale whose
   file-system encoding is not UTF-8 it restarts itself once with the same interpreter in Python's
   UTF-8 mode; it writes nothing and prints no value it finds.
 - Every script of the skills runs `git` through `fabric_git.py` (FAA-190; `test/test_fabric_git.py`,

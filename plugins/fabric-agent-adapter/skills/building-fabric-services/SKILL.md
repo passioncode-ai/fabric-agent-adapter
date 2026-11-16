@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
-  version: "0.96.0"
+  version: "0.96.1"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "560d60369b553fc123ba29c3e1e637de68901678"
@@ -342,8 +342,8 @@ python3 <skill-dir>/scripts/fabric_package.py verify <folder> --trust <trust.jso
 ```
 
 `pack` derives `agentRef`, lists every file with its SHA-256, computes the digest and checks the schema, the rules and
-the folder; it refuses `.env`, keys, `.git`, caches and symlinks. `sign` uses a key file the person names (Ed25519,
-`EdDSA`); it never makes, keeps or prints a key. Read [the package reference](references/package.md) before packing.
+the folder; it refuses `.env`, keys, `*.token`/`*.credential`, private JWKs, `.git`, caches and symlinks. `sign` takes a key
+file outside the folder (Ed25519, `EdDSA`), never making, keeping or printing one. Read [the package reference](references/package.md) before packing.
 
 ## The repository around the service
 
