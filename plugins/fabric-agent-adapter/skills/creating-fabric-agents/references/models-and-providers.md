@@ -29,6 +29,9 @@ model, FAC-SEM-112) and `openrouter-attribution.md` (FAC-SEM-098). The kit that 
 - **A lane that reads what users send runs on an open-vendor model** as its primary, or as its fallback when the
   primary is closed (DEC-0083: declare `reads: ["user-content"]` on the profile; FAC-SEM-112 refuses a route without
   one). Closed vendors refuse or hedge on whole topics; the lane must still handle the worst message it receives.
+  A lane on the kit's OpenRouter Client declares `fallback: none` in its profile: the contract's `between-turns` is
+  the next model after a failed turn, never within one, and the profile has no value for the kit's fallback inside
+  one call, so the open-vendor route of that fallback is the agent's own loader's test.
 - **A judge is another vendor than the writer.** A model grading its own family rates its own habits.
 - **Name catalogue models in the profile, and classes where the contract keeps them**: at the pin a model profile names
   catalogue model ids per lane, and `modelClasses` lives on the project's spend policy or a grant, which narrow the

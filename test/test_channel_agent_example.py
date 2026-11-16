@@ -71,9 +71,19 @@ def problems(declaration) -> list:
             if channel.get("replies_enabled") and channel.get("holding_reply") and texts.get("final") == {
                     "none": "not_used"}:
                 found.append("%s: a holding reply owes a final text" % channel.get("id"))
+            # FAC-SEM-164's conditions (FAA-264 item 39): the holding text is owed only by a channel with a holding
+            # reply and its replies on, the final text only by one with its replies on; a store review asks no
+            # clarifying question. FAC-SEM-163: a channel with replies off names its decision.
+            owed = {"holding": bool(channel.get("replies_enabled") and channel.get("holding_reply")),
+                    "final": bool(channel.get("replies_enabled"))}
+            if channel.get("kind") == "store_review" and channel.get("clarifying_question"):
+                found.append("%s: a store review asks no clarifying question" % channel.get("id"))
+            if channel.get("replies_enabled") is False and channel.get("decision") is None:
+                found.append("%s: replies off without a recorded decision" % channel.get("id"))
             for name in ("holding", "final"):
                 text = texts.get(name)
-                if text is None or (isinstance(text, dict) and "none" in text and not none_form(text)) or (
+                if (name in texts and text is None) or (name not in texts and owed[name]) or (
+                        isinstance(text, dict) and "none" in text and not none_form(text)) or (
                         isinstance(text, dict) and "none" not in text
                         and (not text or any(not isinstance(v, str) or not v.strip() for v in text.values()))):
                     found.append("%s.texts.%s is null or empty" % (channel.get("id"), name))
@@ -112,6 +122,16 @@ class Example(unittest.TestCase):
         self.assertNotIn("—", text)
         self.assertNotRegex(text, r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}", "no address")
 
+    def test_a_final_text_names_a_route_other_than_its_own_channel(self):
+        """FAA-264 item 48: the final text is sent on the channel when the agent could not answer, so it points to
+        another route (a help page, a form), never back to the same mailbox or chat."""
+        own = {"mail": ("write to", "mail", "support address"), "telegram_dm": ("write here", "this chat")}
+        for channel in self.declaration[KEY]["projects"][0]["channels"]:
+            for text in (channel["texts"].get("final") or {}).values():
+                for words in own.get(channel["kind"], ()):
+                    with self.subTest(channel=channel["id"], words=words):
+                        self.assertNotIn(words, text.lower())
+
     def test_the_example_config_measures_the_age_the_declaration_names(self):
         config = json.loads((EXAMPLE.parent / "config.example.json").read_text(encoding="utf-8"))
         source = next(s for s in self.declaration[KEY]["projects"][0]["sources"] if s["id"] == "knowledge")
@@ -140,6 +160,12 @@ class Example(unittest.TestCase):
                 holding={"none": "not_used"})),
             ("a recommendation that is prose", lambda d: project(d)["handoff_queues"][0].update(
                 recommendation="board thread of the request to the queue's owner")),
+            ("a holding text missing where a holding reply owes it",
+             lambda d: project(d)["channels"][0]["texts"].pop("holding")),
+            ("a final text missing with replies on", lambda d: project(d)["channels"][0]["texts"].pop("final")),
+            ("a clarifying question on a store review", lambda d: project(d)["channels"][0].update(
+                kind="store_review", items_seen_unit="reviews")),
+            ("replies off with no decision", lambda d: project(d)["channels"][0].update(replies_enabled=False)),
         ]
         for name, change in cases:
             with self.subTest(name):
@@ -154,10 +180,16 @@ class Example(unittest.TestCase):
         cases = [
             ("no holding reply", lambda d: (project(d)["channels"][0].update(holding_reply=False),
                                             project(d)["channels"][0]["texts"].update(final={"none": "not_used"}))),
-            ("replies off", lambda d: (project(d)["channels"][0].update(replies_enabled=False),
+            ("replies off", lambda d: (project(d)["channels"][0].update(replies_enabled=False, decision="replies-off"),
                                        project(d)["channels"][0]["texts"].update(final={"none": "not_used"}))),
             ("a final not yet there", lambda d: project(d)["channels"][0]["texts"].update(
                 final={"none": "not_yet", "until": "2026-12-01"})),
+            ("no holding text and no holding reply", lambda d: (project(d)["channels"][0].update(holding_reply=False),
+                                                                 project(d)["channels"][0]["texts"].pop("holding"))),
+            ("no texts with replies off by a recorded decision", lambda d: (
+                project(d)["channels"][0].update(replies_enabled=False, decision="replies-off"),
+                project(d)["recorded_decisions"].append({"id": "replies-off"}),
+                project(d)["channels"][0]["texts"].pop("holding"), project(d)["channels"][0]["texts"].pop("final"))),
         ]
         for name, change in cases:
             with self.subTest(name):

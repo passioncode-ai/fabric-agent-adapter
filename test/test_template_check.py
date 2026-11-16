@@ -91,6 +91,18 @@ class TemplateFolder(unittest.TestCase):
         self.folder = renamed
         self.assertTrue(any('is "example-agent", the folder is "another-name"' in m for m in self.messages()))
 
+    def test_the_changelogs_newest_entry_is_the_headers_version(self):
+        """FAA-264: a template is a versioned workflow; a version bumped in the header is recorded as the changelog's
+        newest entry, not anywhere below it."""
+        for name in ("TEMPLATE.md", "manifest.json"):
+            path = self.folder / name
+            path.write_text(path.read_text().replace("1.0.0", "1.1.0"))
+        changelog = self.folder / "CHANGELOG.md"
+        changelog.write_text(changelog.read_text() + "\n## 1.1.0\n\nWritten below the older entry.\n")
+        self.assertIn("CHANGELOG.md $: its newest entry is 1.0.0, TEMPLATE.md names 1.1.0", self.messages())
+        changelog.write_text("# Changelog\n\n## 1.1.0 (2026-11-16)\n\nThe newer entry.\n\n## 1.0.0\n\nThe first version.\n")
+        self.assertEqual(self.messages(), [])
+
     def test_the_header_is_checked_against_its_schema(self):
         text = (self.folder / "TEMPLATE.md").read_text()
         for old, new, says in (("readiness: draft", "readiness: ready", "must be one of"),
