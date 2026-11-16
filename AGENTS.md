@@ -89,8 +89,10 @@ with `--strict-mcp-config` and a temporary config.
   `check_service_lifecycle.py`, `check_service_a2a.py` and `check_service_channel_agent*.py`, none over 1000 lines.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
   `test/evals/<skill>/`. `test/evals/run_evals.py` runs the trigger evals against a real client, only when asked
-  (`FABRIC_REAL_CLIENT=1` and `claude` on PATH); hosted CI holds no model credential and does not run it. Measured
-  runs are recorded under `docs/evidence/evals/`.
+  (`FABRIC_REAL_CLIENT=1` and `claude` on PATH); `test/evals/run_scenarios.py` runs the scenario evals the same way,
+  the agent `claude -p` with the skill loaded and read-only tools, judged by an OpenRouter model of another family
+  (its key `fabric-agent-adapter/local/OPENROUTER_API_KEY`, given by `use_secret.py run`, FAA-339); hosted CI holds no
+  model credential and runs neither. Measured runs are recorded under `docs/evidence/evals/`.
 - `docs/evidence/`: specs, plans, evals, reports and retrospectives. The scaffold's write set is
   declared in the [delivery brief](docs/evidence/specs/2026-08-27-brief.md).
 - `CHANGELOG.md`, `SECURITY.md` and `SKILL-CARD.md` sit at the root. This repository has no ADR
