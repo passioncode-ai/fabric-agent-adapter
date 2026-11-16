@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.96.0 (2026-11-16)
+
+The repin to Fabric Agent Contract `v0.1.0+2026-11-16` (`560d6036`, FAA-342); `2462c90b` (`v0.1.0+2026-11-15`) stays
+supported for bundles issued under it. Impact map: `docs/evidence/specs/2026-11-16-faa-342-repin-560d6036-impact-map.md`.
+
+### Added
+
+- Instance facts (DEC-0173): a new kit module `fabric_instance_facts` (Node `fabric-instance-facts.mjs`, layer L3) reads
+  the `instance-facts/0.1` extension as the contract does and reports its FAC-SEM-180 findings; the probe's new rule
+  `instance-facts.declared` reads them. The descriptor writer and the well-known builder keep the extension's key and
+  value unchanged (tested); `build_well_known` does not refuse a pair problem, the probe reports it, as for FAC-SEM-176.
+- `PROTOCOL_REVISIONS` names `fabric-instance-facts/0.1`, `activity-summary` 1 and 2, `activity-turn/1`,
+  `activity-inventory/1` and `decision-verdict/1` (DEC-0171 to DEC-0173), in both twins.
+- Usage data (DEC-0157, FAA-338): `references/usage-data.md`, byte-identical in creating-fabric-agents and
+  building-fabric-services, tells a builder whose agent sends anonymous usage or error data UD-1 to UD-6 (no send before
+  the first-run notice, its own switch read before the first send, anonymous ids, the agent's door to the switch); a
+  grill row and a short paragraph in the skills, two scenarios and trigger queries per skill.
+
+### Changed
+
+- Vendored vectors regenerated at the pin: feed protocols, share (two device-attribution inventory cases), a new
+  `instance-facts-vectors.json` (35 contract cases and 34 hostile ones); the recorded commit in five more files.
+
 ## 0.95.1 (2026-11-16)
 
 0.95.0 was tagged and never published: its release run (43790823476) failed on four validate jobs, so npm stayed at
