@@ -3,7 +3,7 @@
 1. Start from the pinned Fabric contract and write the intended behaviour/evidence first.
 2. Add or update trigger and scenario evals before changing instructional prose.
 3. Keep scripts Python standard-library only and non-destructive by default.
-4. Run every command in the README validation section.
+4. Run every command in the README's Develop section (Quick start for a new teammate).
 5. Keep marketplace, plugin, skill metadata, and changelog versions synchronized.
 6. Before every push and every release, run `python3 test/validate.py --private-terms`: it reads the
    operator's private-terms list (org-index `check_private.py` rule P1; `$PASSIONCODE_PRIVATE_TERMS`, else

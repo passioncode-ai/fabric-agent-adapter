@@ -342,8 +342,8 @@ python3 <skill-dir>/scripts/fabric_package.py verify <folder> --trust <trust.jso
 ```
 
 `pack` derives `agentRef`, lists every file with its SHA-256, computes the digest and checks the schema, the rules and
-the folder; it refuses `.env`, keys, `.git`, caches and symlinks. `sign` uses a key file the person names (Ed25519,
-`EdDSA`); it never makes, keeps or prints a key. Read [the package reference](references/package.md) before packing.
+the folder; it refuses `.env`, keys, `*.token`/`*.credential`, private JWKs, `.git`, caches and symlinks. `sign` takes a key
+file outside the folder (Ed25519, `EdDSA`), never making, keeping or printing one. Read [the package reference](references/package.md) before packing.
 
 ## The repository around the service
 

@@ -41,7 +41,9 @@ and `building-fabric-services`, which runs an agent as a `fabric-service/0.1` lo
 that is called the `fabric-interop/0.1` way (`scripts/fabric_interop.py`, `fabric-interop.mjs`; job limits per DEC-0087), and checks the estate record, share grants and the estate ceremonies (`fabric_estate.py`, `fabric_share.py`, `fabric_ceremonies.py` and their Node twins).
 Agents that are not services get a `fabric-provider/0.1` entry from
 `adapting-projects-to-fabric/scripts/fabric_provider.py`; `fabric_source_check.py` beside it finds an agent's instance
-data in its source tree without repeating it (FAA-188), under the source manifest `fabric.source.json` with the
+data in its source tree without repeating it (FAA-188; it runs with its siblings
+`fabric_source_{ignore,homes,restart,list,redact,check_cli}.py`, `fabric_secrets.py` and `fabric_git.py`, and refuses with
+exit 2 when one is missing or from another version), under the source manifest `fabric.source.json` with the
 contract's tree check (`fabric_source_tree.py`, held to `test/fixtures/contract/source-vectors.json`, FAA-261). The fourth, `working-with-fabric`, is the
 other side: a coding agent opened outside Fabric working in a project through it (Fabric 0.4.0 REQ-07),
 with the plugin's Claude Code session hooks (`scripts/fabric_session.py`, COM-04). The fifth, `observing-products`,
@@ -82,6 +84,9 @@ with `--strict-mcp-config` and a temporary config.
   fails a stale `kit.json` (`test_kit_json_is_what_the_sources_say`). At a release move `kit.json`'s own `"version"` first: `build` refuses to rewrite the digests of a version that has a release tag. The map, the layers and the rule for a new module: `references/kit-modules.md`. Recipes on the
   kit: `building-fabric-services/recipes/`. `fabric_session.py` in working-with-fabric is a facade over
   `fabric_session_{env,mcp,paths,mail,hosts,cli}.py`; hooks and workers always run the facade.
+- `fabric_git.py` (kit L0) is copied byte for byte into the adapting, creating and working-with-fabric scripts; every
+  script runs Git through it (`test/test_fabric_git.py`). The probe is `check_service.py` with `check_service_rules.py`,
+  `check_service_lifecycle.py`, `check_service_a2a.py` and `check_service_channel_agent*.py`, none over 1000 lines.
 - `test/`: the unit tests, `validate.py`, and each skill's trigger and scenario evals under
   `test/evals/<skill>/`. `test/evals/run_evals.py` runs the trigger evals against a real client, only when asked
   (`FABRIC_REAL_CLIENT=1` and `claude` on PATH); hosted CI holds no model credential and does not run it. Measured
@@ -209,6 +214,9 @@ long-lived process, `watch-mail`, runs only while an agent waits on the board, u
 | `fabric_session.py watch-mail` | a Claude Code agent, under its own background watcher, while it waits on the board | one look per interval (default 60 s ± 20 %, kept between 10 s and 15 min after the jitter; backoff to 15 min while Fabric is down; a look within a minute of the session's last rejoin waits; a look that finds turns the hooks spooled delivers them through its own rejoin, FAA-89) | nothing | its stdin's end, SIGTERM/SIGINT/SIGHUP, or its parent gone | 0 between looks (a sleeping process; each look one `fabric-mcp --rejoin-only` with a 10 s deadline) |
 | `fabric_session.py deliver` (detached worker) | the Stop / SessionEnd hook, only when Fabric advertises `session-hooks/1` | per turn, at most one start per session a minute (an end always starts one), one per session at a time | finishes its spool | its own 10 s deadline; closes `fabric-mcp`'s stdin, then ends its whole process group | 0 |
 | Services built with the kit (`fabric_service.py`, `fabric-service.mjs`) | the service's own installer → launchd (`RunAtLoad`, `KeepAlive`; a LaunchDaemon in the system domain starts at boot with no login, and is stopped as root with `launchctl bootout` + `disable system/<label>`, FAA-278), a systemd user unit (`Restart=always`) or a per-user Scheduled Task (logon trigger) | resident | the service | `launchctl bootout` + `disable` or `launchd_uninstall`; `systemctl --user disable --now` or `systemd_uninstall`; `schtasks /End` + `/Change /DISABLE` or `task_uninstall` | declared by each service in its own `AGENTS.md` |
+| `fabric_source_check.py check` | a person or their agent | on demand | nothing | exits when done; writes nothing; may restart itself once in Python's UTF-8 mode | 0 |
+| `check_service.py` (the probe) | a person, their agent or CI | on demand | nothing | exits when done; redeems one login code it asked for (one dashboard session) | 0 |
+| `check_dashboard_layout.mjs` | a person or their agent | on demand | nothing | closes its headless browser before it exits | 0 |
 | Test suites (`npm test`) | a person or CI | on demand | nothing | exit; the lifecycle tests kill their own children in `finally` | 0 |
 
 The kit's services own their labels and ports; this repository owns none. Tests never touch the

@@ -38,7 +38,8 @@ next action:
 python3 plugins/fabric-agent-adapter/skills/working-with-fabric/scripts/fabric_session.py status
 ```
 
-In Claude Code the plugin adds five session hooks: SessionStart (at startup and `/clear`, never on compact or
+In Claude Code working-with-fabric adds five of the plugin's six session hooks (the sixth is the dashboard-kit
+notice, below): SessionStart (at startup and `/clear`, never on compact or
 resume) puts that preamble into the session when the MCP server `fabric` is registered, Fabric runs and the project
 uses Fabric (one line pointing at `fabric_whoami` in a folder with no sign of it); when Fabric
 is down it adds one line (skip `fabric_whoami`, start Fabric through the broker if the task needs it), and only in a
@@ -172,6 +173,7 @@ then restart your agents. Alone, without any account:
 
 ```bash
 npx @passioncode-ai/fabric-agent-adapter        # installs every skill into the agents hub ~/.agents/skills
+npx @passioncode-ai/fabric-agent-adapter --target claude   # a plain copy into ~/.claude/skills (refused while the plugin is installed)
 npx @passioncode-ai/fabric-agent-adapter --prune-shadow   # remove ~/.claude/skills copies that shadow the plugin
 npx @passioncode-ai/fabric-agent-adapter --force          # update a copy already in the hub (a launcher link is never replaced)
 npx @passioncode-ai/fabric-agent-adapter new ./example-agent --id example-agent [--service]   # a new agent project, contract built in
@@ -243,6 +245,8 @@ the CLI connected to the sample over streamable HTTP, called `sample.echo` and p
 own service by its id once its installer has written the descriptor.
 The free-port line (FAA-283) was run again on 2026-11-12 from this repository's kit with Claude Code 2.1.299 and
 Apple's `/usr/bin/python3`: a port the system chose, 44 rules, 0 FAIL, `listener.owner` PASS, and `ping`.
+Neither run has been repeated since 0.79.0 (no later record under `docs/evidence/runs/`), so the probe's rule count on
+a later release may differ.
 `FABRIC_REAL_CLIENT=1 python3 -m unittest discover -s test -p test_real_client.py` repeats the connection check
 (every sample tool listed, no model call) in the test suite.
 
