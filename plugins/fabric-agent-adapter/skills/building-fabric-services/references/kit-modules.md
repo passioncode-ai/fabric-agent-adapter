@@ -88,7 +88,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L2 | `fabric_share` | share grants and registrations (DEC-0086); whether an organization's instance may run under its grant (`instance_share_grant`, FAA-125) |
 | L2 | `fabric_ceremonies` | the headless join token (DEC-0084) |
 | L2 | `fabric_package_schema` | the reading of `fabric-package.schema.json` with JavaScript's pattern and format semantics (FAA-92) |
-| L2 | `fabric_package` | `fabric-package/1`: pack, sign, verify; re-exports `schema_problems` (DEC-0050, DEC-0051) |
+| L2 | `fabric_package_rules` | `fabric-package/1`'s rules without a folder: the digest and signing statement, FAC-SEM-064…066 and FAC-SEM-102 (`package_findings`), the path rule (`path_problem`, `path_problems`; FAA-78, D5); split from `fabric_package` in 0.95.0 |
+| L2 | `fabric_package` | `fabric-package/1`: pack, sign, verify; re-exports `schema_problems` and `fabric_package_rules` (DEC-0050, DEC-0051) |
 | L3 | `fabric_protocols` | protocol revisions (DEC-0067) and feed data (DEC-0070) |
 | L3 | `fabric_actions` | every action a person has and its agent tool, `fabric-actions/0.1`: the gate a tool runs (`action_decision`), the reader and FAC-SEM-142, the declaration (DEC-0121), the agent surface beside a dashboard (FAC-SEM-176, DEC-0169) |
 | L3 | `fabric_connections` | what an agent uses, `fabric-connections/0.1`: the reference reading and the declaration (DEC-0096, FAC-SEM-127) |
@@ -99,7 +100,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_lock` | the instance lock, its watch where the lock has no path-keyed name (macOS, FAA-303), and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |
-| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document, the loopback HTTP server that refuses another OS account's peer before reading it (`LoopbackHTTPServer`, Node `loopbackServer`; FAA-227) |
+| L3 | `fabric_descriptor_members` | a descriptor's members without a file: `installedBy`, `runner`, `peer` and `source` as the schema shapes them (`descriptor_member_problems`; DEC-0061, DEC-0069, FAA-120), the `source.repository` rule (`source_repository_problem`), a git origin's identity (`origin_identity`, `repository_from_origin`; DEC-0089 item 2) and the host's peer check (`peer_refusal`, FAC-SEM-088); split from `fabric_descriptor` in 0.95.0 |
+| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document, the loopback HTTP server that refuses another OS account's peer before reading it (`LoopbackHTTPServer`, Node `loopbackServer`; FAA-227); re-exports `fabric_descriptor_members` |
 | L3 | `fabric_context` | one instance per context (FAA-125, N-11): a context's instance, folders, descriptor, lock and marker; not in the facade, installed with `--module fabric_context` ([contexts](estate-record.md#one-instance-per-context-the-helper)) |
 | L3 | `fabric_auth` | the token, the network guard, login codes |
 | L3 | `fabric_events` | events, paging, the JSONL event log (DEC-0029) |
@@ -109,7 +111,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_service` | the facade: every name 0.39.1 exported, re-exported from the modules above |
 | L3 | `fabric_profiles` | runner and model profiles ([profiles](profiles.md)) |
 | L3 | `fabric_interop_rules` | `fabric-interop/0.1` rules without a service: constants, `InteropError`, trace context, job limits (DEC-0087; FAA-92), a job's approval step under the mandate (`job_step`, C3.3) |
-| L3 | `fabric_interop` | `fabric-interop/0.1`: jobs, envelopes, MCP tools; re-exports the rule layer ([interop](interop.md)) |
+| L3 | `fabric_interop_jobs` | `fabric-interop/0.1`'s job store (C3.2): `JobStore`, one private JSON file a job, its idempotency keys (DEC-0087, FAA-77) and every transition; the Node twin also holds `intentDigest`; split from `fabric_interop` in 0.95.0 |
+| L3 | `fabric_interop` | `fabric-interop/0.1`: envelopes, MCP tools, the MCP server; re-exports the rule layer and `JobStore` from `fabric_interop_jobs` ([interop](interop.md)) |
 | L3 | `fabric_holds` | work a service holds by its own limits (FAA-298): the held job's `statusMessage` in the pause grammar (`waiting_message`, `read_waiting`, `hold_job`), one push per hold and the operator's scoped lift (`HoldBook`: `hold`, `release`, `lift`, `admit`, `limit`) ([interop](interop.md#work-held-by-the-services-own-limits)) |
 | L4 | `fabric_hub` | the Fabric hub's door (`fabric-hub/0.1`) |
 | L4 | `fabric_board_shapes` | the project board's wire: constants, refusal codes, shapes |
@@ -138,7 +141,8 @@ name fails `test_kit_api`), and the Python facade the private names other code r
 `_DAY_MS`, `_utc_date_ms` from the core). `fabric_board` and `fabric-board.mjs` are
 facades the same way, and since 0.44.1 so are `fabric_interop` (over `fabric_interop_rules`) and `fabric_package` (over
 `fabric_package_schema`), and since 0.52.0 `fabric_estate` (over `fabric_estate_rules`, listed just before it, since it
-imports the rules), with their Node twins: patch the rule or schema module, not the facade. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
+imports the rules), and since 0.95.0 `fabric_interop` over `fabric_interop_jobs` too and `fabric_package` over
+`fabric_package_rules` too and `fabric_descriptor` over `fabric_descriptor_members`, with their Node twins: patch the module that defines the name, not the facade. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
 install with `fabric_kit.py install` and `status` names what is missing. A test or service that replaced a function
 by assigning it on the facade (`fabric_service.X = ...`) no longer changes what the kit does: the code reads its own
 module's name, so patch the module that defines it (`fabric_lock.X`, `fabric_session_env.X`). A service that imported a module-private
