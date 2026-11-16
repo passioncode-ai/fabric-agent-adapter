@@ -3,6 +3,8 @@
 Contract DEC-0050 (format and digest), DEC-0051 (signatures), DEC-0071 and DEC-0074 (a consumer agent), rules
 `FAC-SEM-064`…`066` and `FAC-SEM-102`, all at this plugin's pin. The kit: `scripts/fabric_package.py` and
 `scripts/fabric-package.mjs`, which write the same bytes, and `npx @passioncode-ai/fabric-agent-adapter pack|sign|verify`.
+The digest and the rules over a package document live in `fabric_package_rules.py` / `fabric-package-rules.mjs`, which
+the two re-export (since 0.95.0).
 
 ## Contents
 

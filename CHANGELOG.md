@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.95.1 (2026-11-16)
+
+0.95.0 was tagged and never published: its release run (43790823476) failed on four validate jobs, so npm stayed at
+0.94.0. 0.95.1 carries 0.95.0's changes with both causes fixed, and the module splits below.
+
+### Fixed
+
+- `fabric_source_list.Folded` annotates its arrays as `array`, not `array[int]`: `array.array` takes a subscript only
+  from Python 3.12, so `test_every_annotation_resolves` failed on the hosted Pythons and the 3.9 floor.
+- The FAA-196 (22) Node test labels its cases by index instead of `JSON.stringify` of a 5000-deep value, which
+  overflowed the stack on the hosted runners (`fabric-mandate.test.mjs`).
+
+### Changed
+
+- Three kit modules near the 1000-line ceiling are split, with no behaviour change: `fabric_interop.py` (990 to 771
+  lines) moves `JobStore` into the new `fabric_interop_jobs` (Node `fabric-interop-jobs.mjs`, which also takes
+  `intentDigest`); `fabric_package.py` (990 to 763) moves the package file names, digest helpers and the FAC-SEM-064 to
+  066 and 102 rules into `fabric_package_rules` (Node `fabric-package-rules.mjs`); `fabric_descriptor.py` (996 to 750)
+  moves the member checks, `source_repository_problem`, `origin_identity`, `repository_from_origin` and the URI rules
+  into `fabric_descriptor_members` (Node `fabric-descriptor-members.mjs`). Every name stays importable from where it was;
+  `pack`, `sign` and `verify` run as before.
+
 ## 0.95.0 (2026-11-16)
 
 ### Fixed
