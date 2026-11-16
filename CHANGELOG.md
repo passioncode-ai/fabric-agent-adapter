@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.97.0 (2026-11-16)
+
+The repin to Fabric Agent Contract `v0.1.0+2026-11-16.6` (`2bbfd780`, FAA-343); `560d6036` (`v0.1.0+2026-11-16`) stays
+supported for bundles issued under it. Impact map: `docs/evidence/specs/2026-11-16-faa-343-repin-2bbfd780-impact-map.md`.
+
+### Fixed
+
+- The source check reads the six credential forms it missed (DEC-0175, from our FAA-190 items 14, 31, 34, 38, 77 and
+  the escaped-quote key): a URL's user that is a token, a provider key behind a percent-encoded separator, a password
+  under a parameter named `password` or `passwd`, a JSON escape of `"`, the assignment heads `--name=`, `:=`, `=>`,
+  `||=`, `?=`, `??=`, `+=`, `<-` and `ENV['NAME'] =`, and a value judged piece by piece after a `,`.
+- It no longer reports eight false findings (DEC-0176, from our FAA-190 items 7, 9, 11, 13, 32, 37, 43): a key starts a
+  word after no Latin letter or ASCII digit (so one after `ж` is read, one in `gdańsk-` is not); a URL parameter's key
+  only at a word's start; a bearer value only in a token's shape; a password shorter than 24 characters on a
+  documentation host (RFC 2606 names, `.example`, `.invalid`) and one that is wholly a placeholder (`${X}`, `{{x}}`,
+  `$NAME`) are examples; a DER ECDSA signature as WebAuthn writes it, after `:` or `=>`, is public.
+- A URL whose user name is a token (40 or more of `[A-Za-z0-9_-]` with a letter and a digit) is a credential
+  (DEC-0177): `token_user_name` and `secret_url` in both `fabric_secrets.py` copies, `tokenUserName` and `secretUrl` in
+  `fabric-secrets.mjs`; a manifest URL that stores one is refused (FAC-SEM-057); the channel agent's CA-5 budget counts
+  the user name as the contract's `detectorCost` does (equal on six strings measured under the contract's tsx).
+
+- Instance facts (DEC-0174): `organization` as the audience, and `shared` or `per-organization` as the tenancy, beside a
+  subscription runner are refused, in both twins (a subscription serves only its owner's own sessions); 38 contract
+  cases, all answered.
+
+### Changed
+
+- The contract's URL constants (`PASSWORD_NAME`, `URL_BEARER_VALUE`, `PLACEHOLDER`, `DOCUMENTATION_HOST`,
+  `LETTER_OR_DIGIT`, `GENERATED_LENGTH`) live in a new sibling of the check, `fabric_source_url.py`; `ASSIGNED_HEAD_SOURCE`
+  is the contract's head as written. Vendored vectors regenerated at the pin (source tree 91 to 107 cases, instance
+  facts, channel agent, levels, standing, load).
+
 ## 0.96.1 (2026-11-16)
 
 ### Documentation

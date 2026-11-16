@@ -40,7 +40,7 @@ OWNER = "Acme" + "Holdings"
 #: The check and the siblings it loads at its start (fabric_source_tree.py only under a manifest).
 SIBLINGS = ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py", "fabric_source_homes.py",
             "fabric_source_restart.py", "fabric_source_list.py", "fabric_source_redact.py", "fabric_secrets.py",
-            "fabric_git.py")
+            "fabric_git.py", "fabric_source_url.py")
 ACCOUNT = "owner-" + "account-77"
 
 
@@ -2103,6 +2103,14 @@ class FAA190Rest(Tree):
         self.assertEqual(sc.redact("docs/zqhostname.json", [], seen), "docs/zqhostname.json")
         self.assertEqual(sc.redact("docs/" + pw + ".json", [], seen), "docs/<secret>")
 
+    def test_a_token_user_and_a_query_secret_are_masked_whole(self):
+        # FAA-343 (4): a URL with a token in its user name and a secret in its query masks both, never its host
+        token, pw = "a1" * 20, LONG_RANDOM
+        seen = self.seen_from("u = " + "https" + "://%s@zqhost.org/x?api_key=%s" % (token, pw))
+        self.assertEqual(sc.redact("docs/" + token + ".json", [], seen), "docs/<secret>")
+        self.assertEqual(sc.redact("docs/" + pw + ".json", [], seen), "docs/<secret>")
+        self.assertEqual(sc.redact("docs/zqhost.json", [], seen), "docs/zqhost.json")
+
     def test_grams_of_a_url_finding_cover_only_its_credential(self):  # (54)
         pw = LONG_RANDOM[:15] + "7"
         seen = sc._Seen()
@@ -2257,9 +2265,11 @@ class FAA190Rest(Tree):
     def test_the_reference_names_the_false_findings_left_to_the_contract(self):  # (7) (8) (9) (11) (13) (32) (37) (43)
         flat = " ".join((SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8").split())
         for phrase in ("`app.get(\"/v/Users/<route>\")`", "`ls -a-Users-<name>`", "`class=\"a--Users-<block>\"`",
-                       "`#a--users-<anchor>`", "a WebAuthn assertion's `sig`", "`password1`", "`?q=desk-lamp-with-long-arm-shade`",
-                       "dotenv's vault URL", "a key glued to a letter outside ASCII"):
+                       "`#a--users-<anchor>`", "a passkey's `credentialId`", "dotenv's vault URL", "DEC-0176 item 6",
+                       # narrowed by DEC-0176 (FAA-343): named as no findings now
+                       "`?q=desk-lamp-with-long-arm-shade`", "`?q=bearer%20bonds`", "`${DB_PASSWORD}`", "`gdańsk-`"):
             self.assertIn(phrase, flat)
+        self.assertNotIn("`password1`", flat)  # a placeholder-like password with a digit is a password, as the contract reads it
 
     # --- cost (3)
 

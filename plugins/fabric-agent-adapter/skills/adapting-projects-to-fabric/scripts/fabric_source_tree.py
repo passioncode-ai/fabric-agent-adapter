@@ -291,7 +291,6 @@ def patch_paths_allowed(manifest: Any, paths: Any) -> List[str]:
 
 
 # #region credential and home shapes: the contract's credentialAt and homeAt, read with the source check's shapes
-_PUBLIC_SIGNATURE = re.compile(r"(\"(?:sig|signature|signatures)\"[ \t]*:[ \t]*\")([A-Za-z0-9_-]{86})(\")", re.IGNORECASE)
 _URL_IN_LINE = re.compile("[A-Za-z][A-Za-z0-9+.-]{0,63}://[^\t\n\x0b\x0c\r \x1c-\x1f\x85\xa0  - "
                           "    　\"'<>`]+")
 
@@ -308,7 +307,7 @@ def _unescaped(line: str) -> Optional[Tuple[str, List[int]]]:
 
 
 def _credential_in(written: str) -> int:
-    line = _PUBLIC_SIGNATURE.sub(lambda m: m.group(1) + " " * len(m.group(2)) + m.group(3), written) if '"' in written else written
+    line = _check.blank_signatures(written)  # a whole public signature blanked, every other index kept (DEC-0176)
     found: List[int] = []
     block = _check.PRIVATE_KEY.search(line)
     if block:
@@ -318,7 +317,7 @@ def _credential_in(written: str) -> int:
     found += [a for a, _ in _check._provider_keys(line)]
     found += [m.start() for m in _check._overlapping(_secrets._BEARER_INSIDE, line) if _check._real(m.group(0))]
     found += [a for a, _ in _secret_urls(line)][:1]
-    for m in (_check._assigned(line) if ":" in line or "=" in line else ()):
+    for m in (_check._assigned(line) if ":" in line or "=" in line or "<-" in line else ()):
         name, value = m.group(1), m.group(2)
         if _check._credential(name, value, _check._quoted(line, m)) and _secrets._long_secret(unquote(value)) \
                 and _check._real(unquote(value)):

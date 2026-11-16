@@ -123,12 +123,19 @@ export function rawValues(query) {
   return values;
 }
 
-/** Whether a URL an MCP entry or a launch names carries a credential (LC-21). */
+/**
+ * A URL's user name read as a token (DEC-0177, the contract's tokenUserName): a run of 40 or more of `[A-Za-z0-9_-]`
+ * holding a letter and a digit, a classic token's 40 hex. `git` or `deploy-bot` is none.
+ */
+export const tokenUserName = (user) => /^[A-Za-z0-9_-]{40,}$/.test(user) && /[0-9]/.test(user) && /[A-Za-z]/.test(user);
+
+/** Whether a URL an MCP entry or a launch names carries a credential (LC-21); a token user name too (DEC-0177). */
 export function secretUrl(value) {
   if (secretArgument(value)) return true;
   let url;
   try { url = new URL(value); } catch { return false; }
   if (url.password !== '') return true;
+  if (tokenUserName(decodeKeepingPlus(url.username))) return true;
   for (const part of [url.search, url.hash]) {
     for (const [name, values] of rawValues(part.slice(1))) {
       if (values.some((raw) => (raw !== '' && credentialName(name)) || secretValue(raw))) return true;

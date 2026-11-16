@@ -126,7 +126,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 ```
 
 Run it by path, with its scripts folder whole: it loads its siblings (`fabric_source_ignore.py`,
-`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_list.py`, `fabric_source_redact.py`,
+`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_list.py`, `fabric_source_redact.py`, `fabric_source_url.py`,
 `fabric_source_check_cli.py`, `fabric_source_tree.py`, the
 way it runs Git `fabric_git.py` and the contract's detector `fabric_secrets.py`) and refuses with exit `2` when one is missing or from another version, a
 detector without one of the public names it reads included, or when its folder can be searched but not listed (mode
@@ -264,17 +264,21 @@ names each option.
   not findings.
 
 The check finds the forms the table names, and only those: a credential in another shape (a bare token with no name
-before it, a provider's key the contract's names do not cover, a key glued to a letter outside ASCII, which the
-contract's word start counts as a letter) passes it. A home name outside ASCII is the owner's list's to find, as a
-plain string. Some text that is not a credential or a home reads as one, and fails closed: the shapes are the
-contract's (`src/source-rules.ts` at the pin, which a tree under a manifest is checked with), so they change there
-first (FAA-190): a route whose first segment is one letter before a `Users` segment (`app.get("/v/Users/<route>")`), a
-one-letter flag or block before `-Users-` (`ls -a-Users-<name>`, `class="a--Users-<block>"`, `#a--users-<anchor>`), a
-WebAuthn assertion's `sig` or a passkey's `credentialId` under its name (instance data in any case: a recorded
-assertion belongs to one installation), a placeholder password with a digit in a URL (`password1`, `changeme123`),
-dotenv's vault URL (`<dotenv>://:key_...@dotenv.org/vault/...`), and a search URL whose query holds a key's prefix or
-starts with `bearer` (`?q=desk-lamp-with-long-arm-shade`, `?q=bearer%20bonds`). Name such a file in the ignore file
-with its reason. It is a floor under the owner's review and a
+before it, a provider's key the contract's names do not cover) passes it; a key glued to a letter of another script
+(`ж`) is read since DEC-0176, one after a Latin letter (`gdańsk-`) is not. A home name outside ASCII is the owner's
+list's to find, as a plain string. The shapes are the contract's (`src/source-rules.ts` at the pin, which a tree under
+a manifest is checked with): DEC-0176 (FAA-343) narrowed what read as a credential and was none: a key's prefix inside a
+word of a URL parameter (`?q=desk-lamp-with-long-arm-shade`), a whole query value saying `bearer` without a token's shape
+(`?q=bearer%20bonds`), a password shorter than 24 characters on a documentation host (RFC 2606 names, `.example`,
+`.invalid`) or one that is wholly a placeholder (`${DB_PASSWORD}`), and a WebAuthn assertion's DER ECDSA `sig` under a
+quoted `signature` after `:` or `=>` are no findings now. Some text still reads as one, and fails closed, as the
+contract keeps it (DEC-0176 item 6): a route whose first segment is one letter before a `Users` segment
+(`app.get("/v/Users/<route>")`), a one-letter flag or block before `-Users-` (`ls -a-Users-<name>`,
+`class="a--Users-<block>"`, `#a--users-<anchor>`), dotenv's vault URL (`<dotenv>://:key_...@dotenv.org/vault/...`), a
+passkey's `credentialId`, a mixed-case percent-encoded path under a secret's name, and a 40-character service-account
+name with a digit as a URL's user. Two limits run the other way: a password shaped as a placeholder's name
+(`{secret2024}`) and a short one on a documentation host are not read (the contract's CT-330). Name such a file in the
+ignore file with its reason. It is a floor under the owner's review and a
 secret scanner, never a replacement for either.
 
 The check finds the repository from the folder it checks: a Git location the caller exports (`GIT_DIR`,

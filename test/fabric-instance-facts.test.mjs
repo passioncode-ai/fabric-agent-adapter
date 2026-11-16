@@ -25,7 +25,7 @@ test('the key is the contract\'s, and the facade exports the reader', () => {
 });
 
 test('every case reads and finds as the contract does', () => {
-  assert.equal(V.cases.filter((c) => !c.name.startsWith('hostile: ')).length, 35);
+  assert.equal(V.cases.filter((c) => !c.name.startsWith('hostile: ')).length, 38);
   for (const c of V.cases) {
     const read = instanceFacts(c.descriptor ?? undefined, c.wellKnown ?? undefined);
     assert.deepEqual(read, c.read, c.name);

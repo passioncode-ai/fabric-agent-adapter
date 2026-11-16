@@ -87,3 +87,14 @@ test('a long segment of word starts is read in linear time (FAA-321)', () => {
   assert.equal(repositoryName(segments[16000]), true);
   assert.ok(growth((n) => repositoryName(segments[n]), 4000, 16000) < 9);
 });
+
+test('DEC-0177: a URL whose user name is a token is refused by secretUrl', async () => {
+  const s = await import('../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-secrets.mjs');
+  const token = 'a1'.repeat(20); // a classic token's shape, built at run time
+  assert.equal(s.tokenUserName(token), true);
+  for (const user of ['git', 'deploy-bot', 'a'.repeat(40), '1'.repeat(40), token.slice(0, 39), '']) assert.equal(s.tokenUserName(user), false, user);
+  const scheme = 'https';
+  assert.equal(s.secretUrl(`${scheme}://${token}@github.com/o/r.git`), true);
+  assert.equal(s.secretUrl(`${scheme}://%61${token.slice(1)}@github.com/o/r.git`), true, 'read decoded');
+  assert.equal(s.secretUrl(`${scheme}://git@github.com/o/r.git`), false);
+});

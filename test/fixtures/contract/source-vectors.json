@@ -1,8 +1,8 @@
 {
   "about": "The agent source rules of DEC-0149 at the pin, each answered by the contract's src/source-rules.ts: constants (the block a port holds equal), tree (sourceTreeProblems, as fixtures/vectors/source-tree.json documents it), patches (patchPathsAllowed), manifest (sourceRules('source-manifest'): FAC-SEM-156 and FAC-SEM-157, code and instancePath) and package (sourceRules('source-package'): FAC-SEM-160). Written by make_source_vectors.mjs, never by hand. The contract's own description of the tree cases: Vectors for an agent's source tree (DEC-0149), written by tools/vectors/source-tree.ts, never by hand. `tree`: sourceTreeProblems({manifest, files, instanceStrings?, listed?}) answers each place the instance shows through as {kind, file?, line?, column?, entry?, include?, exclude?} (a file marked nestedRepository: true is a folder holding another repository, a submodule's gitlink or its own .git, read by its path only; a file marked link: true is a symbolic link whose text is its target, link-outside when that target is absolute, climbs above the root or is no source path, and never a licence): file is the index in files; a finding in a file's path has no line; line and column count from 1, the column in UTF-16 code units where the match begins (for a home path, where its name begins). Blocking kinds (FAC-SEM-158): home-path (a home folder with a name, in the forms and with the neutral names of the Fabric Agent Adapter's check; ~ never), credential (a value shaped like one, or a file that is one by its name, the name read folded: the code points HFS+ ignores removed, ASCII case folded, any trailing run of dots and spaces dropped; an unchecked file or one listed in binaries too), binary (not listed in binaries), nested-repository (a nested repository no exclude path names), instance-string (an entry of the operator's list, without regard to case under Unicode simple case folding, the entry and the text each also in NFC: as written, percent-encoded, form-encoded with + for a space, JSON-escaped, JSON-escaped with \\/ for /, or JSON-escaped with every character outside ASCII as \\uXXXX), missing (an include path in the grammar with no file), short-instance-string, no-include. Warnings (FAC-SEM-159): email (not in publicAddresses, not at an RFC 2606 name), link-outside (a relative Markdown link, or a symbolic link, whose target is not source; a link's target is read literally), no-license, excluded-by-fold (a file an exclude entry names only once folded: never read), unused-exclude (an exclude entry naming nothing listed). Problems come in the order: the list's refused entries, then no-include, then each file in order (its path, then each line: home-path, credential, instance-string, email, link-outside), then excluded-by-fold (a file an exclude entry names only once both are folded: never read, said by its index and the entry's), then missing, then unused-exclude (only when the input carries listed, the paths the tree holds that an exclude entry can name: a file, a symbolic link or a nested repository (a gitlink in Git mode, a folder holding its own .git in a walk) written without /, and a folder written with a trailing /; a gitlink outside the manifest's path is listed both as its name and as its folder, name and name/, so a folder entry such as src/vendor/ is used by a gitlink at src/vendor even with no folder in the work tree (the reference CLI computes the used entries directly, with the same effect as this listing convention); an entry without / is used by any of them, its name leaving out everything beneath it, while an entry with / is used only by a folder (so a folder entry over a link names nothing); an exclude entry, read folded, that names none of them), then no-license. A file that is not source (outside include, inside exclude, in .git) is not read; a .git segment is read as Git's is_hfs_dotgit and is_ntfs_dotgit read it (ASCII case folded, the code points HFS+ ignores removed, trailing dots and spaces dropped, or GIT~1), and paths are compared in Unicode NFC. `patches`: patchPathsAllowed(manifest, paths) answers the paths that are not source, in the order given, and also a path an exclude entry names once both are folded per segment (an entry without / also names everything beneath it) (HFS+ ignorable code points removed first, then NFD, lower, upper and lower case, NFC, then Georgian Nuskhuri onto Mkhedruli, trailing dots and spaces dropped), a segment shaped like an 8.3 short name when any exclude entry exists, and the manifest itself in any spelling; the manifest is the receiver's current one. Exclude entries are read folded the same way everywhere. The fold is the runtime's case mappings (Node's ICU at the Unicode version constants.FOLD_UNICODE names): canonical caseless matching (NFD before the case mappings): NFD, then lower, upper and lower case, then NFC, then Georgian Nuskhuri onto Mkhedruli (HFS+ joins Asomtavruli and Mkhedruli), which also joins the dotless i with i and I (Unicode's case folding keeps them apart; the join refuses more); constants.FOLD_PAIRS holds segments and their folds. A segment with ~ followed by a digit is refused in a patch when any exclude entry exists, a paths value that is not a list is refused whole and named paths, a path that is not a string, or a hole in a sparse list, is refused and named paths[<index>], never shown (either label may equal a refused path's own name, and any non-empty answer refuses the patch whole), and a path whose file name is a credential file is refused and shown (CREDENTIAL_FILE and TOKEN_FILE read on the folded name, CREDENTIAL_FILE_OK on the name as written in lower case), and in a patch the name is also read under the full fold (foldSegment). The manifest, fabric.source.json, is always read as text (unless a nested repository, a gitlink or a folder holding its own .git, sits at its path, which blocks on its own as nested-repository; the folder check cannot read a manifest where a folder sits at its path, in a walk or in Git mode, and stops with \"not a file\", and reports nested-repository when the index records a gitlink at that path over a file): never unchecked, never binary, and a nested repository at the manifest's path (one trailing / dropped, NFC) is always in the source, before any exclude is read (exclude cannot remove the manifest; the remedy is to remove what is there). An exclude entry an excluded-by-fold line names is never unused-exclude, and an entry outside the grammar (as written, in NFC or in NFD) is never unused-exclude: FAC-SEM-157 says it. A path or an entry is in the grammar only as written, in NFC and in NFD, with no segment made only of dots, spaces and code points HFS+ ignores (. U+200C ., . followed by a space, ...: it folds to nothing, and a tool that trims or folds names as the fold does may read it as empty, . or ..); a path outside it is no source and is never read, an include or binaries entry outside it names nothing and is never missing, and an exclude entry outside it fails closed: it removes its widest reading, the union of the readings a tool may take (with such a segment, every segment from the first such one is walked, the depth starting at its index, a segment that folds to nothing with two or more dots lowering it by one, one with fewer dots keeping it and any other segment raising it by one, and the entry removes the folder the shallowest reading reaches (at or below depth 0, everything but fabric.source.json), without a trailing / also as a file of its name; lengthened by NFC or NFD only, the entry folded as written); FAC-SEM-157 names the segment cause before a length cause.",
-  "contract": "560d60369b553fc123ba29c3e1e637de68901678",
+  "contract": "2bbfd7805b1f9c4eaf25f62394a11957f131a092",
   "constants": {
-    "about": "The constants a port of the tree check holds equal to the reference's, written from src/source-rules.ts's exports (test/source-rules.test.ts holds the block to them): the neutral home names, the synthetic words, the home-folder patterns, the credential-file name patterns (CREDENTIAL_FILE and TOKEN_FILE read on a file's name with the code points HFS+ ignores removed, ASCII case folded and any trailing run of dots and spaces dropped, as a .git segment is read; CREDENTIAL_FILE_OK on the name as written, in lower case; each name run reads any character but a line feed), the tree check's own provider-key shapes (KEY_SHAPE_SOURCES, unbounded, kept apart from the shared detector) and the URL rule's pattern (URL_SECRET_VALUE), each pattern as its source and flags.",
+    "about": "The constants a port of the tree check holds equal to the reference's, written from src/source-rules.ts's exports (test/source-rules.test.ts holds the block to them): the neutral home names, the synthetic words, the home-folder patterns, the credential-file name patterns (CREDENTIAL_FILE and TOKEN_FILE read on a file's name with the code points HFS+ ignores removed, ASCII case folded and any trailing run of dots and spaces dropped, as a .git segment is read; CREDENTIAL_FILE_OK on the name as written, in lower case; each name run reads any character but a line feed), the tree check's own provider-key shapes (KEY_SHAPE_SOURCES, unbounded, kept apart from the shared detector), masking's and a path's pattern (URL_SECRET_VALUE; since DEC-0176 a URL's parameter is read by URL_BEARER_VALUE and the key shapes at a word's start instead), the assignment head (ASSIGNED_HEAD) and a password parameter's name (PASSWORD_NAME, DEC-0175; a Python port reads its $ as \\Z and its i flag with re.ASCII), a whole query value's bearer token (URL_BEARER_VALUE), a template's placeholder (PLACEHOLDER), a documentation host (DOCUMENTATION_HOST, read on a URL's host in lower case without its port) the characters that stop a key's word start (LETTER_OR_DIGIT, read on the code point before a key) and the length from which a password on a documentation host is read (GENERATED_LENGTH, counted in UTF-16 code units once percent-decoded; DEC-0176; a Python port reads each $ as \\Z, writes a JavaScript \\uXXXX as the character itself and reads an i flag with re.ASCII, as JavaScript's i maps no other character onto an ASCII letter), each pattern as its source and flags.",
     "NEUTRAL_HOMES": [
       "example",
       "examples",
@@ -109,6 +109,31 @@
       "source": "(^bearer\\s.+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9]{20,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,})",
       "flags": "i"
     },
+    "ASSIGNED_HEAD": {
+      "source": "(?<![A-Za-z0-9_.])(?<![A-Za-z0-9_.]-)([A-Za-z_][A-Za-z0-9_.-]{0,63})(?:[\"']\\]?|\\])?[ \\t]{0,8}(?::=|=>|\\|\\|=|\\?\\?=|\\?=|\\+=|<-|[:=])[ \\t]{0,8}[\"']?",
+      "flags": "g"
+    },
+    "PASSWORD_NAME": {
+      "source": "(?:^|[_.-])(?:password|passwd)$",
+      "flags": "i"
+    },
+    "URL_BEARER_VALUE": {
+      "source": "^bearer[ \\t]+(?=[A-Za-z0-9._~+/-]*\\d)[A-Za-z0-9._~+/-]{12,}",
+      "flags": "i"
+    },
+    "PLACEHOLDER": {
+      "source": "^(?=.{2,72}$)(?:\\$\\{_?(?:[A-Z]+[0-9]*(?:_+(?:[A-Z]+[0-9]*|[0-9]+))*|[a-z]+[0-9]*(?:[_.-]+(?:[a-z]+[0-9]*|[0-9]+))*|[a-z]+[0-9]*(?:[A-Z][a-z]*[0-9]*)+)\\}?|\\$_?[A-Z]+[0-9]*(?:_+(?:[A-Z]+[0-9]*|[0-9]+))*|\\{\\{(?:\\.?_?(?:[A-Z]+[0-9]*(?:_+(?:[A-Z]+[0-9]*|[0-9]+))*|[a-z]+[0-9]*(?:[_.-]+(?:[a-z]+[0-9]*|[0-9]+))*|[a-z]+[0-9]*(?:[A-Z][a-z]*[0-9]*)+)|(?:\\.[A-Za-z][a-z]*[0-9]*)+)\\}{0,2}|\\{_?(?:[A-Z]+[0-9]*(?:_+(?:[A-Z]+[0-9]*|[0-9]+))*|[a-z]+[0-9]*(?:[_.-]+(?:[a-z]+[0-9]*|[0-9]+))*)\\}?|%\\(_?(?:[A-Z]+[0-9]*(?:_+(?:[A-Z]+[0-9]*|[0-9]+))*|[a-z]+[0-9]*(?:[_.-]+(?:[a-z]+[0-9]*|[0-9]+))*)\\)s)$",
+      "flags": ""
+    },
+    "DOCUMENTATION_HOST": {
+      "source": "^(?:(?:[a-z0-9-]+\\.)*example\\.(?:com|net|org)|(?:[a-z0-9-]+\\.)+(?:example|invalid))$",
+      "flags": ""
+    },
+    "LETTER_OR_DIGIT": {
+      "source": "^[A-Za-z0-9\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u024F\\u1E00-\\u1EFF]$",
+      "flags": ""
+    },
+    "GENERATED_LENGTH": 24,
     "FOLD_UNICODE": "17.0",
     "FOLD_PAIRS": [
       [
@@ -1361,7 +1386,7 @@
       ]
     },
     {
-      "name": "a key's prefix and the character before it are read without Unicode case folding: U+017F and the Kelvin sign are no s or k, a letter in any script before a key starts no word",
+      "name": "a key's prefix and the character before it are read without Unicode case folding: U+017F and the Kelvin sign are no s or k; only a Latin letter or an ASCII digit before a key stops it, so one after ж is read and one after é or in gdańsk- is not (DEC-0176)",
       "input": {
         "manifest": {
           "format": "fabric-source/1",
@@ -1400,11 +1425,17 @@
           },
           {
             "path": "src/folding.ts",
-            "text": "a = \"ſk-A1b2C3d4A1b2C3d4A1b2C3d4\"\nb = \"sK-A1b2C3d4A1b2C3d4A1b2C3d4\"\nc = \"ésk-A1b2C3d4A1b2C3d4A1b2C3d4\"\nd = \"·sk-A1b2C3d4A1b2C3d4A1b2C3d4\""
+            "text": "a = \"ſk-A1b2C3d4A1b2C3d4A1b2C3d4\"\nb = \"sK-A1b2C3d4A1b2C3d4A1b2C3d4\"\nc = \"жsk-A1b2C3d4A1b2C3d4A1b2C3d4\"\nd = \"·sk-A1b2C3d4A1b2C3d4A1b2C3d4\"\ne = \"ésk-A1b2C3d4A1b2C3d4A1b2C3d4\"\nf = \"gdańsk-office-booking-api\""
           }
         ]
       },
       "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 7
+        },
         {
           "kind": "credential",
           "file": 4,
@@ -2099,7 +2130,7 @@
       ]
     },
     {
-      "name": "a URL parameter holding a provider key right after a letter blocks: the URL rule reads the key shapes unbounded",
+      "name": "a URL parameter holding a provider key right after a letter is read as on a line: no key starts there, so a search for desk-lamp names none; at a word's start it blocks (DEC-0176)",
       "input": {
         "manifest": {
           "format": "fabric-source/1",
@@ -2138,7 +2169,7 @@
           },
           {
             "path": "docs/search.md",
-            "text": "https://api.example.org/find?q=xsk-A1A1A1A1A1A1A1A1A1A1A1A1"
+            "text": "https://api.example.org/find?q=xsk-A1A1A1A1A1A1A1A1A1A1A1A1\nhttps://shop.example/search?q=desk-lamp-with-usb-charging-port\nhttps://api.example.org/find?q=sk-A1A1A1A1A1A1A1A1A1A1A1A1"
           }
         ]
       },
@@ -2146,7 +2177,7 @@
         {
           "kind": "credential",
           "file": 4,
-          "line": 1,
+          "line": 3,
           "column": 1
         }
       ]
@@ -5215,6 +5246,1027 @@
         ]
       },
       "expected": []
+    },
+    {
+      "name": "a password on a documentation host is an example; the same on another host blocks (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/db.md",
+            "text": "postgres://app:Ab3dE5gH7k@db.example.com/app\nhttps://h.example.org/db?password=Ab3dE5gH7k\npostgres://app:Ab3dE5gH7k@db.example.internal/app\nhttps://db.invalid/x?password=Ab3dE5gH7k\npostgres://app:Ab3dE5gH7k@ci.example:5432/app"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "a password of 24 or more characters is read on a documentation host too; one of 23 is an example (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/clone.md",
+            "text": "https://u:0123456789abcdef0123456789abcdef01234567@git.example.com/o/r.git\nhttps://h.example.org/db?password=0123456789abcdef0123456789abcdef01234567\nredis://:Ab3dE5gH7k+Ab3dE5gH7kAb3dE5gH7kAb3d==@redis.example.com\npostgres://app:Ab3dE5gH7kAb3dE5gH7kAb3d@db.example.com/app\npostgres://app:Ab3dE5gH7kAb3dE5gH7kAb3@db.example.com/app"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 4,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "localhost and a host of one label are no documentation host: a tunnel or a service there holds a real password (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/db.md",
+            "text": "postgres://app:Ab3dE5gH7k@localhost:5433/prod\npostgres://app:Ab3dE5gH7k@db.localhost/app\npostgres://app:Ab3dE5gH7k@test:5432/app\nhttps://example/db?password=Ab3dE5gH7k\nhttps://h.test/db?password=Ab3dE5gH7k"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 4,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 5,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "a password that is wholly a template's placeholder holds no secret (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/db.md",
+            "text": "https://h.io/db?password=${DB_PASSWORD_1}\npostgres://app:{{db_password1}}@db.example.internal/app\nhttps://h.io/db?password=%(db_pass1)s\nhttps://h.io/db?password=<your password 1>\nhttps://h.io/db?password=$DB_PASSWORD_1\nhttps://h.io/db?password={DB_PASSWORD_1}\nhttps://h.io/db?password=$PGPASS2\nhttps://h.io/db?password={{.Values.db.password}}\nhttps://h.io/db?password=${dbPassword2}"
+          }
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "a run whose digits run into letters, a mixed-case run or a shell default is a password, not a placeholder (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/db.md",
+            "text": "postgres://app:$Summer2024x@db.example.internal/app\nhttps://h.io/db?password=$Summer2024x\nhttps://h.io/db?password={Secret123x}\nhttps://h.io/db?password=%(Secret123x)s\nhttps://h.io/db?password=$S3CR3TP4SS\npostgres://app:${DB_PASS:-Sup3rS3cretPw}@db.example.internal/app\nhttps://h.io/db?password=${Rq7vPz2mXw"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 4,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 5,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 6,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 7,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "a whole query value saying bearer reads a token only in a token's shape, whatever follows it (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/s.md",
+            "text": "https://h.io/s?q=bearer%20bonds\nhttps://h.io/s?auth=bearer%20Ab1Cd2Ef3Gh4Ij5\nhttps://h.io/s?auth=Bearer%20Ab1Cd2Ef3Gh4Ij5%0A"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "a DER ECDSA signature under signature, after : or =>, is public; under another name it is not (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "src/assertion.json",
+            "text": "{\"signature\": \"MEUCIQAb3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9xZ1Ab3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9x\"}\n\"signature\" => \"MEUCIQAb3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9xZ1Ab3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9x\"\n{\"token\": \"MEUCIQAb3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9xZ1Ab3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9x\"}"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 12
+        }
+      ]
+    },
+    {
+      "name": "a whole signature is public in double or single quotes or none, with or without the closing one, after : or =>; one more base64 character makes it a run (DEC-0176)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "src/assertion.rb",
+            "text": "{\"signature\": \"MEUCIQAb3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9xZ1Ab3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9x\n\"signature\" => \"Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab\n\"sig\" => Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab,\n{\"signature\": \"Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2AbZ\"}\n{\"signature\": 'Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab'}\n\"sig\": 'Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab',\n{\"signature\": \"Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab==\"}\n{\"token\": 'Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab1Cd2Ab'}\n{\"Signature\": \"MEUCIQAb3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9xZ1Ab3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9x\"}\n{\"signature\": \"meUCIQAb3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9xZ1Ab3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3kM5pR7tV9x\"}"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 4,
+          "column": 16
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 7,
+          "column": 16
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 8,
+          "column": 12
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 10,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "name": "a git remote whose user is a bare token blocks; a commit hash in a path does not",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "src/remote.txt",
+            "text": "url = https://0123456789abcdef0123456789abcdef01234567@git.example.org/o/r.git\nhttps://github.com/o/r/commit/0123456789abcdef0123456789abcdef01234567"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "name": "a long run under a credential's name in a query, before an encoded comma and a synthetic word, is judged piece by piece",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/q.md",
+            "text": "https://h.io/p?token=Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1%2Cexample\nhttps://h.io/p?token=Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1-example"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "a key after a percent-encoded separator in a URL's path or a parameter's name blocks",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/u.md",
+            "text": "https://h.io/a%2Fsk-A1A1A1A1A1A1A1A1A1A1A1A1\nhttps://h.io/p?x%3Dsk-A1A1A1A1A1A1A1A1A1A1A1A1=1\nhttps://h.io/a%2Ftask-processing-pipeline-v2"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "a long run under a credential's name after --name=, :=, =>, ||=, <- or ENV['NAME'] = blocks; under another name it does not",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "src/assign.txt",
+            "text": "run --api-token=Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\napiToken := \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\n:api_token => \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\n@api_token ||= \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\napi_token <- \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\nENV['API_TOKEN'] = \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\nx => \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\""
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 17
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 14
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 16
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 4,
+          "column": 17
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 5,
+          "column": 15
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 6,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "name": "a password in a URL's query is read as one in its user information is; a short one or another name is not",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/db.md",
+            "text": "https://h.io/db?password=Ab3dE5gH7k\nhttps://h.io/db?password=ab12\nhttps://h.io/db?pwd_hint=Ab3dE5gH7k"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "the assignment heads ?=, ??=, += and a subscript (config[\"name\"], settings[NAME]) read a long run too (DEC-0175)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "src/more.txt",
+            "text": "api_token ?= \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\napi_token ??= \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\napi_token += \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\nconfig[\"api_key\"] = \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\"\nsettings[API_TOKEN] = \"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\""
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 15
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 16
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 15
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 4,
+          "column": 22
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 5,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "name": "a token user beside a password, a provider key as the user, and passwd or db_password in a query; a piece saying bearer and pwd are not (DEC-0175)",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "docs/more.md",
+            "text": "https://0123456789abcdef0123456789abcdef01234567:x-oauth-basic@git.example.org/o/r.git\nhttps://sk-A1A1A1A1A1A1A1A1A1A1A1A1@h.example/x\nhttps://h.io/db?passwd=Ab3dE5gH7k\nhttps://h.io/db?db_password=Ab3dE5gH7k%2Cexample\nhttps://h.io/s?q=jwt,bearer%20tokens\nhttps://h.io/run?pwd=Ab3dE5gH7k/src"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 2,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 3,
+          "column": 1
+        },
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 4,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "name": "a JSON key written with escaped quotes inside a JSON string",
+      "input": {
+        "manifest": {
+          "format": "fabric-source/1",
+          "include": [
+            "src/",
+            "docs/",
+            "README.md",
+            "LICENSE"
+          ],
+          "exclude": [
+            "src/generated/"
+          ],
+          "binaries": [
+            "docs/icon.png"
+          ],
+          "publicAddresses": [
+            "support@inbox-digest.example"
+          ]
+        },
+        "files": [
+          {
+            "path": "LICENSE",
+            "text": "Licensed under the terms in this file."
+          },
+          {
+            "path": "README.md",
+            "text": "# Inbox digest\n\nSee [the guide](docs/guide.md)."
+          },
+          {
+            "path": "docs/guide.md",
+            "text": "# Guide\n\nBack to the [readme](../README.md)."
+          },
+          {
+            "path": "src/main.ts",
+            "text": "export const name = \"inbox-digest\";"
+          },
+          {
+            "path": "src/s.ts",
+            "text": "const s = \"{\\\"api_key\\\": \\\"Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1Ab1\\\"}\";"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "kind": "credential",
+          "file": 4,
+          "line": 1,
+          "column": 28
+        }
+      ]
     }
   ],
   "patches": [

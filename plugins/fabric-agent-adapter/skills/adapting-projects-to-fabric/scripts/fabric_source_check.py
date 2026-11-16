@@ -106,7 +106,7 @@ _WROTE_BYTECODE, sys.dont_write_bytecode = sys.dont_write_bytecode, True  # a co
 _STEP = "fabric_secrets"  # the sibling being loaded, so a refusal names it whatever the exception says
 #: The public names of fabric_secrets the check and its command line read (FAA-190 (2), (12)), checked when it loads.
 SECRETS_NAMES = ("BEARER_INSIDE", "JS_SPACE", "NOT_LINE_END", "SCHEME", "credential_name", "has_jwt", "jwt_spans",
-                 "long_secret", "raw_values", "secret_value", "url_parts")
+                 "long_secret", "raw_values", "secret_value", "token_user_name", "url_parts")
 try:
     import fabric_secrets as _secrets  # noqa: E402 - the contract's credential detector (DEC-0044), beside this file
     _STEP = "fabric_source_ignore"
@@ -123,6 +123,10 @@ try:
         INVISIBLE, entry_spans as _entry_spans, fold as _fold, fold_map as _fold_map, read_list)
     _STEP = "fabric_source_redact"
     import fabric_source_redact as _redact  # noqa: E402 - how a path is printed without what was found, beside this file
+    _STEP = "fabric_source_url"
+    from fabric_source_url import (  # noqa: E402,F401 - the contract's URL constants (DEC-0176), beside this file
+        DOCUMENTATION_HOST, GENERATED_LENGTH, LETTER_OR_DIGIT, PASSWORD_NAME, PLACEHOLDER, PLACEHOLDER_SOURCE,
+        URL_BEARER_VALUE, _url_user_host)
     _STEP = "fabric_git"
     import fabric_git as _gitrun  # noqa: E402 - how Git runs on the tree (FAA-190 (66)), beside this file
     _STEP = "fabric_source_check_cli"
@@ -188,10 +192,15 @@ SECRET_FILE_OK = re.compile(r"\.env\.(example|sample|template)")
 _PACK_JUNK_FILE = re.compile(r"\.DS_Store|%s*\.pyc" % _JS_DOT)  # held to fabric_package.JUNK by test_source_check
 #: An absolute URL in a line, read whole by `_url_secret`: a password in it, a credential in its query.
 URL = re.compile(r"[A-Za-z][A-Za-z0-9+.-]{0,63}://[^\s\"'<>`]+")  # a bounded scheme: linear, and `${X:-pg://..}`
-#: `NAME = value`, `NAME: value` or `"name": "value"`: the long-run rule applies only where the name carries a credential.
-#: The name is bounded and starts a word, so a long line is read in linear time.
-ASSIGNED = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]{0,63})[\"']?[ \t]{0,8}[:=][ \t]{0,8}[\"']?"
-                      r"((?:[A-Za-z0-9+/_-]|%[0-9A-Fa-f]{2}){40,}={0,2})")  # `=` only as padding; `%2B` read decoded
+#: The contract's ASSIGNED_HEAD (`src/source-rules.ts`, DEC-0175): `NAME = value`, `NAME: value`, `"name": "value"`, a
+#: name after `--` or `:`, closed by a subscript's `]` (`ENV['NAME']`), before `:=`, `=>`, `||=`, `??=`, `?=`, `+=` or
+#: `<-`. A hyphen inside a word starts no name (two fixed-width look-behinds). Compiled as it stands; held equal to the
+#: vectors' `constants` by test_source_tree.
+ASSIGNED_HEAD_SOURCE = (r'''(?<![A-Za-z0-9_.])(?<![A-Za-z0-9_.]-)([A-Za-z_][A-Za-z0-9_.-]{0,63})(?:["']\]?|\])?[ \t]{0,8}'''
+                        r'''(?::=|=>|\|\|=|\?\?=|\?=|\+=|<-|[:=])[ \t]{0,8}["']?''')
+#: `NAME = value` and the other heads: the long-run rule applies only where the name carries a credential. The name is
+#: bounded and starts a word, so a long line is read in linear time.
+ASSIGNED = re.compile(ASSIGNED_HEAD_SOURCE + r"((?:[A-Za-z0-9+/_-]|%[0-9A-Fa-f]{2}){40,}={0,2})")  # `=` only as padding
 
 
 def _homes_once(text: str, owner: Set[str]) -> List[Tuple[int, int]]:
@@ -234,16 +243,9 @@ def _real(token: str) -> bool:
     return not any(word in lowered for word in SYNTHETIC)
 
 
-#: An Ed25519 signature is public: `sign` writes one into fabric.package.json (`"sig"`), and every signed record carries
-#: one. Only a whole one (64 bytes, 86 base64url characters) is: a storage URL's `sig=` (an HMAC) grants access.
-PUBLIC_NAMES = {"sig", "signature", "signatures"}
-_ED25519_SIGNATURE = re.compile(r"[A-Za-z0-9_-]{86}")
-
-
 def _credential(name: str, value: str, quoted: bool) -> bool:
-    """A credential's name, but a whole Ed25519 signature as a JSON member (`"sig": "..."`, as `sign` writes it)."""
-    if quoted and name.lower() in PUBLIC_NAMES and _ED25519_SIGNATURE.fullmatch(value):
-        return False
+    """A credential's name. A public signature was blanked before (blank_signatures); the assignment rule's own
+    exception is gone since DEC-0176. `value` and `quoted` stay for the callers that pass them."""
     return _secrets.credential_name(name)
 
 
@@ -257,31 +259,63 @@ def _quoted(text: str, match: "re.Match[str]") -> bool:
     return start > 0 and text[start - 1] == '"' and text[end:end + 1] == '"' and _COLON_AFTER.match(text, end + 1) is not None
 
 
+def _password_shaped(value: str, decoded: bool = False) -> bool:
+    """A password of 8 or more characters mixing letters and digits, not synthetic nor a placeholder (DEC-0176)."""
+    text = value if decoded else unquote(value)
+    return (len(value) >= 8 and bool(re.search(r"[0-9]", value)) and bool(re.search(r"[A-Za-z]", value))
+            and _real(text) and not PLACEHOLDER.match(text))
+
+
+def _token_user(user: str) -> bool:
+    """A URL's user that is a token (DEC-0175, DEC-0177): a provider key, a JWT or a classic token's run, not synthetic
+    nor a placeholder."""
+    return _real(user) and not PLACEHOLDER.match(user) and (
+        any(True for _ in _provider_keys(user)) or _secrets.has_jwt(user) or _secrets.token_user_name(user))
+
+
 def _url_secret(url: str, depth: int = 0) -> bool:
-    """A URL that carries a credential, as a source tree holds one. The contract's URL rule (LC-21) reads one value a
-    launch names, where any `token=` is one; across a tree it would read every documented `?token=abc` and `user:pw@`.
-    So: a password of 8 or more mixing letters and digits, or a query or fragment value that, percent-decoded, is shaped
-    like a credential (a provider key, a JWT, a long random run under a credential's name)."""
+    """A URL that carries a credential, as a source tree holds one (the contract's urlSecret at the pin). The URL rule a
+    launch is held to (LC-21) reads one value, where any `token=` is one; across a tree it would read every documented
+    `?token=abc`. So: a password of 8 or more mixing letters and digits (in the user information, or under a password's
+    name), a user that is a token, a provider key behind a percent-encoded separator, or a query or fragment value that,
+    percent-decoded, is a provider key at a word's start, a JWT, a whole bearer token or a long random run under a
+    credential's name, judged whole and piece by piece. A short password on a documentation host is an example, as is
+    one that is wholly a placeholder (DEC-0176)."""
     url = url.rstrip(".,;)]}")
     if not _secrets.SCHEME.match(url):
         return False
     password, query, fragment = _secrets.url_parts(url)
+    user, host = _url_user_host(url)
+    documentation = bool(DOCUMENTATION_HOST.match(host))
     # what says it is synthetic is the value, never the host or the path (`examples.blob.core.windows.net`)
-    if len(password) >= 8 and re.search(r"[0-9]", password) and re.search(r"[A-Za-z]", password) and _real(unquote(password)):
+    if _password_shaped(password) and (not documentation or len(unquote(password)) >= GENERATED_LENGTH):
+        return True
+    if _token_user(unquote(user)):
+        return True
+    # a key behind a percent-encoded separator in the path or a parameter's name (CT-325), read only when the URL as
+    # written shows none, so a raw key keeps its own column
+    if "%" in url and not any(True for _ in _provider_keys(url)) and any(True for _ in _provider_keys(unquote(url))):
         return True
     for part in (query, fragment):
         for name, raws in _secrets.raw_values(part).items():
+            password_name = bool(PASSWORD_NAME.search(name))
+            credential = _secrets.credential_name(name)
             for raw in raws:
                 value = unquote(raw)
                 if depth < 2 and "://" in value and _url_secret(value, depth + 1):  # `?next=https%3A%2F%2F...sig%3D`
                     return True  # read before the synthetic filter: an inner URL is judged by its own values
                 if any(True for _ in _provider_keys(value)):  # each key by its own word, as on a line
                     return True
-                if not _real(value):
-                    continue
-                if (_secrets.credential_name(name) and _secrets.long_secret(value)) or \
-                        _secrets.has_jwt(value) or URL_SECRET_VALUE.search(value):
-                    return True
+                pieces = value.split(",") if "," in value else []
+                for index, piece in enumerate([value] + pieces):
+                    if password_name and _password_shaped(piece, True) and (not documentation or len(piece) >= GENERATED_LENGTH):
+                        return True
+                    if not _real(piece):
+                        continue
+                    if (credential and _secrets.long_secret(piece)) or _secrets.has_jwt(piece):
+                        return True
+                    if index == 0 and URL_BEARER_VALUE.search(piece):  # the bearer branch reads the whole value only
+                        return True
     return False
 
 
@@ -342,11 +376,15 @@ def _url_credentials(text: str) -> List[str]:
             parts: List[str] = []
             if "://" in url[:72] and _secrets.SCHEME.match(url):
                 password, query, fragment = _secrets.url_parts(url)
-                if password and _url_secret("https://" + "u:%s@h.invalid/" % password):
+                # probed on `h.test`, no documentation host (DEC-0176): a short password there is read
+                if password and _url_secret("https://" + "u:%s@h.test/" % password):
                     parts += [password, unquote(password)]
+                user = _url_user_host(url)[0]
+                if user and _token_user(unquote(user)):  # a token user name (DEC-0175, DEC-0177)
+                    parts += [user, unquote(user)]
                 for part in (query, fragment):
                     for piece in part.split("&"):
-                        if "=" in piece and _url_finding("https://h.invalid/?" + piece):
+                        if "=" in piece and _url_finding("https://h.test/?" + piece):
                             value = piece.partition("=")[2]
                             parts += [value, unquote(value)]
             out += parts or [url]
@@ -358,8 +396,7 @@ def _url_credentials(text: str) -> List[str]:
 _JWK_MORE = re.compile(r"(?<![A-Za-z0-9_$\\])\\?[\"']?[dk]\\?[\"']?[ \t]*:[ \t]*\\?[\"']?([A-Za-z0-9_-]{43,})")
 #: Plain check only (FAA-190 (11)): a value under a credential's name holding an `=` inside it (`<24>=<30>`), read
 #: whole; the contract's ASSIGNED takes `=` only as padding.
-_ASSIGNED_EQ = re.compile(r"(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]{0,63})[\"']?[ \t]{0,8}[:=][ \t]{0,8}[\"']?"
-                          r"((?:[A-Za-z0-9+/_=-]|%[0-9A-Fa-f]{2}){40,})")
+_ASSIGNED_EQ = re.compile(ASSIGNED_HEAD_SOURCE + r"((?:[A-Za-z0-9+/_=-]|%[0-9A-Fa-f]{2}){40,})")
 
 
 def _jwk_more(line: str) -> Iterable[Tuple[int, int]]:
@@ -369,7 +406,7 @@ def _jwk_more(line: str) -> Iterable[Tuple[int, int]]:
 def _assigned_values(line: str) -> Iterable[Tuple[int, int]]:
     """The spans of long random values assigned to a credential's name: ASSIGNED's, then the plain check's own with an
     `=` inside the value."""
-    if ":" not in line and "=" not in line:
+    if ":" not in line and "=" not in line and "<-" not in line:
         return
     for pattern in (ASSIGNED, _ASSIGNED_EQ):
         for m in _assigned(line, pattern):
@@ -380,10 +417,10 @@ def _assigned_values(line: str) -> Iterable[Tuple[int, int]]:
 
 
 #: The JSON escapes tools write for `&`, `=` and `/` (Go's encoding/json writes `\u0026`, PHP's json_encode `\/`).
-_JSON_ESCAPES = re.compile(r"\\(?:u0026|u003[dD]|/)")
+_JSON_ESCAPES = re.compile(r"\\(?:u0026|u003[dD]|/|\")")  # `\"` since DEC-0175
 
 
-_UNESCAPED = {"u0026": "&", "u003d": "=", "u003D": "=", "/": "/"}
+_UNESCAPED = {"u0026": "&", "u003d": "=", "u003D": "=", "/": "/", '"': '"'}
 
 
 def _json_unescaped(line: str) -> str:
@@ -423,13 +460,25 @@ def _secret_finding(line: str) -> Optional[str]:
     return found
 
 
-#: A whole Ed25519 signature as `sign` writes it: public, so no rule reads it (not even a provider key's shape in it).
-_PUBLIC_SIGNATURE = re.compile(r"\"(?:sig|signature|signatures)\"[ \t]*:[ \t]*\"[A-Za-z0-9_-]{86}\"", re.IGNORECASE)
+#: A whole signature under a quoted `sig`, `signature` or `signatures` member, after `:` or `=>`, in double or single
+#: quotes or none, closing quote or not, followed by no base64 character or `.`: Ed25519 (86 base64url characters, as
+#: `sign` writes it) or a DER ECDSA P-256 one as WebAuthn writes it (DEC-0176). Public: blanked before any rule reads
+#: the line. The value is matched in its case (SIGNATURE_VALUE): the `i` flag is the member's name's.
+PUBLIC_SIGNATURE = re.compile(r"(\"(?:sig|signature|signatures)\"[ \t]*(?::|=>)[ \t]*[\"']?)([A-Za-z0-9_-]{86}|ME[QUY][A-Za-z0-9_-]{91,93})"
+                              r"([\"']|(?![A-Za-z0-9_+/=.-]))", re.IGNORECASE | re.ASCII)
+SIGNATURE_VALUE = re.compile(r"(?:[A-Za-z0-9_-]{86}|ME[QUY][A-Za-z0-9_-]{91,93})")
+
+
+def blank_signatures(line: str) -> str:
+    """The line with each whole public signature blanked, every other index kept (the contract's credentialIn)."""
+    if '"' not in line:
+        return line
+    return PUBLIC_SIGNATURE.sub(lambda m: m.group(1) + " " * len(m.group(2)) + m.group(3)
+                                if SIGNATURE_VALUE.fullmatch(m.group(2)) else m.group(0), line)
 
 
 def _secret_in(line: str) -> Optional[str]:
-    if '"' in line:
-        line = _PUBLIC_SIGNATURE.sub('"sig": ""', line)
+    line = blank_signatures(line)
     if PRIVATE_KEY.search(line):
         return "a private key block"
     if any(_real(m.group(1)) for m in JWK_PRIVATE.finditer(line)) or any(True for _ in _jwk_more(line)):
@@ -496,7 +545,7 @@ def _provider_keys(text: str) -> Iterable[Tuple[int, int]]:
         runs = None
         for m in starts.finditer(text):
             p = m.start()
-            if p and text[p - 1].isalnum():
+            if p and LETTER_OR_DIGIT.match(text[p - 1]):  # DEC-0176: a letter of another script does not stop a key
                 continue
             if open_ended:
                 if runs is None:
@@ -531,7 +580,7 @@ def _overlapping(pattern: "re.Pattern[str]", text: str) -> Iterable["re.Match[st
 def _secret_spans(text: str, urls: bool = True) -> List[Tuple[int, int]]:
     """The spans of credential-shaped values in a text, as `_secret_in` reads them (a public signature is no span);
     without `urls`, a URL's span is left out (`_url_credentials` gives its parts)."""
-    public = [m.span() for m in _PUBLIC_SIGNATURE.finditer(text)] if '"' in text else []
+    public = [m.span() for m in PUBLIC_SIGNATURE.finditer(text) if SIGNATURE_VALUE.fullmatch(m.group(2))] if '"' in text else []
     return [(a, b) for a, b in _raw_secret_spans(text, urls) if not any(p <= a and b <= q for p, q in public)]
 
 

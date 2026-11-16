@@ -12,7 +12,8 @@ from unittest.mock import patch
 from test_adapt_project import ADAPTER, ROOT, scaffold_args
 
 OLD = '2ce392291c6668598d12cd38327e24696b5ca15c'
-NEW = '560d60369b553fc123ba29c3e1e637de68901678'
+NEW = '2bbfd7805b1f9c4eaf25f62394a11957f131a092'
+DEC173 = '560d60369b553fc123ba29c3e1e637de68901678'  # DEC-0171, DEC-0172, DEC-0173, the release v0.1.0+2026-11-16 (0.96.x); stays supported (0.97.0)
 DEC170 = '2462c90b4108e56d35be6a275d9043059c95d5d0'  # DEC-0168, DEC-0169, DEC-0170, the release v0.1.0+2026-11-15 (0.91.0 to 0.95.x); stays supported (0.96.0)
 DEC166 = 'ced7b29265c424688602dda998c0ea4db2ba46a9'  # DEC-0162, DEC-0166, the release v0.1.0+2026-11-14.2 (0.89.0…0.90.4); stays supported (0.91.0)
 DEC164 = '91c031c464695ae9661c12f97ce1e5dc3cb5448c'  # DEC-0156, DEC-0163, DEC-0164, the release v0.1.0+2026-11-14 (0.87.0, 0.88.0); stays supported (0.89.0)
@@ -55,7 +56,7 @@ FIXTURES = ROOT / 'test/fixtures/contract-revisions/legacy'
 class RevisionTests(unittest.TestCase):
     def test_default_is_new_and_supported_revisions_are_immutable(self):
         self.assertEqual(ADAPTER.CONTRACT_COMMIT, NEW)
-        self.assertEqual(ADAPTER.SUPPORTED_CONTRACT_COMMITS, (NEW, DEC170, DEC166, DEC164, DEC155, DEC154, DEC150, DEC145, DEC141, DEC137, DEC125, DEC124, DEC121, DEC111, DEC106, DEC104, DEC103, DEC97, DEC95, DEC88, DEC83, DEC82, DEC79, DEC78, DEC77, DEC57, DEC55, DEC46, DEC45, DEC39, DEC36, DEC35, DEC33, DEC31, PREVIOUS, PRIOR, EARLIER, OLD))
+        self.assertEqual(ADAPTER.SUPPORTED_CONTRACT_COMMITS, (NEW, DEC173, DEC170, DEC166, DEC164, DEC155, DEC154, DEC150, DEC145, DEC141, DEC137, DEC125, DEC124, DEC121, DEC111, DEC106, DEC104, DEC103, DEC97, DEC95, DEC88, DEC83, DEC82, DEC79, DEC78, DEC77, DEC57, DEC55, DEC46, DEC45, DEC39, DEC36, DEC35, DEC33, DEC31, PREVIOUS, PRIOR, EARLIER, OLD))
 
     def test_complete_issued_legacy_bundles_remain_locally_valid(self):
         for profile in ('mcp', 'a2a', 'local-runner'):

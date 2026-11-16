@@ -98,6 +98,18 @@ class Vectors(unittest.TestCase):
                     self.assertNotIn(text, finding["message"])
 
 
+class TokenUserCost(unittest.TestCase):
+    def test_the_user_name_counts_in_the_budget_as_the_contract_counts_it(self):
+        # DEC-0177 (FAA-343 (12)): detectorCost adds `url.username.length`; these values are the contract's detectorCost
+        # at v0.1.0+2026-11-16.6, measured under its tsx on the same strings
+        ca = load("check_service_channel_agent")
+        s = "https"
+        cases = [s + "://" + "a1" * 20 + "@h/x", s + "://a b@h/x?q=1", s + "://us%41er:pw@h/", s + "://h/x",
+                 "x-app://tok\u00e9n@h/y", s + "://[::1]/"]
+        self.assertEqual([ca.detector_cost(c) for c in cases], [327, 435, 348, 278, 186, 242])
+        self.assertEqual(ca.url_username(s + "://a b@h/x"), "a%20b")
+
+
 class Recipe(unittest.TestCase):
     def test_the_support_agent_recipes_declaration_has_no_finding(self):
         example = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes/support-agent/channel-agent.example.json"
