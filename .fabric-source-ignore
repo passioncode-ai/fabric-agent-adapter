@@ -1,5 +1,10 @@
-# The contract's vectors and the kit's fixtures carry synthetic credential shapes and home paths on purpose.
-test/fixtures/
+# The contract's vectors (and the script that makes some of them) carry synthetic credential shapes and home paths on
+# purpose: a folder that holds only the contract's synthetic vectors.
+test/fixtures/contract/
+# The delegation vectors carry synthetic tokens and keys on purpose.
+test/fixtures/delegation/vectors.json
+# The kit's connection inputs carry synthetic credential URLs and keys on purpose, for the refusals they test.
+test/fixtures/kit-connections-inputs.json
 # Tests that write a synthetic credential or a home path inline, to check the kit refuses or redacts it.
 test/fabric-connections.test.mjs
 test/fabric-http.test.mjs

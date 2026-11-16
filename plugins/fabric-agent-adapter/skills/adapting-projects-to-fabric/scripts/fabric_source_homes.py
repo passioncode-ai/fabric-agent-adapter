@@ -70,3 +70,18 @@ def _dashed_home(name: str) -> Tuple["re.Pattern[str]", ...]:
         whole = r"((?i:%s))(?![A-Za-z0-9])" % body
         _DASHED[name] = tuple(re.compile(prefix + whole, re.ASCII) for prefix in _DECLARED_SLASHED + _DECLARED_DASHED)
     return _DASHED[name]
+
+
+_HOME_NAME = r"([A-Za-z0-9][A-Za-z0-9._-]*)"
+#: The plain check's own home forms, read beside the contract's (fabric_source_check.HOME_PATHS, which the contract's
+#: `SOURCE_HOME_PATHS` mirrors and the tree check under a manifest reads alone): a home after a `file` URL's host or in
+#: VS Code's `vscode://file/` URI, and a drive whose colon is percent-encoded (`file:///c%3A/Users/<name>/`), which
+#: the contract's forms read neither (FAA-190 (78)).
+MORE_HOME_PATHS = (
+    re.compile(r"(?i:file)://[^/\s\"'<>`]+/(?:[A-Za-z](?::|%3[Aa])/)?(?:Users|home)/" + _HOME_NAME, re.ASCII),
+    re.compile(r"(?i:vscode(?:-insiders)?)://(?i:file)/(?:[A-Za-z](?::|%3[Aa])/)?(?:Users|home)/" + _HOME_NAME, re.ASCII),
+    re.compile(r"(?<![A-Za-z0-9_.-])(?i:[A-Za-z]%3A(?:/|%2F|%5C)+Users(?:/|%2F|%5C)+)" + _HOME_NAME, re.ASCII),
+)
+#: A slash as JSON writes it escaped: `\/` (PHP), `\\/` (escaped twice) and `\u002f`; a home path is read with each one
+#: undone too (FAA-190 (16)).
+HOME_ESCAPES = re.compile(r"\\+(?:/|u002[fF])")

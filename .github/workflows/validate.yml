@@ -38,6 +38,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "22"
+      # An ISO-8859-1 locale, so the source check's UTF-8 restart is exercised here, not only in a local container
+      # (FAA-190 (72): test_under_a_latin_1_locale_* skips where no such locale exists, as on a fresh runner).
+      - run: sudo locale-gen en_US
       - run: python3 -m unittest discover -s test -v
         env:
           FABRIC_REQUIRE_RELEASE_TAGS: "1"
