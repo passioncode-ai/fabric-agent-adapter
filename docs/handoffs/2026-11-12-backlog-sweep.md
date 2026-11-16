@@ -12,7 +12,6 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.78.0 | the two 0.78.0 lines joined (`rel-0.78.0` with FAA-278, `main` with FAA-290, FAA-291, FAA-297) | PR #276, merge `8d5bf23d`, tag `v0.78.0`, release run 43150500652 success, npm 0.78.0 |
 | 0.79.0 | wave 1 (37 rows): the register sweep, working-with-fabric against Fabric v0.3.19, the catalogue line, kit fixes, FAA-293, dashboard kit 1.1.6 | PR #277, merge `97ca5b5e`, tag `v0.79.0`; its release run 43176165810 failed `floors` and `windows`, nothing published |
 | 0.79.1 | 0.79.0 plus the fixes its run and the blind seam reading found (Node 18 `localhost`, Windows dispatch tests and the open descriptor, `foreign-user` dropping a lost call's record, the default loopback port) | PR #278, merge `3b6519bc`, tag `v0.79.1`, npm `latest` 0.79.1, GitHub release `v0.79.1`; the run reads red only for the registry poll (FAA-307) |
-
 | 0.80.0, 0.80.1 | wave 2 and wave 3's first builders (session scripts, kit and docs, the three operator rules, FAA-307, 2B's kit rows, FAA-289, the docs rows) | PRs #279 and #280, tags `v0.80.0` and `v0.80.1`; each run failed a platform test (macOS-only paths, Windows separators), nothing published |
 | 0.80.2 | 0.80.0 shipped, its two cross-platform test fixes in | PR #281, merge `b8d2355a`, tag `v0.80.2`, npm `latest` 0.80.2 |
 | 0.81.0 | wave 3: the repin to contract `v0.1.0+2026-11-08.1` (FAA-258, DEC-0151 `SECRET_VALUE`), the `fabric-source/1` tree and `new` (FAA-261, FAA-270, G21), `fabric_holds` and `limits.holds` (FAA-265), FAA-298, FAA-227, FAA-251, parts of FAA-260 and FAA-286, the seam reading's five fixes; new rows FAA-311 to FAA-319 | PR #282, merge `5511f98b`, tag `v0.81.0`, release run 43284542201 success, npm `latest` 0.81.0, GitHub release `v0.81.0` |
@@ -44,7 +43,8 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.94.0 | FAA-194 (17 items: slots kept through long jobs, lost answers, take-back races), FAA-264 (the communication agent template 1.1.0) | PR #321, merge `e8ad146f`, tag `v0.94.0`, release run 43780677698 success (six validate jobs, release, publish through OIDC), npm `latest` 0.94.0; checks: validate, both strict plugin validations, Python 2542 OK, Node 810 (one transient failure under the parallel Python run; a rerun had none) |
 | 0.95.0 | FAA-190's remaining source-check items (printed paths, plain-check forms, cost), FAA-196 (6), (22), FAA-200 (41), (45), (57), FAA-341 | PR #322, merge `54a988dc`, tag `v0.95.0`, release run 43790823476 failed on python, macos, windows and floors (an `array[int]` annotation below Python 3.12; a test's `JSON.stringify` of a 5000-deep value on the hosted stack): not published, see 0.95.1 |
 | 0.95.1 | 0.95.0 republished with its two hosted failures fixed; refactor: `fabric_interop_jobs`, `fabric_package_rules`, `fabric_descriptor_members` (three modules under the ceiling, no behaviour change) | PR #323, merge `48a36783`, tag `v0.95.1`, release run 43794842316 success (six validate jobs, release, publish through OIDC), npm `latest` 0.95.1; checks: validate, both strict plugin validations, Python 2585 OK, Node 812 with 0 fail, Python 3.9.6 on the touched suites 421 OK |
-| 0.96.0 | the repin to `v0.1.0+2026-11-16` (FAA-342): instance facts (DEC-0173), six protocol revisions, usage-data guidance (FAA-338, DEC-0157) | release receipts follow the merge |
+| 0.96.0 | the repin to `v0.1.0+2026-11-16` (FAA-342): instance facts (DEC-0173), six protocol revisions, usage-data guidance (FAA-338, DEC-0157) | PR #324, merge `9ca05a73`, tag `v0.96.0`, release run 43799379257: attempt 1 failed at publish (npm E401 "token is invalid", as FAA-73 once saw), attempt 2 success (six validate jobs, release, publish through OIDC), npm `latest` 0.96.0; checks: validate, both strict plugin validations, Python 2601 OK, Node 817 with 0 fail |
+| 0.96.1 | the 0.95.1 documentation audit's fixes (31 findings: README, AGENTS, SECURITY, SKILL-CARD, kit-modules, the skills, the backlog statuses, this handoff) | release receipts follow the merge |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -54,22 +54,30 @@ Recorded for the operator; later builder briefs name the rule.
 
 ## Next task
 
-1. 0.91.0 is on npm (OIDC, no token); the launcher takes it as PC-228. This machine's Claude Code still loads the adapter the PassionCode launcher pins
-   (0.62.0 from `~/.passioncode/current`) until the launcher's 0.2.77 (adapter 0.86.0) and 0.2.78 (0.87.0, PR #343) are
-   published; both wait on the operator's answer to the launcher's question `5f196939`.
-1a. 0.91.0 is on the contract's `v0.1.0+2026-11-15`. Next on that line: `build_well_known` refusing `FAC-SEM-176` once the services on this machine serve an agent surface (two were asked; one done, `04502c77`), and the contract's CT-316 (DEC-0169's open questions).
-2. Wave 7, part two, row by row. The large rows were re-measured on `main` `4f1a66d7` on 2026-11-15: FAA-190 (77 open), FAA-200 (25 open, 7 blocked), FAA-194 (20 open), FAA-196 (2 open), FAA-264 (38 open); their first builders shipped in 0.92.0 and 0.93.0; next: FAA-194's board-slot items, FAA-264's template gaps, FAA-190's remaining items, FAA-116. FAA-338 (DEC-0157's builder guidance) waits for the next repin.
-4. The three hosts the operator offered (2026-11-13): a Hermes A2A endpoint (FAA-10's live test), a Windows machine
-   with Claude Code (FAA-183), a headless Mac with root for one LaunchDaemon install (FAA-286 (4)); each waits for how
+1. The launcher 0.2.78 pins the adapter at v0.87.0, so this machine's Claude Code loads 0.87.0 from
+   `~/.passioncode/current`; the launcher's PC-228 repins it to the adapter's npm `latest` (0.96.x now).
+1a. 0.96.0 is on the contract's `v0.1.0+2026-11-16` (FAA-342). Next on that line: `build_well_known` refusing
+   `FAC-SEM-176` and the instance-facts pair problems once the services on this machine serve them, the contract's
+   CT-316, then CT-325's tag (due 2026-11-22, thread `b9e5668d`) for FAA-190's last six items and CT-328 for the eight
+   false findings its shapes give.
+2. The exact next unit: FAA-202 (P1), usage analytics on by default in the agent templates, now that DEC-0157's UD-1
+   to UD-6 are in the pin (FAA-338's `references/usage-data.md` is the guidance). Then FAA-201's remaining open list
+   and FAA-124 (P1); then the P2 rows in order: FAA-339 first (the scenario runner FAA-264 (6), (34), FAA-286 (3) and
+   FAA-201's scenarios wait on), FAA-183, FAA-204, FAA-285, FAA-287, FAA-288, FAA-294; FAA-225 and FAA-230 wait on the
+   contract's DEC-0160.
+3. The three hosts the operator offered (2026-11-13): a Hermes A2A endpoint (FAA-10's live test), a Windows machine
+   with Claude Code (FAA-183), a headless Mac with root for one LaunchDaemon install (FAA-340); each waits for how
    to reach it.
-5. FAA-116 builds the rest of an answering agent: it goes through the agent architect first (the operator's rule of
+4. FAA-116 builds the rest of an answering agent: it goes through the agent architect first (the operator's rule of
    2026-11-12), `python3 ~/DATA/fabric-agents-database/tools/audit.py consult "<the need>"`.
 
 ## Waits
 
 - Blocked rows and their owners are in the inventory; re-check them at each wave boundary.
-- The launcher installs adapter 0.62.0 on machines it sets up until its PC-123 repins the set.
-- FAA-296's fix is Fabric's CO-563, in the Fabric release after v0.3.19.
+- The launcher pins adapter v0.87.0 until PC-228 repins it.
+- FAA-190's last six items wait on the contract's CT-325 tag (due 2026-11-22), the eight false findings on CT-328.
+- Sub-agents of this account are out of their weekly limit until 2026-11-21 01:00 Europe/Warsaw; until then the
+  session builds alone.
 
 ## Checks run
 
