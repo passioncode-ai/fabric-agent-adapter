@@ -437,9 +437,10 @@ class PackTests(unittest.TestCase):
             fp.sign(self.root, pem)
         by_pem = fp.sign(self.root, pem, kid=V["keys"]["publisher"]["jwk"]["kid"])
         self.assertEqual(by_pem["signature"]["sig"], fp.sign(self.root, self.key())["signature"]["sig"])
-        if shutil.which("openssl"):
-            made = Path(self.tmp.name) / "made.pem"
-            subprocess.run(["openssl", "genpkey", "-algorithm", "ed25519", "-out", str(made)], check=True, capture_output=True)
+        made = Path(self.tmp.name) / "made.pem"
+        # FAA-345: macOS's /usr/bin/openssl is LibreSSL, which makes no ed25519 key; that part needs an openssl that can
+        if shutil.which("openssl") and subprocess.run(["openssl", "genpkey", "-algorithm", "ed25519", "-out", str(made)],
+                                                      capture_output=True).returncode == 0:
             made.chmod(0o600)
             answer = fp.sign(self.root, made, kid="example-2026")
             pkg = dict(json.loads((self.root / fp.PACKAGE_FILE).read_text()), signatures=[answer["signature"]])

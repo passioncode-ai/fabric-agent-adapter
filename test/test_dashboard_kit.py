@@ -283,8 +283,11 @@ class Cli(unittest.TestCase):
         self.temp.cleanup()
 
     def run_kit(self, *args, stdin=None, env=None):
+        # FAA-344: a session Fabric started on a board request exports FABRIC_DISPATCH_*, which silences the notice
+        # by design; the child gets the caller's environment without them, and a test that wants them passes them.
+        base = {k: v for k, v in os.environ.items() if not k.startswith("FABRIC_DISPATCH_")}
         return subprocess.run([sys.executable, str(SCRIPTS / "dashboard_kit.py")] + list(args), input=stdin,
-                              capture_output=True, text=True, env=dict(os.environ, **(env or {})), timeout=30)
+                              capture_output=True, text=True, env=dict(base, **(env or {})), timeout=30)
 
     def test_install_adds_then_keeps_then_refuses_a_changed_copy(self):
         target = self.base / "static"
