@@ -15,6 +15,12 @@
 - The backlog's FAA-194, FAA-196 and FAA-201 statuses agree with their cells; the handoff's next task is FAA-202, its
   waits current.
 
+### Fixed
+
+- Tests only: the dashboard-kit CLI tests drop `FABRIC_DISPATCH_*` from the child's environment, so they pass inside a
+  session Fabric started on a board request (FAA-344); `test_the_key_file` makes its ed25519 key with `openssl` only when
+  that `openssl` can (macOS's LibreSSL cannot) (FAA-345).
+
 ## 0.96.0 (2026-11-16)
 
 The repin to Fabric Agent Contract `v0.1.0+2026-11-16` (`560d6036`, FAA-342); `2462c90b` (`v0.1.0+2026-11-15`) stays
