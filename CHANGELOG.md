@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.95.1 (2026-11-16)
+
+### Changed
+
+- Three kit modules near the 1000-line ceiling are split, with no behaviour change: `fabric_interop.py` (990 to 771
+  lines) moves `JobStore` into the new `fabric_interop_jobs` (Node `fabric-interop-jobs.mjs`, which also takes
+  `intentDigest`); `fabric_package.py` (990 to 763) moves the package file names, digest helpers and the FAC-SEM-064 to
+  066 and 102 rules into `fabric_package_rules` (Node `fabric-package-rules.mjs`); `fabric_descriptor.py` (996 to 750)
+  moves the member checks, `source_repository_problem`, `origin_identity`, `repository_from_origin` and the URI rules
+  into `fabric_descriptor_members` (Node `fabric-descriptor-members.mjs`). Every name stays importable from where it was;
+  `pack`, `sign` and `verify` run as before.
+
 ## 0.95.0 (2026-11-16)
 
 ### Fixed

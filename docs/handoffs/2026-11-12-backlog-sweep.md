@@ -43,6 +43,7 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.93.1 | 0.93.0 republished with the Windows test fixed | PR #320, merge `e690273f`, tag `v0.93.1`, release run 43777534237 success (six validate jobs, Windows included, release, publish through OIDC), npm `latest` 0.93.1; checks: validate, test_validate 125 OK, kit, source check and git suites 179 OK |
 | 0.94.0 | FAA-194 (17 items: slots kept through long jobs, lost answers, take-back races), FAA-264 (the communication agent template 1.1.0) | PR #321, merge `e8ad146f`, tag `v0.94.0`, release run 43780677698 success (six validate jobs, release, publish through OIDC), npm `latest` 0.94.0; checks: validate, both strict plugin validations, Python 2542 OK, Node 810 (one transient failure under the parallel Python run; a rerun had none) |
 | 0.95.0 | FAA-190's remaining source-check items (printed paths, plain-check forms, cost), FAA-196 (6), (22), FAA-200 (41), (45), (57), FAA-341 | release receipts follow the merge |
+| 0.95.1 | refactor: `fabric_interop_jobs`, `fabric_package_rules`, `fabric_descriptor_members` (three modules under the ceiling, no behaviour change) | release receipts follow the merge |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
