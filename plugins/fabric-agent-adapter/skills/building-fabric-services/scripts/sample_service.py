@@ -201,7 +201,8 @@ class Service:
             return {"capability": capability, "moved": False}
         if not isinstance(capability, str) or capability not in self.board_moved():
             raise fs.ServiceError("No slot of that capability has moved away from this service.")
-        self.board.take_back(capability)
+        if not self.board.take_back(capability, only_if_moved=True):
+            return {"capability": capability, "moved": False}  # a move back landed since the check (FAA-194 (30))
         # Who decided and by which route are words in the sentence; the caller, a machine id, goes in data only
         # (events-and-notifications.md, "Writing an event"; 0.56.0 product r34).
         # The route in words; the tokens by and via, with the caller, in data (product r35).

@@ -117,6 +117,7 @@ export class Responder extends Recovery {
     this.draining = null;
     this.claimKeys = Object.create(null);
     this.probing = new Set(); // moved slots whose move-back claim lost its answer: asked again under the same key
+    this.lostAnswer = false; // this tick lost a move-back answer: no success (FAA-194 (13))
     this.said = Object.create(null);
     this.upSince = null; // when the board was last seen up after a fault (FAA-187 (22))
     this.rr = 0;
@@ -299,7 +300,9 @@ export class Responder extends Recovery {
     if (now < this.waitUntil) return this.waitUntil - now;
     try {
       if (!this.session) await this.connect();
+      this.lostAnswer = false;
       await this.tick();
+      if (this.lostAnswer) return this.interval(); // a lost move-back answer, kept from the fault, is no success either (FAA-194 (13))
       this.backoff.reset();
       if (this.state === 'down') this.state = 'ready'; // a lost call was sent again and answered: the session held throughout
       this.upSince ??= now;

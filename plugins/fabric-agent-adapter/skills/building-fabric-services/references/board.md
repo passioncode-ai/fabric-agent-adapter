@@ -307,7 +307,9 @@ held and not transferred). The responder keeps that move instead of undoing it:
   (`com.status` once a renewal, then one `com.claim`, below) is sent for that capability: no `com.renew`,
   `com.complete`, `com.enroll` or `com.responder_replace`, not at recovery after a restart, and not when the new
   holder's lease lapses, nor when com.status later names no generation for the slot (a recorded move stays until
-  take-back or a move back). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back
+  take-back or a move back; when the move's record could not be written, the slot's own generation stands for it
+  until a restart, FAA-194 (12)). While other work runs, the move-back check sends one `com.enroll` in place of the
+  `com.claim` (below). Accepted requests stay `accepted` on the board, unanswered, until the slot is taken back
   or moved back (CT-175 will hand them to the new holder). One `board.slot.moved` event (warning, notify) says so, once, also across restarts
   (the record keeps `moved`).
 - A responder that never held the slot (a first start: no record, or a record of another Project), or whose record
@@ -331,18 +333,33 @@ held and not transferred). The responder keeps that move instead of undoing it:
   at the next renewal. `idempotency_window_expired` or `capacity_exceeded` asks again at the next renewal under a
   fresh key, recording nothing. `fenced`, or any other refusal that is not the board session's (`not_authorized` counted with them, since a
   non-holder's claim may be refused so), is another session's slot:
-  recorded as `moved` at that generation, so it is not asked about twice. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
+  recorded as `moved` at that generation, so it is not asked about twice. So a real loss of the grant while the only
+  slot is moved reads as another session's slot and says nothing: `board.access.needed` comes with the next call the
+  grant refuses elsewhere, or the next reconnect (FAA-194 (10)); a client cannot tell the two apart from the claim alone. A claim whose answer was lost (`unreachable`) is asked again under the same key at the next renewal, so a claim that
   landed is not stranded; until then it counts as at most a lease from that key's first send (a fresh key starts
   its own, and it counts only while more than the 10 s margin of that lease is left, then no more, as a lapsed slot), so a second lost answer keeps
-  the session (as any call without an answer does while a lease holds: the failure table above; FAA-194 (34)). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
+  the session (as any call without an answer does while a lease holds: the failure table above; FAA-194 (34)). A tick
+  that lost such an answer is no success: the backoff is not reset, a `down` state stays and the `board.down` quiet window
+  does not run (FAA-194 (13)). A take-back that lands while that claim is in flight wins: no probe lease is kept for a
+  slot the operator took back (FAA-194 (25)). A replayed receipt from a generation older than `com.status` shows (a move away and back meanwhile) is
   dead: its key is dropped and a fresh key asks at the next renewal. A take-back drops the capability's claim key too, so a request a move-back claim handed out while the take-back raced
   it waits for its attempt's lease (60 s) before it is claimed again (a take-back that lands before the move-back check makes its claim key
-  leaves that key to the claim loop, which works the request at once). Nothing is asked while the responder stops. It is never an enroll or a replace on a slot another session holds, and it waits
-  while other work runs: a move back during a job longer than the lease (60 s) may lapse and be lost to another
-  session, after which take-back, or another move back to this session, brings it back.
+  leaves that key to the claim loop, which works the request at once). Nothing is asked while the responder stops.
+  While other work runs a claim could hand out a second request, so the check sends one `com.enroll` instead (FAA-194
+  (2)): it renews a slot this session holds without handing out a request, so a move back during a job longer than the
+  lease (60 s) is kept, and the claim loop asks once the job ends. It is sent only while `com.status` shows the slot
+  `active` (a live holder), since an enroll replaces a lapsed one; a `stale` or `absent` slot waits for the claim after
+  the job (`lease_expired` enrolls then). `fenced` is another session's live slot, recorded as `moved` at that
+  generation; a receipt at another generation than `com.status` showed (the holder lapsed between the read and the
+  enroll) is not a move back: recorded as `moved` at the receipt's generation and left to lapse unused, the safe side
+  as for a replay above. A lost answer counts as a probe's lease, as for the claim. It is never an enroll or a replace
+  that takes a slot another session holds.
 - Otherwise only the operator brings the slot back: `take_back(capability)` (`takeBack`) forgets the record, and wins over a move
   being read at the same time: the move is written under the responder's lock (Node: on the fence queue, after any fenced
-  call in flight) and only while the record is unchanged (FAA-158). Never edit the
+  call in flight) and only while the record is unchanged (FAA-158). A caller that checks the slot first passes
+  `only_if_moved=True` (`takeBack(capability, { onlyIfMoved: true })`): the take-back then acts only on a slot still
+  moved (its state or its record) and answers `False` when a move back landed since the check, so the record of a slot
+  held again is kept (FAA-194 (30)); it answers `True` when it acted. The reference service passes it. Never edit the
   checkpoint's `slots` record by hand to undo a move. Once the slot is held again after a take-back (an enroll or a
   replace lands, in the same process), the kit says `board.slot.returned` (info, once per take-back; FAA-325), as it
   does for a move back. In the same board
@@ -428,7 +445,7 @@ message, retryable, data)`.
 
 Python (`fabric_board`): `Responder(*, hub, project_id, capabilities, credential_file, checkpoint_file, handler,
 admit, observe=None, emit=None, service, now, rand, spawn, session_factory, agent_id=None, mandate_from=None, wall=time.time, identify_agent=None, links=None)`
-with `step()`, `run(stop, drain)`, `shutdown(drain)`, `take_back(capability)`; `WorkContext.progress(note)`,
+with `step()`, `run(stop, drain)`, `shutdown(drain)`, `take_back(capability, only_if_moved=False)`; `WorkContext.progress(note)`,
 `.begin_effect(summary)`, `.stopped`, `.mandate`, `.mandate_covers(call)`; `PERSONAL_BOARD`; `BoardSession(grant)`;
 `Checkpoint(path)`; `comms_canonical(value)`, `comms_digest(operation, value)`, `receipt_problems(value, op)`,
 `refusal_problems(value)`, `directory_findings(page)`, `directory_problems(page)`, `find_project(page, project_id,
@@ -437,5 +454,5 @@ effect_began)`, `self_check()`; `BoardError`, `Stopped`.
 
 Node: the same names in camelCase (`locateHub(root, {alive, estate, now})`, `new HubClient(root, {alive, timeout,
 estate, post})`, `new Responder({...})` with async `step()`, `run({signal, drain})`, `shutdown(drain)`,
-`takeBack(capability)`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`, `ctx.mandate`, `ctx.mandateCovers(call)`;
+`takeBack(capability, { onlyIfMoved })`; `await ctx.progress(note)`, `await ctx.beginEffect(summary)`, `ctx.mandate`, `ctx.mandateCovers(call)`;
 the options `agentId`, `mandateFrom`, `wall` (milliseconds), `identifyAgent` and `links`; `selfCheck()`). Both kits read and write the same checkpoint file. `links` maps a notify kind to the page on the service that resolves it (`{"board.slot.moved": "/#board"}`, a path, as `make_event` takes one): a notice that notifies carries it as `link`, so the banner opens that page; give it only with an emit that takes `link` (`JsonlEventLog.append` does; FAA-187 (21)). A Node emit receives `{notify, subject, link?, data?}` as one object: spread it before its own `subject` or `link` if it sets its own, or the responder's wins (FAA-187 (27)).

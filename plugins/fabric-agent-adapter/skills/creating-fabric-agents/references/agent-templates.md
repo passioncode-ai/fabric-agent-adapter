@@ -21,7 +21,7 @@ close one is its owner's decision, open; `test/validate.py` runs the check on ev
 | `data-rooms.json` | a list of `{room, blocks, access}` with optional `scope`, `classes`, `level`, `required`, `variants`, `use`, `notes`; `[]` when none | `data-rooms.schema.json` |
 | `checks/` | the acceptance tests the assembled agent passes before it serves anyone | at least one file |
 | `assembly.md` | how a developer agent fills it for one organization | present, not empty |
-| `CHANGELOG.md` | the template's versions | names the header's version |
+| `CHANGELOG.md` | the template's versions | names the header's version as its newest entry (the first `## ` heading) |
 
 Every variant a file names is one the header declares. A key a template needs beyond the schema goes in as `x-<name>`
 in `manifest.json` or `access.json` (an entry of the manifest's `variants` may carry keys of its own); anywhere else

@@ -7,8 +7,9 @@ Reads only; writes nothing. Exit 0 when no folder has an error, 1 when one has, 
 
 The rules come from the JSON Schema files in ../schemas/template/, read by a small interpreter of the subset they use,
 so the schema and this check cannot drift apart. On top of the schemas it checks what one file cannot: the header's id
-is the folder's name, manifest.json names the same template and version, every variant a file names is declared in the
-header, TEMPLATE.md inherits the operating rules A1 to A12 by reference, and the folder holds its other parts.
+is the folder's name, manifest.json names the same template and version, CHANGELOG.md's newest entry is that version,
+every variant a file names is declared in the header, TEMPLATE.md inherits the operating rules A1 to A12 by reference,
+and the folder holds its other parts.
 
 --legacy reads the older spellings the first templates used (`class` for `source_class`, `withApproval`, a level
 called `architect`, `spend` for `budget`, ...), names each one as a warning with its canonical form, and checks the
@@ -412,9 +413,14 @@ def check_folder(folder, legacy=False):
     if not checks.is_dir() or not any(p.is_file() for p in checks.rglob("*")):
         add("error", "checks/", "$", "holds no acceptance check")
     changelog = folder / "CHANGELOG.md"
-    if isinstance(version, str) and changelog.is_file() and version not in changelog.read_text(
-            encoding="utf-8", errors="replace"):
-        add("error", "CHANGELOG.md", "$", "has no entry for version %s" % version)
+    if isinstance(version, str) and changelog.is_file():
+        notes = changelog.read_text(encoding="utf-8", errors="replace")
+        newest = re.search(r"^##\s+v?(\S+)", notes, re.MULTILINE)
+        if version not in notes:
+            add("error", "CHANGELOG.md", "$", "has no entry for version %s" % version)
+        elif newest and newest.group(1) != version:
+            # A template is a versioned workflow (FAA-264): its header's version is the changelog's newest entry.
+            add("error", "CHANGELOG.md", "$", "its newest entry is %s, TEMPLATE.md names %s" % (newest.group(1), version))
 
     docs = {}
     for file, schema_name in JSON_FILES.items():

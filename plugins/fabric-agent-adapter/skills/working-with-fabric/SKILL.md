@@ -13,7 +13,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.93.1"
+  version: "0.94.0"
 ---
 
 # Working with Fabric
@@ -302,16 +302,17 @@ A repository's backlog row stays the status source. File the Fabric task that ru
 ```
 
 through `fabric_task_create`, whose `origin` is required (or `fabric_work_claim`, which files one when none exists); read its answer as Step 4
-item 2 says. Your single live claim links the row (Fabric 0.3.14): file an unrelated row after your release, never linked
-by hand, or say it is linked. Do not paste the row's text or status into the task; edit it in its repository.
+item 2 says. Your single live claim links the row (Fabric 0.3.14): file an unrelated row after your release, never linked,
+whatever Step 4 says, or say it is linked. Do not paste the row's text or status into the task; edit it in its repository.
 
 ## Step 7: at the end
 
 1. `fabric_stage_report` and `fabric_task_note` with what was done, what remains, and the exact next step.
 2. `fabric_task_handoff` when a task follows this one: a NAMED result, not a summary of the chat.
 3. `fabric_work_release` with how it ended: `done` (the task goes to review), handed over (to whom, with the note
-   the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. After `done` or at session end, the retro:
-   `observatory_lesson`, insight/1 lines in `insights/`, or one line that there is nothing (measured wins:
+   the next agent reads) or let go (why). Older Fabric: `fabric_task_release`. Then file rows Step 6 held back.
+   After `done` or at session end, the retro: `observatory_lesson`, insight/1 lines in `insights/`, or one line that
+   there is nothing (measured wins:
    [agents database](references/agents-database.md)); a solved frequent harness, MCP, account or tooling problem also
    goes there as a fix record.
 

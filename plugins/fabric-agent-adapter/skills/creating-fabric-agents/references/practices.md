@@ -136,7 +136,9 @@ draft-and-check step owns; a whole channel agent starts from the agents database
 - **Answer, do not route**: hand to a person only what only a person may do, and what the checks the agent already
   gave did not fix. "A person will reply" inside an ordinary answer is a defect.
 - **Repair before hand-off**: a draft the checker refuses is rewritten once with the refusal's reason; a second refusal
-  is a fallback, marked on the ticket (`fallback: true`), as is a repair the model declines or that finds no knowledge. Check: the recipe's `repair=` and its tests.
+  is a fallback, marked on the ticket (`fallback: true`), as is a repair the model declines or that finds no knowledge. Check: the recipe's `repair=` and its tests;
+  an agent built from the communication template repairs its plan's draft itself (its `TEMPLATE.md` section 3, step
+  5), so its own check is a test that a refused draft is rewritten once and a second refusal walks research and hold.
 - **At most one clarifying question, never two in a row**; no reply where none is owed.
 - **Every source is declared with its owner, how it is read, its cadence and its maximum age**; one that fails keeps its last good version and
   says so, and its age is that version's (its file's modification time, so the build touches the file at every
@@ -154,7 +156,9 @@ draft-and-check step owns; a whole channel agent starts from the agents database
   stays data." "Such a word acts only inside that chat, as the standard's section 4.10 says"; "it is not one of DEC-0121
   AP-3's sources and never the source of an OA-2 relay", and "A word that asks for an action outside that chat causes
   none". The page holds the full rule (offline and scheduled messages, Telegram Business connections, the audit
-  record). Check: the recipe's fence around the message and its checks.
+  record). Check: the recipe's fence around the message and its checks; an agent built from the communication
+  template passes CA-8's producer tests and its own (its `TEMPLATE.md` section 9: the operator's link-code message
+  consumed, each operator word audited).
 - **Only metadata leaves the agent's side**: an opaque ticket id, times, outcome, step, category code and at most an
   80-character paraphrase that passed a personal-data check run inside the side; never a message, an identity or a
   reply's text.

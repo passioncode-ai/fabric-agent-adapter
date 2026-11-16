@@ -7,8 +7,9 @@ How a developer agent fills this template for one organization.
    what only a person may do with that person's queue, the knowledge sources with their owners and maximum ages, the
    tools for account data, the voice pack, the owner and the access levels. A field the systems do not answer is a
    question for the agent's owner before the build, never a guess.
-2. Defaults: a model key of USD 100 a month with the code's stop just under it; the open-vendor lanes of section 7;
-   one variant, `local` or `cloud`, by where the organization runs its agents.
+2. Defaults: a model key of USD 100 a month with the code's stop just under it and a daily guard under that stop;
+   the open-vendor lanes of section 7; the `cloud` variant for a channel people write to (uptime A), `local` only for
+   development or a demo sender.
 3. What needs a person: the owner's switch of each channel to live (S2's A8 gate for that channel's replies), a key
    limit above the default, a grant for a transport or a CRM, and the weekly labelling of judged pairs.
 4. Give the whole prompt to the coding agent in the agent's own repository; it builds the agent end to end and passes

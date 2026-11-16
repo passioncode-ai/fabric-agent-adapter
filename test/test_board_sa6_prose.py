@@ -111,5 +111,47 @@ class Evals(unittest.TestCase):
         self.assertTrue(any("slot active" in q["query"] and q["shouldTrigger"] for q in triggers["queries"]))
 
 
+
+class MovedSlotProse(unittest.TestCase):
+    """FAA-194 (4), (2), (10), (30): the moved-slot prose in the service kit's board reference and FAA-172's sentence in
+    the requester's reference are held, so they cannot drift from the kit with no failing test."""
+
+    KIT_BOARD = flat(ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/references/board.md")
+
+    def test_the_move_back_and_take_back_are_described(self):
+        for word in ("The operator may move the slot back to this session", "`take_back(capability)` (`takeBack`) forgets the record",
+                     "the check sends one `com.enroll` instead (FAA-194 (2))",
+                     "a move back during a job longer than the lease (60 s) is kept",
+                     "It is sent only while `com.status` shows the slot `active`",
+                     "So a real loss of the grant while the only slot is moved reads as another session's slot",
+                     "passes `only_if_moved=True` (`takeBack(capability, { onlyIfMoved: true })`)"):
+            with self.subTest(word=word[:40]):
+                self.assertIn(word, self.KIT_BOARD)
+        self.assertNotIn("it waits while other work runs: a move back during a job longer than the lease (60 s) may lapse",
+                         self.KIT_BOARD)
+
+    def test_accepted_requests_of_a_moved_slot_are_named_for_the_requester(self):
+        for word in ("keeps the requests the old holder had accepted",
+                     "\"requests no agent answers now\" leaves them out (FAA-172)"):
+            with self.subTest(word=word[:40]):
+                self.assertIn(word, BOARD)
+
+
+class HeldBackRows(unittest.TestCase):
+    """FAA-194 (7), (31): a row held back until after the release is filed at the end (Step 7), and Step 6 keeps Step 4's
+    link-it-yourself rule off it."""
+
+    SKILL_TEXT = flat(SKILL / "SKILL.md")
+
+    def test_step_seven_files_the_row_step_six_held_back(self):
+        step7 = self.SKILL_TEXT.split("## Step 7: at the end", 1)[1].split(" ## ", 1)[0]
+        self.assertIn("Then file rows Step 6 held back.", step7)
+
+    def test_step_six_never_links_the_row_filed_after_the_release(self):
+        step6 = self.SKILL_TEXT.split("## Step 6:", 1)[1].split(" ## ", 1)[0]
+        self.assertIn("file an unrelated row after your release, never linked, whatever Step 4 says", step6)
+        expected = " ".join(SCENARIOS["a-backlog-row-filed-while-a-claim-is-held"]["expected"])
+        self.assertIn("files the held-back row at the end of the session, right after its release (Step 7)", expected)
+
 if __name__ == "__main__":
     unittest.main()
