@@ -99,7 +99,8 @@ A module imports only modules listed before it in `kit.json`, so the kit has no 
 | L3 | `fabric_lock` | the instance lock, its watch where the lock has no path-keyed name (macOS, FAA-303), and the supervisor marker (LC-01, DEC-0057) |
 | L3 | `fabric_usage` | usage receipts, the ledger, the usage report, attribution, spending limits ([usage](usage.md)) |
 | L3 | `fabric_backups` | settings backups (DEC-0025) |
-| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document, the loopback HTTP server that refuses another OS account's peer before reading it (`LoopbackHTTPServer`, Node `loopbackServer`; FAA-227) |
+| L3 | `fabric_descriptor_members` | a descriptor's members without a file: `installedBy`, `runner`, `peer` and `source` as the schema shapes them (`descriptor_member_problems`; DEC-0061, DEC-0069, FAA-120), the `source.repository` rule (`source_repository_problem`), a git origin's identity (`origin_identity`, `repository_from_origin`; DEC-0089 item 2) and the host's peer check (`peer_refusal`, FAC-SEM-088); split from `fabric_descriptor` in 0.95.0 |
+| L3 | `fabric_descriptor` | the descriptor, peers, app descriptors, the well-known document, the loopback HTTP server that refuses another OS account's peer before reading it (`LoopbackHTTPServer`, Node `loopbackServer`; FAA-227); re-exports `fabric_descriptor_members` |
 | L3 | `fabric_context` | one instance per context (FAA-125, N-11): a context's instance, folders, descriptor, lock and marker; not in the facade, installed with `--module fabric_context` ([contexts](estate-record.md#one-instance-per-context-the-helper)) |
 | L3 | `fabric_auth` | the token, the network guard, login codes |
 | L3 | `fabric_events` | events, paging, the JSONL event log (DEC-0029) |
@@ -140,7 +141,7 @@ name fails `test_kit_api`), and the Python facade the private names other code r
 facades the same way, and since 0.44.1 so are `fabric_interop` (over `fabric_interop_rules`) and `fabric_package` (over
 `fabric_package_schema`), and since 0.52.0 `fabric_estate` (over `fabric_estate_rules`, listed just before it, since it
 imports the rules), and since 0.95.0 `fabric_interop` over `fabric_interop_jobs` too and `fabric_package` over
-`fabric_package_rules` too, with their Node twins: patch the rule, schema or job-store module, not the facade. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
+`fabric_package_rules` too and `fabric_descriptor` over `fabric_descriptor_members`, with their Node twins: patch the module that defines the name, not the facade. What changed for a service that copies the kit: `fabric_service.py` alone is no longer enough;
 install with `fabric_kit.py install` and `status` names what is missing. A test or service that replaced a function
 by assigning it on the facade (`fabric_service.X = ...`) no longer changes what the kit does: the code reads its own
 module's name, so patch the module that defines it (`fabric_lock.X`, `fabric_session_env.X`). A service that imported a module-private

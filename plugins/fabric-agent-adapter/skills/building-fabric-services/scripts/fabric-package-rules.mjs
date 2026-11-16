@@ -15,7 +15,7 @@ export const SIGNATURE_STATEMENT = 'fabric-package-signature/1';
 
 // --- digest, statement, identity -----------------------------------------------------------------------------------
 
-/** urn:fabric:agent:<publisher>:<id> — one agent across its versions, derived and never chosen (FAC-SEM-066). */
+/** urn:fabric:agent:<publisher>:<id>: one agent across its versions, derived and never chosen (FAC-SEM-066). */
 export const agentRefOf = (publisher, id) => `urn:fabric:agent:${publisher}:${id}`;
 
 /** sha256: and the hex SHA-256 of some bytes (a string is taken as UTF-8). */
