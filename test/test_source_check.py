@@ -2265,9 +2265,11 @@ class FAA190Rest(Tree):
     def test_the_reference_names_the_false_findings_left_to_the_contract(self):  # (7) (8) (9) (11) (13) (32) (37) (43)
         flat = " ".join((SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8").split())
         for phrase in ("`app.get(\"/v/Users/<route>\")`", "`ls -a-Users-<name>`", "`class=\"a--Users-<block>\"`",
-                       "`#a--users-<anchor>`", "a WebAuthn assertion's `sig`", "`password1`", "`?q=desk-lamp-with-long-arm-shade`",
-                       "dotenv's vault URL", "a key glued to a letter outside ASCII"):
+                       "`#a--users-<anchor>`", "a passkey's `credentialId`", "dotenv's vault URL", "DEC-0176 item 6",
+                       # narrowed by DEC-0176 (FAA-343): named as no findings now
+                       "`?q=desk-lamp-with-long-arm-shade`", "`?q=bearer%20bonds`", "`${DB_PASSWORD}`", "`gdańsk-`"):
             self.assertIn(phrase, flat)
+        self.assertNotIn("`password1`", flat)  # a placeholder-like password with a digit is a password, as the contract reads it
 
     # --- cost (3)
 

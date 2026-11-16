@@ -44,7 +44,8 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.95.0 | FAA-190's remaining source-check items (printed paths, plain-check forms, cost), FAA-196 (6), (22), FAA-200 (41), (45), (57), FAA-341 | PR #322, merge `54a988dc`, tag `v0.95.0`, release run 43790823476 failed on python, macos, windows and floors (an `array[int]` annotation below Python 3.12; a test's `JSON.stringify` of a 5000-deep value on the hosted stack): not published, see 0.95.1 |
 | 0.95.1 | 0.95.0 republished with its two hosted failures fixed; refactor: `fabric_interop_jobs`, `fabric_package_rules`, `fabric_descriptor_members` (three modules under the ceiling, no behaviour change) | PR #323, merge `48a36783`, tag `v0.95.1`, release run 43794842316 success (six validate jobs, release, publish through OIDC), npm `latest` 0.95.1; checks: validate, both strict plugin validations, Python 2585 OK, Node 812 with 0 fail, Python 3.9.6 on the touched suites 421 OK |
 | 0.96.0 | the repin to `v0.1.0+2026-11-16` (FAA-342): instance facts (DEC-0173), six protocol revisions, usage-data guidance (FAA-338, DEC-0157) | PR #324, merge `9ca05a73`, tag `v0.96.0`, release run 43799379257: attempt 1 failed at publish (npm E401 "token is invalid", as FAA-73 once saw), attempt 2 success (six validate jobs, release, publish through OIDC), npm `latest` 0.96.0; checks: validate, both strict plugin validations, Python 2601 OK, Node 817 with 0 fail |
-| 0.96.1 | the 0.95.1 documentation audit's fixes (31 findings: README, AGENTS, SECURITY, SKILL-CARD, kit-modules, the skills, the backlog statuses, this handoff) | release receipts follow the merge |
+| 0.96.1 | the 0.95.1 documentation audit's fixes (31 findings: README, AGENTS, SECURITY, SKILL-CARD, kit-modules, the skills, the backlog statuses, this handoff) | PR #328, merge `03a3ac53`, tag `v0.96.1`, release run 43861944540 success (six validate jobs, release, publish through OIDC), npm `latest` 0.96.1; checks: validate, both strict plugin validations, test_validate, test_source_check and test_fabric_kit 333 OK, FAA-344 and FAA-345 red first |
+| 0.97.0 | the repin to `v0.1.0+2026-11-16.6` (FAA-343): DEC-0175's six forms and DEC-0176's eight narrowed findings in the source check (FAA-190 closed), DEC-0177's token user name | release receipts follow the merge |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -56,10 +57,9 @@ Recorded for the operator; later builder briefs name the rule.
 
 1. The launcher 0.2.78 pins the adapter at v0.87.0, so this machine's Claude Code loads 0.87.0 from
    `~/.passioncode/current`; the launcher's PC-228 repins it to the adapter's npm `latest` (0.96.x now).
-1a. 0.96.0 is on the contract's `v0.1.0+2026-11-16` (FAA-342). Next on that line: `build_well_known` refusing
-   `FAC-SEM-176` and the instance-facts pair problems once the services on this machine serve them, the contract's
-   CT-316, then CT-325's tag (due 2026-11-22, thread `b9e5668d`) for FAA-190's last six items and CT-328 for the eight
-   false findings its shapes give.
+1a. 0.97.0 is on the contract's `v0.1.0+2026-11-16.6` (FAA-343, which closed FAA-190 through CT-325 and CT-328). Next on
+   that line: `build_well_known` refusing `FAC-SEM-176` and the instance-facts pair problems once the services on this
+   machine serve them, the contract's CT-316, and its open edges CT-331 to CT-334 at the next pin.
 2. The exact next unit: FAA-202 (P1), usage analytics on by default in the agent templates, now that DEC-0157's UD-1
    to UD-6 are in the pin (FAA-338's `references/usage-data.md` is the guidance). Then FAA-201's remaining open list
    and FAA-124 (P1); then the P2 rows in order: FAA-339 first (the scenario runner FAA-264 (6), (34), FAA-286 (3) and
@@ -75,7 +75,6 @@ Recorded for the operator; later builder briefs name the rule.
 
 - Blocked rows and their owners are in the inventory; re-check them at each wave boundary.
 - The launcher pins adapter v0.87.0 until PC-228 repins it.
-- FAA-190's last six items wait on the contract's CT-325 tag (due 2026-11-22), the eight false findings on CT-328.
 - Sub-agents of this account are out of their weekly limit until 2026-11-21 01:00 Europe/Warsaw; until then the
   session builds alone.
 

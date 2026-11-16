@@ -38,9 +38,7 @@ class TokenUserName(unittest.TestCase):
 class StoredManifestUrl(unittest.TestCase):
     def test_a_manifest_url_with_a_token_user_is_refused(self):
         # FAA-343 (13): the contract's fixtures/semantic/command-line-token-user-in-manifest-url.json, rebuilt here
-        import sys
-        sys.path.insert(0, str(ROOT / "plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts"))
-        import adapt_project
+        from test_adapt_project import ADAPTER as adapt_project
         url = "https" + "://" + TOKEN + "@agents.example/mcp"
         manifest = {"capabilities": [{"profile": {"connection": {"mode": "streamable-http", "url": url}}}]}
         self.assertTrue(any("capability[0].url" in p for p in adapt_project._credential_problems(manifest)))
