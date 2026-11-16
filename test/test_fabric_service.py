@@ -342,6 +342,13 @@ class DescriptorTests(unittest.TestCase):
             self.assertEqual(Path(seen[0].filename).name, Path(__file__).name, "the warning names the caller")
             self.assertIn("names no source.repository", str(seen[0].message))
             self.assertNotIn("source", json.loads(fs.descriptor_path("sample", "default", root).read_text()), "written as given")
+            # FAA-200 (41): the rewrite that drops an installed source.repository says so, never silently
+            self.assertIn("the installed descriptor names one, which this rewrite drops", str(seen[0].message))
+            with warnings.catch_warnings(record=True) as again:
+                warnings.simplefilter("always")
+                fs.write_descriptor(bare, root)  # nothing installed names one now: nothing to drop
+            self.assertEqual(len(again), 1)
+            self.assertNotIn("drops", str(again[0].message))
             self.assertIsNone(fs.source_refusal(bare, root), "an installed descriptor is a rewrite")
             for empty in ({}, {"repository": ""}, "x", ["a"], 1, True):  # a source that is no object names nothing (unit reading 1)
                 with self.subTest(source=empty):
@@ -433,6 +440,41 @@ class DescriptorTests(unittest.TestCase):
                 verdicts = {r["rule"]: r for r in p.results}
                 self.assertEqual(verdicts["descriptor.source-repository"]["verdict"], "PASS", kept)
                 self.assertNotIn("fixture-token", verdicts["descriptor.source-repository"]["evidence"], "printed redacted (unit reading 3)")
+
+
+class RepositoryFromOriginTests(unittest.TestCase):
+    """FAA-200 (45): an installer's origin, scp form included, as the https://host/owner/name a descriptor's
+    source.repository takes, on the contract's spelling (DEC-0089 item 2, normalizeOrigin) and the kit's rules."""
+    V = json.loads((ROOT / "test/fixtures/contract/origin-vectors.json").read_text(encoding="utf-8"))["origin"]
+    NOT_A_URI = {"https://github.com/Example-Org/\u00dcber-\u00c9cole"}  # an identity, but no RFC 3986 URI: no repository
+
+    def test_every_contract_origin(self):
+        self.assertEqual(len(self.V), 28)
+        for case in self.V:
+            with self.subTest(origin=case["origin"]):
+                got = fs.repository_from_origin(case["origin"])
+                if case["expected"] is None or case["origin"] in self.NOT_A_URI:
+                    self.assertIsNone(got)
+                else:
+                    self.assertEqual(got, "https://" + case["expected"])
+                    self.assertIsNone(fs.source_repository_problem(got), "a repository the kit's rules take")
+        self.assertIsNotNone(fs.source_repository_problem("https://github.com/example-org/\u00dcber-\u00c9cole"))
+
+    def test_credentials_never_travel_and_a_key_shaped_name_is_none(self):
+        self.assertEqual(fs.repository_from_origin("https://user:pw@github.com/Example-Org/Agent.git"),
+                         "https://github.com/example-org/agent")
+        self.assertEqual(fs.repository_from_origin("deploy:pw@git.example.com:team/app.git"), "https://git.example.com/team/app")
+        key = "sk-" + "ab1d" * 10  # made up at run time: an `sk-` shape, never a key
+        self.assertIsNotNone(fs.source_repository_problem("https://github.com/example-org/" + key))
+        self.assertIsNone(fs.repository_from_origin("git@github.com:example-org/" + key + ".git"))
+        for odd in (None, 7, [], "x" * 4097, "git@github.com:example-org/" + "a" * 4096):
+            self.assertIsNone(fs.repository_from_origin(odd))
+
+    def test_the_answer_installs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            d = dict(descriptor(47199), source={"repository": fs.repository_from_origin("git@github.com:Example-Org/Sample.git")})
+            self.assertEqual(fs.validate_descriptor(d), [])
+            fs.write_descriptor(d, Path(temp), port_owner=lambda port: None)
 
 
 class TokenAndNetworkTests(unittest.TestCase):

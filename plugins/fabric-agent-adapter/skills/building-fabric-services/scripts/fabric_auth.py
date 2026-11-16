@@ -41,6 +41,7 @@ from fabric_descriptor import (
     names_repository,
     source_refusal,
     validate_descriptor,
+    installed_names_repository,
     warn_no_source,
     write_descriptor,
 )
@@ -419,7 +420,8 @@ def register_remote(*, service_id: str, name: str, origin: str, token: str, inst
         raise ServiceError(refusal)
     warned = not names_repository(descriptor)
     if warned:  # before the token: under warnings as errors neither file changes (FAA-200 (1))
-        warn_no_source(descriptor, 2)  # the warning names the installer's call
+        # the warning names the installer's call, and a hand-edited installed source it drops (FAA-200 (41))
+        warn_no_source(descriptor, 2, installed_names_repository(service_id, instance, root))
     ensure_private_dir(token_file.parent)
     atomic_write(token_file, token.strip().encode(), 0o600)
     return write_descriptor(descriptor, root, _warned=warned)

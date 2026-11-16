@@ -651,7 +651,12 @@ class StopAndEndActive(Base):
 
     def spool(self, event, **extra):
         spawned = []
-        said = fs.hook_spool(dict({"session_id": SID, "cwd": str(self.repo)}, **extra), event, self.env, spawn=spawned.append)
+        # These tests check what a turn carries, not how fast: a loaded machine must not run out the 1.5 s facts budget
+        # (FAA-341, as TurnRepositories.spool_turn does); the budget itself is tested with until= and the hook's timing.
+        with mock.patch.object(sys.modules["fabric_session_cli"], "FACTS_BUDGET_S", 60.0), \
+                mock.patch.object(MCP, "GIT_TIMEOUT_S", 30.0):
+            said = fs.hook_spool(dict({"session_id": SID, "cwd": str(self.repo)}, **extra), event, self.env,
+                                 spawn=spawned.append)
         return said, spawned
 
     def test_the_branch_goes_with_a_turn_only_where_fabric_takes_it(self):
@@ -664,7 +669,7 @@ class StopAndEndActive(Base):
         self.assertEqual(json.loads(entry.read_text())["branch"], branch)
         self.spool("end", reason="other")
         self.assertNotIn("branch", json.loads(sorted(spawned[0].glob("*-end.json"))[0].read_text()))
-        fs.deliver(spawned[0], self.env, deadline_s=8)
+        fs.deliver(spawned[0], self.env, deadline_s=30)  # an upper bound, not a wait
         self.assertEqual(["branch" in c["arguments"] for c in self.records("call")], [False, False, False],
                          "a Fabric that does not declare it gets none")
         self.record.unlink()
@@ -674,7 +679,7 @@ class StopAndEndActive(Base):
         subprocess.run(["git", "-C", str(self.repo), "checkout", "-q", "--detach"], check=True)
         self.spool("turn")
         self.spool("end", reason="other")
-        fs.deliver(spawned[0], self.env, deadline_s=8)
+        fs.deliver(spawned[0], self.env, deadline_s=30)  # an upper bound, not a wait
         calls = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
         self.assertEqual([(c["event"], c.get("branch", "absent")) for c in calls],
                          [("turn", "agent/faa-152"), ("turn", None), ("end", "absent")])
@@ -684,7 +689,7 @@ class StopAndEndActive(Base):
         self.spool("turn")
         subprocess.run(["git", "-C", str(self.repo), "checkout", "-qb", "f\u00e4hig"], check=True)
         said, spawned = self.spool("turn")
-        fs.deliver(spawned[0], self.env, deadline_s=8)
+        fs.deliver(spawned[0], self.env, deadline_s=30)  # an upper bound, not a wait
         calls = [c["arguments"] for c in self.records("call") if c["name"] == "fabric_session_observe"]
         self.assertEqual([c.get("branch", "absent") for c in calls], ["absent", "absent"])
         # turned off: none read, none sent

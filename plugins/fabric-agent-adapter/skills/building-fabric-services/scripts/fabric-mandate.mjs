@@ -3,8 +3,12 @@
 // task, narrowed at each hand-over. Part of the Node service kit (layer L2); the twin of fabric_mandate.py.
 //
 // - mandateCovers(input): whether a callee takes one call as the operator's decision under a mandate (MD-3 to MD-5),
-//   exactly as the contract's mandateCovers answers. `input` holds mandate, tier, now, self (the callee's own agent id),
-//   callerAgent (only when the callee authenticated one) and call ({capability, action?, effect, spendUsd?, project?}).
+//   as the contract's mandateCovers answers, but for a spend that is no JSON data JSON.parse gives (shared or cyclic,
+//   an accessor, a class instance), whose arrays nest in arrays more than MAX_SPEND_DEPTH deep, or that holds an object
+//   with an own toString at its top or through arrays alone: the core refuses all three as no estimate, where the
+//   contract reads the first, reads or throws RangeError on the second and throws TypeError on the third (FAA-196 (22)).
+//   `input` holds mandate, tier, now, self (the callee's own agent id), callerAgent (only when the callee authenticated
+//   one) and call ({capability, action?, effect, spendUsd?, project?}).
 // - mandateProblem(mandate): 'mandate-malformed', 'mandate-widened' or undefined (FAC-SEM-144); mandateShape(mandate):
 //   mandate.schema.json alone; mandateRules(kind, value): the findings.
 // - scopeWithin(child, parent), effectiveScope(mandate), effectClosure(ceiling).
@@ -56,6 +60,65 @@ export const OPERATOR_SOURCE_PROTOCOL = 'operator-source/1';
 const SCOPE_MEMBERS = new Set(['capabilities', 'actions', 'effects', 'perCallMaxUsd', 'projects']);
 const STEP_MEMBERS = new Set(['agent', 'at', 'scope']);
 const AGENT_ID = /^[a-z][a-z0-9-]{1,62}(\.[a-z][a-z0-9-]{0,31})?$/; // common.schema.json agentId
+
+/**
+ * A spend whose lists nest in one another more deeply than this, with no object between them, is no estimate: String()
+ * of a list recurses through that nesting (RangeError a few thousand deep), and the estimate a refusal carries is one a
+ * serialiser writes. The twin of fabric_mandate.py's MAX_SPEND_DEPTH (FAA-196 (22)).
+ */
+export const MAX_SPEND_DEPTH = 100;
+
+/**
+ * Whether a spend is JSON data as JSON.parse gives it, walked without recursion: null, booleans, numbers, strings,
+ * arrays and plain objects of own data properties, never one met twice (JSON.parse never shares or cycles), its arrays
+ * nested in arrays at most MAX_SPEND_DEPTH deep (an object ends the count), and no object at the top or reached through
+ * arrays alone with an own toString, on which Number() throws. Reads no accessor. The twin of _json_data.
+ */
+function jsonSpend(value) {
+  const stack = [[value, 0]];
+  const seen = new Set();
+  while (stack.length) {
+    const [item, depth] = stack.pop();
+    const kind = typeof item;
+    if (item === null || kind === 'boolean' || kind === 'number' || kind === 'string') continue;
+    if (kind !== 'object' || seen.has(item)) return false;
+    seen.add(item);
+    const array = Array.isArray(item);
+    if (Object.getPrototypeOf(item) !== (array ? Array.prototype : Object.prototype)) return false;
+    let next = depth;
+    if (array && depth !== undefined) {
+      next = depth + 1;
+      if (next > MAX_SPEND_DEPTH) return false;
+    }
+    if (!array && depth !== undefined && Object.hasOwn(item, 'toString')) return false; // Number() reaches it
+    const keys = Reflect.ownKeys(item);
+    if (array && keys.length !== item.length + 1) return false; // a hole or an extra member: no JSON array
+    for (const key of keys) {
+      if (array && key === 'length') continue;
+      if (typeof key !== 'string') return false;
+      const descriptor = Object.getOwnPropertyDescriptor(item, key);
+      if (!('value' in descriptor)) return false; // an accessor: never run
+      stack.push([descriptor.value, array ? next : undefined]);
+    }
+  }
+  return true;
+}
+
+/**
+ * Number(spend) for a spend jsonSpend admits, without the join JavaScript builds for a list: [] is 0, a list of two
+ * or more items is NaN (the comma never reads as a number), one item is read as String() reads it. The twin of
+ * _spend_number.
+ */
+function spendNumber(spend) {
+  let value = spend;
+  while (Array.isArray(value)) {
+    if (value.length === 0) return 0;
+    if (value.length > 1) return NaN;
+    [value] = value;
+  }
+  if (value === spend) return Number(value);
+  return value === null ? 0 : Number(String(value));
+}
 
 /** A registry agent id (common.schema.json agentId): a provider or service id, optionally `.instance`. */
 export const isAgentId = (value) => typeof value === 'string' && AGENT_ID.test(value);
@@ -298,8 +361,11 @@ export function mandateCovers(input) {
   if (!estateWide && !READS_AND_DRAFTS.has(effect) && capabilities === undefined && (action === undefined || actions === undefined)) return outside('outside-mandate: capability');
   const ceiling = member(scope, 'perCallMaxUsd');
   const spend = member(call, 'spendUsd');
-  if (ceiling !== undefined && (spend === undefined || spend > ceiling)) {
-    return { ok: false, code: OUTSIDE_MANDATE, data: { detail: 'outside-mandate: spend', ...(spend === undefined ? {} : { estimateUsd: spend }), perCallMaxUsd: ceiling } };
+  // A spend is read only when a ceiling asks (no walk without one), and only when it is JSON data Number() reads
+  // without throwing; any other is no estimate, which the ceiling refuses (FAA-196 (22), as fabric_mandate.py reads it).
+  const readable = ceiling !== undefined && spend !== undefined && jsonSpend(spend);
+  if (ceiling !== undefined && (!readable || spendNumber(spend) > ceiling)) {
+    return { ok: false, code: OUTSIDE_MANDATE, data: { detail: 'outside-mandate: spend', ...(readable ? { estimateUsd: spend } : {}), perCallMaxUsd: ceiling } };
   }
   const project = member(call, 'project');
   const projects = member(scope, 'projects');

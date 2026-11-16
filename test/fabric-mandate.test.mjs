@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import {
-  MANDATE_INVALID, MANDATE_LIFETIME_SECONDS, OUTSIDE_MANDATE, effectClosure, effectiveScope, handOn, mandateCovers, mandateProblem, mandateRules,
+  MANDATE_INVALID, MANDATE_LIFETIME_SECONDS, MAX_SPEND_DEPTH, OUTSIDE_MANDATE, effectClosure, effectiveScope, handOn, mandateCovers, mandateProblem, mandateRules,
   mandateShape, operatorMandate, scopeWithin, sourceShape, withoutSource, OPERATOR_SOURCE_PROTOCOL,
 } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-mandate.mjs';
 import { actionDecision } from '../plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric-actions.mjs';
@@ -169,4 +169,41 @@ test('a full chain takes no fifth agent (MD-2; the contract on board thread 118f
     lead: 'agent-a', at, expiresAt: '2026-11-09T10:00:00Z' });
   for (const agent of ['agent-b', 'agent-c', 'agent-d']) held = handOn(held, agent, at);
   assert.throws(() => handOn(held, 'agent-e', at), (e) => e instanceof ServiceError && e.message.endsWith(': mandate-malformed'));
+});
+
+test('FAA-196 (22): a spend Number() would throw on is no estimate, never a throw, as fabric_mandate.py reads it', () => {
+  const mandate = operatorMandate({ task: 't', instruction: 'run the research', scope: SCOPE, lead: 'example-developer', at: '2026-10-26T10:00:00Z' });
+  const handed = handOn(mandate, 'example-researcher', '2026-10-26T10:05:00Z', { capabilities: ['research.run'], effects: ['charge'], projects: ['example-site'], perCallMaxUsd: 20 });
+  const covers = (spendUsd) => mandateCovers({ mandate: handed, tier: 'T0', now: '2026-10-26T12:00:00Z', self: 'example-researcher', callerAgent: 'example-developer', call: { capability: 'research.run', effect: 'charge', spendUsd } });
+  const refusedWithout = (spend, name) => assert.deepEqual(covers(spend), { ok: false, code: 'operator-decision-required', data: { detail: 'outside-mandate: spend', perCallMaxUsd: 20 } }, name);
+  const nested = (depth, inner = [3]) => { let value = inner; for (let i = 0; i < depth; i += 1) value = [value]; return value; };
+  assert.equal(MAX_SPEND_DEPTH, 100);
+  // An own toString Number() reaches (at the top, or through lists alone): the contract and 0.94 throw TypeError.
+  for (const spend of [JSON.parse('{"toString":1}'), JSON.parse('[{"toString":"7"}]'), JSON.parse('[1,{"toString":null}]'), JSON.parse('[[{"a":1,"toString":{}}]]')]) {
+    refusedWithout(spend, JSON.stringify(spend));
+  }
+  // Lists nested in lists more than MAX_SPEND_DEPTH deep: String() recurses through them (RangeError a few thousand deep).
+  for (const spend of [JSON.parse('['.repeat(6000) + '1' + ']'.repeat(6000)), nested(MAX_SPEND_DEPTH), nested(MAX_SPEND_DEPTH + 1), [1, nested(5000)], nested(MAX_SPEND_DEPTH, [1, 2])]) {
+    refusedWithout(spend, 'deep');
+  }
+  // JSON.parse never shares or cycles; a structure that does is no estimate either.
+  const cyclic = []; cyclic.push(cyclic);
+  const shared = [3];
+  refusedWithout(cyclic, 'cyclic');
+  refusedWithout([shared, shared], 'shared');
+  // Read as Number() reads them, without building the join: 100 lists deep, a dict at any depth (NaN, never descended).
+  assert.equal(covers(nested(MAX_SPEND_DEPTH - 1)).ok, true, '100 lists around 3');
+  assert.deepEqual(covers(nested(MAX_SPEND_DEPTH - 1, [30])).data, { detail: 'outside-mandate: spend', estimateUsd: nested(MAX_SPEND_DEPTH - 1, [30]), perCallMaxUsd: 20 });
+  for (const spend of [JSON.parse('{"a":{"toString":1}}'), JSON.parse('[{"a":{"toString":1}}]'), JSON.parse('{"valueOf":1}'), JSON.parse('[{"tostring":1}]'),
+    JSON.parse('{"a":'.repeat(150) + '1' + '}'.repeat(150)), { a: nested(5000) }, [[1, 2]], [], [[null]], [true]]) {
+    assert.equal(covers(spend).ok, true, JSON.stringify(spend).slice(0, 40));
+  }
+  assert.equal(covers(['7'.repeat(16000), '7']).ok, true, 'two items are NaN: the 32 KB join is never built');
+  assert.equal(covers([['21']]).ok, false, 'one item is read as String() reads it');
+  assert.equal(covers(true).ok, true, 'Number(true) is 1');
+  // What no JSON gives: an accessor, a symbol, a class instance or a null-prototype object is no estimate.
+  for (const spend of [Symbol('s'), { get a() { throw new Error('never read'); } }, Object.create(null), new Date(0), 10n, () => 1, [undefined]]) {
+    refusedWithout(spend, String(typeof spend));
+  }
+  assert.deepEqual(covers(21).data, { detail: 'outside-mandate: spend', estimateUsd: 21, perCallMaxUsd: 20 }, 'a number is unchanged');
 });

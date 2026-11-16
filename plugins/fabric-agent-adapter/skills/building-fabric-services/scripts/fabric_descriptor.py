@@ -36,6 +36,7 @@ from fabric_base import (
 )
 import fabric_peer_owner  # noqa: E402 - L0: who listens on a port (DEC-0154 HA-2, FAA-225)
 import fabric_git  # noqa: E402 - L0: git from no folder of the checkout, no fsmonitor, no caller's GIT_DIR (FAA-190)
+from fabric_jsvalue import _JS_SPACE  # noqa: E402 - L0: JavaScript's \s, as the contract's normalizeOrigin reads it
 from fabric_paths import (
     atomic_write,
     ensure_private_dir,
@@ -205,6 +206,64 @@ def read_descriptors(directory: Optional[Path] = None) -> List[Tuple[Path, Dict[
         if isinstance(value, dict):  # a file that holds no object is no descriptor (FAA-200 (50))
             found.append((path, value))
     return found
+
+
+def source_repository_problem(repository: Any) -> Optional[str]:
+    """Why a value is no `source.repository` the kit takes, or None: validate_descriptor's reading (FAA-198)."""
+    import fabric_secrets  # noqa: E402 - beside this file; the contract's detector (DEC-0044)
+    if not (isinstance(repository, str) and _SOURCE_URI.match(_IP_LITERAL.sub(r"\1h", repository, count=1))):
+        return "source.repository is a URI (RFC 3986), such as https://github.com/owner/name"
+    if _URI_PASSWORD.match(repository):  # before the host: user information is a credential, said as one
+        return "source.repository carries no password: it names the repository, never a credential"
+    if "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
+        # before the authority, whose two-slash rule would name `<https>:u@h/r` less usefully (0.86.0)
+        return "source.repository with a user is a URL with an authority (https://user@host/path), never an scp form"
+    if not _authority_ok(repository):
+        return "source.repository names a host, and a port of digits up to 65535 when it has one"
+    if fabric_secrets.repository_credential(repository):  # its name is no key (0.62.0 seam reading 6)
+        return ("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write "
+                "the repository's name in lower case if it is one")
+    return None
+
+
+_ORIGIN_SCHEMES, _S = ("http", "https", "ssh", "git", "git+ssh", "git+https"), re.escape(_JS_SPACE)  # normalizeOrigin's
+_ORIGIN_SCP = re.compile(r"(?:[^@/%s]+@)?([^:/%s]+):([^%s]+)" % (_S, _S, _S))
+
+
+def origin_identity(raw: Any) -> Optional[str]:
+    """A remote's repository identity `host/path`, or None: the contract's normalizeOrigin (DEC-0089 item 2), held to
+    its origin vectors (test/fixtures/contract/origin-vectors.json)."""
+    if not isinstance(raw, str) or len(raw) > 4096:
+        return None
+    value = raw.strip(_JS_SPACE)
+    scheme = re.match(r"[A-Za-z][A-Za-z0-9+.-]*(?=://)", value)
+    if scheme:
+        if scheme.group(0).lower() not in _ORIGIN_SCHEMES:
+            return None
+        host, slash, path = re.split(r"[?#]", value[scheme.end() + 3:], maxsplit=1)[0].partition("/")
+        if not slash:
+            return None
+    else:
+        scp = None if value.startswith(("/", ".")) or re.match(r"[A-Za-z]:[\\/]", value) else _ORIGIN_SCP.fullmatch(value)
+        if not scp:
+            return None
+        host, path = scp.group(1), re.split(r"[?#]", scp.group(2), maxsplit=1)[0]
+    lower = lambda text: re.sub("[A-Z]", lambda letter: letter.group(0).lower(), text)  # noqa: E731 - A to Z alone
+    host = lower(re.sub(r":[0-9]*\Z", "", host[host.rfind("@") + 1:], count=1))
+    path = lower(path.strip("/"))
+    segments = (path[:-4] if path.endswith(".git") else path).split("/")
+    if (not re.fullmatch(r"[a-z0-9.-]+", host) or "." not in host or len(segments) < 2
+            or any(not segment or re.search("[%s]" % _S, segment) for segment in segments)):
+        return None
+    return "%s/%s" % (host, "/".join(segments))
+
+
+def repository_from_origin(origin: Any) -> Optional[str]:
+    """An installer's git origin (scp form included) as the `https://host/owner/name` source.repository takes, or None
+    (no identity, or one the kit's rules refuse: no URI, a key's shape); no credential of it travels (FAA-200 (45))."""
+    identity = origin_identity(origin)
+    repository = None if identity is None else "https://" + identity
+    return None if repository is None or source_repository_problem(repository) else repository
 
 
 def validate_descriptor(descriptor: Dict[str, Any]) -> List[str]:
@@ -472,19 +531,9 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("source is {repository?}")
             source = {}
         problems += ["source has no member %s" % _shown_member(k) for k in source if k != "repository"]
-        if "repository" in source:
-            repository = source["repository"]
-            if not (isinstance(repository, str) and _SOURCE_URI.match(_IP_LITERAL.sub(r"\1h", repository, count=1))):
-                problems.append("source.repository is a URI (RFC 3986), such as https://github.com/owner/name")
-            elif _URI_PASSWORD.match(repository):  # before the host: user information is a credential, said as one
-                problems.append("source.repository carries no password: it names the repository, never a credential")
-            elif "@" in repository and not _HIERARCHICAL.match(repository):  # 0.62.0 readings 7: never an scp form's user
-                # before the authority, whose two-slash rule would name `<https>:u@h/r` less usefully (0.86.0)
-                problems.append("source.repository with a user is a URL with an authority (https://user@host/path), never an scp form")
-            elif not _authority_ok(repository):
-                problems.append("source.repository names a host, and a port of digits up to 65535 when it has one")
-            elif fabric_secrets.repository_credential(repository):  # its name is no key (0.62.0 seam reading 6)
-                problems.append("FAC-SEM-086: /source/repository holds a value shaped like a credential; it names a repository: write the repository's name in lower case if it is one")
+        problem = source_repository_problem(source["repository"]) if "repository" in source else None
+        if problem:
+            problems.append(problem)
     if "peer" in descriptor:
         peer = descriptor.get("peer")
         if not isinstance(peer, dict):
@@ -511,8 +560,9 @@ def descriptor_member_problems(descriptor: Dict[str, Any]) -> List[str]:
             problems.append("a service offered to others never runs on a subscription (DEC-0061)")
     for place, value in places:
         if isinstance(value, str) and fabric_secrets.secret_argument(value):
-            problems.append("FAC-SEM-086: %s holds a value shaped like a credential; it names %s" % (
-                place, "a repository" if place.startswith("/source/") else "a kind, a role or an installer"))
+            # places are /installedBy and /runner alone: /source/repository has its own check above (FAA-200 (57))
+            problems.append("FAC-SEM-086: %s holds a value shaped like a credential; it names a kind, a role or an "
+                            "installer" % place)
     return problems
 
 
@@ -668,10 +718,25 @@ def port_listener_refusal(port: int, reader: Optional[Any] = None) -> Optional[s
             "FAA-225)." % (port, uid))
 
 
-def warn_no_source(descriptor: Dict[str, Any], stacklevel: int = 2) -> None:
-    """The rewrite warning of a descriptor that names no source.repository (FAA-198)."""
+#: FAA-200 (41): the clause the rewrite warning adds when the installed descriptor names a source.repository it drops.
+DROPS_INSTALLED_SOURCE = "the installed descriptor names one, which this rewrite drops"
+
+
+def installed_names_repository(service_id: Any, instance: Any, directory: Optional[Path] = None) -> bool:
+    """Whether the installed descriptor of ``service_id.instance`` names a source.repository: an unreadable, absent,
+    non-UTF-8 or non-JSON file, or one nested too deep to read, names none (FAA-200 (41)). Never raises."""
+    try:
+        return names_repository(json.loads(descriptor_path(service_id, instance, directory).read_text(encoding="utf-8")))
+    except (OSError, ValueError, TypeError, RecursionError):
+        return False
+
+
+def warn_no_source(descriptor: Dict[str, Any], stacklevel: int = 2, dropped: bool = False) -> None:
+    """The rewrite warning of a descriptor that names no source.repository (FAA-198); with ``dropped``, it names the
+    installed source.repository the rewrite drops (FAA-200 (41)). The repository itself is never in it."""
     me = "%s.%s" % (descriptor["id"], descriptor["instance"])
-    warnings.warn("Descriptor %s %s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY),
+    drop = "; %s" % DROPS_INSTALLED_SOURCE if dropped else ""
+    warnings.warn("Descriptor %s %s%s; a new install is refused without it." % (me, NO_SOURCE_REPOSITORY, drop),
                   NoSourceRepositoryWarning, stacklevel=stacklevel + 1)
 
 
@@ -681,7 +746,8 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
     OS account listens on (FAA-225; ``port_owner(port) -> (kind, uid) | None`` reads it, the kit's own by default).
 
     FAA-198: a new descriptor names its ``source.repository``; rewriting one already installed without it only
-    warns (``NoSourceRepositoryWarning``), so an installed agent's update keeps working."""
+    warns (``NoSourceRepositoryWarning``, naming an installed source.repository it drops: FAA-200 (41)), so an
+    installed agent's update keeps working."""
     problems = validate_descriptor(descriptor)
     if problems:
         raise ServiceError("Descriptor is invalid: %s." % "; ".join(problems))
@@ -691,7 +757,7 @@ def write_descriptor(descriptor: Dict[str, Any], directory: Optional[Path] = Non
     if refusal:
         raise ServiceError(refusal)
     if not names_repository(descriptor) and not _warned:  # register_remote warns itself, before its token (FAA-200 (1))
-        warn_no_source(descriptor, _stacklevel)
+        warn_no_source(descriptor, _stacklevel, installed_names_repository(descriptor["id"], descriptor["instance"], root))
     # DEC-0019: only a local placement claims a port on this computer; DEC-0069: an app's descriptor names none.
     port = None if placement_of(descriptor) == "remote" or "origin" not in descriptor else port_of(descriptor["origin"])
     for path, other in read_descriptors(root):
