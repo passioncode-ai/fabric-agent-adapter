@@ -4,8 +4,11 @@ The contract's [usage data page](https://github.com/passioncode-ai/fabric-agent-
 (DEC-0157, rules UD-1 to UD-6) binds every product the estate ships to people that collects anonymous data about how it
 is used and about its errors: an app, an agent, a command line tool, a service installed on the person's machine or a
 component run on their own server. A product may collect none. A hosted service that installs nothing for the person is
-outside the page (pending the operator's answer, the contract's OQ-0013). The kit offers no usage data switch of its
-own: an agent or service that sends such data builds what follows, and nothing on the wire declares it.
+outside the page (pending the operator's answer, the contract's OQ-0013). The service kit offers no usage data switch
+of its own; the adapter's `new` command lays one into every new agent project (`src/usage_data.py`, its tests and
+`docs/usage-data.md`, described in creating-fabric-agents' `references/new-agent.md`, FAA-202): on by default, silent
+without a release's app key, counts and codes only. Any other agent or service that sends such data builds what
+follows, and nothing on the wire declares it.
 
 ## Contents
 

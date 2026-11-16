@@ -46,6 +46,7 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.96.0 | the repin to `v0.1.0+2026-11-16` (FAA-342): instance facts (DEC-0173), six protocol revisions, usage-data guidance (FAA-338, DEC-0157) | PR #324, merge `9ca05a73`, tag `v0.96.0`, release run 43799379257: attempt 1 failed at publish (npm E401 "token is invalid", as FAA-73 once saw), attempt 2 success (six validate jobs, release, publish through OIDC), npm `latest` 0.96.0; checks: validate, both strict plugin validations, Python 2601 OK, Node 817 with 0 fail |
 | 0.96.1 | the 0.95.1 documentation audit's fixes (31 findings: README, AGENTS, SECURITY, SKILL-CARD, kit-modules, the skills, the backlog statuses, this handoff) | PR #328, merge `03a3ac53`, tag `v0.96.1`, release run 43861944540 success (six validate jobs, release, publish through OIDC), npm `latest` 0.96.1; checks: validate, both strict plugin validations, test_validate, test_source_check and test_fabric_kit 333 OK, FAA-344 and FAA-345 red first |
 | 0.97.0 | the repin to `v0.1.0+2026-11-16.6` (FAA-343): DEC-0175's six forms and DEC-0176's eight narrowed findings in the source check (FAA-190 closed), DEC-0177's token user name | release receipts follow the merge |
+| 0.98.0 | usage data on by default in every new agent project (FAA-202): `src/usage_data.py`, its tests, `docs/usage-data.md` and the slot `USAGE_DATA_APP_KEY`; the hooks' error classes filed as FAA-347 | release receipts follow the merge |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
@@ -60,9 +61,8 @@ Recorded for the operator; later builder briefs name the rule.
 1a. 0.97.0 is on the contract's `v0.1.0+2026-11-16.6` (FAA-343, which closed FAA-190 through CT-325 and CT-328). Next on
    that line: `build_well_known` refusing `FAC-SEM-176` and the instance-facts pair problems once the services on this
    machine serve them, the contract's CT-316, and its open edges CT-331 to CT-334 at the next pin.
-2. The exact next unit: FAA-202 (P1), usage analytics on by default in the agent templates, now that DEC-0157's UD-1
-   to UD-6 are in the pin (FAA-338's `references/usage-data.md` is the guidance). Then FAA-201's remaining open list
-   and FAA-124 (P1); then the P2 rows in order: FAA-339 first (the scenario runner FAA-264 (6), (34), FAA-286 (3) and
+2. The exact next unit: FAA-201's remaining open list, then FAA-124 (P1) (FAA-202 shipped in 0.98.0; its hooks part is
+   FAA-347, waiting for the adapter's app key on the analytics host); then the P2 rows in order: FAA-339 first (the scenario runner FAA-264 (6), (34), FAA-286 (3) and
    FAA-201's scenarios wait on), FAA-183, FAA-204, FAA-285, FAA-287, FAA-288, FAA-294; FAA-225 and FAA-230 wait on the
    contract's DEC-0160.
 3. The three hosts the operator offered (2026-11-13): a Hermes A2A endpoint (FAA-10's live test), a Windows machine

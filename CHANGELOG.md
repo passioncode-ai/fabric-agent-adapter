@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.98.0 (2026-11-16)
+
+Usage data, on by default, in every new agent project (FAA-202, the contract's DEC-0157).
+
+### Added
+
+- `new` (`new_agent.py` 0.3.0) lays down `src/usage_data.py`, `tests/test_usage_data.py` and `docs/usage-data.md`
+  (the texts in the new `new_agent_usage.py` beside it) and the optional slot `USAGE_DATA_APP_KEY` in
+  `fabric.source.json`. The module sends anonymous usage and error data to the estate's analytics host in the shape
+  the family's products send (`/api/v0/events`, `iid` and `environment` on every event), on by default and under the
+  agent's own switch (`python3 src/usage_data.py --data-dir <dir> status|on|off`): nothing before its notice was shown
+  once where the person reads it (UD-1), nothing without the release's app key, so a source checkout, a fork and a test
+  send nothing; an earlier no in the shared PassionCode installation file stays off, and a shared file it cannot read
+  sends nothing in that run (UD-2); off drops what waits and deletes the agent's own random installation id, on makes a
+  new one; an event property is a number, a boolean or a short code, and a path, an address, a long hex or base64 run,
+  text or a nested value is refused (UD-3, the planted-identifier test). The usage data page (UD-5) carries the host's
+  retention and the lines its owner confirms before the first release that sends; `docs/agent-surface.md` lists the
+  switch (the person's own shell owes no action, UD-4).
+- The generated project's own tests cover it (twelve with the placement guard's); `test_new_agent.py` runs them.
+
+### Changed
+
+- `references/usage-data.md` (both copies) and `references/new-agent.md` name what `new` lays down.
+
+### Not in this release
+
+- The adapter's own session hooks reporting their error classes under the same switch (FAA-202's last part) is now
+  FAA-347: it waits for an app key for the adapter on the analytics host from its owner.
+
 ## 0.97.0 (2026-11-16)
 
 The repin to Fabric Agent Contract `v0.1.0+2026-11-16.6` (`2bbfd780`, FAA-343); `560d6036` (`v0.1.0+2026-11-16`) stays

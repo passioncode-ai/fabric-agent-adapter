@@ -16,6 +16,9 @@ It writes, into an empty (or new) folder:
   starts degraded when it cannot read it, and starts when there is none; `config/placement.example.json` shows the
   record's shape on neutral values;
 - `README.md`, `LICENSE` (all rights reserved until the owner names the terms), `.gitignore`;
+- usage data, on by default (FAA-202, the contract's DEC-0157): `src/usage_data.py` with its tests, which sends nothing
+  before its notice was shown and nothing without the release's app key (the optional slot `USAGE_DATA_APP_KEY`), only
+  counts and codes, under the agent's own switch; and `docs/usage-data.md`, its usage data page (UD-5);
 - `docs/agent-surface.md`: the inventory of every function a person reaches beside its capability (FAA-332, the
   agent surface reference's AS-6), starting with the one capability;
 - with `--service`: `service/`, the service kit's sample (`service.py`, a fabric-service/0.1 service with one capability
@@ -42,8 +45,9 @@ from typing import Any, Dict, List, Optional, Sequence
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import adapt_project as ap  # noqa: E402 - the scaffolder and the source manifest, beside this file
+import new_agent_usage as usage  # noqa: E402 - the usage data files (FAA-202)
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 RECORD = "fabric/new-agent.json"
 #: The agent's id: the package's `name` grammar (`fabric-package.schema.json#/$defs/name`), kebab case.
 AGENT_ID = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
@@ -159,6 +163,7 @@ A Fabric agent made with the Fabric Agent Adapter's `new` command, contract `{co
 - `fabric.source.json`: the agent's source manifest (DEC-0149): what is source, and the slots an installation fills,
   never a value. `fabric_source_check.py check .` reads the source under it (exit 0 before every release).
 - `src/placement.py`: the placement guard the agent runs at start, before it polls, schedules or listens.
+- `src/usage_data.py`: anonymous usage and error data, on by default; `docs/usage-data.md` says what it sends.
 {service_line}
 ## Agent first
 
@@ -172,6 +177,14 @@ adapter's agent surface reference, AS-1 to AS-6).
 
 Keys are read by name from the environment or the secret store, never from a file of this repository. Slots:
 {slots}
+
+## Usage data
+
+On by default, under the agent's own switch (the Fabric Agent Contract's DEC-0157): `src/usage_data.py` sends counts
+and error codes only, never before its notice was shown once in the first output a person reads (`notice_due()`, then
+`notice_shown()`), and nothing at all without the release's app key (`USAGE_DATA_APP_KEY`), so a source checkout, a fork
+and a test send nothing. The switch: `python3 src/usage_data.py --data-dir <data dir> off`. Keep `docs/usage-data.md`
+true before the first release that carries a key.
 
 ## Data
 
@@ -187,6 +200,7 @@ A row with no capability is built before the release, never filed for later.
 | Function a person reaches | Where | Capability | Read or write | Gate |
 |---|---|---|---|---|
 | {capability} | (none yet: no page, bot or CLI) | `{capability}` | write | {gate} |
+| Usage data switch | `python3 src/usage_data.py off` (the person's own shell owes no action, UD-4) | (none yet: a page or bot that offers the switch adds a tool with the effect `change-policy` and gate `relayed`) | write | relayed |
 """
 
 GITIGNORE = """# the instance: real configuration, keys and what running the agent leaves
@@ -228,6 +242,7 @@ def plan(args: argparse.Namespace) -> Dict[str, str]:
     include = ["README.md", "LICENSE", ".gitignore", "src/", "tests/", "docs/", "config/placement.example.json",
                "fabric-agent.json", "fabric-contract.lock.json", "fabric/"] + (["service/"] if args.service else [])
     manifest = ap.source_manifest(include, "%s, a Fabric agent" % agent_id, service=args.service)
+    manifest["slots"].append(dict(usage.APP_KEY_SLOT))
     slots = "\n".join("- `%s` (%s%s): %s" % (s["name"], s["kind"], ", optional" if s.get("optional") else "", s["purpose"])
                       for s in manifest["slots"])
     files.update({
@@ -239,6 +254,9 @@ def plan(args: argparse.Namespace) -> Dict[str, str]:
         "LICENSE": "Copyright (c) the owner of %s. All rights reserved, until the owner names other terms.\n" % agent_id,
         ".gitignore": GITIGNORE,
         "src/placement.py": PLACEMENT_PY,
+        "src/usage_data.py": usage.USAGE_DATA_PY.replace("{agent_id}", agent_id),
+        "tests/test_usage_data.py": usage.USAGE_DATA_TEST.replace("{agent_id}", agent_id),
+        "docs/usage-data.md": usage.USAGE_PAGE.replace("{agent_id}", agent_id),
         "tests/test_placement.py": PLACEMENT_TEST.format(service_id=service_id, label=label),
         "config/placement.example.json": _placement_example(service_id, label),
         "docs/agent-surface.md": AGENT_SURFACE.format(capability=capability, gate="none" if args.effect == "none" else "relayed"),

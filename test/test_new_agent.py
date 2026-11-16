@@ -72,14 +72,15 @@ class NewAgentTests(unittest.TestCase):
         self.assertEqual((answer["id"], answer["profile"], answer["service"], answer["repeated"]), ("example-agent", "mcp", False, False))
         self.assertEqual(answer["folder"], str(self.folder.resolve()))
         for path in ("fabric-agent.json", "fabric-contract.lock.json", "fabric.source.json", "src/placement.py",
-                     "tests/test_placement.py", "config/placement.example.json", "README.md", "LICENSE", ".gitignore"):
+                     "tests/test_placement.py", "config/placement.example.json", "README.md", "LICENSE", ".gitignore",
+                     "src/usage_data.py", "tests/test_usage_data.py", "docs/usage-data.md"):
             self.assertIn(path, answer["created"])
             self.assertTrue((self.folder / path).is_file(), path)
         lock = json.loads((self.folder / "fabric-contract.lock.json").read_text(encoding="utf-8"))
         self.assertEqual(lock["commit"], ap.CONTRACT_COMMIT)
         manifest = json.loads((self.folder / "fabric.source.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["format"], "fabric-source/1")
-        self.assertEqual([s["name"] for s in manifest["slots"]], ["PUBLISHER_URI", "PLACEMENT_RECORD"])
+        self.assertEqual([s["name"] for s in manifest["slots"]], ["PUBLISHER_URI", "PLACEMENT_RECORD", "USAGE_DATA_APP_KEY"])
         placement = json.loads((self.folder / "config/placement.example.json").read_text(encoding="utf-8"))
         self.assertEqual(placement["schema"], "observatory-placement/1")
         self.assertEqual(placement["elsewhere"][0]["serviceId"], "example-agent.default")
@@ -90,7 +91,7 @@ class NewAgentTests(unittest.TestCase):
         self.assertIn("| example_agent.run | (none yet: no page, bot or CLI) | `example_agent.run` | write | none |", surface)
         self.assertIn("docs/agent-surface.md", answer["created"])
         self.assertEqual(json.loads((self.folder / "fabric/new-agent.json").read_text(encoding="utf-8"))["tool"],
-                         "fabric-agent-adapter new 0.2.0")
+                         "fabric-agent-adapter new 0.3.0")
         # the generated project passes the source check under its own manifest, and its own tests
         code, report = self.source_check(self.folder)
         self.assertEqual(code, 0, report)
