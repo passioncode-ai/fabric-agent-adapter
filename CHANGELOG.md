@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.96.1 (2026-11-16)
+
+### Documentation
+
+- The 0.95.1 documentation audit's 31 findings (each with its evidence; no behaviour changes): README names the six
+  hooks and the current commands; AGENTS.md names `fabric_git`, the source check's sibling modules
+  (`fabric_source_list.py`, `fabric_source_redact.py`) and the check, the probe and the layout probe in its lifecycle
+  table; SECURITY.md states that the source check also reads Git's stored blobs (`git diff --cached`, `git cat-file
+  --batch`), that a gui-domain plist in `/Library/LaunchDaemons` is refused, and that an unproven macOS calibration is
+  tried again after a minute (SKILL-CARD too); `kit-modules.md` names peer_owner `1.3.1+kit.10`; building-fabric-services
+  lists 0.92.0's pack and sign refusals; the credential-file rule names every `*.credential` file in all three copies of
+  `source-and-instance.md`; an eval cites the right Observatory ticket.
+- The backlog's FAA-194, FAA-196 and FAA-201 statuses agree with their cells; the handoff's next task is FAA-202, its
+  waits current.
+
 ## 0.96.0 (2026-11-16)
 
 The repin to Fabric Agent Contract `v0.1.0+2026-11-16` (`560d6036`, FAA-342); `2462c90b` (`v0.1.0+2026-11-15`) stays
