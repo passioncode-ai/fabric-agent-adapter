@@ -424,3 +424,75 @@ if (!providerFixtures.some((f) => f.name === 'provider-entry-windows-path' && f.
 write('provider-fixtures.json', { about: "DEC-0145 at the pin: every provider.schema.json fixture as fixtures/catalogue.json lists it, its validity re-checked by the contract's validator, with the instance path and keyword of each schema error. Written by vendor_vectors.mjs, never by hand.",
   source: 'fixtures/catalogue.json, fixtures/*/provider-entry-*.json, schemas/provider.schema.json', fixtures: providerFixtures });
 console.log(`${providerFixtures.length} provider fixtures`);
+
+// DEC-0173 (FAA-342): extensions/instance-facts/0.1. The contract's fixtures/vectors/instance-facts.json, each case
+// re-answered by instanceFacts and instanceFactsRules (code, path and message per kind), and hostile cases of this kit
+// answered by the same functions. The kits' fabric_instance_facts.py and fabric-instance-facts.mjs are held to them.
+const instanceFactsModule = await src('instance-facts.ts');
+const facts = read('fixtures/vectors/instance-facts.json');
+const FACTS_KEY = facts.key;
+const factsFindings = (kind, value) => instanceFactsModule.instanceFactsRules(kind, value).map((f) => ({ code: f.code, instancePath: f.instancePath, message: f.message }));
+const factsCase = (name, descriptor, wellKnown) => ({
+  name, descriptor, wellKnown,
+  read: instanceFactsModule.instanceFacts(descriptor ?? undefined, wellKnown ?? undefined),
+  findings: {
+    descriptor: descriptor === null ? null : factsFindings('service-descriptor', descriptor),
+    wellKnown: wellKnown === null ? null : factsFindings('service-well-known', wellKnown),
+    pair: descriptor === null || wellKnown === null ? null : factsFindings('service-observation', { descriptor, wellKnown })
+  }
+});
+const factsCases = facts.cases.map((c) => {
+  const answered = factsCase(c.name, c.descriptor, c.wellKnown);
+  const short = (list) => (list === null ? null : list.map((f) => `${f.code} ${f.instancePath}`));
+  if (!same(answered.read, c.read)) throw new Error(`the contract's instance-facts case "${c.name}" no longer reads as written`);
+  for (const k of ['descriptor', 'wellKnown', 'pair']) if (!same(short(answered.findings[k]), c.findings[k])) throw new Error(`the contract's instance-facts case "${c.name}" no longer finds as written (${k})`);
+  return answered;
+});
+const base = { protocol: 'fabric-service/0.1', id: 'notes', instance: 'default', origin: 'http://127.0.0.1:47910' };
+const withFacts = (doc, value) => ({ ...doc, extensions: { [FACTS_KEY]: value } });
+const known = { service: { id: 'notes', instance: 'default' } };
+const remote = { ...base, placement: 'remote', origin: 'https://notes.example.com' };
+// A credential-shaped label, assembled from parts so no key-shaped literal sits in this source.
+const shaped = ['sk', 'Ab3dEf6hIj9kLm2nOp5qRs8t'].join('-');
+const hostile = [
+  ['the extension value is a string', withFacts(base, 'operator'), known],
+  ['the extension value is an array', withFacts(base, [{ access: { audience: 'operator' } }]), known],
+  ['the extension value is null', withFacts(base, null), known],
+  ['extensions is an array', { ...base, extensions: [FACTS_KEY] }, known],
+  ['an unknown member', withFacts(base, { access: { audience: 'operator' }, owner: 'x' }), known],
+  ['an unknown field in access', withFacts(base, { access: { audience: 'operator', role: 'admin' } }), known],
+  ['a __proto__ member in access', withFacts(base, JSON.parse('{"access": {"__proto__": {"audience": "operator"}}}')), known],
+  ['an audience outside the enum', withFacts(base, { access: { audience: 'Operator' } }), known],
+  ['an audience that is not a string', withFacts(base, { access: { audience: true } }), known],
+  ['an empty tenancy fails its required mode', withFacts(base, { tenancy: {} }), known],
+  ['a space without its kind', withFacts(base, { space: { account: 'agents-1' } }), known],
+  ['a label of 65 characters', withFacts(remote, { space: { kind: 'vm', account: `a${'b'.repeat(64)}` } }), known],
+  ['a label of 64 characters', withFacts(remote, { space: { kind: 'vm', account: `a${'b'.repeat(63)}` } }), known],
+  ['a label starting with a dot', withFacts(remote, { space: { kind: 'vm', account: '.agents' } }), known],
+  ['a label with a trailing newline', withFacts(remote, { space: { kind: 'vm', account: 'agents\n' } }), known],
+  ['a label with a non-ASCII letter', withFacts(remote, { space: { kind: 'vm', account: 'agentś' } }), known],
+  ['a credential-shaped label on a remote descriptor', withFacts(remote, { space: { kind: 'container', account: shaped } }), known],
+  ['a credential-shaped label in a remote well-known document', remote, withFacts(known, { space: { kind: 'container', account: shaped } })],
+  ['a well-known label read without a descriptor', null, withFacts(known, { space: { kind: 'user', account: 'agents-1' } })],
+  ['a well-known shared mode read without a descriptor', null, withFacts(known, { tenancy: { mode: 'shared' } })],
+  ['a well-known public audience on a remote descriptor with peer', { ...remote, peer: { port: 47911 } }, withFacts(known, { access: { audience: 'public' } })],
+  ['organization beside a subscription runner on a remote placement', { ...remote, runner: { credentialKind: 'subscription' } }, withFacts(known, { access: { audience: 'organization' } })],
+  ['public beside a subscription runner on a remote placement', { ...remote, runner: { credentialKind: 'subscription' } }, withFacts(known, { access: { audience: 'public' } })],
+  ['a placement that is not a string reads as local', withFacts({ ...base, placement: 1 }, { tenancy: { mode: 'shared' } }), known],
+  ['a dashboard login that is a string is not read', withFacts(base, { access: { entry: 'own-signin' } }), { ...known, surfaces: { dashboard: { login: 'true' } } }],
+  ['a dashboard login false and none declared', withFacts(base, { access: { entry: 'none' } }), { ...known, surfaces: { dashboard: { login: false } } }],
+  ['a dashboard login true over a declared none in both documents', withFacts(base, { access: { entry: 'none' } }), withFacts({ ...known, surfaces: { dashboard: { login: true } } }, { access: { entry: 'none' } })],
+  ['a well-known document without a service member is foreign', withFacts(base, { access: { audience: 'operator' } }), withFacts({}, { access: { audience: 'organization' } })],
+  ['an absent instance on both sides reads as default', withFacts({ ...base, instance: undefined }, { tenancy: { mode: 'single' } }), withFacts({ service: { id: 'notes' } }, { space: { kind: 'user' } })],
+  ['a null instance in the well-known document reads as default', withFacts(base, { tenancy: { mode: 'single' } }), withFacts({ service: { id: 'notes', instance: null } }, { space: { kind: 'user' } })],
+  ['a numeric id against a string id', withFacts({ ...base, id: 5 }, { tenancy: { mode: 'single' } }), withFacts({ service: { id: '5', instance: 'default' } }, { space: { kind: 'user' } })],
+  ['an id in another case is another service', withFacts(base, { tenancy: { mode: 'single' } }), withFacts({ service: { id: 'Notes', instance: 'default' } }, { space: { kind: 'user' } })],
+  ['every refused field in one descriptor', withFacts({ ...base, peer: { port: 47911 } }, { access: { audience: 'operator', entry: 'host-signin' }, tenancy: { mode: 'shared' }, space: { kind: 'system', account: shaped } }), { ...known, surfaces: { dashboard: { login: false } } }],
+  ['both documents fail their schema', withFacts(base, { tenancy: {} }), withFacts(known, { space: {} })]
+].map(([name, descriptor, wellKnown]) => {
+  const clean = (doc) => (doc === null ? null : JSON.parse(JSON.stringify(doc)));
+  return factsCase(`hostile: ${name}`, clean(descriptor), clean(wellKnown));
+});
+write('instance-facts-vectors.json', { about: `DEC-0173 at the pin: the contract's fixtures/vectors/instance-facts.json, every case re-answered by instanceFacts and instanceFactsRules, findings as {code, instancePath, message} per kind (descriptor: service-descriptor, wellKnown: service-well-known, pair: service-observation; null where a document is not given), and hostile cases of this kit answered by the same functions. Written by vendor_vectors.mjs, never by hand. The contract's own description: ${facts.about}`,
+  source: 'fixtures/vectors/instance-facts.json, src/instance-facts.ts, schemas/service-instance-facts-extension.schema.json', key: FACTS_KEY, cases: [...factsCases, ...hostile] });
+console.log(`instance-facts-vectors.json: ${factsCases.length} contract cases, ${hostile.length} hostile cases`);

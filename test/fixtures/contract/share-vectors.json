@@ -6962,6 +6962,142 @@
       ]
     },
     {
+      "name": "device-attribution-inventory-listed.json",
+      "value": {
+        "binding": {
+          "org": {
+            "id": "org-7f3a"
+          },
+          "user": {
+            "id": "m-4821"
+          },
+          "device": {
+            "id": "dev-01j9a"
+          }
+        },
+        "epochs": [
+          {
+            "epoch": 2,
+            "binding": {
+              "org": {
+                "id": "org-7f3a"
+              },
+              "user": {
+                "id": "m-4821"
+              },
+              "device": {
+                "id": "dev-01j9a"
+              }
+            }
+          }
+        ],
+        "batch": {
+          "protocol": "fabric-activity/0.1",
+          "device": {
+            "id": "dev-01j9a"
+          },
+          "events": [
+            {
+              "protocol": "fabric-activity/0.1",
+              "eventId": "sha256:84966993ddde81dd7ffe3451b420c4d4d5ad16d8a90553bef8c63ef2262aced9",
+              "kind": "account.inventory",
+              "source": "switchboard",
+              "sourceKey": "sha256:221a4e37ce2350f676bededd85b76430c55a84fef7a4ff88643180e73bc2cc67",
+              "collector": {
+                "id": "observatory-node",
+                "epoch": 2
+              },
+              "seq": 1,
+              "occurred": "2026-11-14T00:00:00Z",
+              "bootId": "boot-7c41e2",
+              "monotonicNs": "0",
+              "data": {
+                "day": "2026-11-14",
+                "provider": "anthropic",
+                "tenantRef": "sha256:7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+                "billing": "subscription",
+                "plan": "max-5x",
+                "holder": "switchboard",
+                "accounts": 2
+              }
+            }
+          ]
+        },
+        "tenants": [
+          "sha256:7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a"
+        ]
+      },
+      "expected": []
+    },
+    {
+      "name": "device-attribution-inventory-unlisted.json",
+      "value": {
+        "binding": {
+          "org": {
+            "id": "org-7f3a"
+          },
+          "user": {
+            "id": "m-4821"
+          },
+          "device": {
+            "id": "dev-01j9a"
+          }
+        },
+        "epochs": [
+          {
+            "epoch": 2,
+            "binding": {
+              "org": {
+                "id": "org-7f3a"
+              },
+              "user": {
+                "id": "m-4821"
+              },
+              "device": {
+                "id": "dev-01j9a"
+              }
+            }
+          }
+        ],
+        "batch": {
+          "protocol": "fabric-activity/0.1",
+          "device": {
+            "id": "dev-01j9a"
+          },
+          "events": [
+            {
+              "protocol": "fabric-activity/0.1",
+              "eventId": "sha256:84966993ddde81dd7ffe3451b420c4d4d5ad16d8a90553bef8c63ef2262aced9",
+              "kind": "account.inventory",
+              "source": "switchboard",
+              "sourceKey": "sha256:221a4e37ce2350f676bededd85b76430c55a84fef7a4ff88643180e73bc2cc67",
+              "collector": {
+                "id": "observatory-node",
+                "epoch": 2
+              },
+              "seq": 1,
+              "occurred": "2026-11-14T00:00:00Z",
+              "bootId": "boot-7c41e2",
+              "monotonicNs": "0",
+              "data": {
+                "day": "2026-11-14",
+                "provider": "anthropic",
+                "tenantRef": "sha256:7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+                "billing": "subscription",
+                "plan": "max-5x",
+                "holder": "switchboard",
+                "accounts": 2
+              }
+            }
+          ]
+        },
+        "tenants": [
+          "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      },
+      "expected": []
+    },
+    {
       "name": "device-attribution-ok.json",
       "value": {
         "binding": {

@@ -5,13 +5,23 @@
     "access-log": [
       "1"
     ],
-    "approval": [
+    "activity-inventory": [
       "1"
     ],
     "activity-summary": [
+      "1",
+      "2"
+    ],
+    "activity-turn": [
+      "1"
+    ],
+    "activity-unit": [
       "1"
     ],
     "agent-directory": [
+      "1"
+    ],
+    "approval": [
       "1"
     ],
     "call-record": [
@@ -30,6 +40,9 @@
       "1"
     ],
     "credential-revocation": [
+      "1"
+    ],
+    "decision-verdict": [
       "1"
     ],
     "enroll-token": [
@@ -63,12 +76,6 @@
     "fabric-credential-envelope": [
       "1"
     ],
-    "fabric-load": [
-      "0.1"
-    ],
-    "fabric-ops-digest": [
-      "0.1"
-    ],
     "fabric-dashboard": [
       "0.1"
     ],
@@ -78,9 +85,15 @@
     "fabric-device": [
       "0.1"
     ],
+    "fabric-instance-facts": [
+      "0.1"
+    ],
     "fabric-interop": [
       "0.1",
       "0.2"
+    ],
+    "fabric-load": [
+      "0.1"
     ],
     "fabric-local-channel": [
       "0.1"
@@ -92,6 +105,9 @@
       "1"
     ],
     "fabric-operator-channel": [
+      "0.1"
+    ],
+    "fabric-ops-digest": [
       "0.1"
     ],
     "fabric-package": [
@@ -166,13 +182,13 @@
     "org-authority-draft": [
       "1"
     ],
+    "org-instance": [
+      "1"
+    ],
     "org-key-set": [
       "1"
     ],
     "org-key-set-draft": [
-      "1"
-    ],
-    "org-instance": [
       "1"
     ],
     "org-membership": [
@@ -206,22 +222,19 @@
     "revocation-delta": [
       "1"
     ],
-    "session-handoff": [
-      "1"
-    ],
-    "standing": [
-      "1"
-    ],
     "service-load": [
       "1"
     ],
-    "activity-unit": [
+    "session-handoff": [
       "1"
     ],
     "share-registration": [
       "1"
     ],
     "share-registration-receipt": [
+      "1"
+    ],
+    "standing": [
       "1"
     ],
     "support-quality-daily": [

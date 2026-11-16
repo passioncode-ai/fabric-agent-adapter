@@ -9,6 +9,7 @@ SHARED = {
     "references/operator-channel-and-repository.md": ("adapting-projects-to-fabric", "creating-fabric-agents"),
     "references/source-and-instance.md": ("adapting-projects-to-fabric", "creating-fabric-agents"),  # FAA-188
     "references/agent-surface.md": ("adapting-projects-to-fabric", "creating-fabric-agents"),  # FAA-332
+    "references/usage-data.md": ("building-fabric-services", "creating-fabric-agents"),  # FAA-338, DEC-0157
 }
 
 

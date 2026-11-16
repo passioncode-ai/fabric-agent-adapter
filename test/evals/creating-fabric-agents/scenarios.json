@@ -361,6 +361,18 @@
         "keeps a daily guard under the monthly stop, refuses to go live when the catalogue has no open-vendor row for a lane that reads people, and writes a commitments-ledger row for every holding line",
         "gives every adversarial batch of the acceptance its expected route and turn outcome"
       ]
+    },
+    {
+      "id": "an-agent-that-sends-usage-data",
+      "request": "Our new Fabric agent should send anonymous usage and error counts so we can improve it. What must it do before its first send, which ids may it send, where is the switch, and how may another agent turn it back on after the person turned it off?",
+      "expected": [
+        "sends nothing before its notice was shown once where the person reads it (for an agent with no window: its first answer in the person's chat or its first output in a terminal the person reads, never a line only an agent's tool reads); the notice is not a question, nothing waits on an answer and no answer means on (DEC-0157 UD-1)",
+        "has the notice name what it collects, its purpose, the installation id it sends (whether it is shared and with which products, that it ties events together), any session id, where the data is sent or a link to its usage data page, and where the switch is (UD-1)",
+        "gives it a switch of its own in its own settings, governing this agent alone, read before its first send: an earlier decline stays off (a shared off present before the first send included), off stops both kinds, drops what waits and deletes an id the agent owns, and the agent never writes the shared file's analytics field (UD-2)",
+        "keeps it anonymous: an installation id that is a random UUID for analytics only, a session id only in memory and renewed after an idle hour, no name, email, account, kept IP, hardware or advertising id, path, credential or content a person wrote, and never joined with an account, purchase or billing record (UD-3)",
+        "serves the switch on its agent surface as a tool whose effect is change-policy with gate relayed, declared under extensions/actions/0.1, turned back on only on the operator's own word naming that switch (never a mandate, another approver or a standing rule), and never declines a person who asks to turn it off (UD-4)",
+        "documents on its usage data page what it sends, the id, where it goes and who reads it there, how long it is kept, the version that turned it on and whether sent data can be erased (UD-5), and keeps activity telemetry, a digest kept on the machine and the service's usage report out of it (UD-6)"
+      ]
     }
   ]
 }

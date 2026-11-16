@@ -11,7 +11,7 @@ metadata:
   author: PassionCode.ai
   version: "0.95.0"
   contract-version: "0.1.0"
-  contract-commit: "2462c90b4108e56d35be6a275d9043059c95d5d0"
+  contract-commit: "560d60369b553fc123ba29c3e1e637de68901678"
 ---
 
 # Creating Fabric-compatible agents
@@ -78,6 +78,7 @@ board (or, with a grant, its scan tool over the source projects), and build from
 | **Who pays?** | one key per agent and context with its own ceiling (USD 100 a month by default, more only where the operator names it), from the estate's key manager, read from the environment; checked before every call, the agent's own stop under the key's limit; a personal key never pays for an organization, and an organization's instance follows its grant |
 | **How does it learn?** | decisions recorded with reasons, one trace per turn, every failure a planted fixture first, history replayed, learnings proposed and never self-approved (references/orchestration-and-learning.md) |
 | **Text for people?** | if it writes anything a person reads (a reply, a message, a post, a report, a UI string), its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in new output, from the first commit (the resilience reference, *Text for people*) |
+| **Does it send usage data?** | if it sends anonymous usage or error data to its owner (DEC-0157): nothing before its notice was shown where the person reads it (for an agent, its first answer in the person's chat), a notice and never a question; its own switch read before the first send, an earlier decline kept off; a random UUID installation id only, no person, path, credential or content; the switch's agent tool a `change-policy` effect with `gate: relayed`, back on only on the operator's own word naming it ([the usage data reference](references/usage-data.md), UD-1 to UD-6) |
 | **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it starts from the agents database's template when one is named, read beside references/communication-agent-template.md, else from that template prompt, and either way carries from its first release the turn record and the daily `support.quality_daily` report, the lane table with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, false-state gates and a checker that sees the material first, numbers and account state from tools, the live tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never counted or judged as answers, a commitments ledger, a knowledge client that reads the service's `answer` flag, a gap queue and a feed re-read on a new event kind (references/agents-that-answer-people.md) |
 
 ## Step 1: the knowledge intake
@@ -186,7 +187,7 @@ instance](references/source-and-instance.md), *The source manifest*).
 The effect class is declared, never defaulted: ask the author what the agent does outside itself when the request
 does not say. Cost presets are only for a run whose cost varies; their amounts come from the author or measured runs.
 
-Pin exactly contract `0.1.0` at commit `2462c90b4108e56d35be6a275d9043059c95d5d0` and
+Pin exactly contract `0.1.0` at commit `560d60369b553fc123ba29c3e1e637de68901678` and
 read the pinned guide before implementing protocol details. If this skill is installed
 without its sibling, the scaffolder is absent: create the bundle by hand from the pinned
 contract's `docs/guides/connecting-compatible-agents.md` and mark the structural check

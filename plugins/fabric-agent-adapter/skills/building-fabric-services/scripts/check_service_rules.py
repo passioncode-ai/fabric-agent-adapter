@@ -24,6 +24,7 @@ from fabric_secrets import ascii_decoded, repository_name, repository_password, 
 import fabric_peer_owner as po  # noqa: E402 - DEC-0154 HA-2
 import fabric_supervisors as _sup  # noqa: E402 - where a LaunchDaemon's plist lives (FAA-278)
 import fabric_git  # noqa: E402 - git from no folder of the checkout, no fsmonitor, no caller's GIT_DIR (FAA-190)
+import fabric_instance_facts as fif  # noqa: E402 - DEC-0173, FAC-SEM-180 (FAA-342)
 import socket  # noqa: E402
 
 
@@ -964,3 +965,19 @@ def holds_verdict(limits: List[str], repo: Optional[Path], why: str,
                        "through fabric_holds (HoldBook, waiting_message, hold_job) yet. Adopt fabric_holds so each hold "
                        "is said on the job, the operator is pushed once per hold and takes a scoped lift (FAA-298, "
                        "references/interop.md); until then this rule is not run" % "; ".join(limits))
+
+
+def instance_facts_verdict(descriptor: Any, wk: Any) -> Tuple[str, str]:
+    """`instance-facts.declared` (FAA-342; contract DEC-0173 IF-5, IF-6, FAC-SEM-180 as instanceFactsRules reads it): each
+    document alone and the pair, each problem once. Neither document declaring the extension is NOT_RUN; a value a clause
+    refuses, or one that fails the schema, FAILs (a host reads that fact as not declared); else PASS with the facts read."""
+    if not any(isinstance(d, dict) and isinstance(d.get("extensions"), dict)
+               and fif.INSTANCE_FACTS_EXTENSION_KEY in d["extensions"] for d in (descriptor, wk)):
+        return "NOT_RUN", "the service declares no instance facts (extensions/instance-facts/0.1)"
+    findings = (fif.instance_facts_rules("service-descriptor", descriptor) + fif.instance_facts_rules("service-well-known", wk)
+                + fif.instance_facts_rules("service-observation", {"descriptor": descriptor, "wellKnown": wk}))
+    if findings:
+        return "FAIL", "; ".join("%s at %s: %s" % (f["code"], f["instancePath"], f["message"]) for f in findings)
+    view = fif.instance_facts(descriptor, wk)
+    read = ", ".join("%s %s" % (k, v) for k, v in view["facts"].items()) or "nothing"
+    return "PASS", "read: %s%s" % (read, " (the well-known document answers as another service and gives nothing)" if view["foreign"] else "")

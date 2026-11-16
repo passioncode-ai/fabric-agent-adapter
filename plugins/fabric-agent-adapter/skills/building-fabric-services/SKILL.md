@@ -12,7 +12,7 @@ metadata:
   version: "0.95.0"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
-  extension-commit: "2462c90b4108e56d35be6a275d9043059c95d5d0"
+  extension-commit: "560d60369b553fc123ba29c3e1e637de68901678"
 ---
 
 # Building Fabric services
@@ -288,6 +288,9 @@ An agent that calls paid models reports **what it spent**: one receipt per call 
 provider's own usage numbers, served behind the token at `surfaces.usage` as the DEC-0021 usage
 report. An unknown cost is null, never 0. It lists **every** spending limit the service applies
 in `budgets`, enforced or not. Read [the usage reference](references/usage.md) before wiring it.
+
+**Anonymous usage and error data** (DEC-0157): notice first, own switch, random UUID id, a `change-policy` tool with
+`gate: relayed` ([usage data](references/usage-data.md)). The usage report and a local digest are not usage data.
 
 A service whose store holds what the operator decided keeps **settings backups** outside its data
 directory, restores only on a fresh database and never overwrites. Read

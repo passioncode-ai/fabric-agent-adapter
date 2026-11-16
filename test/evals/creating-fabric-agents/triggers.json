@@ -35,6 +35,8 @@
     {"query": "Сделай агента, который отвечает пользователям в чате поддержки и обрабатывает лидов, по шаблону Fabric.", "shouldTrigger": true},
     {"query": "Create a Fabric-compatible support bot that answers our customers' questions in chat from the help center.", "shouldTrigger": true},
     {"query": "Build a new Fabric agent that replies to app store reviews for us.", "shouldTrigger": true},
-    {"query": "We are building a Fabric support bot from the communication agent template: which turn outcome does a clarifying question record?", "shouldTrigger": true}
+    {"query": "We are building a Fabric support bot from the communication agent template: which turn outcome does a clarifying question record?", "shouldTrigger": true},
+    {"query": "Our new Fabric agent should send anonymous usage and error data: what does it owe before the first send?", "shouldTrigger": true},
+    {"query": "Add a cookie consent banner to our marketing site's checkout page.", "shouldTrigger": false}
   ]
 }
