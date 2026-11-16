@@ -5,7 +5,8 @@ at the commit this plugin pins. This page says how the kit implements it; where 
 differ, the contract is right.
 
 A service that other agents (and Fabric) call does five things. Each has one helper in
-`scripts/fabric_interop.py` (Python) and `scripts/fabric-interop.mjs` (Node).
+`scripts/fabric_interop.py` (Python) and `scripts/fabric-interop.mjs` (Node); the job store lives in
+`fabric_interop_jobs.py` / `fabric-interop-jobs.mjs` since 0.95.0 and both re-export it.
 
 | Rule | What the service does | Helper |
 |---|---|---|
