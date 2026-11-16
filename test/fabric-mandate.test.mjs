@@ -194,9 +194,9 @@ test('FAA-196 (22): a spend Number() would throw on is no estimate, never a thro
   // Read as Number() reads them, without building the join: 100 lists deep, a dict at any depth (NaN, never descended).
   assert.equal(covers(nested(MAX_SPEND_DEPTH - 1)).ok, true, '100 lists around 3');
   assert.deepEqual(covers(nested(MAX_SPEND_DEPTH - 1, [30])).data, { detail: 'outside-mandate: spend', estimateUsd: nested(MAX_SPEND_DEPTH - 1, [30]), perCallMaxUsd: 20 });
-  for (const spend of [JSON.parse('{"a":{"toString":1}}'), JSON.parse('[{"a":{"toString":1}}]'), JSON.parse('{"valueOf":1}'), JSON.parse('[{"tostring":1}]'),
-    JSON.parse('{"a":'.repeat(150) + '1' + '}'.repeat(150)), { a: nested(5000) }, [[1, 2]], [], [[null]], [true]]) {
-    assert.equal(covers(spend).ok, true, JSON.stringify(spend).slice(0, 40));
+  for (const [index, spend] of [JSON.parse('{"a":{"toString":1}}'), JSON.parse('[{"a":{"toString":1}}]'), JSON.parse('{"valueOf":1}'), JSON.parse('[{"tostring":1}]'),
+    JSON.parse('{"a":'.repeat(150) + '1' + '}'.repeat(150)), { a: nested(5000) }, [[1, 2]], [], [[null]], [true]].entries()) {
+    assert.equal(covers(spend).ok, true, `case ${index}`);  // no JSON.stringify: a hosted runner's stack is smaller
   }
   assert.equal(covers(['7'.repeat(16000), '7']).ok, true, 'two items are NaN: the 32 KB join is never built');
   assert.equal(covers([['21']]).ok, false, 'one item is read as String() reads it');

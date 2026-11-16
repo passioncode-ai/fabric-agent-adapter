@@ -44,7 +44,7 @@ class Folded:
 
     __slots__ = ("text", "_out", "_src", "_end", "_linear")
 
-    def __init__(self, text: str, out: "array[int]", src: "array[int]", end: "array[int]", linear: bytearray) -> None:
+    def __init__(self, text: str, out: array, src: array, end: array, linear: bytearray) -> None:
         self.text, self._out, self._src, self._end, self._linear = text, out, src, end, linear
 
     def span(self, a: int, b: int) -> Tuple[int, int]:
