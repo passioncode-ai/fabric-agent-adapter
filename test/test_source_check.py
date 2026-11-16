@@ -37,6 +37,10 @@ LONG_RANDOM = "Ab3" * 14  # 42 characters mixing upper case, lower case and digi
 FAKE_JWT = "ey" + "J" + "hbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl"
 PEM = "-----BEGIN " + "RSA PRIVATE KEY-----"
 OWNER = "Acme" + "Holdings"
+#: The check and the siblings it loads at its start (fabric_source_tree.py only under a manifest).
+SIBLINGS = ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py", "fabric_source_homes.py",
+            "fabric_source_restart.py", "fabric_source_list.py", "fabric_source_redact.py", "fabric_secrets.py",
+            "fabric_git.py")
 ACCOUNT = "owner-" + "account-77"
 
 
@@ -100,8 +104,34 @@ def _sas_signature(escaped: bool = False) -> str:
         if all(re.search(c, raw) for c in ("[a-z]", "[A-Z]", "[0-9]")) and (not escaped or "%2B" in sig or "%2F" in sig):
             return sig
 
+#: Whether names, arguments and files are read as UTF-8 in this process: the check restarts itself in UTF-8 mode when
+#: they are not, but run in process (`run`) it cannot (FAA-190 (75)).
+IN_UTF8 = bool(sys.flags.utf8_mode) or sys.getfilesystemencoding().lower().replace("_", "-") in ("utf-8", "utf8")
+
+
+def tracked_copy(root, dest):
+    """A copy of the files Git tracks in root, as the work tree holds them, without an untracked file (FAA-190 (3)):
+    False when root is not in a Git checkout."""
+    listed = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True)
+    if listed.returncode != 0 or not listed.stdout:
+        return False
+    for raw in listed.stdout.split(b"\0"):
+        if not raw:
+            continue
+        name = os.fsdecode(raw)
+        source, target = Path(root, name), Path(dest, name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if os.path.islink(str(source)):
+            os.symlink(os.readlink(str(source)), str(target))
+        elif source.is_file():
+            shutil.copy2(str(source), str(target))
+    return True
+
+
 class Tree(unittest.TestCase):
     def setUp(self):
+        if not IN_UTF8:
+            self.skipTest("not UTF-8 here: InUtf8Mode runs the suite in Python's UTF-8 mode")
         self.tmp = Path(tempfile.mkdtemp())
         self.root = self.tmp / "agent"
         self.root.mkdir()
@@ -1056,8 +1086,7 @@ class WhatIsRead(Tree):
     def test_a_copy_inside_the_checked_tree_writes_no_bytecode(self):
         tools = self.root / "tools"
         tools.mkdir()
-        for name in ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py", "fabric_source_homes.py",
-                     "fabric_source_restart.py", "fabric_secrets.py", "fabric_git.py"):
+        for name in SIBLINGS:
             shutil.copy(SCRIPTS / name, tools / name)
         self.git("init", "-q")
         self.git("add", "-A")
@@ -1641,7 +1670,7 @@ class Refusals(Tree):
         self.assertIn("holds a space, a dash, a dot, an underscore or an apostrophe (each a dash in the dashed form", reference)
         # reading 38, product: the reference says what happens to a short declared home and to a typographic apostrophe
         flat = " ".join(reference.split())
-        self.assertIn("once found anywhere in the tree, is masked wherever it stands in a printed path", flat)
+        self.assertIn("a name of three characters or fewer, found or declared, only as a word", flat)
         self.assertIn("a folder whose name holds `\u2019` is listed as a plain string with `\u2019` kept", flat)
         changelog = " ".join((ROOT / "CHANGELOG.md").read_text(encoding="utf-8").split())
         self.assertNotIn("including container and cloud users", changelog)
@@ -1705,8 +1734,7 @@ class Refusals(Tree):
         self.assertIn("1 home name(s) declared", out)
 
     def test_a_copy_without_its_siblings_refuses_with_exit_2(self):
-        siblings = ("fabric_source_ignore.py", "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py",
-                    "fabric_source_tree.py", "fabric_source_check_cli.py", "fabric_git.py")  # 0.81.0 seam: the tree module, imported only when a manifest is there
+        siblings = SIBLINGS[1:] + ("fabric_source_tree.py",)  # 0.81.0 seam: the tree module, imported only when a manifest is there
         (self.root / "fabric.source.json").write_text("{}\n", encoding="utf-8")
         for missing in siblings:  # reading 38, seam: each sibling left behind in turn
             tools = self.tmp / ("tools-" + missing)
@@ -2034,6 +2062,387 @@ def flat(relative):
     return " ".join((SKILLS / relative).read_text(encoding="utf-8").split())
 
 
+class FAA190Rest(Tree):
+    """FAA-190's remaining items: what a printed path may show, the forms the plain check reads beside the contract's,
+    and the cost of reading a tree."""
+
+    def git(self, *args, cwd=None):
+        subprocess.run(["git", "-C", str(cwd or self.root), *args], check=True, capture_output=True)
+
+    def seen_from(self, *texts, entries=()):
+        seen = sc._Seen()
+        for text in texts:
+            sc._text_findings(text, list(entries), seen)
+        return seen
+
+    # --- what a printed path shows (1)
+
+    def test_the_printed_path_holds_no_finding_after_marks(self):  # (19)
+        entries = ["", sc._fold("zq" + "fake" + "corp")]
+        path = "q/api_key=" + LONG_RANDOM + "zq" + "fake" + "corp.txt"
+        self.assertIsNone(sc._secret_finding(path))  # as written, the synthetic word keeps the value from being one
+        out = sc.redact(path, entries)
+        self.assertNotIn(LONG_RANDOM[:8], out)
+        self.assertIsNone(sc._secret_finding(out), out)
+        self.assertTrue(out.startswith("q/"), out)
+
+    def test_a_ligature_spelling_of_a_found_home_is_masked(self):  # (25)
+        name = "fi" + "nnzq"
+        seen = self.seen_from("/" + "Users/" + name + "/x")
+        out = sc.redact("a/\ufb01nnzq/b", [], seen)
+        self.assertNotIn("nnzq", out)
+        self.assertTrue(out.startswith("a/") and out.endswith("/b"), out)
+
+    def test_a_home_ending_in_a_dot_masks_the_bare_name(self):  # (39)
+        seen = self.seen_from("/" + "Users/" + HOME_NAME + "./x")
+        self.assertNotIn(HOME_NAME, sc.redact("q/" + HOME_NAME + "/z", [], seen))
+
+    def test_a_url_host_does_not_mask_an_unrelated_path(self):  # (45)
+        pw = LONG_RANDOM[:15] + "7"
+        seen = self.seen_from("db = <https>://app:%s@zqhostname.org/x" .replace("<https>", "https") % pw)
+        self.assertEqual(sc.redact("docs/zqhostname.json", [], seen), "docs/zqhostname.json")
+        self.assertEqual(sc.redact("docs/" + pw + ".json", [], seen), "docs/<secret>")
+
+    def test_grams_of_a_url_finding_cover_only_its_credential(self):  # (54)
+        pw = LONG_RANDOM[:15] + "7"
+        seen = sc._Seen()
+        seen.add_values("db = " + "https" + "://app:%s@zqhostname-long-enough.org/some/long/path/x" % pw)
+        self.assertTrue(seen.grams)
+        self.assertLessEqual(seen.grams, {pw[i:i + 8] for i in range(len(pw) - 7)})
+
+    def test_a_short_found_home_is_masked_only_as_a_word(self):  # (53)
+        seen = self.seen_from("/" + "Users/" + "bo" + "/x")
+        self.assertEqual(sc.redact("src/bootstrap/robot.py", [], seen), "src/bootstrap/robot.py")
+        self.assertEqual(sc.redact("src/bo/x.py", [], seen), "src/<home>/x.py")
+        self.assertEqual(sc.redact("src/bo_notes.py", [], seen), "src/<home>_notes.py")
+
+    def test_a_part_of_a_dotted_home_is_masked(self):  # (55)
+        part = "ZQ" + "CORPORATE"
+        seen = self.seen_from("/" + "Users/" + HOME_NAME + "." + part + "/x")
+        self.assertNotIn(part, sc.redact("q/" + part + "/z", [], seen))
+        self.assertNotIn(HOME_NAME, sc.redact("q/" + HOME_NAME + "/z", [], seen))
+
+    def test_a_long_found_run_and_many_folders_stay_fast(self):  # (58)
+        import random
+        draw = random.Random(7)
+        value = "".join(draw.choice("ABCDEFGHJKLMNPQRSTabcdefghijkmnpqrst23456789") for _ in range(8000))
+        seen = sc._Seen()
+        seen.grams.update(value[i:i + 8] for i in range(len(value) - 7))
+        ratio = growth(lambda n: sc.redact(value[:n] + "/a" * n, [], seen), 1000, 4000)
+        self.assertLess(ratio, 9, "a gram hit walked every segment (16 on 0.93.1)")
+
+    def test_a_part_of_a_found_entry_is_masked(self):  # (59)
+        entry = sc._fold("zq" + "acmeholdings")
+        seen = self.seen_from("we are zq" + "acmeholdings here", entries=["", entry])
+        out = sc.redact("q/zq" + "acmehold.txt", ["", entry], seen)
+        self.assertNotIn("zqacmeho", out.lower())
+        self.assertIn("<line 2>", out)
+
+    def test_a_short_declared_home_is_masked_only_as_a_word(self):  # (76)
+        entries = [sc.HOME_ENTRY + "qz"]
+        seen = self.seen_from("/" + "Users/" + "qz" + "/x", entries=entries)
+        self.assertEqual(sc.redact("q/qzone/a.txt", entries, seen), "q/qzone/a.txt")
+        self.assertEqual(sc.redact("q/qz/a.txt", entries, seen), "q/<home>/a.txt")
+
+    def test_an_unfound_declared_neutral_name_is_masked_as_a_word_as_documented(self):  # (86)
+        self.assertEqual(sc.redact("admin-panel/.env", [sc.HOME_ENTRY + "admin"]), "<home>-panel/.env")
+        flat = " ".join((SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8").split())
+        self.assertIn("`home: admin` prints `admin-panel/.env` as `<home>-panel/.env`", flat)
+
+    def test_redact_with_many_names_and_a_declared_home_stays_fast(self):  # (87)
+        seen = sc._Seen()
+        seen.names.update("u%05dname" % i for i in range(4000))
+        paths = ["src/m%04d/file.py" % i for i in range(200)]
+
+        def work(declared):
+            entries = [sc.HOME_ENTRY + "zqowner"] if declared else [""]
+            for p in paths:
+                sc.redact(p, entries, seen)
+        sc.redact(paths[0], [""], seen)  # the names' pattern is built once, before either is timed
+        best = {}
+        for _ in range(3):
+            for declared in (False, True):
+                started = CPU_CLOCK()
+                work(declared)
+                took = CPU_CLOCK() - started
+                best[declared] = min(best.get(declared, took), took)
+        self.assertLess(best[True] / max(best[False], 1e-9), 6, "a declared home read every name per path (37 on 0.93.1)")
+
+    def test_a_declared_home_glued_to_a_mark_is_masked(self):  # (88)
+        entries = ["", sc._fold("zq" + "do"), sc.HOME_ENTRY + "jane"]
+        out = sc.redact("q/zqdojane-x.txt", entries)
+        self.assertNotIn("jane", out)
+        self.assertIn("<line 2>", out)
+
+    def test_a_key_cut_by_a_slash_prints_no_part(self):  # (28)
+        key = FAKE_GITHUB
+        out = sc.redact("x/" + key[:24] + "/" + key[24:] + "/readme.md", [])
+        self.assertNotIn(key[24:], out)
+        self.assertTrue(out.startswith("x/"), out)
+
+    # --- the forms the plain check reads beside the contract's (2)
+
+    def test_a_json_escaped_home_path_is_found(self):  # (16)
+        for text in ("\\/" + "Users\\/" + HOME_NAME + "\\/x", "\\u002f" + "Users\\u002f" + HOME_NAME + "\\u002fx",
+                     "\\\\/" + "Users\\\\/" + HOME_NAME + "\\\\/x"):
+            spans = sc._home_names(text)
+            self.assertTrue(spans, text)
+            self.assertIn(HOME_NAME, [text[a:b] for a, b in spans])
+        self.write("a.json", '{"p": "\\/' + 'Users\\/' + HOME_NAME + '\\/notes"}\n')
+        code, out, err = run(["check", str(self.root)])
+        self.assertEqual(code, 1, out)
+        self.assertIn("a.json:1: home-path", out)
+        self.assertNotIn(HOME_NAME, out + err)
+
+    def test_a_home_after_a_file_url_host_is_found(self):  # (78)
+        for text in ("vscode" + "://file/" + "Users/" + HOME_NAME + "/x", "file" + "://localhost/" + "Users/" + HOME_NAME + "/x",
+                     "file" + ":///c%3A/" + "Users/" + HOME_NAME + "/x", "vscode" + "://file/c:/" + "Users/" + HOME_NAME):
+            self.assertIn(HOME_NAME, [text[a:b] for a, b in sc._home_names(text)], text)
+        self.assertEqual(sc._home_names("https" + "://site.org/" + "Users/" + HOME_NAME + "/x"), [])  # a web route
+
+    def test_a_doubled_prefix_still_finds_the_home(self):  # (85)
+        text = "C:\\" + "Users\\" + "C:\\" + "Users\\" + HOME_NAME + "\\x"
+        self.assertIn(HOME_NAME, [text[a:b] for a, b in sc._home_names(text)])
+
+    def test_a_special_url_without_slashes_is_found(self):  # (48)
+        pw = LONG_RANDOM[:15] + "7"
+        self.assertIsNotNone(sc._secret_finding("dsn=" + "https" + ":app:%s@db" % pw))
+        self.assertIsNone(sc._secret_finding("see " + "https" + ": the scheme"))
+
+    def test_a_standalone_percent_encoded_url_is_found(self):  # (52)
+        pw = LONG_RANDOM[:15] + "7"
+        line = "u=" + "https" + "%3A%2F%2Fapp%3A" + pw + "%40db%2Fx"
+        self.assertIsNotNone(sc._secret_finding(line))
+        a, b = sc._secret_spans(line)[0]
+        self.assertIn(pw, line[a:b])
+
+    def test_a_url_in_another_urls_path_is_found(self):  # (18)
+        pw = LONG_RANDOM[:15] + "7"
+        self.assertIsNotNone(sc._secret_finding("https" + "://proxy/" + "https" + "://app:%s@db/x" % pw))
+
+    def test_a_url_nested_three_levels_is_found(self):  # (17)
+        from urllib.parse import quote
+        pw = LONG_RANDOM[:15] + "7"
+        inner = "https" + "://app:%s@db/x" % pw
+        for _ in range(3):
+            inner = "https" + "://h%d.org/?next=" % len(inner) + quote(inner, safe="")
+        self.assertFalse(sc._url_secret(inner))  # the contract's rule reads two levels
+        self.assertIsNotNone(sc._secret_finding(inner))
+
+    def test_a_jwk_d_as_a_js_key_or_a_symmetric_k_is_found(self):  # (8)
+        d = "Q" + LONG_RANDOM + "x"  # 44 base64url characters
+        for line in ('{kty: "OKP", crv: "Ed25519", d: "%s"}' % d, "{ kty: OKP, d: %s }" % d,
+                     '{"kty":"oct","k":"%s"}' % d, "{\\\"kty\\\":\\\"oct\\\",\\\"k\\\":\\\"%s\\\"}" % d):
+            self.assertIsNotNone(sc._secret_finding(line), line)
+        self.assertIsNone(sc._secret_finding('{"kty":"oct","k":"%s"}' % ("fake" + d[4:])))  # says it is synthetic
+        self.assertIsNone(sc._secret_finding("d: %s" % d))  # YAML across lines: no `kty` on the line, not read
+
+    def test_a_value_with_an_inner_equals_is_found(self):  # (11)
+        line = "X_SECRET=" + LONG_RANDOM[:24] + "=" + LONG_RANDOM[:30]
+        self.assertIsNone(next(iter(sc._assigned(line)), None))  # the contract's ASSIGNED: `=` only as padding
+        self.assertIsNotNone(sc._secret_finding(line))
+        self.assertIsNone(sc._secret_finding("X_LABEL=" + LONG_RANDOM[:24] + "=" + LONG_RANDOM[:30]))
+
+    def test_a_folder_with_pyvenv_cfg_is_a_dependency_folder(self):  # (40)
+        self.write("env1/pyvenv.cfg", "home = /usr/bin\n")
+        self.write("env1/lib/site.py", "API_TOKEN = '%s'\n" % FAKE_GITHUB)
+        self.write("main.py", "pass\n")
+        with mock.patch.object(sc, "_git_files", return_value=None):
+            code, result, _ = self.json_check()
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["dependencies"], ["env1"])
+        code, result, _ = self.json_check("--every-file")  # what pack reads: every file
+        self.assertEqual(code, 1, result)
+
+    def test_the_reference_names_the_false_findings_left_to_the_contract(self):  # (7) (8) (9) (11) (13) (32) (37) (43)
+        flat = " ".join((SCRIPTS.parent / "references/source-and-instance.md").read_text(encoding="utf-8").split())
+        for phrase in ("`app.get(\"/v/Users/<route>\")`", "`ls -a-Users-<name>`", "`class=\"a--Users-<block>\"`",
+                       "`#a--users-<anchor>`", "a WebAuthn assertion's `sig`", "`password1`", "`?q=desk-lamp-with-long-arm-shade`",
+                       "dotenv's vault URL", "a key glued to a letter outside ASCII"):
+            self.assertIn(phrase, flat)
+
+    # --- cost (3)
+
+    def test_a_large_non_ascii_line_stays_fast(self):  # (79)
+        import tracemalloc
+        tracemalloc.start()
+        try:
+            folded = sc._fold_map("\u0436" * 400000)
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        self.assertLess(peak, 20 * 10 ** 6, "a list a character (about 48 MB here on 0.93.1)")
+        self.assertEqual(folded.span(10, 20), (10, 20))
+        mixed = "ab \u00e9 Stra\u00dfe x" * 3 + "Zq" + "e\u0301" + "x"
+        folded = sc._fold_map(mixed)
+        at = folded.text.find("zq\u00e9x")
+        self.assertEqual(mixed[slice(*folded.span(at, at + 4))], "Zqe\u0301x")
+        at = folded.text.find("strasse")
+        self.assertEqual(mixed[slice(*folded.span(at, at + 7))], "Stra\u00dfe")
+        self.assertLess(growth(lambda n: sc._fold_map("abc d\u00e9f " * n), 20000, 80000), 8)
+
+    def test_declared_homes_cost_linear_time(self):  # (84)
+        lines = ["const x = path.join(base, 'file%d.txt') // a comment with words" % i for i in range(3000)]
+        homes = {"jane zqdo", "zqowner", "alex.smith"}
+        best = {}
+        for _ in range(3):
+            for owner in (set(), homes):
+                started = CPU_CLOCK()
+                for line in lines:
+                    sc._home_names(line, owner)
+                took = CPU_CLOCK() - started
+                best[bool(owner)] = min(best.get(bool(owner), took), took)
+        self.assertLess(best[True] / max(best[False], 1e-9), 2.6, "each declared home read every line (3.6 on 0.93.1)")
+
+    # --- the rest (4)
+
+    def test_a_quantified_prefix_is_refused(self):  # (33)
+        with self.assertRaises(ImportError):
+            sc._alternatives(re.compile("(sk-(?:proj-)?[A-Za-z0-9]{16,})"))
+        with self.assertRaises(ImportError):
+            sc._alternatives(re.compile("(ab?c[A-Z]{4})"))
+        self.assertEqual(len(sc._alternatives(sc.PROVIDER_KEY)), len(sc.KEY_SHAPE_SOURCES))
+
+    def test_a_list_inside_root_in_another_case_is_refused(self):  # (47)
+        other = self.root.parent / self.root.name.upper()
+        if not other.exists():
+            self.skipTest("a case-sensitive file system: another case is another folder")
+        listed = other / "instance-strings.txt"
+        listed.write_text("zqcorpx\n", encoding="utf-8")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listed)])
+        self.assertEqual(code, 2, out + err)
+        self.assertIn("inside the tree it checks", err)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_value_only_in_the_staged_copy_is_found(self):  # (68)
+        self.git("init", "-q")
+        self.write("a.txt", "plain\n")
+        self.git("add", "a.txt")
+        self.write("b.txt", "API_TOKEN=%s\n" % FAKE_GITHUB)
+        self.git("add", "b.txt")
+        self.write("b.txt", "API_TOKEN=read-from-the-vault\n")  # fixed in the work tree only: `git commit` takes the stage
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 1, result)
+        self.assertEqual([(f["path"], f["line"], f["rule"]) for f in result["findings"]],
+                         [("b.txt", 1, "a value shaped like a provider key in its staged copy")])
+        code, out, err = run(["check", str(self.root)])
+        self.assertNotIn(FAKE_GITHUB, out + err)
+        self.git("add", "b.txt")
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 0, result)
+        # the staged copy is read as stored: a clean filter the checked tree's configuration names never runs
+        marker = self.tmp / "filter-ran"
+        self.git("config", "filter.zq.clean", "touch '%s'; cat" % marker.as_posix())
+        self.write(".gitattributes", "*.txt filter=zq\n")
+        self.write("b.txt", "API_TOKEN=%s\n" % FAKE_GITHUB)
+        self.git("add", "b.txt")
+        marker.unlink() if marker.exists() else None
+        self.write("b.txt", "API_TOKEN=read-from-the-vault-again\n")
+        os.utime(str(self.root / "b.txt"), (1, 1))  # a stat that differs from the index: a work tree read would filter it
+        code, result, _ = self.json_check()
+        self.assertEqual(code, 1, result)
+        self.assertFalse(marker.exists(), "a clean filter ran")
+
+    def test_a_windows_name_that_is_not_utf8_is_listed_as_not_read(self):  # (71)
+        self.assertEqual(sc._git_name(b"caf\xe9.txt", True), ("caf\udce9.txt", False))
+        self.assertEqual(sc._git_name("caf\u00e9.txt".encode(), True), ("caf\u00e9.txt", True))
+        listing = sc._Listing(["caf\udce9.txt", "main.py"])
+        listing.undecodable = {"caf\udce9.txt"}
+        self.write("main.py", "pass\n")
+        self.write(sc.IGNORE_FILE, "caf?\xe9.txt\n")
+        with mock.patch.object(sc, "_git_files", return_value=listing), mock.patch.object(sc, "_staged_copies", return_value={}):
+            code, result, _ = self.json_check()
+        self.assertEqual(code, 2, result)
+        self.assertEqual(result["notRead"][0]["why"], "a name that is not UTF-8, which Windows cannot hold")
+
+    def test_a_latin_1_name_prints_its_own_byte(self):  # (83)
+        raw = io.BytesIO()
+        out = io.TextIOWrapper(raw, encoding="iso-8859-1", errors="backslashreplace")
+        with mock.patch.object(sys, "stdout", out):
+            sc._print("x/caf\udce9.txt: not read (binary) \u2192")
+            out.flush()
+        if os.name == "nt":
+            self.assertIn(b"caf\\udce9", raw.getvalue())
+        else:
+            self.assertEqual(raw.getvalue(), b"x/caf\xe9.txt: not read (binary) \\u2192\n")
+
+    def test_an_entry_with_an_inner_soft_hyphen_is_refused(self):  # (90)
+        listing = self.outside / "list.txt"
+        for mark in ("\u00ad", "\u200b", "\u200e", "\u2066"):
+            listing.write_text("zq" + mark + "corpx\n", encoding="utf-8")
+            code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+            self.assertEqual(code, 2, repr(mark))
+            self.assertIn("line 1 of the owner's list holds an invisible character inside a string", err)
+            self.assertNotIn("zq", out + err)
+        listing.write_text("zq\u200dcx\n", encoding="utf-8")  # a joiner stays: an emoji or a Persian word needs one
+        self.write("a.txt", "zq\u200dcx\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertEqual(code, 1, err)
+
+    def test_a_soft_hyphen_inside_a_listed_string_in_a_file_is_found(self):  # (93)
+        listing = self.owner_list("zqcorpx")
+        self.write("a.html", "<p>zq&shy;x zq\u00adcorpx and zq\u200bcorpx</p>\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertEqual(code, 1, out)
+        self.assertIn("a.html:1: instance-string", out)
+        self.assertEqual(sc._entry_spans("a zq\u00adcorpx b", ["", "zqcorpx"]), [(2, 10, 2)])
+
+    def test_a_variation_selector_at_an_entry_end_is_trimmed(self):  # (94)
+        listing = self.owner_list("zqcorpx\ufe0f", "\u034fzqbrand\u034f")
+        self.assertEqual(sc.read_list(listing), ["zqcorpx", "zqbrand", ""])
+        self.write("a.txt", "zqcorpx\n")
+        code, out, err = run(["check", str(self.root), "--instance-strings", str(listing)])
+        self.assertEqual(code, 1, out)
+
+    @unittest.skipIf(os.name != "posix" or (hasattr(os, "geteuid") and os.geteuid() == 0), "a folder mode on POSIX")
+    def test_an_unlistable_scripts_folder_is_named(self):  # (92)
+        tools = self.tmp / "tools"
+        tools.mkdir()
+        for name in SIBLINGS:
+            shutil.copy(SCRIPTS / name, tools / name)
+        self.write("a.txt", "plain\n")
+        tools.chmod(0o311)
+        try:
+            done = subprocess.run([sys.executable, "-B", str(tools / "fabric_source_check.py"), "check", str(self.root),
+                                   "--every-file"], capture_output=True, text=True)
+        finally:
+            tools.chmod(0o755)
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("cannot be listed", done.stderr)
+        self.assertNotIn("from another version", done.stderr)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_a_git_ceiling_does_not_switch_to_the_walk(self):  # (98)
+        self.git("init", "-q")
+        self.write("a.txt", "plain\n")
+        sub = self.root / "sub"
+        self.write("sub/b.txt", "plain\n")
+        with mock.patch.dict(os.environ, {"GIT_CEILING_DIRECTORIES": str(self.root)}):
+            code, result, _ = (lambda c: (c[0], json.loads(c[1]), c[2]))(run(["check", str(sub), "--json"]))
+        self.assertEqual(result["mode"], "git", result)
+
+    @unittest.skipIf(shutil.which("git") is None, "needs git")
+    def test_the_tracked_copy_leaves_an_untracked_file_out(self):  # (3)
+        self.git("init", "-q")
+        self.write("kept.txt", "plain\n")
+        self.git("add", "kept.txt")
+        self.write("scratch.txt", "/" + "Users/" + HOME_NAME + "/notes\n")
+        copy = self.tmp / "copy"
+        self.assertTrue(tracked_copy(self.root, copy))
+        self.assertEqual(sorted(p.name for p in copy.iterdir()), ["kept.txt"])
+
+
+class InUtf8Mode(unittest.TestCase):  # (75)
+    def test_the_suite_runs_in_utf8_mode_under_another_locale(self):
+        """Run in process, the check does not restart itself: under a locale whose file-system encoding is not UTF-8
+        the in-process tests skip (Tree.setUp) and this one runs the suite again in Python's UTF-8 mode."""
+        if IN_UTF8:
+            self.skipTest("the file-system encoding is UTF-8: the suite ran in process")
+        done = subprocess.run([sys.executable, "-B", "-X", "utf8", "-m", "unittest", "discover", "-s", str(ROOT / "test"),
+                               "-p", "test_source_check.py"], capture_output=True, text=True)
+        self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+
+
 class TheSkillsTeachIt(unittest.TestCase):
     def test_the_default_list_is_in_the_users_configuration_folder(self):
         home = Path.home()
@@ -2063,7 +2472,7 @@ class TheSkillsTeachIt(unittest.TestCase):
         for words in ("never repeats", "Exit `0`: no finding and every file read; `1`: at least one finding",
                       "a file was not read", "a nested repository", "`--every-file`", "named in the ignore file", "A list inside the tree is refused", sc.IGNORE_FILE,
                       "passioncode-fabric/" + sc.LIST_NAME, "FABRIC_INSTANCE_STRINGS", "`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`",
-                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "but `.git`, `__pycache__`, `.DS_Store` and `*.pyc`", "The check finds the forms the table names, and only those", "dependency folders", "check a nested repository in its own tree", "a web route under `/home/`",
+                      "`<line N>`", "`<home>`", "`<secret>`", "every text file read", "listed by its path", "its line in the owner's list", "never followed", "Git was not used", "but `.git`, `__pycache__`, `.DS_Store` and `*.pyc`", "The check finds the forms the table names, and only those", "dependency folders", "check a nested repository in its own tree", "a root-relative web route under `/home/`",
                       "`fabric_paths.service_dirs`", "`<id>.<instance>`", "(LC-09)", "FAA-188 part 2",
                       "private-terms.txt"):
             self.assertIn(words, ref)
@@ -2071,12 +2480,17 @@ class TheSkillsTeachIt(unittest.TestCase):
 
 class TheAdapterChecksItself(unittest.TestCase):
     def test_this_repository_has_no_instance_data(self):
-        """The adapter's own tree passes, with its test vectors left out by its .fabric-source-ignore."""
+        """The adapter's own tree passes, with its test vectors left out by its .fabric-source-ignore: the files Git
+        tracks, copied, so a contributor's untracked file never fails the suite, and every ignore line still matches a
+        tracked file (FAA-190 (3))."""
         with tempfile.TemporaryDirectory() as folder:
             empty = Path(folder, "instance-strings.txt")
             empty.write_text("", encoding="utf-8")
-            code, out, err = run(["check", str(ROOT), "--instance-strings", str(empty)])
+            copy = Path(folder, "tree")
+            root = copy if shutil.which("git") and tracked_copy(ROOT, copy) else ROOT
+            code, out, err = run(["check", str(root), "--instance-strings", str(empty), "--json"])
         self.assertEqual(code, 0, out + err)
+        self.assertEqual(json.loads(out)["unmatched"], [], "an ignore line that matches no tracked file")
 
 
 
@@ -2110,8 +2524,7 @@ class TheDetectorIsReadByItsPublicNames(unittest.TestCase):
         tools, root = tmp / "tools", tmp / "root"
         tools.mkdir()
         root.mkdir()
-        for name in ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py",
-                     "fabric_source_restart.py", "fabric_source_homes.py", "fabric_secrets.py", "fabric_git.py"):
+        for name in SIBLINGS:
             shutil.copy(SCRIPTS / name, tools / name)
         older = (tools / "fabric_secrets.py").read_text(encoding="utf-8") + "\ndel BEARER_INSIDE  # as before 0.83.0\n"
         (tools / "fabric_secrets.py").write_text(older, encoding="utf-8")

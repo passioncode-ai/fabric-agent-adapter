@@ -72,6 +72,8 @@ STDLIB_IMPORTS = {
     "inspect", "functools",  # the board responder reads whether a service's emit takes a subject (0.56.0 seam r31)
     "unicodedata",  # the page-link port maps a host that is not ASCII as UTS 46 does (DEC-0123, FAA-132)
     "pwd",  # a LaunchDaemon's UserName to its uid, the job's proof (DEC-0161, FAA-278); POSIX only, guarded
+    "array",  # the source check's folded text keeps its map in arrays, not a list a character (FAA-190 (79))
+    "tracemalloc",  # the test that holds that map's memory to a few times the line's size (FAA-190 (79))
 }
 RECIPES = ROOT / "plugins/fabric-agent-adapter/skills/building-fabric-services/recipes"
 KIT_MODULES = {e["module"] for e in json.loads(

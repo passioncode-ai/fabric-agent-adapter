@@ -113,12 +113,12 @@ source under it.
 ## The check
 
 `fabric_source_check.py check` reads the files the source would carry (what Git would commit: tracked files and
-untracked ones that are not ignored, as they are in the work tree; a staged copy that differs is not read) and reports each place where the instance shows through, by path, line and kind:
+untracked ones that are not ignored, as they are in the work tree, and a staged copy that differs from it) and reports each place where the instance shows through, by path, line and kind:
 
 | Kind | Finds |
 |---|---|
-| `home-path` | an absolute path inside a person's home folder (a web route under `/home/` is reported too; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one. The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name holds a space, a dash, a dot, an underscore or an apostrophe (each a dash in the dashed form; a slashed name also ends at a space) declares it with `home: <name>` in the owner's list, which reads it whole in every form, and one whose home name is not ASCII, or holds another character, lists it as a plain string (a typographic apostrophe a keyboard typed, which the folder's name does not hold, is written as `'` in `home:`; a folder whose name holds `’` is listed as a plain string with `’` kept and declared too with `home: <name>` written with `'`, which reads the dashed forms; its URL-encoded `’` is not read; a name outside ASCII of one or two characters cannot be checked) |
-| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (a run of 40 or more characters mixing upper case, lower case and digits, so a shorter key under `X_API_KEY=` is not read; but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict; a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`) or nested in another URL's parameter (two levels deep); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`); and a folder named so anywhere in a file's path (`k.pem/a.txt`), which `pack` refuses too (FAA-190, `test_a_folder_named_like_a_credential_file_is_a_finding`) |
+| `home-path` | an absolute path inside a person's home folder (a root-relative web route under `/home/` is reported too, one after a host is not; a route under `/users/` is not): `/Users/<name>/`, `/home/<name>/`, `C:\Users\<name>\`, Git Bash's `/c/Users/<name>/`, WSL's `/mnt/c/Users/<name>/`, and the dashed (`-Users-<name>-`, `C--Users-<name>-`) and URL-encoded forms a tool makes of one; and, read by this check beside the contract's forms, one after a `file` URL's host (`file://localhost/Users/<name>/`), in VS Code's `vscode://file/Users/<name>/`, after a drive whose colon is percent-encoded (`file:///c%3A/Users/<name>/`), with its slashes JSON-escaped (`\/`, `\\/`, `\u002f`), and after a doubled prefix (`C:\Users\C:\Users\<name>\`) (FAA-190, `test_a_home_after_a_file_url_host_is_found`, `test_a_json_escaped_home_path_is_found`). The name is ASCII, and in the dashed form it ends at the next dash: an owner whose home name holds a space, a dash, a dot, an underscore or an apostrophe (each a dash in the dashed form; a slashed name also ends at a space) declares it with `home: <name>` in the owner's list, which reads it whole in every form, and one whose home name is not ASCII, or holds another character, lists it as a plain string (a typographic apostrophe a keyboard typed, which the folder's name does not hold, is written as `'` in `home:`; a folder whose name holds `’` is listed as a plain string with `’` kept and declared too with `home: <name>` written with `'`, which reads the dashed forms; its URL-encoded `’` is not read; a name outside ASCII of one or two characters cannot be checked) |
+| `secret` | a value shaped like a credential by the contract's detector (DEC-0044), read line by line: a provider key starting a word, a JWT, a bearer token, a long random value assigned to a credential's name (a run of 40 or more characters mixing upper case, lower case and digits, so a shorter key under `X_API_KEY=` is not read; but a whole Ed25519 signature under a JSON `"sig"`, `"signature"` or `"signatures"` member, as `sign` writes it, which is public); or a private key: a PEM, OpenSSH or PGP block, or a JWK's `d` as a JSON member, escaped JSON or a Python dict, and on a line that names `kty` a `d` or a symmetric JWK's `k` under a key quoted or not (a JS object, YAML flow; a YAML JWK across lines is not read); a URL with a password of 8 or more characters mixing letters and digits (a password without a digit or without a letter is not read) or a credential in its query, percent-encoded or not, JSON-escaped (`\u0026`, `\/`), nested in another URL's parameter (four levels deep) or in its path (`<https>://proxy/<https>://app:<password>@db/`), written without its `//` (`<https>:app:<password>@db`) or percent-encoded whole (`<https>%3A%2F%2F...`); a long random value under a credential's name that holds an `=` inside it (`<24>=<30>`); a file that is a credential by its name, as `pack` refuses it (`.env`, `*.pem`, `*.key`, `.npmrc` and the rest), or a kit credential file (`*.token`, `board.credential`); and a folder named so anywhere in a file's path (`k.pem/a.txt`), which `pack` refuses too (FAA-190, `test_a_folder_named_like_a_credential_file_is_a_finding`) |
 | `instance-string` | a string from the owner's list, in a file, in a file's path or in a link's target |
 
 ```bash
@@ -126,9 +126,11 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 ```
 
 Run it by path, with its scripts folder whole: it loads its siblings (`fabric_source_ignore.py`,
-`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_check_cli.py`, `fabric_source_tree.py`, the
+`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_list.py`, `fabric_source_redact.py`,
+`fabric_source_check_cli.py`, `fabric_source_tree.py`, the
 way it runs Git `fabric_git.py` and the contract's detector `fabric_secrets.py`) and refuses with exit `2` when one is missing or from another version, a
-detector without one of the public names it reads included (FAA-190). `python3 -m fabric_source_check` writes its own
+detector without one of the public names it reads included, or when its folder can be searched but not listed (mode
+`311`, an import lists it; FAA-190, `test_an_unlistable_scripts_folder_is_named`). `python3 -m fabric_source_check` writes its own
 `.pyc` before the check turns bytecode off; run by path, it writes nothing. `ROOT` defaults to the current folder.
 `--json` prints one object: `mode` (`git` or a walk), `files`, `findings` (`path`, `line`, `kind`, `rule`),
 `notRead`, `skipped`, `dependencies`, `unmatched` (the ignore lines that match no file, by their place),
@@ -139,10 +141,19 @@ names each option.
   folder it checks reaches its output. A file's path is checked like its text (line `0` of a finding), and printed
   with an entry of the list as `<line N>`, a home folder's name as `<home>` and each segment holding a
   credential-shaped value as `<secret>` (two files can then print the same; the segments a found value runs across, an
-  assigned value, a bearer run or a URL, are masked too, while a key, a JWT or a JWK `d` is read up to the `/` that
-  cuts it, so the rest of a cut one can print in the next folder: find the file by the folder the finding names); an instance string is named by its line in the owner's list. The report can go in a commit
-  message, an issue or a chat. A declared home of one or two letters, once found anywhere in the tree, is masked wherever it stands in a printed
-  path, inside a word too (`qzone` prints `<home>one`); found nowhere, it is not masked.
+  assigned value, a bearer run or a URL, are masked too, and a key, a JWT or a JWK `d` cut by a `/` masks the next folder,
+  its rest, and the ones after it while they hold only a key's characters: find the file by the folder the finding
+  names, `test_a_key_cut_by_a_slash_prints_no_part`); a path as printed, with its marks, is read once more, so a mark
+  that takes away a synthetic word beside a value never leaves that value printed
+  (`test_the_printed_path_holds_no_finding_after_marks`). An instance string is named by its line in the owner's list,
+  and once found in a file, any 8 characters of it in another printed path print as that line's mark. The report can
+  go in a commit message, an issue or a chat. A home name found in the tree is masked wherever a printed path holds
+  it, its dotted, underscored or dashed parts of three or more characters too (`<name>.CORPORATE` masks `CORPORATE`)
+  and without a trailing `.` or `_`; a name of three characters or fewer, found or declared, only as a word, with no
+  ASCII letter or digit beside it (`bo` masks `src/bo/` and leaves `robot` readable, `home: qz` leaves `qzone`;
+  `test_a_short_found_home_is_masked_only_as_a_word`); a declared home of one or two letters found nowhere is not
+  masked. A URL found leaves only its credential (its password, a query value) to mask other paths with, so a path
+  sharing its host prints whole.
 - It **changes nothing.** Exit `0`: no finding and every file read; `1`: at least one finding (the step is not done);
   `2`: the check could not run, or a file was not read: an unreadable file, a nested repository, or a binary file the
   ignore file does not name as source (the summary counts each, and how many files were left out by name); or it
@@ -156,21 +167,36 @@ names each option.
   (litter `pack` refuses): run it
   on a folder before `pack`, which carries them. A committed symbolic link is checked by the path it names, never followed. When the folder is
   not in a Git checkout, Git lists nothing in it, or no `git` is found in PATH's absolute folders (with PATH unset, in `/bin` and `/usr/bin`; on Windows, nowhere), every file is read but `.git` and `__pycache__` (uncounted) and the dependency
-  folders (`node_modules`, virtual environments, caches), and the summary says Git was not used and how many dependency folders were not read.
+  folders (`node_modules`, virtual environments, caches; a folder holding `pyvenv.cfg` is a virtual environment
+  whatever its name, `test_a_folder_with_pyvenv_cfg_is_a_dependency_folder`), and the summary says Git was not used and
+  how many dependency folders were not read; that walk stands in for what Git would commit, so it reads `.DS_Store` and
+  `*.pyc` (as binary files not read, exit `2`) where `--every-file` leaves them out. In Git mode the staged copy of a
+  file whose index differs from the last commit is read too when it differs from the work tree, since a plain `git
+  commit` takes it: its findings say `in its staged copy` (`test_a_value_only_in_the_staged_copy_is_found`). It is
+  read as Git stores it (`diff --cached`, `cat-file`), so no clean filter the tree's configuration names runs.
   Under a locale whose file-system encoding is not UTF-8 (ISO-8859-1, KOI8-R) the check restarts itself in Python's UTF-8
   mode, so a file name, an argument and a file's text are read in one encoding; a name that is not UTF-8 is matched as its bytes.
   A file's text is read as UTF-8, so an entry of the owner's list with a letter outside ASCII is found in a UTF-8 file
-  (composed or decomposed, as macOS may store a name), not in one saved as Latin-1 or CP1252.
+  (composed or decomposed, as macOS may store a name), not in one saved as Latin-1 or CP1252. An entry without an accent
+  does not find a name written with one (`jose` does not find `josé`, composed or decomposed): list both spellings.
+  On Windows a tracked name that is not UTF-8 (committed elsewhere) is listed as not read, since no Windows work tree can
+  hold it. After the UTF-8 restart a name that is not UTF-8 prints as its own bytes, as the console's locale shows them.
   In Git mode a nested repository (a submodule, a vendored checkout) is not read: check a nested repository in its own tree with
   the same check (a submodule checked out first, `git submodule update --init`), then name its path in the ignore file,
   with that reason on the line above. That line serves the check of the outer tree only: before `pack`, check the
-  nested repository with `--every-file` in its own tree too, because `pack` carries its files, ignored ones included.
+  nested repository's files as the clean copy carries them too, `check <clean>/<nested> --every-file` on the clean copy
+  ([the package reference](../../building-fabric-services/references/package.md)), because `pack` carries its files;
+  `--every-file` in the nested repository's own tree would also read what the clean copy never carries (its
+  dependency folders and ignored files).
 - **The owner's list** holds the strings only the owner knows are theirs (their name, company, accounts, hosts), one
   per line, at least three characters; a line starting with `#` is a comment, so list a channel or a hashtag without its `#`, and a `#` after a string is
   part of that string. An entry matches in any case and inside any word; an invisible format character (a direction mark, a
-  soft hyphen, a joiner) at either end of a string is dropped, spaces between such characters too, and does not count
-  toward the three; one inside it is kept and counts (an emoji's joiner), so a string copied with a soft hyphen in it
-  matches only text that holds one. A line `home: <name>` declares the owner's home
+  soft hyphen, a joiner) or another default-ignorable character (a variation selector, U+034F) at either end of a
+  string is dropped, spaces between such characters too, and does not count toward the three; a joiner inside it
+  (U+200C, U+200D: an emoji or a Persian word needs one) is kept and counts, and a soft hyphen, a zero-width space, a
+  word joiner or a direction mark inside it refuses the line, exit 2, since a file's text is compared without those
+  (a listed `zqcorpx` finds `zq&shy;corpx` once a page turns it into U+00AD;
+  `test_a_soft_hyphen_inside_a_listed_string_in_a_file_is_found`). A line `home: <name>` declares the owner's home
   name instead (ASCII letters, digits, `.`, `_`, `-`, `'` and spaces, starting with a letter or a digit; a name holding a
   space, as a Windows profile may, is written whole, `home: Jane Doe`, and everything after the colon is the name, so
   a note goes on a line of its own (`# laptop`); spaces and tabs may stand around the colon; a line
@@ -179,14 +205,20 @@ names each option.
   refuses it too); such a line is never a string
   entry, so list a string like `home: page` by a part of it, `ome: page`): the check then finds that home in every form the table names (it is never neutral, even with one or two
   letters), and the bare name is not looked for anywhere else, though a declared name of three or more letters and digits is
-  masked wherever a printed path holds it as a word, its parts joined by none or any run of a space, `.`, `_`, `-`, `+`, `'`, their
+  masked wherever a printed path holds it as a word (so `home: admin` prints `admin-panel/.env` as `<home>-panel/.env`
+  even when no home of that name is found: the declared name is the owner's own), its parts joined by none or any run of a space, `.`, `_`, `-`, `+`, `'`, their
   percent-encodings or an escaped apostrophe (`\'`, `\x27`, `\u0027`, `&#39;`, `&#x27;`, `&apos;`), the same separators it is found with in every form; a home that is also your name goes in the list
   as a plain string too, to be found in text. It is `--instance-strings FILE`, else the file
   `FABRIC_INSTANCE_STRINGS` names, else `passioncode-fabric/instance-strings.txt` in the user's configuration folder
   (`$XDG_CONFIG_HOME` when it is absolute, else `~/.config`; on Windows `%APPDATA%` when it is absolute, else `~\AppData\Roaming`). A list inside the tree is refused, because it would
   travel with the source. A person who already keeps private terms for org-index's `check_private.py`
   (`~/.config/passioncode/private-terms.txt`) passes that file with `--instance-strings`; this check matches a term
-  anywhere in a word, and it does not look for e-mail addresses or account ids by their shape.
+  anywhere in a word, and it does not look for e-mail addresses or account ids by their shape. Two more differences, as
+  org-index's `scripts/check_private.py` reads its terms at `2c8dda9`: it splits its file with `splitlines` (a form
+  feed or U+2028 also ends a term there, never here) and matches with `re.IGNORECASE`, so its `istanbul` finds
+  `İSTANBUL`, which a casefolded comparison here does not (U+0130 folds to `i` and a combining dot). Keep `home:` lines
+  in this check's own list, never in a terms file the two share: `check_private.py` reads such a line as a literal
+  term.
 - **Leaving paths out.** `.fabric-source-ignore` at the root (globs, one per line, `#` comments) or `--exclude GLOB`
   leaves out files that hold synthetic values on purpose, such as test vectors. A line is a path from the root, not a
   `.gitignore` line (a leading `/` changes nothing, a line with no `/` matches at the root only, and a line holding `\`, `//`, an unclosed `[` or a class such as `[[:digit:]]` is refused, as Git reads each
@@ -232,11 +264,23 @@ names each option.
   not findings.
 
 The check finds the forms the table names, and only those: a credential in another shape (a bare token with no name
-before it, a provider's key the contract's names do not cover) passes it. It is a floor under the owner's review and a
+before it, a provider's key the contract's names do not cover, a key glued to a letter outside ASCII, which the
+contract's word start counts as a letter) passes it. A home name outside ASCII is the owner's list's to find, as a
+plain string. Some text that is not a credential or a home reads as one, and fails closed: the shapes are the
+contract's (`src/source-rules.ts` at the pin, which a tree under a manifest is checked with), so they change there
+first (FAA-190): a route whose first segment is one letter before a `Users` segment (`app.get("/v/Users/<route>")`), a
+one-letter flag or block before `-Users-` (`ls -a-Users-<name>`, `class="a--Users-<block>"`, `#a--users-<anchor>`), a
+WebAuthn assertion's `sig` or a passkey's `credentialId` under its name (instance data in any case: a recorded
+assertion belongs to one installation), a placeholder password with a digit in a URL (`password1`, `changeme123`),
+dotenv's vault URL (`<dotenv>://:key_...@dotenv.org/vault/...`), and a search URL whose query holds a key's prefix or
+starts with `bearer` (`?q=desk-lamp-with-long-arm-shade`, `?q=bearer%20bonds`). Name such a file in the ignore file
+with its reason. It is a floor under the owner's review and a
 secret scanner, never a replacement for either.
 
 The check finds the repository from the folder it checks: a Git location the caller exports (`GIT_DIR`,
-`GIT_WORK_TREE`, `GIT_INDEX_FILE` and the rest, as a hook in a linked worktree has two) is not passed to Git. So a work
+`GIT_WORK_TREE`, `GIT_INDEX_FILE` and the rest, as a hook in a linked worktree has two) is not passed to Git, nor are
+its discovery limits (`GIT_CEILING_DIRECTORIES`, `GIT_DISCOVERY_ACROSS_FILESYSTEM`), so a ceiling at or above the
+repository's top does not turn the folder into one outside Git (`test_a_git_ceiling_does_not_switch_to_the_walk`). So a work
 tree Git finds only through those variables (a bare repository with a separate work tree) is read with the walk, every
 file but the dependency folders; give that folder a `.git` file (`gitdir: <the repository>`) for Git mode. In a
 pre-commit hook the check reads the repository's own index, not the one the commit is building: a file deleted with

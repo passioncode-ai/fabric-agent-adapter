@@ -323,7 +323,8 @@ Pack, sign and verify an agent as a `fabric-package/1` folder (contract DEC-0050
 `--apply`, and the key file is the person's, never made or kept here). First check the checkout, then make the clean
 copy [the package reference](plugins/fabric-agent-adapter/skills/building-fabric-services/references/package.md)
 describes and check that with `--every-file`, since it is what `pack` carries (a path named in `.fabric-source-ignore`
-or `--exclude` is carried unread; a nested repository is checked in its own tree with `--every-file`):
+or `--exclude` is carried unread; a nested repository is checked as the clean copy carries it,
+`check <clean>/<nested> --every-file`):
 
 ```bash
 python3 plugins/fabric-agent-adapter/skills/adapting-projects-to-fabric/scripts/fabric_source_check.py check ./example-agent
