@@ -126,7 +126,7 @@ python3 <plugin-dir>/skills/adapting-projects-to-fabric/scripts/fabric_source_ch
 ```
 
 Run it by path, with its scripts folder whole: it loads its siblings (`fabric_source_ignore.py`,
-`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_list.py`, `fabric_source_redact.py`,
+`fabric_source_homes.py`, `fabric_source_restart.py`, `fabric_source_list.py`, `fabric_source_redact.py`, `fabric_source_url.py`,
 `fabric_source_check_cli.py`, `fabric_source_tree.py`, the
 way it runs Git `fabric_git.py` and the contract's detector `fabric_secrets.py`) and refuses with exit `2` when one is missing or from another version, a
 detector without one of the public names it reads included, or when its folder can be searched but not listed (mode

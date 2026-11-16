@@ -5,6 +5,8 @@ test/fixtures/contract/
 test/fixtures/delegation/vectors.json
 # The kit's connection inputs carry synthetic credential URLs and keys on purpose, for the refusals they test.
 test/fixtures/kit-connections-inputs.json
+# The repository-name vectors carry synthetic key shapes on purpose, a percent-encoded one among them (FAA-343).
+test/repository_vectors.json
 # Tests that write a synthetic credential or a home path inline, to check the kit refuses or redacts it.
 test/fabric-connections.test.mjs
 test/fabric-http.test.mjs

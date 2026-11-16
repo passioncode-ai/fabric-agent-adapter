@@ -40,7 +40,7 @@ OWNER = "Acme" + "Holdings"
 #: The check and the siblings it loads at its start (fabric_source_tree.py only under a manifest).
 SIBLINGS = ("fabric_source_check.py", "fabric_source_check_cli.py", "fabric_source_ignore.py", "fabric_source_homes.py",
             "fabric_source_restart.py", "fabric_source_list.py", "fabric_source_redact.py", "fabric_secrets.py",
-            "fabric_git.py")
+            "fabric_git.py", "fabric_source_url.py")
 ACCOUNT = "owner-" + "account-77"
 
 
@@ -2102,6 +2102,14 @@ class FAA190Rest(Tree):
         seen = self.seen_from("db = <https>://app:%s@zqhostname.org/x" .replace("<https>", "https") % pw)
         self.assertEqual(sc.redact("docs/zqhostname.json", [], seen), "docs/zqhostname.json")
         self.assertEqual(sc.redact("docs/" + pw + ".json", [], seen), "docs/<secret>")
+
+    def test_a_token_user_and_a_query_secret_are_masked_whole(self):
+        # FAA-343 (4): a URL with a token in its user name and a secret in its query masks both, never its host
+        token, pw = "a1" * 20, LONG_RANDOM
+        seen = self.seen_from("u = " + "https" + "://%s@zqhost.org/x?api_key=%s" % (token, pw))
+        self.assertEqual(sc.redact("docs/" + token + ".json", [], seen), "docs/<secret>")
+        self.assertEqual(sc.redact("docs/" + pw + ".json", [], seen), "docs/<secret>")
+        self.assertEqual(sc.redact("docs/zqhost.json", [], seen), "docs/zqhost.json")
 
     def test_grams_of_a_url_finding_cover_only_its_credential(self):  # (54)
         pw = LONG_RANDOM[:15] + "7"

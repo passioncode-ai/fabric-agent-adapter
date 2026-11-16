@@ -409,6 +409,29 @@ def url_parts(text: str) -> Optional[Tuple[str, str]]:
     return ("?" + query if has_query and query else "", "#" + fragment if has_fragment and fragment else "")
 
 
+#: The WHATWG userinfo percent-encode set beyond C0 controls, space and non-ASCII (the URL standard).
+_USERINFO_SET = frozenset('"#<>?`{}/:;=@[\\]^|')
+
+
+def url_username(text: str) -> str:
+    """`new URL(text).username` for a string url_parts parses: the user part of its user information, percent-encoded
+    as the parser writes it (C0 controls, space, non-ASCII as UTF-8 and the userinfo set); empty when it has none."""
+    text = re.sub(r"[\t\n\r]", "", text.strip("".join(map(chr, range(0x21)))))
+    scheme, _, rest = text.partition(":")
+    lowered = scheme.lower()
+    body = rest.partition("#")[0].partition("?")[0]
+    if lowered in _SPECIAL and lowered != "file":
+        authority = re.split(r"[/\\]", body.lstrip("/\\"), maxsplit=1)[0]
+    elif lowered not in _SPECIAL and body.startswith("//"):
+        authority = body[2:].partition("/")[0]
+    else:
+        return ""  # a file URL takes no user information; another without `//` has no authority
+    userinfo, at, _ = authority.rpartition("@")
+    user = userinfo.partition(":")[0] if at else ""
+    return "".join(c if 0x20 < ord(c) < 0x7F and c not in _USERINFO_SET
+                   else "".join("%%%02X" % b for b in c.encode("utf-8")) for c in user)
+
+
 def detector_cost(whole: str, is_head: bool = False) -> int:
     """The UTF-16 units FAC-SEM-165's detector may read in a string's head (the contract's detectorCost)."""
     text = whole if is_head else head(whole)
@@ -420,6 +443,7 @@ def detector_cost(whole: str, is_head: bool = False) -> int:
     parts = url_parts(text)
     if parts is None:
         return cost
+    cost += len(url_username(text))  # the user name, read once as a token (DEC-0177): as the parse writes it
     for part in parts:
         cost += ARG_PIECE_COST * part.count("&")
         for name, values in raw_values(part[1:]).items():

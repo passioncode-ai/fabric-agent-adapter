@@ -4,6 +4,7 @@ fabric_source_check.py under a source manifest (FAA-261)."""
 import contextlib
 import io
 import json
+import re
 import os
 from pathlib import Path
 import shutil
@@ -45,7 +46,7 @@ class Vectors(unittest.TestCase):
     def test_vectors_are_the_pinned_contracts(self):
         lock = json.loads((ROOT / "fabric-contract.lock.json").read_text(encoding="utf-8"))
         self.assertEqual(VECTORS["contract"], lock["commit"])
-        self.assertEqual((len(VECTORS["tree"]), len(VECTORS["patches"])), (91, 32))
+        self.assertEqual((len(VECTORS["tree"]), len(VECTORS["patches"])), (107, 32))  # 91 until DEC-0175 and DEC-0176 (FAA-343)
 
     def test_tree(self):
         for case in VECTORS["tree"]:
@@ -79,6 +80,17 @@ class Vectors(unittest.TestCase):
                           for p in sc.HOME_PATHS])
         for name in ("CREDENTIAL_FILE", "CREDENTIAL_FILE_OK", "TOKEN_FILE"):
             self.assertEqual(constants[name]["source"], "^" + getattr(st, name).pattern[:-2] + "$", name)
+        # DEC-0175 and DEC-0176 (FAA-343): written as the contract carries them, `$` read as `\Z`, flag i with re.ASCII
+        self.assertEqual(constants["ASSIGNED_HEAD"], {"source": sc.ASSIGNED_HEAD_SOURCE, "flags": "g"})
+        self.assertEqual(constants["PLACEHOLDER"], {"source": sc.PLACEHOLDER_SOURCE, "flags": ""})
+        for name in ("PASSWORD_NAME", "URL_BEARER_VALUE", "DOCUMENTATION_HOST", "LETTER_OR_DIGIT"):
+            pattern = getattr(sc, name)
+            self.assertEqual(constants[name]["source"], pattern.pattern.replace("\\Z", "$").replace(
+                "\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F\u1E00-\u1EFF", "\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u024F\\u1E00-\\u1EFF"), name)
+            self.assertEqual("i" in constants[name]["flags"], bool(pattern.flags & re.IGNORECASE), name)
+        self.assertEqual(constants["GENERATED_LENGTH"], sc.GENERATED_LENGTH)
+        for value in ("${DB_PASSWORD}", "{{ .Values.db.password }}".replace(" ", ""), "$S3CR3TP4SS", "$Summer2024x", "${X:-d}"):
+            self.assertEqual(bool(sc.PLACEHOLDER.match(value)), value[:3] in ("${D", "{{."), value)
 
     def test_packer_members_come_from_the_slots(self):
         manifest = {"format": "fabric-source/1", "include": ["src/"], "slots": [

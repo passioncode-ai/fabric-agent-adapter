@@ -1,6 +1,6 @@
 {
  "about": "A place's standing mandate (DEC-0166) at the pin: the contract's fixtures/vectors/profile.json, each answer re-checked here by actionDecision and mandateRules. Written by make_levels_vectors.mjs, never by hand.",
- "commit": "560d60369b553fc123ba29c3e1e637de68901678",
+ "commit": "2bbfd7805b1f9c4eaf25f62394a11957f131a092",
  "source": "fixtures/vectors/profile.json, src/mandate.ts, src/actions.ts",
  "actions": [
   {

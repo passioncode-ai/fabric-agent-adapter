@@ -444,15 +444,38 @@ def url_refused(value: str) -> bool:
     return any(c in _FORBIDDEN_HOST for c in host) or (host == "" and ("@" in authority or ":" in hostport))
 
 
+def token_user_name(user: str) -> bool:
+    """A URL's user name read as a token (DEC-0177, the contract's tokenUserName): a run of 40 or more of
+    `[A-Za-z0-9_-]` holding a letter and a digit, a classic token's 40 hex. A name such as `git` or `deploy-bot` is
+    none; a provider key or a JWT there is found by secret_argument already."""
+    return bool(re.fullmatch(r"[A-Za-z0-9_-]{40,}", user) and re.search(r"[0-9]", user) and re.search(r"[A-Za-z]", user))
+
+
+def _url_user(value: str) -> str:
+    """The user name of an absolute URL's user information, as url_parts splits the authority (raw, not decoded)."""
+    scheme, _, rest = value.partition(":")
+    rest = rest.partition("#")[0].partition("?")[0]
+    lowered = scheme.lower()
+    if lowered in _SPECIAL:
+        authority = rest.replace("\\", "/").lstrip("/").partition("/")[0]
+    elif lowered != "file" and rest.startswith("//"):
+        authority = rest[2:].partition("/")[0]
+    else:
+        authority = ""
+    userinfo, at, _ = authority.rpartition("@")
+    return userinfo.partition(":")[0] if at else ""
+
+
 def secret_url(value: str) -> bool:
     """Whether a URL an MCP entry or a launch names carries a credential (LC-21): anything secret_argument finds, a
-    password in its user information, or a query or fragment parameter whose name can only carry a credential and has
-    a value, or whose value is shaped like one. A string that is not an absolute URL, or one whose host or port
-    `new URL` refuses (url_refused, FAA-309), is checked as an argument only, as the Node twin's secretUrl reads it."""
-    return _url_credential(value, hosts=True)
+    password in its user information, a user name that is a token (token_user_name, DEC-0177), or a query or fragment
+    parameter whose name can only carry a credential and has a value, or whose value is shaped like one. A string that
+    is not an absolute URL, or one whose host or port `new URL` refuses (url_refused, FAA-309), is checked as an argument
+    only, as the Node twin's secretUrl reads it."""
+    return _url_credential(value, hosts=True, token_user=True)
 
 
-def _url_credential(value: str, hosts: bool) -> bool:
+def _url_credential(value: str, hosts: bool, token_user: bool = False) -> bool:
     """secret_url; with `hosts` False the host is not checked, as repository_credential reads a repository's parameters
     whatever its host (the Node twin's repositoryParts)."""
     if secret_argument(value):
@@ -466,6 +489,8 @@ def _url_credential(value: str, hosts: bool) -> bool:
         return False  # `new URL` refuses its host or port, so the Node twin reads it as an argument only (FAA-309)
     password, query, fragment = url_parts(value)
     if password:
+        return True
+    if token_user and token_user_name(_decode_keeping_plus(_url_user(value))):
         return True
     for part in (query, fragment):
         for name, raws in raw_values(part).items():
