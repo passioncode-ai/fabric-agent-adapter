@@ -19,6 +19,14 @@ Usage data, on by default, in every new agent project (FAA-202, the contract's D
   retention and the lines its owner confirms before the first release that sends; `docs/agent-surface.md` lists the
   switch (the person's own shell owes no action, UD-4).
 - The generated project's own tests cover it (twelve with the placement guard's); `test_new_agent.py` runs them.
+- `test/evals/run_scenarios.py` (FAA-339): the scenario evals run against a real client. The agent is `claude -p` with
+  the skill loaded as its instructions, read-only tools (Read, Grep, Glob) in a copy of the skill's folder, no MCP
+  server, setting source or saved session; the judge is an OpenRouter model of another family (default
+  `moonshotai/kimi-k3.1-pro`) that rules on each expectation with a quote from the answer, no quote meaning not met.
+  `NOT_RUN` (exit 2) without `FABRIC_REAL_CLIENT=1`, `claude` and the judge's key, which `use_secret.py run` gives from
+  `fabric-agent-adapter/local/OPENROUTER_API_KEY`. `--record` writes `run.json` and a summary. Its first run, FAA-201's
+  nine scenarios with sonnet judged by Kimi ($0.97 + $0.38): six pass, three fail
+  (`docs/evidence/evals/2026-11-16-faa-339-scenario-run/`); the three are triaged as FAA-348.
 
 ### Changed
 
