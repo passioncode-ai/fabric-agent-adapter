@@ -274,7 +274,7 @@
     "fabric_jsvalue",
     "fabric_secrets"
    ],
-   "sha256": "c75175693915edc1c328e9d3bef3a2ea9c09ce43d4fffc6b4226c1304af28d3f"
+   "sha256": "7bfeb2dcd97af5a6bfebb3855fd8069a15cc9fe12759189bb89f9bc91e349d84"
   },
   {
    "module": "fabric_a2a",
@@ -943,7 +943,7 @@
     "fabric-jsvalue",
     "fabric-secrets"
    ],
-   "sha256": "4122422b847ebd33cff085a7fd3bc3aca0c6d76705fae97fdaa0a65f7e9ce801"
+   "sha256": "92382562424de25f1dc78bd03949ea1ddee2d0f22bf54b4b820ee1d2c87d477d"
   },
   {
    "module": "fabric-a2a",
@@ -10564,7 +10564,7 @@
    "fabric_protocols.py": "c9c555bbefa0d1d43cf43d27d2b5c0cf37fd71e185593f646cb1d63a1d7bba80",
    "fabric_actions.py": "6d483c879723da895b6e99b7e69c9869548ddd61fb717a9e6be291017769d95f",
    "fabric_connections.py": "35721ade284773a23ea5c8323577a8de80562c7f8508f48e8199bed1ae3af865",
-   "fabric_instance_facts.py": "c75175693915edc1c328e9d3bef3a2ea9c09ce43d4fffc6b4226c1304af28d3f",
+   "fabric_instance_facts.py": "7bfeb2dcd97af5a6bfebb3855fd8069a15cc9fe12759189bb89f9bc91e349d84",
    "fabric_a2a.py": "fead6285fa49502fc2282b2518f63cf2f0d42183bebc0c22f9b00d9430b4aa70",
    "fabric_page_links.py": "a7e0045c78148b372b6a47b709dd12f3394f5656d749dfc8654fb1518146154d",
    "fabric_load.py": "f44dbb2929aa9fa368784432adaa46e5351cd095c616a0eb4f114f74ec698465",
@@ -10622,7 +10622,7 @@
    "fabric-protocols.mjs": "c5aa02c2f324a7e18a8036f0616aa2270af34288940acb82a8bd85cc9c841a92",
    "fabric-actions.mjs": "6435f458863a6cb7e3e1266de4aa1d9a68a5a5cfcd5aae1b934b9573b028b569",
    "fabric-connections.mjs": "9010a2493040eebd6d9777e497bdca32d0925a42c3cd3d44ced261b39ef68875",
-   "fabric-instance-facts.mjs": "4122422b847ebd33cff085a7fd3bc3aca0c6d76705fae97fdaa0a65f7e9ce801",
+   "fabric-instance-facts.mjs": "92382562424de25f1dc78bd03949ea1ddee2d0f22bf54b4b820ee1d2c87d477d",
    "fabric-a2a.mjs": "b7cb7e74b5589b6ec6f2b5c5a2178f06e9c6b2c9480d09cc780982df38118819",
    "fabric-page-links.mjs": "38acc6188ea5e546dd84767cdcae04287059b883db7e3922d5db29dc14139af4",
    "fabric-load.mjs": "b47e1b45a18bf29cf9b324772f70e7d3f9124053973d3d17f57859179579d20b",

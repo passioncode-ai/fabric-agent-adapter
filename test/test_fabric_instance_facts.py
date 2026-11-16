@@ -26,7 +26,7 @@ class VectorTests(unittest.TestCase):
         self.assertEqual(fif.INSTANCE_FACTS_EXTENSION_KEY, KEY)
 
     def test_every_case_reads_as_the_contract_does(self):
-        self.assertEqual(len([c for c in V["cases"] if not c["name"].startswith("hostile: ")]), 35)
+        self.assertEqual(len([c for c in V["cases"] if not c["name"].startswith("hostile: ")]), 38)
         self.assertGreaterEqual(len(V["cases"]), 69)
         for c in V["cases"]:
             with self.subTest(c["name"]):

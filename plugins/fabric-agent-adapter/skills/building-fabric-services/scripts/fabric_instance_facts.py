@@ -135,11 +135,19 @@ def _refusal(field: str, value: Any, document: str, setting: Dict[str, bool]) ->
         if value == "public" and setting.get("subscription") is True:
             return ("public beside a subscription runner: a service others reach never runs on the operator's subscription "
                     "(DEC-0046, DEC-0061 item 3)")
+        # DEC-0174: an organization's members reaching a remote surface with their own keys still run on its runner, and
+        # a subscription serves only its owner's own sessions.
+        if value == "organization" and setting.get("subscription") is True:
+            return ("organization beside a subscription runner: a subscription serves only its owner's own sessions, never "
+                    "an organization's members (DEC-0061, DEC-0174)")
     if field == "entry" and "login" in setting and (value == "host-signin") != setting["login"]:
         return ("the dashboard requires a host's login code (surfaces.dashboard.login)" if setting["login"]
                 else "the dashboard takes no host's login code (surfaces.dashboard.login is false)")
     if field == "mode" and value == "shared" and local:
         return "shared is a remote service's: a local placement names one context and at most one grant (DEC-0082 item 4)"
+    if field == "mode" and value in ("shared", "per-organization") and setting.get("subscription") is True:
+        return ("%s beside a subscription runner: an instance holding others' data serves more than its owner's own "
+                "sessions (DEC-0061, DEC-0174)" % value)
     if field == "kind" and value == "system" and local:
         return "system is a remote placement's: a local service runs under a counted OS account (DEC-0154)"
     if field == "account":

@@ -21,6 +21,10 @@ supported for bundles issued under it. Impact map: `docs/evidence/specs/2026-11-
   `fabric-secrets.mjs`; a manifest URL that stores one is refused (FAC-SEM-057); the channel agent's CA-5 budget counts
   the user name as the contract's `detectorCost` does (equal on six strings measured under the contract's tsx).
 
+- Instance facts (DEC-0174): `organization` as the audience, and `shared` or `per-organization` as the tenancy, beside a
+  subscription runner are refused, in both twins (a subscription serves only its owner's own sessions); 38 contract
+  cases, all answered.
+
 ### Changed
 
 - The contract's URL constants (`PASSWORD_NAME`, `URL_BEARER_VALUE`, `PLACEHOLDER`, `DOCUMENTATION_HOST`,
