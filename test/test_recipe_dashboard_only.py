@@ -237,6 +237,14 @@ class Snapshot(unittest.TestCase):
             self.assertEqual(svc.read_snapshot(path, now)["degraded"], "stale")
             self.assertEqual(svc.read_snapshot(path, now - 86400 * 1.5)["sections"], [])
 
+    def test_a_wide_table_scrolls_in_its_own_box(self):
+        # ED-1 and ED-4: a table wider than a narrow panel scrolls inside a labelled box, never the page.
+        svc = load("dashboard_only_service", RECIPE / "dashboard_service.py")
+        page = svc.render_sections({"takenAt": "2026-11-01T00:00:00Z", "sections": [
+            {"title": "Services <x>", "source": "s", "columns": ["A"], "rows": [["1"]]}]})
+        self.assertIn('<div class="fd-scroll" data-fd-label="Services &lt;x&gt; table"><table class="fd-table">', page)
+        self.assertIn("</table></div></section>", page)
+
 
 class Prose(unittest.TestCase):
     def test_the_readme_says_what_waits_and_the_skill_links_it(self):
