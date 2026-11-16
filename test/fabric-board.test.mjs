@@ -1359,6 +1359,265 @@ test('FAA-165: a not_authorized move-back claim reads as another session\'s slot
   assert.deepEqual(h.events.slice(seen), []);
 });
 
+// FAA-194: the move-back check's branches, twins of MovedSlotTests in test_fabric_board.py.
+const claimKeys = (s, from = 0) => s.calls.map((c, k) => [c, s.callArgs[k]]).slice(from).filter(([c]) => c === 'com.claim').map(([, a]) => a.idempotency.key);
+
+test('FAA-194 (9): a held move-back claim is asked again after the hold', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'set', values: { holds: { slots: [{ project: r.project, capability: 'video.render' }] } } });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.equal(record(hub)['video.render'].moved, 2, 'a hold records no move');
+  await hub.control({ op: 'set', values: { holds: {} } });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'held');
+});
+
+for (const code of ['capacity_exceeded', 'idempotency_window_expired']) {
+  test(`FAA-194 (9): a move-back claim refused ${code} asks under a fresh key at the next renewal`, async (t) => {
+    const { hub, h, r, mine } = await movedOff(t);
+    await hub.control({ op: 'move', capability: 'video.render', to: mine });
+    await hub.control({ op: 'fail', tool: 'com.claim', code });
+    const seen = (await h.tools()).length;
+    await h.advance(20);
+    await r.step();
+    assert.ok(!('video.render' in r.claimKeys));
+    assert.equal(r.slots['video.render'].state, 'moved');
+    assert.equal(record(hub)['video.render'].moved, 2, 'nothing recorded');
+    await h.advance(20);
+    await r.step();
+    const keys = claimKeys(await h.state(), seen);
+    assert.notEqual(keys[0], keys[1], 'a fresh key');
+    assert.equal(r.slots['video.render'].state, 'held');
+  });
+}
+
+test('FAA-194 (9): a move-back claim refused session-ended goes to the fault', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'fail', tool: 'com.claim', code: 'session-ended' });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.state, 'down');
+  assert.equal(r.session, null);
+  assert.equal(record(hub)['video.render'].moved, 2);
+});
+
+test('FAA-194 (12): a move whose record could not be written still finds a move back', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  const r = h.responder();
+  await r.step();
+  const mine = (await h.state()).slots['video.render'].holder;
+  const slot = r.checkpoint.slot.bind(r.checkpoint);
+  r.checkpoint.slot = (capability, rec) => {
+    if (rec && 'moved' in rec) throw new fb.BoardError('checkpoint', 'The disk is full.');
+    return slot(capability, rec);
+  };
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.ok(!('moved' in record(hub)['video.render']));
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'held');
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+});
+
+test('FAA-194 (13): a tick whose only failure is a lost move-back answer is no success', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  r.state = 'down'; r.upSince = null; r.backoff.attempt = 3;
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step();
+  assert.deepEqual([r.state, r.backoff.attempt, r.upSince], ['down', 3, null]);
+  await h.advance(20);
+  await r.step();
+  assert.deepEqual([r.state, r.backoff.attempt], ['ready', 0]);
+  assert.equal(r.slots['video.render'].state, 'held');
+});
+
+test('FAA-194 (15): a takeBack and a lease_expired move-back claim drop the claim key', async (t) => {
+  {
+    const { hub, h, r, mine } = await movedOff(t);
+    await hub.control({ op: 'move', capability: 'video.render', to: mine });
+    await hub.control({ op: 'drop', tool: 'com.claim' });
+    await h.advance(20);
+    await r.step();
+    assert.ok('video.render' in r.claimKeys);
+    r.takeBack('video.render');
+    assert.ok(!('video.render' in r.claimKeys));
+  }
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const seen = (await h.tools()).length;
+  await h.advance(61); // the lease from the move lapsed before this session asked
+  await r.step();
+  const keys = claimKeys(await h.state(), seen);
+  assert.equal(keys.length, 2);
+  assert.notEqual(keys[0], keys[1]);
+});
+
+test('FAA-194 (15): an error that is not the board\'s is thrown out of the move-back check', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const call = r.call.bind(r);
+  r.call = async (op, args) => { if (op === 'com.claim') throw new TypeError('a defect'); return call(op, args); };
+  await h.advance(20);
+  await assert.rejects(r.movedBack('video.render'), TypeError);
+});
+
+test('FAA-194 (17): a lost move-back claim replayed under a hold is the slot this session\'s again', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step();
+  assert.equal((await h.state()).requests[rid].state, 'claimed');
+  await hub.control({ op: 'set', values: { holds: { slots: [{ project: r.project, capability: 'video.render' }] } } });
+  await h.advance(20);
+  await r.step();
+  assert.ok(['held', 'paused'].includes(r.slots['video.render'].state), r.slots['video.render'].state);
+  assert.ok(!('moved' in record(hub)['video.render']));
+  assert.ok(h.kinds().includes('board.slot.returned'));
+  await hub.control({ op: 'set', values: { holds: {} } });
+  for (let i = 0; i < 3; i += 1) { await h.advance(20); r.waitUntil = 0; await r.step(); }
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+});
+
+test('FAA-194 (18): a resent probe keeps its first send time', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'drop', tool: 'com.claim', times: 3 });
+  const seen = (await h.tools()).length;
+  await h.advance(20);
+  await r.step();
+  const t0 = h.clock.t;
+  for (let i = 0; i < 2; i += 1) {
+    await h.advance(20);
+    await r.step();
+    assert.equal(r.slots['video.render'].probeAt, t0);
+    assert.equal(r.leaseLeft(), t0 + 60 - h.clock.t);
+  }
+  const keys = claimKeys(await h.state(), seen);
+  assert.deepEqual([keys.length, new Set(keys).size], [3, 1], 'three sends under one key');
+  assert.ok(r.session);
+  await h.advance(20); // t0 + 60: the probe no longer counts
+  assert.equal(r.leaseLeft(), 0);
+  await hub.control({ op: 'drop', tool: 'com.status' });
+  await r.step();
+  assert.equal(r.session, null);
+});
+
+test('FAA-194 (22): a reconnect forgets the lost probes', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'drop', tool: 'com.claim' });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.probing.has('video.render'));
+  await r.dropSession();
+  await h.advance(1);
+  r.waitUntil = 0;
+  await r.step();
+  assert.ok(r.session);
+  assert.equal(r.probing.size, 0);
+});
+
+test('FAA-194 (23): a lost probe at forty seconds still counts its lease', async (t) => {
+  const hub = await fakeHub(t, ['video.render', 'video.cut']);
+  const h = harness(hub);
+  const r = h.responder({ capabilities: ['video.render', 'video.cut'] });
+  await r.step();
+  const mine = (await h.state()).slots['video.render'].holder;
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await hub.control({ op: 'drop', tool: 'com.claim', capability: 'video.render' });
+  await h.advance(20);
+  await r.step(); // the probe's answer is lost at t0
+  const t0 = h.clock.t;
+  await hub.control({ op: 'set', values: { status_generation: 'absent' } });
+  await h.advance(20);
+  await r.step();
+  await h.advance(20); // t0 + 40
+  const generation = (await h.state()).slots['video.cut'].generation;
+  await hub.control({ op: 'drop', tool: 'com.claim', capability: 'video.cut' });
+  await r.step();
+  assert.ok(r.session);
+  assert.equal(r.leaseLeft(), t0 + 60 - h.clock.t, "the probe's lease is the oldest");
+  assert.equal((await h.state()).slots['video.cut'].generation, generation);
+});
+
+test('FAA-194 (25): a takeBack while a lost probe is in flight keeps no probe lease', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await h.advance(20);
+  const call = r.call.bind(r);
+  r.call = async (op, args) => {
+    if (op !== 'com.claim') return call(op, args);
+    r.call = call;
+    r.takeBack('video.render');
+    await call(op, args);
+    throw new fb.BoardError('unreachable', 'The answer was lost.', true);
+  };
+  await r.step();
+  assert.ok(!r.probing.has('video.render'));
+  assert.ok(!('probeAt' in r.slots['video.render']));
+  assert.equal(r.leaseLeft(), 0);
+});
+
+test('FAA-194 (28): a request a raced move-back claim handed out waits for its lease', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const call = r.call.bind(r);
+  r.call = async (op, args) => {
+    if (op === 'com.claim' && r.slots['video.render']?.state === 'moved') r.takeBack('video.render'); // between the check and the claim
+    return call(op, args);
+  };
+  await h.advance(20);
+  await r.step();
+  const claimedAt = h.clock.t;
+  assert.equal((await h.state()).requests[rid].state, 'claimed');
+  while (h.clock.t + 20 < claimedAt + 60) {
+    await h.advance(20);
+    await r.step();
+    assert.equal((await h.state()).requests[rid].state, 'claimed', 'not before its lease');
+  }
+  await h.advance(claimedAt + 60 - h.clock.t);
+  r.waitUntil = 0;
+  await r.step();
+  assert.equal((await h.state()).requests[rid].state, 'completed');
+});
+
+test('FAA-194 (30): takeBack onlyIfMoved keeps a slot held again', async (t) => {
+  const { hub, h, r, mine } = await movedOff(t);
+  await hub.control({ op: 'move', capability: 'video.render', to: mine });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'held');
+  const kept = { ...record(hub)['video.render'] };
+  assert.equal(r.takeBack('video.render', { onlyIfMoved: true }), false);
+  assert.deepEqual(record(hub)['video.render'], kept);
+  assert.ok(!r.takenBack.has('video.render'));
+  await hub.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.equal(r.takeBack('video.render', { onlyIfMoved: true }), true);
+  assert.equal(record(hub)['video.render'], undefined);
+});
+
 test('FAA-155: work running when the slot moves stops, stays held, and is never completed or transferred', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

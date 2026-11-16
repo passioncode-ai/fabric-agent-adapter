@@ -10,7 +10,8 @@ service can be told apart: ``current``, ``older`` (with the release it came from
     fabric_kit.py build [--check]          # maintainers: refresh kit.json from the sources
 
 ``install`` copies the closure of the named modules (default ``fabric_service`` / ``fabric-service``) and nothing else.
-It refuses to overwrite a file it does not recognise (a ``modified`` copy) unless ``--force``. ``status`` also names a
+It refuses to overwrite a file it does not recognise (a ``modified`` copy) unless ``--force``, and names a copy already
+there that imports a module it installs but is not current itself: install it too (FAA-194 (40)). ``status`` also names a
 module a present module imports that is missing from the folder: the copy would fail when that code path runs.
 Standard library only. Exit codes: 0 done or all current, 1 a problem (missing, modified, refused), 2 usage.
 """
@@ -181,7 +182,7 @@ def install(service_dir: Path, lang: str, modules: List[str], dry_run: bool = Fa
     entries = manifest[lang]
     roots = modules or [DEFAULT_ROOT[lang]]
     plan = closure(entries, roots)
-    result = {"kit": manifest["version"], "copied": [], "kept": [], "refused": []}
+    result = {"kit": manifest["version"], "copied": [], "kept": [], "refused": [], "stale": []}
     files = []
     for e in plan:
         files.append(e["file"])
@@ -197,6 +198,22 @@ def install(service_dir: Path, lang: str, modules: List[str], dry_run: bool = Fa
                 result["refused"].append(name)
                 continue
         result["copied"].append(name)
+    # A copy left here that imports a module this install replaces, from another release or edited, may not fit it
+    # (an older fabric_board_session beside a new fabric_board_slots): named, never changed (FAA-194 (40)).
+    copying = {e["file"]: e["module"] for e in plan if e["file"] in result["copied"]}
+    for e in entries:
+        target = service_dir / e["file"]
+        if e in plan or not target.is_file() or not copying:
+            continue
+        st = state_of(target, manifest)
+        try:
+            deps = (python_imports if lang == "python" else node_imports)(target, [x["module"] for x in entries])
+        except (SyntaxError, ValueError, UnicodeDecodeError):
+            deps = []
+        hit = [f for f, m in copying.items() if m in deps]
+        if st["state"] != "current" and hit:
+            result["stale"].append({"file": e["file"], "module": e["module"], "state": st["state"], "version": st["version"],
+                                    "imports": hit})
     if not dry_run and not result["refused"]:
         service_dir.mkdir(parents=True, exist_ok=True)
         for name in result["copied"]:
@@ -253,6 +270,9 @@ def main(argv: List[str]) -> int:
         print("current    " + name)
     for name in result["refused"]:
         print("refused    %s: the copy there is not one the kit released; --force overwrites it" % name)
+    for s in result["stale"]:
+        print("%-10s %s%s imports %s; install it too: --module %s" % (
+            s["state"], s["file"], " (%s)" % s["version"] if s["version"] else "", ", ".join(s["imports"]), s["module"]))
     return 1 if result["refused"] else 0
 
 

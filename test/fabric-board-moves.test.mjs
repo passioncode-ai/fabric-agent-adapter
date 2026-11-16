@@ -347,7 +347,7 @@ test('FAA-194 (11): a move back waits while other work runs', async (t) => {
   const state = await h.control({ op: 'state' });
   const claims = state.calls.slice(before).filter((c, k) => c === 'com.claim' && state.callArgs[before + k]?.capability === 'video.render');
   assert.deepEqual(claims, [], 'no move-back claim while other work runs');
-  assert.equal(r.slots['video.render'].state, 'moved');
+  assert.equal(r.slots['video.render'].state, 'held', 'FAA-194 (2): an enroll found the move back');
   release();
   for (let k = 0; k < 4; k += 1) {
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -357,4 +357,77 @@ test('FAA-194 (11): a move back waits while other work runs', async (t) => {
   const done = await h.control({ op: 'state' });
   assert.equal(done.requests[cut].state, 'completed');
   assert.equal(done.requests[render].state, 'completed');
+});
+
+// FAA-194 (2): a move back landing during a job longer than the 60 s lease is renewed by an enroll (no request handed
+// out) and kept; the claim waits for the job (twin of test_a_move_back_during_a_job_longer_than_the_lease_is_renewed_and_kept).
+test('FAA-194 (2): a move back during a job longer than the lease is renewed and kept', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  t.after(() => release());
+  const r = new fb.Responder({ ...h.options(), handler: async (request) => {
+    if (request.capability === 'video.cut') await gate;
+    return { state: 'completed' };
+  } });
+  await r.step();
+  const mine = (await h.control({ op: 'state' })).slots['video.render'].holder;
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  const { request: cut } = await h.control({ op: 'queue', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.current);
+  await h.control({ op: 'move', capability: 'video.render', to: mine });
+  const generation = (await h.control({ op: 'state' })).slots['video.render'].generation;
+  const { request: render } = await h.control({ op: 'queue', capability: 'video.render' });
+  const before = (await h.control({ op: 'state' })).calls.length;
+  for (let k = 0; k < 5; k += 1) { await h.advance(20); await r.step(); assert.ok(r.current, 'the job still runs'); }
+  const state = await h.control({ op: 'state' });
+  assert.equal(state.slots['video.render'].holder, mine);
+  assert.equal(state.slots['video.render'].generation, generation, 'renewed, never re-enrolled');
+  assert.equal(r.slots['video.render'].state, 'held');
+  const claims = state.calls.slice(before).filter((c, k) => c === 'com.claim' && state.callArgs[before + k]?.capability === 'video.render');
+  assert.deepEqual(claims, [], 'no second request while the job runs');
+  assert.equal(state.requests[render].state, 'queued');
+  release();
+  for (let k = 0; k < 4; k += 1) { await new Promise((resolve) => setTimeout(resolve, 50)); await h.advance(20); await r.step(); }
+  const done = await h.control({ op: 'state' });
+  assert.equal(done.requests[cut].state, 'completed');
+  assert.equal(done.requests[render].state, 'completed');
+});
+
+test('FAA-194 (2): a move to a third session during a job is never taken', async (t) => {
+  const h = await fakeHub(t, ['video.render', 'video.cut']);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  t.after(() => release());
+  const r = new fb.Responder({ ...h.options(), handler: async (request) => {
+    if (request.capability === 'video.cut') await gate;
+    return { state: 'completed' };
+  } });
+  await r.step();
+  await h.control({ op: 'move', capability: 'video.render' });
+  await h.advance(20);
+  await r.step();
+  await h.control({ op: 'queue', capability: 'video.cut' });
+  await h.advance(20);
+  await r.step();
+  assert.ok(r.current);
+  await h.control({ op: 'move', capability: 'video.render', to: 's-third' });
+  await h.advance(20);
+  await r.step();
+  const record = () => JSON.parse(fs.readFileSync(path.join(h.data, 'board-checkpoint.json'), 'utf8')).slots['video.render'];
+  assert.equal(record().moved, (await h.control({ op: 'state' })).slots['video.render'].generation);
+  await h.control({ op: 'move', capability: 'video.render', to: 's-fourth' });
+  await h.advance(61); // the fourth session lapses before this session asks
+  const before = (await h.control({ op: 'state' })).calls.length;
+  for (let k = 0; k < 3; k += 1) { await r.step(); await h.advance(20); }
+  const state = await h.control({ op: 'state' });
+  const enrolls = state.calls.slice(before).filter((c, k) => c === 'com.enroll' && state.callArgs[before + k]?.capability === 'video.render');
+  assert.deepEqual(enrolls, []);
+  assert.equal(state.slots['video.render'].holder, 's-fourth');
+  assert.equal(r.slots['video.render'].state, 'moved');
+  release();
 });

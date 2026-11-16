@@ -200,6 +200,14 @@ class Board:
             return self._slot_held(capability)
         return ("project" in scopes or "slot" in scopes) and self._slot_held(capability)
 
+    def _stored(self, tool: str, args: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """The receipt stored under this call's key and digest, as a repeat (`repeated: true`), or None."""
+        idem = (args.get("fence") or {}).get("idempotency") if isinstance(args.get("fence"), dict) else args.get("idempotency")
+        if not isinstance(idem, dict) or idem.get("epoch") != self.epoch:
+            return None
+        seen = self.receipts.get((tool, idem.get("epoch"), idem.get("key")))
+        return dict(seen[1], repeated=True) if seen and seen[0] == digest(tool, args) else None
+
     def _claimable(self, r: Dict[str, Any]) -> bool:
         return r["thread"] not in ((self.holds or {}).get("threads") or [])
 
@@ -212,6 +220,9 @@ class Board:
         if (tool, args.get("capability")) in self.refuse_always:
             return refusal(self.refuse_always[(tool, args.get("capability"))], "a refusal the test asked for")
         if self._held(tool, args):
+            stored = self._stored(tool, args)
+            if stored is not None:  # project-comms, holds: a repeat stored before the hold answers its receipt (FAA-194 (17))
+                return stored
             if tool == self.lift_holds_after:
                 self.holds, self.lift_holds_after = {}, None
             return refusal("held", "The operator holds this work; try again later.", retryable=True)
