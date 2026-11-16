@@ -7,7 +7,8 @@
 // DEC-0061/0069: fixtures/vectors/service-peer.json (peerRefusal), fixtures/vectors/app-descriptor.json
 // (appDescriptorAction, appDescriptorStale), every service descriptor fixture and the FAC-SEM-085/086 semantic ones;
 // DEC-0122: every service-well-known-a2a* fixture with its validity re-checked by the contract's validator; DEC-0145:
-// every provider.schema.json fixture, the same way (provider-fixtures.json).
+// every provider.schema.json fixture, the same way (provider-fixtures.json); DEC-0089 item 2: the origin vectors of
+// fixtures/vectors/folder-attribution.json, re-answered by normalizeOrigin (origin-vectors.json, FAA-200 (45)).
 // Never written by hand.
 //
 // Run it under the contract's own tsx, on a clean tree of the contract at the pin (a `git archive` of the pinned commit,
@@ -201,6 +202,12 @@ for (const c of [...ids.normal, ...ids.laxPorts]) if (identifiers.normalIdentifi
 for (const [a, b] of ids.same) if (!identifiers.sameIdentifier(a, b)) throw new Error(`the contract's same pair ${a} ${b} no longer answers as written`);
 for (const [a, b] of ids.different) if (identifiers.sameIdentifier(a, b)) throw new Error(`the contract's different pair ${a} ${b} no longer answers as written`);
 write('identifier-vectors.json', { ...ids, source: 'fixtures/vectors/identifiers.json' });
+
+// DEC-0089 item 2: the repository identity of a remote, the spelling the kits' repository_from_origin builds on (FAA-200 (45)).
+const folderAttribution = await src('folder-attribution.ts');
+const origins = read('fixtures/vectors/folder-attribution.json').origin;
+for (const c of origins) if ((folderAttribution.normalizeOrigin(c.origin) ?? null) !== c.expected) throw new Error(`the contract's origin ${JSON.stringify(c.origin)} no longer answers as written`);
+write('origin-vectors.json', { about: "DEC-0089 item 2 at the pin: normalizeOrigin(origin), a remote's repository identity host/path or null, each case re-answered by the contract's function. The kits' repository_from_origin / repositoryFromOrigin answer https://<identity> for each, or null. Written by vendor_vectors.mjs, never by hand.", source: 'fixtures/vectors/folder-attribution.json (origin)', origin: origins });
 // DEC-0067: negotiateRevision's cases, the register, and FAC-SEM-099 over lists answered by protocolsFindings.
 const negotiation = read('fixtures/vectors/protocol-revisions.json');
 for (const c of negotiation.cases) if (!same(protocolRevisions.negotiateRevision(c.received, c.accepted), c.expect)) throw new Error(`the contract's revision case "${c.name}" no longer answers as written`);

@@ -125,7 +125,8 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
   fs.writeFileSync(rotated, JSON.stringify({ ...hand, source: { repository: 'git@github.com:example/agent.git' } })); // edited by hand
   const emit = process.emitWarning;
   const seen = [];
-  process.emitWarning = (message, options) => seen.push(options?.code);
+  const said = [];
+  process.emitWarning = (message, options) => { seen.push(options?.code); said.push(message); };
   try {
     const again = k.registerRemote({ id: 'example-agent', name: 'Example Agent', origin: 'https://agent.example.com', token: 's'.repeat(40), dir });
     assert.ok(!('source' in JSON.parse(fs.readFileSync(again, 'utf8'))), 'a source the kit refuses never blocks a rotation');
@@ -133,6 +134,8 @@ test('registerRemote writes source.repository, checked as the schema URI (FAA-12
     process.emitWarning = emit;
   }
   assert.deepEqual(seen, ['FABRIC_NO_SOURCE_REPOSITORY']);
+  assert.ok(said[0].includes(k.DROPS_INSTALLED_SOURCE), 'it names the drop (FAA-200 (41))');
+  assert.ok(!said[0].includes('git@github.com'), 'never the repository itself');
   assert.throws(() => k.registerRemote({ id: 'example-bare', name: 'Bare', origin: 'https://bare.example.com', token: 't'.repeat(40), dir }),
     /example-bare\.default names no source\.repository[\s\S]*in this call[\s\S]*in registerRemote's options/); // FAA-198
   assert.ok(!fs.existsSync(k.remoteTokenFile('example-bare', 'default', dir)), 'a refused install writes no token');

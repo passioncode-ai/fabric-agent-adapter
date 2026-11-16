@@ -240,6 +240,17 @@ test('a new install names its repository; a reinstall without it warns (FAA-198)
   assert.equal(seen.length, 1);
   assert.match(seen[0][0], /names no source\.repository/);
   assert.equal(seen[0][1], 'FABRIC_NO_SOURCE_REPOSITORY');
+  // FAA-200 (41): the rewrite that drops an installed source.repository says so, never silently
+  assert.match(seen[0][0], /the installed descriptor names one, which this rewrite drops/);
+  assert.ok(!('source' in JSON.parse(fs.readFileSync(k.descriptorPath('sample', 'default', dir), 'utf8'))), 'written as given');
+  process.emitWarning = (message, options) => seen.push([message, options?.code]);
+  try {
+    k.writeDescriptor(bare, dir); // nothing installed names one now: nothing to drop
+  } finally {
+    process.emitWarning = emit;
+  }
+  assert.equal(seen.length, 2);
+  assert.doesNotMatch(seen[1][0], /drops/);
   assert.equal(k.sourceRefusal(bare, dir), null, 'an installed descriptor is a rewrite');
   for (const empty of [{}, { repository: '' }, 'x', ['a'], 1, true]) assert.ok(k.sourceRefusal({ ...bare, id: 'other', source: empty }, dir), JSON.stringify(empty));
   fs.mkdirSync(path.join(dir, 'folder.default.json')); // a folder at the descriptor's path is no installed descriptor
@@ -460,4 +471,29 @@ test('usage receipt refuses what the report cannot carry; the ledger is private,
   assert.equal(ledger.prune(Date.parse(usageCase.now)), 1);
   assert.equal(ledger.receipts().length, 5);
   assert.ok(!fs.readFileSync(ledger.file, 'utf8').includes('torn'));
+});
+
+test('FAA-200 (45): repositoryFromOrigin spells an origin as source.repository takes it (DEC-0089 item 2)', () => {
+  const V = JSON.parse(fs.readFileSync(new URL('./fixtures/contract/origin-vectors.json', import.meta.url), 'utf8')).origin;
+  const NOT_A_URI = new Set(['https://github.com/Example-Org/\u00dcber-\u00c9cole']); // an identity, but no RFC 3986 URI
+  assert.equal(V.length, 28);
+  for (const c of V) {
+    const got = k.repositoryFromOrigin(c.origin);
+    if (c.expected === null || NOT_A_URI.has(c.origin)) assert.equal(got, null, JSON.stringify(c.origin));
+    else {
+      assert.equal(got, `https://${c.expected}`, c.origin);
+      assert.equal(k.sourceRepositoryProblem(got), null, 'a repository the kit\'s rules take');
+    }
+  }
+  assert.ok(k.sourceRepositoryProblem('https://github.com/example-org/\u00dcber-\u00c9cole'));
+  assert.equal(k.repositoryFromOrigin('https://user:pw@github.com/Example-Org/Agent.git'), 'https://github.com/example-org/agent');
+  assert.equal(k.repositoryFromOrigin('deploy:pw@git.example.com:team/app.git'), 'https://git.example.com/team/app');
+  const key = `sk-${'ab1d'.repeat(10)}`; // made up at run time: an `sk-` shape, never a key
+  assert.ok(k.sourceRepositoryProblem(`https://github.com/example-org/${key}`));
+  assert.equal(k.repositoryFromOrigin(`git@github.com:example-org/${key}.git`), null);
+  for (const odd of [null, undefined, 7, [], 'x'.repeat(4097), `git@github.com:example-org/${'a'.repeat(4096)}`]) assert.equal(k.repositoryFromOrigin(odd), null);
+  const dir = tempDir('fabric-origin-');
+  const d = { ...descriptor(47199), source: { repository: k.repositoryFromOrigin('git@github.com:Example-Org/Sample.git') } };
+  assert.deepEqual(k.validateDescriptor(d), []);
+  k.writeDescriptor(d, dir, { portOwner: () => null });
 });

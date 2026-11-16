@@ -1,0 +1,118 @@
+{
+  "about": "DEC-0089 item 2 at the pin: normalizeOrigin(origin), a remote's repository identity host/path or null, each case re-answered by the contract's function. The kits' repository_from_origin / repositoryFromOrigin answer https://<identity> for each, or null. Written by vendor_vectors.mjs, never by hand.",
+  "source": "fixtures/vectors/folder-attribution.json (origin)",
+  "origin": [
+    {
+      "origin": "git@github.com:Example-Org/Fabric.git",
+      "expected": "github.com/example-org/fabric"
+    },
+    {
+      "origin": "https://github.com/example-org/fabric",
+      "expected": "github.com/example-org/fabric"
+    },
+    {
+      "origin": "https://git@github.com/example-org/fabric.git/",
+      "expected": "github.com/example-org/fabric"
+    },
+    {
+      "origin": "ssh://git@github.com:22/example-org/fabric.git",
+      "expected": "github.com/example-org/fabric"
+    },
+    {
+      "origin": "git+ssh://git@github.com:2222/team/app.git",
+      "expected": "github.com/team/app"
+    },
+    {
+      "origin": "https://bitbucket.org/team/app.git",
+      "expected": "bitbucket.org/team/app"
+    },
+    {
+      "origin": "https://gitlab.example.com/group/sub/app.git?ref=main#readme",
+      "expected": "gitlab.example.com/group/sub/app"
+    },
+    {
+      "origin": "  git@github.com:example-org/fabric.git  ",
+      "expected": "github.com/example-org/fabric"
+    },
+    {
+      "origin": "git@github.com:example-org/fabric.git?x=1#y",
+      "expected": "github.com/example-org/fabric"
+    },
+    {
+      "origin": "git@github.com-work:example-org/fabric.git",
+      "expected": "github.com-work/example-org/fabric"
+    },
+    {
+      "origin": "git@github.com:/example-org/fabric.git",
+      "expected": "github.com/example-org/fabric"
+    },
+    {
+      "origin": "https://github.com/Example-Org/Über-École",
+      "expected": "github.com/example-org/Über-École"
+    },
+    {
+      "origin": "https://git_host.example.com/example-org/fabric",
+      "expected": null
+    },
+    {
+      "origin": "https://Kithub.com/example-org/fabric",
+      "expected": null
+    },
+    {
+      "origin": "https://github.com/example-org/fabric/.git",
+      "expected": null
+    },
+    {
+      "origin": "git@GITHUB.KOM:example-org/fabric.git",
+      "expected": null
+    },
+    {
+      "origin": "/local/path/repo",
+      "expected": null
+    },
+    {
+      "origin": "../repo",
+      "expected": null
+    },
+    {
+      "origin": "C:\\work\\repo",
+      "expected": null
+    },
+    {
+      "origin": "C:/work/repo",
+      "expected": null
+    },
+    {
+      "origin": "file:///u/ana/repo",
+      "expected": null
+    },
+    {
+      "origin": "ftp://github.com/example-org/fabric",
+      "expected": null
+    },
+    {
+      "origin": "https://github.com/only-owner",
+      "expected": null
+    },
+    {
+      "origin": "git@localhost:owner/name",
+      "expected": null
+    },
+    {
+      "origin": "https://github.com",
+      "expected": null
+    },
+    {
+      "origin": "",
+      "expected": null
+    },
+    {
+      "origin": null,
+      "expected": null
+    },
+    {
+      "origin": 7,
+      "expected": null
+    }
+  ]
+}

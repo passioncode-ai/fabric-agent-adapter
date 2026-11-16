@@ -73,6 +73,9 @@ class UpgradingProse(unittest.TestCase):
         self.assertIn("the fixture of a test suite that writes a temporary services folder too", row)
         self.assertIn(self.FILTER, row)
         self.assertIn("never by its message text", row)
+        self.assertIn("naming an installed `source.repository` it drops, FAA-200 (41)", row)
+        self.assertIn("`repository_from_origin` / `repositoryFromOrigin` spell a git origin, scp form included", row)
+        self.assertIn("DEC-0089 item 2", row)
 
     def test_the_filter_the_page_gives_keeps_a_rewrite_quiet(self):
         sys.path.insert(0, str(SKILLS / "building-fabric-services/scripts"))
