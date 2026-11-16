@@ -1,6 +1,6 @@
 # fabric-service/0.1: wire reference
 
-Pinned to `fabric-agent-contract` commit `2462c90b4108e56d35be6a275d9043059c95d5d0`
+Pinned to `fabric-agent-contract` commit `560d60369b553fc123ba29c3e1e637de68901678`
 (`docs/specification/service.md`, DEC-0015; the usage report DEC-0021; Windows and Linux supervision
 DEC-0032 and DEC-0033; the operator channel DEC-0034 and DEC-0035; the embedded dashboard DEC-0036;
 delegation and the operator session's lifetime DEC-0039; the meter's call window DEC-0041; session handoff DEC-0042;

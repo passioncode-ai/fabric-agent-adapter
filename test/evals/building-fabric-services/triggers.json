@@ -204,6 +204,14 @@
     {
       "query": "Serve an A2A Agent Card and the JSON-RPC binding from example-agent's service so other agents can send it tasks.",
       "shouldTrigger": true
+    },
+    {
+      "query": "My example-agent service should send anonymous usage counts to our analytics host: wire the switch and the notice.",
+      "shouldTrigger": true
+    },
+    {
+      "query": "Count my blog's page views with a privacy-friendly web analytics script.",
+      "shouldTrigger": false
     }
   ]
 }

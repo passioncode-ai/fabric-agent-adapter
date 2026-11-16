@@ -1,6 +1,6 @@
 {
   "about": "extensions/channel-agent/0.1 (DEC-0150) vendored byte for byte by make_channel_agent_vectors.mjs, each declaration answered again by the contract at the commit. Never written by hand.",
-  "commit": "2462c90b4108e56d35be6a275d9043059c95d5d0",
+  "commit": "560d60369b553fc123ba29c3e1e637de68901678",
   "files": {
     "channel-agent-vectors.json": {
       "source": "fixtures/vectors/channel-agent.json",

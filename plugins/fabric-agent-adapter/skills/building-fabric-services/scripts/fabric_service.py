@@ -202,6 +202,7 @@ from fabric_connections import (  # noqa: F401
     connections_rules,
     connections_view,
 )
+from fabric_instance_facts import INSTANCE_FACTS_EXTENSION_KEY, instance_facts, instance_facts_rules  # noqa: F401,E402 - DEC-0173 (FAA-342)
 from fabric_load import (  # noqa: F401 - the call queue and the load report (DEC-0104, FAA-289)
     LOAD_EXTENSION_KEY,
     LOAD_REPORT_TYPE,
