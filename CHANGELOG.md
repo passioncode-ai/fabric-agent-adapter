@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.94.0 (2026-11-16)
+
+### Fixed
+
+- The board responder keeps a slot moved back to it while another job runs longer than the 60 s lease: the move-back
+  check renews it with `com.enroll` (only while `com.status` shows it `active`) and claims after the job, never a second
+  request at once (FAA-194 item 2). A move's record that cannot be written falls back to the slot's own generation
+  (12); a tick whose only failure was a lost move-back answer is no success (13); a take-back in flight wins over a lost
+  answer, so no phantom probe lease remains (25); `take_back(capability, only_if_moved=True)` answers whether it acted,
+  and the sample reports `moved: false` when a move back landed first (30). The fake hub answers a stored receipt under
+  a hold, as the contract says (17). `fabric_kit.py install` names an older copy in the folder that imports a module it
+  installs (40). Six more branches are pinned by tests in both twins (9, 15, 18, 22, 23, 28).
+- The communication agent template 1.1.0 (FAA-264): a table gives each route its turn outcome and every adversarial
+  batch its expected route and outcome; step 0 takes the operator's link code as `not_a_ticket`; `replies_enabled` and
+  `clarifying_question` are named; one gate order; a daily spend guard under the monthly stop; no going live without an
+  open-vendor row; a holding line writes a commitments-ledger row. `template_check.py` checks that a template's newest
+  CHANGELOG entry is its header's version.
+
+### Documentation
+
+- working-with-fabric step 7 files the rows step 6 held back, never linked (FAA-194 items 7 and 31).
+
+### Upgrading
+
+- A responder's slot is released at a clean end; after a crash it stays held until its lease lapses and may be moved
+  meanwhile (FAA-194 item 35).
+
 ## 0.93.1 (2026-11-16)
 
 0.93.0 was tagged and never published: its Windows job failed on one new test, so the release workflow stopped before

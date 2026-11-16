@@ -41,6 +41,7 @@ inventory of all 134 open rows: [the plan](../evidence/specs/2026-11-12-backlog-
 | 0.92.0 | FAA-190 (15) and FAA-194 (32) (pack and sign refusals), FAA-200 (2), (7), (16), (23), (32), (40), (42), (52 part), (53), FAA-189 (10), FAA-233 | PR #318, merge `286beb41`, tag `v0.92.0`, release run 43772488074 success (six validate jobs, release, publish through OIDC), npm `latest` 0.92.0; checks: validate, both strict plugin validations, Node 786 with 0 fail, Python 2477 tests with one finding of the adapter's own source check (the new `sk-` name example), fixed before the merge and its suites rerun OK |
 | 0.93.0 | `fabric_git` and the source check's FAA-190 items (44), (46), (49), (50), (56), (60), (61), (64), (66), (67), (74), (99) to (103); FAA-200 (15), (21), (28), (29), (31), (33), (34), (35), (39), (54) | PR #319, merge `c7aa801c`, tag `v0.93.0`, release run 43775169379 failed on the Windows job (one test's Git configuration path, see 0.93.1): not published |
 | 0.93.1 | 0.93.0 republished with the Windows test fixed | release receipts follow the merge |
+| 0.94.0 | FAA-194 (17 items: slots kept through long jobs, lost answers, take-back races), FAA-264 (the communication agent template 1.1.0) | release receipts follow the merge |
 
 Board: request `2718ece8` completed (0.79.1); request `bfc0e14e` accepted for 0.80.0 (FAA-299 to FAA-301); findings
 `f09b651f` and `90f24e15` answered with 0.79.1; the coordinator's threads `478d8876` and `6255f2d5` answered.
