@@ -177,6 +177,15 @@ body (contract project-comms.md, DEC-0125 MD-3). The kit cannot tell his persona
   hashes the bytes itself. Two ids with one normal form (DEC-0076) name one artifact and are refused.
 - `reply: {text, format?, artifacts?}` is posted with `com.reply` before the completion. A reply is not a completion.
   It is a fenced reply, so it carries no `deliverTo` and reaches the requester (DEC-0135 DR-3).
+- Three calls put text on the request's thread, and the board stores all three as a message of kind `reply` from the
+  responder (Fabric's `board_insert_fenced_message`; only the journal's `operation` tells them apart): the
+  `begin_effect(summary)` summary (`com.effect_begin`), a `progress(note)` note (`com.progress`) and the outcome's
+  `reply` (`com.reply`). A requester that reads replies takes any of them for an answer unless the answer carries
+  something a note never does. So put a status line ("asked, waiting") in `progress(note)`, keep the summary to what
+  the effect is, and put an answer a requester parses (a `fabric-people-answer/1` block for `people.ask`, Fabric's
+  `docs/evidence/specs/2026-11-16-people-ask-bridge.md` §2) only in the outcome's `reply` (FAA-350). Notes are text
+  a person reads: in the requester's language, naming the agent by its current name, and saying where a person was
+  asked only when they were asked there.
 - A handler that raises before any effect completes the request `failed_known` naming only the exception's class.
 - The handler checks `ctx.stopped` in long work: after a session loss its answer is not sent.
 
