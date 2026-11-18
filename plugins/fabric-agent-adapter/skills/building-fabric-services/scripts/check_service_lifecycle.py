@@ -39,9 +39,16 @@ class LifecycleRules:
         if life.get("manager") != "launchd":
             self.add("lifecycle.launchd", "NOT_RUN", "lifecycle.manager is %s" % life.get("manager"))
             return
-        plist_path = fs.expand(str(life.get("plist")))
+        named = life.get("plist")
+        if not isinstance(named, str) or not named:  # the descriptor rules above FAIL it; nothing to read here (FAA-353)
+            self.add("lifecycle.plist", "NOT_RUN", "the descriptor names no lifecycle.plist, so no launchd job is read")
+            return
         try:
+            plist_path = fs.expand(named)
             plist = plistlib.loads(plist_path.read_bytes())
+        except fs.ServiceError as exc:
+            self.add("lifecycle.plist", "FAIL", "lifecycle.plist %s: %s" % (named, exc))
+            return
         except (OSError, ValueError) as exc:
             self.add("lifecycle.plist", "FAIL", "cannot read %s: %s" % (plist_path, exc))
             return

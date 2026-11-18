@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.97.1 (2026-11-18)
+
+### Fixed
+
+- The probe reports a broken service as rule lines, never as a traceback (FAA-353, SMM Manager's board request
+  `26dabf75`): a token file that is not UTF-8 is `auth.token-file` FAIL «is not UTF-8» and the rules after it run;
+  a launchd descriptor that names no `lifecycle.plist` (absent, empty or not a string) gets `lifecycle.plist` NOT_RUN
+  (the descriptor rules already FAIL it), and a relative `plist` is `lifecycle.plist` FAIL instead of `ServiceError`.
+- `read_token` (`fabric_auth.py`) and `readToken` (`fabric-auth.mjs`) refuse a token file that is not UTF-8 with
+  `ServiceError`, the refusal naming the file and never its bytes. Python raised `UnicodeDecodeError` (and read the
+  file in the locale's encoding); Node read the bytes as U+FFFD and served a token no client could present. A BOM
+  is kept as before. Tests: `test/test_check_service_crash_free.py`.
+
 ## 0.97.0 (2026-11-16)
 
 The repin to Fabric Agent Contract `v0.1.0+2026-11-16.6` (`2bbfd780`, FAA-343); `560d6036` (`v0.1.0+2026-11-16`) stays

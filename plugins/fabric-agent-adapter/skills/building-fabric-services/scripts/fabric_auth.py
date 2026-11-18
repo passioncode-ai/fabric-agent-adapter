@@ -90,7 +90,10 @@ def read_token(path: Path) -> str:
             raise ServiceError("Token file %s belongs to another user." % path)
         if info.st_mode & 0o077:
             raise ServiceError("Token file %s is readable by others; set mode 0600." % path)
-    token = path.read_text().strip()
+    try:
+        token = path.read_bytes().decode("utf-8").strip()
+    except UnicodeDecodeError:  # never quote the bytes: they may be the secret (FAA-353)
+        raise ServiceError("Token file %s is not UTF-8; write the token as text." % path) from None
     if len(token) < 16:
         raise ServiceError("Token file %s holds no usable token." % path)
     return token
