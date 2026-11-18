@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.98.0 (2026-11-18)
+
+### Added
+
+- Two MCP doors in the service kit (FAA-354, the agents database's board request `a7277193`, its rule R33 O13 and
+  decision D-66, the operator's words of 2026-11-18): `McpToolServer.serve_compact(domain, direct=None)` lists
+  `<domain>.search` and `<domain>.execute` instead of one tool per capability. `search` answers every operation with its
+  schema, gate, example and calls; `execute` re-enters `tools/call` under the operation's own name, so its authorize
+  level, action gate, mandate, audit and `Mcp-Name` are the ones a call by that name gets (DEC-0121 parity), with the
+  typed refusals `unknown-operation` and `invalid-arguments`. A direct tool beside the doors needs its measured case
+  (at least 20 calls and 30 % of the service's calls, at most three). Every tool keeps answering by its own name; a
+  listing of five tools or fewer stays as it is. Opt-in in this release.
+- The probe's `interop.compact-listing`: a compact listing has at most five tools, both doors and only measured direct
+  tools; the capabilities are read through `search`, so `interop.tools-match`, `interop.job-tools` and
+  `interop.action-tools` still check each one. A full listing of more than five tools is NOT_RUN while the mode is
+  opt-in. Tests: `test/test_compact_mcp.py` (19, four of them a live probe of the sample service).
+
 ## 0.97.1 (2026-11-18)
 
 ### Fixed

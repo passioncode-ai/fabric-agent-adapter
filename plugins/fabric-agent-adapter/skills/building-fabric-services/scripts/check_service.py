@@ -40,6 +40,11 @@ Actions (fabric-actions/0.1, DEC-0121): `well-known.actions` holds a declared ex
 actions with no MCP surface; a remote one there is NOT_RUN, its twin may be on A2A), and `dashboard.actions-declared`
 is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboard cannot declare an empty list).
 
+interop.compact-listing (FAA-354, agents database R33 O13, D-66): a tools/list that names a search door
+(`_meta` ai.passioncode.fabric/compact) lists at most five tools: the two doors and up to three direct tools, each with
+its measured case in search's answer. The capabilities are then read through search, so interop.tools-match and
+interop.action-tools still check every one. A full listing of more than five tools is NOT_RUN while the mode is opt-in.
+
 channel-agent.declaration (DEC-0150, FAC-SEM-162 to 165): extensions/channel-agent/0.1 under provider.extensions of the
 manifest the descriptor names, or, with no manifest, under extensions of the well-known answer (CA-1). FAC-SEM-164's
 obligations on a declaration still read FAIL, and so does a string shaped like a credential in it or in any copy beside
@@ -638,7 +643,7 @@ class Probe(LifecycleRules):
             reason = ("no MCP surface" if not mcp_surface
                       else "surfaces.mcp.auth is %s: the MCP surface takes its callers' credentials, not the host's token (%s)" % (auth, why) if own
                       else "no readable token")
-            for rule in ("interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
+            for rule in ("interop.compact-listing", "interop.output-schema-object", "interop.tools-match", "interop.job-tools", "interop.unknown-job", "interop.trace-propagation"):
                 self.add(rule, "NOT_RUN", reason)
             self.add("interop.action-tools", *action_tools_verdict(self.wk, None, reason, no_surface=not mcp_surface,
                                                                     remote=self.remote))
@@ -647,11 +652,13 @@ class Probe(LifecycleRules):
                 listing = self.mcp_call("tools/list", {})
             except (OSError, ValueError) as exc:
                 self.add("interop.tools-match", "FAIL", "tools/list failed: %s" % exc)
+                self.add("interop.compact-listing", "NOT_RUN", "tools/list failed: %s" % exc)
                 self.add("interop.action-tools", *action_tools_verdict(self.wk, None, "tools/list failed: %s" % exc))
                 listing = None
             if listing is not None:
                 sent = self.sent_traceparent
-                tools = {t.get("name"): t for t in (listing.get("result") or {}).get("tools", []) if isinstance(t, dict)}
+                listed = {t.get("name"): t for t in (listing.get("result") or {}).get("tools", []) if isinstance(t, dict)}
+                tools = self.compact_listing_rule(listed)  # FAA-354: two doors read through search, one by one after
                 self.object_root_rule(tools)
                 self.tools_match_rule(capabilities, manifest_path, tools)
                 self.job_tools_rule(capabilities, tools)
@@ -698,6 +705,47 @@ class Probe(LifecycleRules):
         self.add("auth.delegation-declared", "FAIL" if missing else "PASS",
                  ("auth.delegation lacks %s (DL-16)" % ", ".join(missing)) if missing
                  else "auth.delegation names its issuer and JWKS (DL-16)")
+
+    def compact_listing_rule(self, listed: Dict[str, Any]) -> Dict[str, Any]:
+        """`interop.compact-listing` (FAA-354, agents database R33 O13, D-66): a listing of more than five tools is two
+        doors, `<domain>.search` and `<domain>.execute`, and at most three direct tools, each on its measured case. A
+        compact service's operations are read through search, so the rules after this one see every tool one by one.
+        A full listing of more than five tools is NOT_RUN while the mode is opt-in."""
+        doors = {}
+        for name, tool in listed.items():
+            door = (tool.get("_meta") or {}).get(fi.COMPACT_META) if isinstance(tool.get("_meta"), dict) else None
+            if door in ("search", "execute"):
+                doors[door] = name
+        if not doors:
+            self.add("interop.compact-listing", "PASS" if len(listed) <= fi.COMPACT_LIMIT else "NOT_RUN",
+                     ("%d tools listed, at most %d" % (len(listed), fi.COMPACT_LIMIT)) if len(listed) <= fi.COMPACT_LIMIT else
+                     "%d tools listed one by one; a service of more than %d lists two doors, search and execute "
+                     "(serve_compact, D-66)" % (len(listed), fi.COMPACT_LIMIT))
+            return listed
+        problems = ["no %s door is listed" % d for d in ("search", "execute") if d not in doors]
+        if len(listed) > fi.COMPACT_LIMIT:
+            problems.append("%d tools listed beside the doors, at most %d in all" % (len(listed), fi.COMPACT_LIMIT))
+        operations: List[Any] = []
+        if "search" in doors:
+            try:
+                answer = self.mcp_call("tools/call", {"name": doors["search"], "arguments": {}})
+                found = ((answer.get("result") or {}).get("structuredContent") or {}).get("operations")
+                if not isinstance(found, list):
+                    raise ValueError("it answered no operations")
+                operations = [op for op in found if isinstance(op, dict) and isinstance(op.get("name"), str)]
+            except (OSError, ValueError) as exc:
+                problems.append("%s failed: %s" % (doors["search"], exc))
+        by_name = {op["name"]: op for op in operations}
+        for name in sorted(set(listed) - set(doors.values())):
+            problem = fi.direct_problem(name, (by_name.get(name) or {}).get("direct"))
+            if problem:
+                problems.append("direct tool " + problem)
+        self.add("interop.compact-listing", "FAIL" if problems else "PASS", "; ".join(problems) or
+                 "%d tools listed (%s); %d operations read through %s" % (len(listed), ", ".join(sorted(listed)),
+                                                                         len(operations), doors["search"]))
+        tools = {name: {k: v for k, v in op.items() if k not in ("gate", "example", "calls", "direct")} for name, op in by_name.items()}
+        tools.update({name: tool for name, tool in listed.items() if name not in tools})
+        return tools
 
     def object_root_rule(self, tools: Dict[str, Any]) -> None:
         """FAC-SEM-023 (DEC-0018): every listed tool's outputSchema, when present, has root type object —
