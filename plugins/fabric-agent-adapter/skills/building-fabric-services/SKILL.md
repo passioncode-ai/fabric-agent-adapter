@@ -451,8 +451,8 @@ reports a `FAIL`.
 The operator's rule (2026-10-24) for every page of an agent or a local Fabric service, in any host: a link in an
 answer or a notification, `<tool> dashboard`, a completion message, a page the agent opens itself.
 
-1. Resolve the exact registered service key (`id.instance`) with the `fabric-dashboards` MCP `execute` with operation
-   `list_services` (the server shows only `search` and `execute`, FD-339); never guess it from a project name or a port.
+1. Resolve the exact registered service key (`id.instance`) with the `fabric-dashboards` MCP (`execute`/`list_services`);
+   never guess it from a project name or a port.
 2. Hand over the `open_link` its `link` operation returns for the service and the page's path, as the primary action.
 3. To open it, use the host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
    `start <url>`, `webbrowser.open` or `shell.openExternal` aimed at the service's pages.
