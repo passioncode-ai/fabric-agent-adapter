@@ -60,7 +60,7 @@ Setup looks in these places, in this order, and writes one row per channel it fi
    project's recorded resources (analytics properties, servers, store accounts) and `observatory_credentials` names
    the keys the project holds, by name; it never returns a value.
 3. **The machine's services**: the Fabric services that serve this product (the `fabric-dashboards` MCP
-   `list_services`), and their events and usage feeds.
+   `execute` with operation `list_services`), and their events and usage feeds.
 4. **The board**: the project's Fabric board is always a channel when Fabric runs (`board`, `remote` when the hub is
    reachable from where the cycle runs, `local` otherwise).
 

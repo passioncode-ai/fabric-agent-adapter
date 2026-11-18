@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.97.1"
+  version: "0.97.2"
   contract-version: "0.1.0"
   contract-commit: "2bbfd7805b1f9c4eaf25f62394a11957f131a092"
 ---
@@ -303,9 +303,9 @@ passed against a real provider and the project binding is valid.
 
 The operator's rule (2026-10-24) for every page of an agent or a local Fabric service, in any host: a
 link in an answer or a notification, `<tool> dashboard`, a completion message, a page the agent opens
-itself. Hand over the `open_link` the `fabric-dashboards` MCP's `link` tool returns for the exact
-registered service key (`list_services`, never guessed) and the page's path; open it only with the
-host's `open` and `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
+itself. Hand over the `open_link` the `fabric-dashboards` MCP's `link` operation returns for the exact
+registered service key (`execute` with operation `list_services`, never guessed) and the page's path; open
+it only with the host's `open` operation and `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
 `webbrowser.open` or `shell.openExternal` aimed at the agent's pages. A browser only on a confirmed
 `not_installed` host; an installed host that failed to open is reported, never replaced by HTTP.
 Links carry no token or login code.

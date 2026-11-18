@@ -13,7 +13,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.97.1"
+  version: "0.97.2"
 ---
 
 # Working with Fabric
@@ -203,8 +203,8 @@ route below that carries it. Hand them the page only when no route does, and say
   arguments only), take these routes in order and say which you took: Fabric's `agent.call` with `call.decision`,
   once Fabric's hub forwards it (CT-125); the service's own elicitation, where your client shows one (an accepted one
   is the operator's decision, from the service's own record); else the action's page handed to the operator as
-  Fabric Dashboards' `open_link` (the `fabric-dashboards` `link` tool with the service and the page's path), opened
-  only with `open` and `fallback=never`, never in a browser.
+  Fabric Dashboards' `open_link` (the `fabric-dashboards` MCP `execute` with operation `link`, the service and the
+  page's path), opened only with its `open` operation and `fallback=never`, never in a browser.
 - Never approve your own promotion, grant, rule or policy change on your own account; you may relay the operator's
   approval of it. Report the action done only when the service's answer says so.
 

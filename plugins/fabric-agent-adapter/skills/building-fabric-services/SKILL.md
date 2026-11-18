@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
-  version: "0.97.1"
+  version: "0.97.2"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "2bbfd7805b1f9c4eaf25f62394a11957f131a092"
@@ -451,9 +451,9 @@ reports a `FAIL`.
 The operator's rule (2026-10-24) for every page of an agent or a local Fabric service, in any host: a link in an
 answer or a notification, `<tool> dashboard`, a completion message, a page the agent opens itself.
 
-1. Resolve the exact registered service key (`id.instance`) with the `fabric-dashboards` MCP (`list_services`);
+1. Resolve the exact registered service key (`id.instance`) with the `fabric-dashboards` MCP (`execute`/`list_services`);
    never guess it from a project name or a port.
-2. Hand over the `open_link` its `link` tool returns for the service and the page's path, as the primary action.
+2. Hand over the `open_link` its `link` operation returns for the service and the page's path, as the primary action.
 3. To open it, use the host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`, `xdg-open`,
    `start <url>`, `webbrowser.open` or `shell.openExternal` aimed at the service's pages.
 4. A browser only on a confirmed `not_installed` host (`host_status`); an installed host that failed to open is

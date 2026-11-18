@@ -54,7 +54,8 @@ directory. `check_service.py <id>` passes every rule it can run on it (the test 
 ## Where its data comes from
 
 The page shows `<folder>/snapshot.json`, which the person's agent writes from what it reads through the Fabric
-Dashboards MCP (`list_services`, `spend`, `connections`) and Project Observatory's tools. The service itself calls
+Dashboards MCP, `execute` with operation `list_services`, `spend` or `connections` (since Fabric Dashboards 0.8.200
+its server shows only `search` and `execute`, FD-339), and Project Observatory's tools. The service itself calls
 nobody, so it holds no token but its own. An agent reads the same sections, `takenAt` and `degraded` as structured
 data from `POST /mcp` (the service token, `tools/call` `dashboard.snapshot`):
 

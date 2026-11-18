@@ -662,7 +662,7 @@ def a2a_card_verdict(wk: Any, status: int, body: bytes, *, remote: bool, origin:
         len(card["supportedInterfaces"]), fa2.A2A_PROTOCOL_VERSION, where)
 
 # dashboard.opens-in-host (FAA-118; the operator rule of 2026-10-24; decision D13) ----------------------------------
-# A service's own pages open only through Fabric Dashboards: the `open_link` of the fabric-dashboards MCP `link` tool,
+# A service's own pages open only through Fabric Dashboards: the `open_link` of the fabric-dashboards MCP `link` op.,
 # opened with the host's `open` and `fallback=never`; a browser only on a confirmed `not_installed` host. The rule reads
 # the service's checkout, tracked text files only (`git grep -I`, no untracked file, no binary), within a time budget,
 # and reports a line that opens a browser at the service's pages. The matcher, kept precise on purpose:
@@ -851,7 +851,7 @@ def opens_in_host_verdict(repo: Path, port: int, origin: Optional[str], dashboar
         found += ["%s:%d %s" % (name, line, snippet[:100]) for line, snippet in opener_findings(name, text, port, origin, dashboard_path)]
     if found:
         return "FAIL", ("%s. Open the service's pages through Fabric Dashboards: the open_link of the fabric-dashboards MCP "
-                        "link tool, opened with fallback=never; a browser only on a confirmed not_installed host "
+                        "execute operation link, opened with fallback=never; a browser only on a confirmed not_installed host "
                         "(operator rule of 2026-10-24)" % "; ".join(found[:5] + (["and %d more" % (len(found) - 5)] if len(found) > 5 else [])))
     return "PASS", ("%d tracked text file(s) in %s name a possible opener; none opens a browser at the service's pages: "
                     "they open through Fabric Dashboards" % (len(candidates), root))
