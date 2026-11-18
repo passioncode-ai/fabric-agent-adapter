@@ -22,8 +22,14 @@ other browser, unless Fabric Dashboards is confirmed not installed.
 
 1. Discover the target computer and exact registered `service.id.instance`.
    Never guess a key from a project name or port. `default` and `preview` differ.
-2. Discover Fabric Dashboards tools by their descriptions; provider tool prefixes
-   differ. Use `link` with service + path (including the page's query/fragment),
+2. Discover Fabric Dashboards' operations through its MCP. Since Fabric Dashboards
+   0.8.200 (FD-339, the operator's two-doors rule) the server shows two tools,
+   `search` (the operations with their input schemas) and `execute` (runs one by
+   name); every operation this page names (`list_services`, `link`, `host_status`,
+   `open`) is called as `execute` with that `operation`, never as a tool of that
+   name, which a client does not show. An older server lists them as tools; its
+   old names are accepted for one more release. Provider tool prefixes differ.
+   Use `link` with service + path (including the page's query/fragment),
    or pass a known local service URL to it. For a root, `list_services.open_link`
    is also authoritative. Hand back **the returned `open_link` as the primary
    dashboard action**. Do not rebuild its URI or double-encode `path`.
@@ -58,9 +64,9 @@ notification renderers follow it:
 
 Every page of this agent (its dashboard, a job, an approval, a report) opens in
 Fabric Dashboards, never in a browser. Resolve the registered service key with
-the fabric-dashboards MCP (`list_services`, never guessed) and hand over the
-`open_link` its `link` tool returns for the page's path; to open it, call the
-host's `open` with `fallback=never`. Never `open <url>`, `open -a Safari`,
+the fabric-dashboards MCP `execute` with operation `list_services` (never
+guessed) and hand over the `open_link` its `link` operation returns for the
+page's path; to open it, call the host's `open` operation with `fallback=never`. Never `open <url>`, `open -a Safari`,
 `xdg-open`, `start <url>`, `webbrowser.open` or `shell.openExternal` on this
 agent's pages. A browser only when `host_status` confirms `not_installed`, and
 a raw `http://127.0.0.1:<port>` address only after the listener on that port is

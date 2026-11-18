@@ -5,7 +5,8 @@
                      [--port N] [--label LABEL --plist PLIST] [--services-dir DIR] [--json]
 
 The service has no capabilities, no provider keys and no token of anybody else: its page shows what the person's agent
-reads through the Fabric Dashboards MCP (`list_services`, `spend`, `connections`) and Project Observatory and writes
+reads through the Fabric Dashboards MCP (`execute` with operation `list_services`, `spend` or `connections`) and
+Project Observatory and writes
 into `<folder>/snapshot.json`. The installer picks a loopback port no other descriptor claims and that is free now,
 writes the token file (0600) and the descriptor through the kit's `write_descriptor`, whose port claim check refuses a
 port another descriptor declares. The last stdout line is `{"descriptor": <path>, "key": "<id>.<instance>", "port": <n>}`

@@ -6,8 +6,8 @@
 It serves the well-known document (surfaces `dashboard`, `events` and `mcp`, no `usage`: it calls no model), its
 events feed, the login code, the signed-in page and the page's agent twin: the MCP tool `dashboard.snapshot` answers
 what the page shows, the same sections as structured data (FAA-332: nothing a person sees is out of an agent's reach). The page shows `<folder>/snapshot.json`,
-which the person's agent writes from what it read through the Fabric Dashboards MCP (`list_services`, `spend`,
-`connections`) and Project Observatory; the service holds no token but its own and calls nobody. A missing snapshot,
+which the person's agent writes from what it read through the Fabric Dashboards MCP (`execute` with operation
+`list_services`, `spend` or `connections`) and Project Observatory; the service holds no token but its own and calls nobody. A missing snapshot,
 one that cannot be read and one older than a day are reported in `degraded`, never shown as data.
 
 snapshot.json: {"takenAt": "<RFC 3339>", "sections": [{"title": str, "source": str, "columns": [str], "rows": [[str]]}]}

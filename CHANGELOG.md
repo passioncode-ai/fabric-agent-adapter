@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.97.2 (2026-11-18)
+
+### Changed
+
+- Fabric Dashboards' operations are named as calls through its MCP `execute` (FAA-354, Fabric Dashboards' board request
+  `128d37ce`, FD-339): since Fabric Dashboards 0.8.200 its server shows only `search` and `execute`, so an agent told
+  to call a tool named `list_services` finds none. `references/dashboard-links.md` (all three copies) says how to reach
+  `list_services`, `link`, `host_status` and `open` through `execute`, and the block a generated `AGENTS.md` carries
+  says «`execute` with operation `list_services`»; so do the dashboard rules of `building-fabric-services`,
+  `creating-fabric-agents`, `adapting-projects-to-fabric` and `working-with-fabric`, the observer's channel list, the
+  `dashboard-only` recipe (`list_services`, `spend`, `connections`) and the probe's `dashboard.opens-in-host` message.
+  The scenario evals that name these calls say the same. The session-start line «call the fabric-dashboards MCP
+  list_services if connected» is not the plugin's (it dropped that line in 0.38.0, FAA-59): it is the machine script
+  `fabric-session-note.sh`, still wired only for Gemini.
+
 ## 0.97.1 (2026-11-18)
 
 ### Fixed
