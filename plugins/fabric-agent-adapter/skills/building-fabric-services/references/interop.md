@@ -30,6 +30,7 @@ That key has one spelling (the contract's `src/extensions.ts`); copy it, never r
 - [Limits and uncertain effects](#limits-and-uncertain-effects)
 - [Actions: every button has a tool](#actions)
 - [The operator's mandate](#the-operators-mandate)
+- [Two doors: search and execute](#two-doors-search-and-execute)
 - [What the probe checks](#what-the-probe-checks)
 
 ## The kit
@@ -480,12 +481,42 @@ targetProtocols})`. Without it (no list, another list, a board Project, a sessio
 directory lists no `protocols`), `_meta` carries the decision and the mandate without `source`, and the ones you passed,
 your own record, keep it (OA-6).
 
+## Two doors: search and execute
+
+The operator's rule of 2026-11-18 (agents database R33 O15, decision D-72): an MCP server lists two doors,
+`<domain>.search` and `<domain>.execute`, not one tool per capability. Opt in after the tools are added (FAA-356):
+
+```python
+server.serve_compact("example-agent")              # tools/list: example-agent.search, example-agent.execute
+server.serve_compact("example-agent", direct={"notes.write": {"calls": 40, "total": 100, "window": "2026-11-11/2026-11-18"}},
+                     retired="2026-11-19")         # the day the full listing left tools/list
+```
+
+- `search {query?}` answers every operation (the built-in job tools included) as the full listing serves it, plus its
+  `gate` (`none`, `relayed`, `human`, from the action table), an `example` (the input schema's first `examples` entry)
+  and `calls` answered since the start; `query` keeps the operations whose name, title or description holds every word.
+- `execute {operation, arguments?, idempotencyKey?}` re-enters `tools/call` with the operation's own name: its
+  `authorize` level, action gate, mandate and audit run as for a call by that name, never wider, and the request's
+  `Mcp-Name` is rewritten to the operation (DEC-0121 parity). Typed refusals: `unknown-operation` (with `near` names)
+  and `invalid-arguments`; `idempotencyKey` goes in only for an operation whose schema takes one.
+- Three seats beside the doors. On a server with a job store `fabric.job.get` and `fabric.job.cancel` take two of them
+  with no measurement (D-72: a client holding a job handle must see the tool that reads it, until the contract folds
+  the job tools into `execute`). The rest go to direct tools, each only on a measured case: at least 20 calls and 30 %
+  of the service's calls in the window, recorded as `{calls, total, window}` (`serve_compact` refuses anything less;
+  `search` shows the measurement as `direct`).
+- Every tool still answers by its own name, so a client of the full listing keeps working (R28: an old name leaves
+  `tools/list` at once and stays callable, with no sunset). `retired`, the day the full listing left `tools/list`
+  (YYYY-MM-DD), is what `search` answers as `retired` on each operation not listed itself; the manifest still declares
+  and the probe still checks every capability one by one. A server whose full listing holds five tools or fewer lists
+  it as it is.
+
 ## What the probe checks
 
 `check_service.py` adds these rules; they read, and never call a capability.
 
 | Rule | PASS when | NOT_RUN when |
 |---|---|---|
+| `interop.compact-listing` | a listing that names a search door (`_meta` `ai.passioncode.fabric/compact`) has at most five tools: both doors and up to three seats, the job tools with no measurement and direct tools each with its measured case in `search`'s answer; the capabilities are then read through `search`, so the rules below still check each one (FAA-356, D-72); a listing of five tools or fewer passes as it is | no MCP surface, or a full listing of more than five tools (opt-in while services move: the evidence names `serve_compact`) |
 | `interop.output-schema-object` | every listed tool's `outputSchema`, when present, has root `type: object` (FAC-SEM-023) | no MCP surface |
 | `interop.manifest-link` | the manifest `fabricManifest` names carries the service key with this `<id>.<instance>` (G-07) | the descriptor names no manifest |
 | `interop.well-known-capabilities` | every name in `surfaces.mcp.capabilities` is a manifest capability | the surface lists none |
