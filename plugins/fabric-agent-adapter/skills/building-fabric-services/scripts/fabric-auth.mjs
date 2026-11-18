@@ -40,7 +40,14 @@ export function readToken(file) {
     if (typeof process.getuid === 'function' && info.uid !== process.getuid()) throw new ServiceError(`Token file ${file} belongs to another user.`);
     if (info.mode & 0o077) throw new ServiceError(`Token file ${file} is readable by others; set mode 0600.`);
   }
-  const token = fs.readFileSync(file, 'utf8').trim();
+  let token;
+  try {
+    // strict like Python's decode; ignoreBOM keeps a BOM as readFileSync('utf8') did (FAA-353)
+    token = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(fs.readFileSync(file)).trim();
+  } catch (err) {
+    if (err instanceof TypeError) throw new ServiceError(`Token file ${file} is not UTF-8; write the token as text.`);
+    throw err;
+  }
   if (token.length < 16) throw new ServiceError(`Token file ${file} holds no usable token.`);
   return token;
 }
