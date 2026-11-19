@@ -94,6 +94,15 @@
         "a cycle that would cross the budget stops before spending and says so once",
         "the default budget is USD 100 a month per observer"
       ]
+    },
+    {
+      "id": "a-product-others-build-on",
+      "request": "Put an observer on our shared engine; four apps build on it.",
+      "expected": [
+        "adds the consumers' audit to every 30-minute cycle",
+        "reads each consumer's pinned version, its calls and errors, retired names still called and knowledge.search questions that found nothing",
+        "reads consumers from the product's own records, never their repositories, and files a consumer's gap on that consumer's board"
+      ]
     }
   ]
 }

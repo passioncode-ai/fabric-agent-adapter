@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.98.2"
+  version: "0.98.3"
   contract-version: "0.1.0"
   contract-commit: "2bbfd7805b1f9c4eaf25f62394a11957f131a092"
 ---
@@ -131,6 +131,13 @@ of `search` and called through `execute` under its own gate and audit; the old t
 retired. The rule is [agent-stack's canon](https://github.com/ssheleg/agent-stack/blob/98025b3/plugins/agent-stack/skills/agent-interop/references/mcp-two-doors.md);
 a server on the service kit gets it from `McpToolServer.serve_compact` (`building-fabric-services`, interop
 reference, "Two doors: search and execute"). The profile's `tool:<capability>` names the operation either way.
+
+A project other agents call, build on or read for facts also gets its own knowledge surface (the operator's rule of
+2026-11-19, board request `52f7914b`): `knowledge.search` answering claims with verified citations (quote verbatim,
+path, lines, commit and date; a claim whose quote is not found is dropped), a hybrid index (BM25 with stemming,
+trigrams, local vectors, fused by RRF; rebuilt on each commit, checked before each push, measured on an evaluation
+set) and the two doors above. Decide it in the audit and record the answer with its reason; how: [agent
+knowledge](references/agent-knowledge.md). The rule for templates is the agents database's (its request `e968b42b`).
 
 `--effect` is required and never defaulted: the capability's class (`none`, `draft`, `publish`, `send`, `reply`,
 `charge`, `delete`, `merge`, `deploy`, `change-policy`), read from what the code does or asked of the author. Choose

@@ -12,7 +12,7 @@ compatibility: >-
   from Project Observatory's vault by slot name when it is installed.
 metadata:
   author: PassionCode.ai
-  version: "0.98.2"
+  version: "0.98.3"
 ---
 
 # Observing products
@@ -123,6 +123,23 @@ write one cycle record; advance the cursors only after the record is written
 - A cycle with no new finding writes its record and says nothing to the person.
 - Reading and triage run on a cheap model; a fix runs on the model the project's coding agent uses. A cycle that
   would cross the observer's budget stops before spending and says so once.
+
+### A project others build on: the consumers' audit
+
+When the product is one other projects build on (an engine, a kit, a contract, a shared service), each cycle also
+audits its consumers, every 30 minutes like the rest (the operator's rule of 2026-11-19, board request `52f7914b`;
+linked to CO-598):
+
+- which version each consumer pins, against the current release; a consumer more than one release behind is a
+  finding with its pin as evidence;
+- which operations each consumer called since the last cycle, with their errors, from the product's own logs;
+- which retired names are still called, and by whom, so the name is removed only after its last caller moved;
+- which questions to the product's `knowledge.search` found nothing or had every claim dropped: each is a missing
+  or wrong document.
+
+Consumers are read from the product's own records (its board threads, its keys' callers, its logs), never from their
+repositories. A consumer's gap goes to that consumer's Project on the board; the product's own gap is fixed like any
+finding. The product's search side: `working-with-fabric`, `references/agent-knowledge.md`.
 
 ## Phase 3: triage and act
 
