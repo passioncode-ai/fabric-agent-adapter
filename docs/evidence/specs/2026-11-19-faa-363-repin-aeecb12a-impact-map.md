@@ -14,6 +14,11 @@ src fixtures/vectors schemas scripts`). The repin was taken for DEC-0183, asked 
 | DEC-0181 (CT-341) | a responder's message says which operation wrote it (`via`, `comms-message.schema.json`, `comms-common.schema.json`) | nothing to port: the kit writes no board message; Fabric owns the board |
 | DEC-0182 (CT-342) | the tools probe compares a capability as its search operation (`src/interop-rules.ts`, `operationFindings`; `interop-tool` gains `operation`) | waits: FAA-355 (`interop.tools-match` on a compact surface) |
 
+Regenerated on a clean tree of the pin with the contract's tsx: `vendor_vectors.mjs` (`feed-protocols-vectors.json`
+gains `agent-health/1` and `compact-mcp-search/1`; `comms-vectors.json` gains DEC-0181's cases; `usage-attribution-vectors.json`
+gains the positive DEC-0183 fixture, 209 to 210 usage cases), `make_levels_vectors.mjs`, `make_load_vectors.mjs`,
+`make_source_vectors.mjs` and `make_channel_agent_vectors.mjs` (the recorded commit only).
+
 Waiting, with the reason:
 
 - `spend.limits.set` (DEC-0183 SL-2) as a kit door, and the emergency defaults (SL-5, a SHOULD): the kit holds no
