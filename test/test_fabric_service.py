@@ -1,4 +1,5 @@
 import importlib.util
+import inspect
 import json
 import os
 from pathlib import Path
@@ -266,6 +267,25 @@ class LoopbackServerTests(unittest.TestCase):
             self.assertTrue(srv.daemon_threads)
         finally:
             srv.server_close()
+
+    def test_reuse_address_is_off_on_windows_only(self):
+        # FAA-362 (board request fdb8b224): on Windows SO_REUSEADDR lets a bind succeed on a port a live socket holds,
+        # and connections then reach either listener; elsewhere it only lets a restart rebind over TIME_WAIT.
+        self.assertIs(fs.LoopbackHTTPServer.allow_reuse_address, os.name != "nt")
+        import fabric_descriptor
+        source = inspect.getsource(fabric_descriptor.LoopbackHTTPServer)
+        self.assertIn('allow_reuse_address = os.name != "nt"', source)
+
+    def test_a_second_server_cannot_bind_a_port_a_live_one_holds(self):
+        # The behaviour the option broke on Windows CI: a second listener bound on top of the first one.
+        import http.server
+        first = fs.LoopbackHTTPServer(("127.0.0.1", 0), http.server.BaseHTTPRequestHandler)
+        try:
+            with self.assertRaises(OSError):
+                second = fs.LoopbackHTTPServer(("127.0.0.1", first.server_port), http.server.BaseHTTPRequestHandler)
+                second.server_close()
+        finally:
+            first.server_close()
 
     def test_the_sample_service_uses_it(self):
         sample = load("sample_service")
