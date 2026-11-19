@@ -227,7 +227,9 @@ export class Recovery extends SlotKeeper {
     if (this.now() < this.reconcileAt) return;
     this.reconcileAt = this.now() + 300;
     for (const entry of Object.values(this.checkpoint.entries)) {
-      if (entry.step === 'unknown' && this.slots[entry.capability]?.state === 'held') await this.reconcile(entry);
+      // An entry left 'reconciling' (its com.reconcile failed while the lease held, so the session was kept) goes again
+      // under the same keys.reconcile; one the board already settled reads terminal and is dropped (FAA-359).
+      if ((entry.step === 'unknown' || entry.step === 'reconciling') && this.slots[entry.capability]?.state === 'held') await this.reconcile(entry);
     }
   }
 }

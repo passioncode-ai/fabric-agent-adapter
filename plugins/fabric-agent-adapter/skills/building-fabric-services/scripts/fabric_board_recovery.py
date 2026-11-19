@@ -228,10 +228,15 @@ class Recovery(SlotKeeper):
                 self._replace(capability, live, self.slots[capability].get("generation", 0))
 
     def _reconcile_pending(self) -> None:
-        """Work whose outcome became unknown while running is reconciled from `observe` every five minutes, or stays so."""
+        """Work whose outcome became unknown while running is reconciled from `observe` every five minutes, or stays so.
+
+        An entry left `reconciling` (its `com.reconcile` failed while the slot's lease held, so the session was kept) is
+        taken again too: the retry sends the same `keys.reconcile`, so the board answers it idempotently, and an entry the
+        board already settled reads terminal and is dropped (FAA-359)."""
         if self.now() < getattr(self, "_reconcile_at", 0.0):
             return
         self._reconcile_at = self.now() + 300.0
         for entry in list(self.checkpoint.entries.values()):
-            if entry.get("step") == "unknown" and self.slots.get(entry.get("capability"), {}).get("state") == "held":
+            if entry.get("step") in ("unknown", "reconciling") and \
+                    self.slots.get(entry.get("capability"), {}).get("state") == "held":
                 self._reconcile(entry)

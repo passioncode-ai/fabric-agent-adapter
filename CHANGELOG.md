@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.98.2 (2026-11-19)
+
+### Fixed
+
+- A board responder no longer leaves a request `outcome_unknown` until a restart when its `com.reconcile` fails under
+  a live lease (FAA-359, passioncode-pm-agent's board request `56135275`): `_reconcile` marks the entry `reconciling`
+  before the call, and when the call failed in transport (`board.down`) while the slot's lease held, the session was
+  kept and `_reconcile_pending` took only `unknown` entries, so only a new session's recovery tried it again (the copy
+  saw three requests held about 30 minutes). `_reconcile_pending` (`fabric_board_recovery.py:240`, Node twin
+  `fabric-board-recovery.mjs:232`) now takes `reconciling` too; the retry sends the same `keys.reconcile`, so the board
+  answers it idempotently, and an entry the board already settled reads terminal and is dropped. Tests:
+  `test_a_failed_reconcile_under_a_live_lease_is_sent_again_with_its_key_and_no_new_session` and its Node twin
+  `FAA-359: ...` (one transport failure of `com.reconcile`, the next five-minute pass settles it in the same session
+  under the same key; both fail on 0.98.1).
+
 ## 0.98.1 (2026-11-19)
 
 ### Changed
