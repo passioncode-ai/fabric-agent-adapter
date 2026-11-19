@@ -145,6 +145,9 @@ from fabric_usage import (  # noqa: F401
     _spent_since,
     _spent_in,
     LIMIT_SCOPES,
+    LIMIT_PERIODS,
+    LIMIT_CHANGE_BY,
+    LIMIT_CHANGE_VIA,
     PER_ORDER_KINDS,
     _LIMIT_ID,
     _LIMIT_KIND,
@@ -152,6 +155,7 @@ from fabric_usage import (  # noqa: F401
     _TIMESTAMP,
     _is_timestamp,
     usage_limit_problems,
+    usage_history_problems,
     JsonlUsageLedger,
 )
 from fabric_backups import (  # noqa: F401

@@ -269,6 +269,67 @@ test('the report counts a machine period limit and refuses an incoherent one', (
   assert.equal(rolling.budgets[0].spentUsd, 0.25, 'a rolling machine window is counted from the receipts, even from an iterator');
 });
 
+test('DEC-0183: the contract fixtures, weekly limits, editable bounds, the change history and months', () => {
+  const edit = fixture('positive-service-usage-limits-edit');
+  assert.deepEqual(k.usageLimitProblems(edit), []);
+  assert.deepEqual(k.usageHistoryProblems(edit), []);
+  for (const [name, needle] of [['negative-service-usage-budgets-bad-period', 'period is day, week or month'],
+    ['negative-service-usage-limit-change-unknown-via', 'via must be one of'], ['negative-service-usage-month-bad', 'month is YYYY-MM']]) {
+    const doc = fixture(name);
+    assert.ok(has([...k.usageLimitProblems(doc), ...k.usageHistoryProblems(doc)], needle), name);
+  }
+  const weekly = { id: 'machine.weekly', scope: 'machine', kind: 'weekly', period: 'week', limitUsd: 80, spentUsd: 1, enforced: true, editable: true, minUsd: 1, maxUsd: 200 };
+  assert.deepEqual(k.usageLimitProblems({ budgets: [weekly] }), []);
+  const { period, minUsd, maxUsd, ...rolling } = weekly;
+  assert.deepEqual(k.usageLimitProblems({ budgets: [{ ...rolling, windowSeconds: 604800 }] }), []);
+  const { editable, ...unmarked } = weekly;
+  for (const [limit, needle] of [[{ ...weekly, period: 'month' }, 'a weekly limit'], [{ ...weekly, editable: false }, 'only on a limit with editable: true'],
+    [unmarked, 'only on a limit with editable: true'], [{ ...weekly, minUsd: 300 }, 'minUsd is not above maxUsd'], [{ ...weekly, maxUsd: 0 }, 'maxUsd is a dollar amount above zero'],
+    [{ ...weekly, editable: 'yes' }, 'editable is true or false'], [{ ...weekly, limitUsd: null }, 'only a relative limit'], [{ ...weekly, period: 'year' }, 'period is day, week or month']]) {
+    assert.ok(has(k.usageLimitProblems({ budgets: [limit] }), needle), needle);
+  }
+  const change = { id: 'chg-2', at: '2026-10-04T09:00:00Z', by: 'operator', byRef: 'grant:7f3a', via: 'agent', limitId: 'machine.weekly',
+    before: { limitUsd: 50, enforced: true }, after: { limitUsd: 80, enforced: true }, reason: 'Raised for the launch week.' };
+  const older = { ...change, id: 'chg-1', at: '2026-10-01T09:00:00Z', by: 'service', via: 'config', before: null };
+  const month = { month: '2026-10', calls: 3, unpricedCalls: 0, costUsd: 1.5 };
+  const base = { generatedAt: '2026-10-04T16:00:00Z' };
+  assert.deepEqual(k.usageHistoryProblems({ ...base, limitChanges: [change, older], months: [{ ...month, month: '2025-11' }, month] }), []);
+  const { reason, ...noReason } = change;
+  for (const [report, needle] of [
+    [{ ...base, limitChanges: [older, change] }, 'newest change first'],
+    [{ ...base, limitChanges: [change, { ...older, id: 'chg-2' }] }, 'change id chg-2 appears twice'],
+    [{ ...base, limitChanges: [{ ...change, at: '2026-10-05T00:00:00Z' }] }, "not after the report's generatedAt"],
+    [{ ...base, limitChanges: [{ ...change, by: 'person' }] }, 'by must be one of'],
+    [{ ...base, limitChanges: [{ ...change, after: { limitUsd: 0, enforced: true } }] }, 'after/limitUsd'],
+    [{ ...base, limitChanges: [{ ...change, who: 'x' }] }, 'who is not a limit change field'],
+    [{ ...base, limitChanges: [noReason] }, 'missing reason'],
+    [{ ...base, limitChanges: Array(65).fill(change) }, 'at most 64'],
+    [{ ...base, months: [month, { ...month, month: '2026-09' }] }, 'oldest first'],
+    [{ ...base, months: [{ ...month, month: '2026-11' }] }, "the report's UTC month or one of the 11 before it"],
+    [{ ...base, months: [{ ...month, month: '2025-10' }] }, "the report's UTC month or one of the 11 before it"],
+    [{ ...base, months: [{ ...month, calls: -1 }] }, 'calls is a whole number'],
+    [{ ...base, months: Array(13).fill(month) }, 'at most 12'],
+  ]) assert.ok(has(k.usageHistoryProblems(report), needle), needle);
+});
+
+test('DEC-0183: the report counts an ISO week and passes the history through', () => {
+  const now = Date.UTC(2026, 9, 4, 16); // a Sunday: the ISO week began Monday 2026-09-28
+  const receipts = [[0.25, '2026-10-04T10:00:00Z'], [0.5, '2026-09-28T00:00:00Z'], [1, '2026-09-27T23:59:59Z']]
+    .map(([costUsd, at]) => k.makeUsageReceipt('anthropic', 'm', { inputTokens: 1, outputTokens: 1, costUsd, costBasis: 'provider', at }));
+  const change = { id: 'chg-1', at: '2026-10-04T09:00:00Z', by: 'agent', via: 'agent', limitId: 'machine.weekly',
+    before: { limitUsd: 100, enforced: true }, after: { limitUsd: 80, enforced: true }, reason: 'Tightened.' };
+  const months = [{ month: '2026-09', calls: 1, unpricedCalls: 0, costUsd: 1.5 }, { month: '2026-10', calls: 1, unpricedCalls: 0, costUsd: 0.25 }];
+  const report = k.usageReport(receipts, { id: 'example-agent', now, limitChanges: [change], months, budgets: [
+    { id: 'machine.weekly', scope: 'machine', kind: 'weekly', period: 'week', limitUsd: 80, enforced: true, editable: true, minUsd: 1, maxUsd: 200 }] });
+  assert.equal(report.budgets[0].spentUsd, 0.75, 'the week runs from Monday 00:00 UTC');
+  assert.deepEqual(report.limitChanges, [change]);
+  assert.deepEqual(report.months, months);
+  const plain = k.usageReport(receipts, { id: 'example-agent', now });
+  assert.ok(!('limitChanges' in plain) && !('months' in plain));
+  assert.throws(() => k.usageReport(receipts, { id: 'example-agent', now, months: [...months].reverse() }), /oldest first/);
+  assert.throws(() => k.usageReport(receipts, { id: 'example-agent', now, limitChanges: 'chg-1' }), k.ServiceError);
+});
+
 test('the descriptor names its header and scheme the schema way', () => {
   const base = { protocol: k.PROTOCOL, id: 'example-agent', instance: 'default', name: 'Example', origin: 'http://127.0.0.1:47195',
     auth: { tokenFile: '~/t' }, lifecycle: { manager: 'none' }, paths: { data: '~/d', logs: [] }, installedAt: '2026-10-05T00:00:00Z', installedBy: 'test' };
