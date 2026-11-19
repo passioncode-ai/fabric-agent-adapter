@@ -178,9 +178,9 @@ A Fabric with no `fabric_work_*` tools listed (before v0.3.5): use `fabric_tasks
 - `fabric_memory_search` before re-deriving what the project knows; `fabric_memory_remember` for a fact worth
   keeping, with where you learned it.
 - `fabric_question_ask` for a decision you are not entitled to make; `fabric_effect_request` before spending,
-  deleting or publishing on your own initiative: its first answer is a refusal while Fabric asks the operator; ask
-  again once they agree. An action of a service the operator told you to take is not that: relay their decision
-  (below).
+  deleting or publishing on your own initiative (a checks-approved release: its tag push, FAA-363): first answer
+  refuses while Fabric asks the operator; ask again once agreed. A service's action the operator told you to take is
+  not that: relay their decision (below).
 
 ### The operator told you to act: relay their decision
 
