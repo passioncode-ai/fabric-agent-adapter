@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.98.1 (2026-11-19)
+
+### Changed
+
+- The three building skills teach the two MCP doors and link the rule's canon instead of copying it (FAA-358,
+  sshlg-skills' board request `ab3ecf7e`, the operator's words of 2026-11-18): `building-fabric-services` names
+  `serve_compact` beside the interop step, `adapting-projects-to-fabric` says an MCP server the estate builds or runs
+  lists `search` and `execute` with each capability an operation of `search`, and `creating-fabric-agents` plans a new
+  agent's MCP surface that way from its first version. Each links agent-stack's
+  `agent-interop/references/mcp-two-doors.md` at `98025b3` (agent-stack 0.33.0); the interop reference's section "Two
+  doors: search and execute" now names it as the rule and itself as the kit's side. A scenario eval per skill holds
+  it (`an-mcp-surface-with-many-capabilities`, `adapting-an-mcp-server-with-many-tools`,
+  `a-new-agent-with-an-mcp-surface`). The kit's code is 0.98.0's: `serve_compact` stays opt-in until the estate's
+  kit services move (FAA-356 next step 1).
+
 ## 0.98.0 (2026-11-18)
 
 ### Added

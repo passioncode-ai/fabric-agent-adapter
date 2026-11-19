@@ -294,6 +294,16 @@
         "adds a read tool for the queue view and tools for pause and resume, with their gates, before calling the adaptation done",
         "says that no function stays reachable by a person and not by an agent, except a human step that answers human-step-required with its link"
       ]
+    },
+    {
+      "id": "adapting-an-mcp-server-with-many-tools",
+      "trap": "the adapter writes a provider entry for an MCP server that lists fifteen tools and calls it done, without saying that the estate's rule is two doors",
+      "request": "Adapt example-agent's MCP server to Fabric. It lists fifteen tools today.",
+      "expected": [
+        "keeps the mcp profile's capability-to-operation mapping and says that a server the estate builds or runs lists two doors, search and execute, with each capability an operation of search",
+        "points a server built on the kit at McpToolServer.serve_compact and the building-fabric-services interop reference, and one built otherwise at the canon agent-stack agent-interop references/mcp-two-doors.md",
+        "keeps the old tool names callable for one release, marked retired, so no caller breaks"
+      ]
     }
   ]
 }

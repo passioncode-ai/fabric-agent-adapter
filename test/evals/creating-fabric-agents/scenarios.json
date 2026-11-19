@@ -373,6 +373,16 @@
         "serves the switch on its agent surface as a tool whose effect is change-policy with gate relayed, declared under extensions/actions/0.1, turned back on only on the operator's own word naming that switch (never a mandate, another approver or a standing rule), and never declines a person who asks to turn it off (UD-4)",
         "documents on its usage data page what it sends, the id, where it goes and who reads it there, how long it is kept, the version that turned it on and whether sent data can be erased (UD-5), and keeps activity telemetry, a digest kept on the machine and the service's usage report out of it (UD-6)"
       ]
+    },
+    {
+      "id": "a-new-agent-with-an-mcp-surface",
+      "trap": "the designer plans one MCP tool per capability for a new agent with ten capabilities",
+      "request": "Design a new Fabric agent, example-agent, with ten capabilities other agents will call over MCP.",
+      "expected": [
+        "plans the MCP surface as two doors from the first version, search and execute, each capability an operation of search (serve_compact in the kit)",
+        "names the seats beside the doors: the job tools when a capability is a job, a direct tool only after a measured case",
+        "links the canon agent-stack agent-interop references/mcp-two-doors.md and the building-fabric-services interop reference instead of a second copy of the rule"
+      ]
     }
   ]
 }

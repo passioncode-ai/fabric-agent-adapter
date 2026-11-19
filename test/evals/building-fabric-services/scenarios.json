@@ -794,6 +794,18 @@
         "offers the switch on the agent surface as a tool with effect change-policy and gate relayed, declared under extensions/actions/0.1, never gate none (UD-4), and runs the probe",
         "keeps the service's usage report (GET /fabric/v1/usage) and its operations digests kept on the machine apart from usage data (UD-6)"
       ]
+    },
+    {
+      "id": "an-mcp-surface-with-many-capabilities",
+      "trap": "the builder lists one MCP tool per capability (twelve tools) because the kit's handle() does that by default, or writes a second search/execute router beside the kit instead of serve_compact",
+      "request": "example-agent's service has twelve capabilities. Give it its MCP surface so other agents on this machine can call them.",
+      "expected": [
+        "serves the surface with McpToolServer.serve_compact(domain): tools/list shows <domain>.search and <domain>.execute, and every capability is an operation of search's catalogue (FAA-356, agents database R33 O15, D-72)",
+        "keeps every call through execute under the operation's own gate, grant, mandate and audit (DEC-0121 parity), with the typed refusals unknown-operation and invalid-arguments",
+        "gives fabric.job.get and fabric.job.cancel their own seats beside the doors and adds a direct tool only with its measured case (at least 20 calls and 30 % of the service's calls), three seats at most",
+        "keeps old tool names callable for one release, marked retired with their day, and runs the probe's interop.compact-listing",
+        "links the canon agent-stack agent-interop references/mcp-two-doors.md instead of restating the rule"
+      ]
     }
   ]
 }

@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.98.0"
+  version: "0.98.1"
   contract-version: "0.1.0"
   contract-commit: "2bbfd7805b1f9c4eaf25f62394a11957f131a092"
 ---
@@ -202,7 +202,9 @@ ready for admission.
 
 A new agent is called the `fabric-interop/0.1` way from its first version: add `--job`
 for a capability whose work may outlive one request, serve each capability as the MCP
-tool of its name, and carry the caller's trace (the `building-fabric-services` interop
+operation of its name behind two doors, `search` and `execute` (the job tools and a measured direct tool beside
+them, three seats at most; [agent-stack's canon](https://github.com/ssheleg/agent-stack/blob/98025b3/plugins/agent-stack/skills/agent-interop/references/mcp-two-doors.md),
+`McpToolServer.serve_compact` in the kit), and carry the caller's trace (the `building-fabric-services` interop
 reference). An agent that is not a service is announced with a provider entry
 (`adapting-projects-to-fabric`, `scripts/fabric_provider.py`).
 

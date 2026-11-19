@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.98.0"
+  version: "0.98.1"
   contract-version: "0.1.0"
   contract-commit: "2bbfd7805b1f9c4eaf25f62394a11957f131a092"
 ---
@@ -125,6 +125,12 @@ as the MCP tool of its own name (`requiredFeatures: ["tool:<capability>"]`, cont
 `fabric-interop/0.1`); add `--job` when its work may outlive one request, which writes
 `"job": true` in the capability's interop block. The helper creates only the locked
 target paths. It refuses any collision.
+
+An MCP server the estate builds or runs lists two doors, `search` and `execute`, with each capability an operation
+of `search` and called through `execute` under its own gate and audit; the old tool names stay callable, marked
+retired. The rule is [agent-stack's canon](https://github.com/ssheleg/agent-stack/blob/98025b3/plugins/agent-stack/skills/agent-interop/references/mcp-two-doors.md);
+a server on the service kit gets it from `McpToolServer.serve_compact` (`building-fabric-services`, interop
+reference, "Two doors: search and execute"). The profile's `tool:<capability>` names the operation either way.
 
 `--effect` is required and never defaulted: the capability's class (`none`, `draft`, `publish`, `send`, `reply`,
 `charge`, `delete`, `merge`, `deploy`, `change-policy`), read from what the code does or asked of the author. Choose
