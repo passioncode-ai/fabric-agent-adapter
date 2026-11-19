@@ -1,4 +1,4 @@
-# FAA-363: the repin to Fabric Agent Contract v0.1.0+2026-11-19 (aeecb12a): impact map
+# FAA-365: the repin to Fabric Agent Contract v0.1.0+2026-11-19 (aeecb12a): impact map
 
 The contract moved from `v0.1.0+2026-11-16.6` (`2bbfd780`) to `v0.1.0+2026-11-19` (`aeecb12a`): DEC-0179 (CT-336),
 DEC-0180 (CT-340), DEC-0181 (CT-341), DEC-0182 (CT-342), DEC-0183 (CT-343). `contractVersion` stays `0.1.0`; the

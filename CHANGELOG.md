@@ -20,7 +20,7 @@
 
 - The repin to Fabric Agent Contract `v0.1.0+2026-11-19` (`aeecb12a`, FAA-365); `2bbfd780` (`v0.1.0+2026-11-16.6`)
   stays supported for bundles issued under it. `agent-health/1` (DEC-0179) and `compact-mcp-search/1` (DEC-0180) are
-  known protocol revisions. Impact map: `docs/evidence/specs/2026-11-19-faa-363-repin-aeecb12a-impact-map.md`.
+  known protocol revisions. Impact map: `docs/evidence/specs/2026-11-19-faa-365-repin-aeecb12a-impact-map.md`.
 
 ### Added
 
