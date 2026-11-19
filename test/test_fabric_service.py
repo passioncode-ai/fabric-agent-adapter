@@ -272,8 +272,7 @@ class LoopbackServerTests(unittest.TestCase):
         # FAA-362 (board request fdb8b224): on Windows SO_REUSEADDR lets a bind succeed on a port a live socket holds,
         # and connections then reach either listener; elsewhere it only lets a restart rebind over TIME_WAIT.
         self.assertIs(fs.LoopbackHTTPServer.allow_reuse_address, os.name != "nt")
-        import fabric_descriptor
-        source = inspect.getsource(fabric_descriptor.LoopbackHTTPServer)
+        source = inspect.getsource(fs.LoopbackHTTPServer)
         self.assertIn('allow_reuse_address = os.name != "nt"', source)
 
     def test_a_second_server_cannot_bind_a_port_a_live_one_holds(self):
