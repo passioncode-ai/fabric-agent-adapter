@@ -13,7 +13,7 @@ compatibility: >-
   this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
 metadata:
   author: PassionCode.ai
-  version: "0.98.1"
+  version: "0.98.2"
 ---
 
 # Working with Fabric

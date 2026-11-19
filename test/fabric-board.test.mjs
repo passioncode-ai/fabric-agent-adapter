@@ -881,6 +881,45 @@ test('FAA-77 37: an effect the handler failed or left unobserved is settled from
   assert.deepEqual(h3.checkpoint(), {});
 });
 
+test('FAA-359: a com.reconcile that failed under a live lease goes again under its key at the next pass, with no new session', async (t) => {
+  const hub = await fakeHub(t);
+  const h = harness(hub);
+  h.outcome = async (request, ctx) => {
+    await ctx.beginEffect('x');
+    throw new Error('crashed mid-effect');
+  };
+  const { request: rid } = await hub.control({ op: 'queue', capability: 'video.render' });
+  const r = h.responder();
+  await r.step();
+  await settle(h, r, 1, 5);
+  let s = await h.state();
+  assert.equal(s.requests[rid].state, 'outcome_unknown');
+  assert.equal(h.checkpoint()[rid].step, 'unknown');
+  const session = r.session;
+  const call = r.call.bind(r);
+  const sent = [];
+  r.call = (op, args) => {
+    if (op === 'com.reconcile') {
+      sent.push(args.idempotency.key);
+      if (sent.length === 1) return Promise.reject(new fh.HubError('unreachable', 'Fabric\'s board did not answer.', true));
+    }
+    return call(op, args);
+  };
+  h.observed = { state: 'completed', observed: true, summary: 'on disk after all' };
+  for (let i = 0; i < 12 && !sent.length; i += 1) await settle(h, r, 1);
+  assert.equal(sent.length, 1);
+  assert.equal((await h.state()).requests[rid].state, 'outcome_unknown');
+  assert.equal(h.checkpoint()[rid].step, 'reconciling');
+  assert.equal(r.session, session); // the lease held: the session was kept, so no new session's recovery
+  await settle(h, r, 12);
+  s = await h.state();
+  assert.equal(s.requests[rid].state, 'completed');
+  assert.equal(r.session, session);
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0], sent[1]); // the same keys.reconcile: the board answers a repeat idempotently
+  assert.deepEqual(h.checkpoint(), {});
+});
+
 test('FAA-77 38: one lost answer keeps the session and the work; a lost session with work in progress is reconciled without a restart', async (t) => {
   const hub = await fakeHub(t);
   const h = harness(hub);

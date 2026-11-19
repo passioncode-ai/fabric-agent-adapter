@@ -1155,6 +1155,45 @@ class AuditFaultTests(Conversation):
         self.assertIn("com.reconcile", self.tools())
         self.assertEqual(self.checkpoint(), {})
 
+    def test_a_failed_reconcile_under_a_live_lease_is_sent_again_with_its_key_and_no_new_session(self):
+        # FAA-359: com.reconcile fails in transport (the board went down) while the slot's lease holds, so the session
+        # is kept and the entry stays `reconciling`; the next five-minute pass sends it again under the same key, with
+        # no new session. Before the fix only a new session's recovery took a `reconciling` entry.
+        def acts(request, ctx):
+            ctx.begin_effect("x")
+            raise RuntimeError("crashed mid-effect")
+        self.outcome = acts
+        rid = self.board.queue("video.render")
+        r = self.responder()
+        r.step()
+        self.assertEqual(self.board.requests[rid]["state"], "outcome_unknown")
+        self.assertEqual(self.checkpoint()[rid]["step"], "unknown")
+        session, call, sent = r.session, r._call, []
+
+        def down_once(op, args):
+            if op == "com.reconcile":
+                sent.append(args["idempotency"]["key"])
+                if len(sent) == 1:
+                    raise fh.HubError("unreachable", "Fabric's board did not answer.", True)
+            return call(op, args)
+        r._call = down_once
+        self.observed = {"state": "completed", "observed": True, "summary": "on disk after all"}
+        for _ in range(12):
+            if sent:
+                break
+            self.board.advance(max(31, r.wait_until - self.board.now))
+            r.step()
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(self.board.requests[rid]["state"], "outcome_unknown")
+        self.assertEqual(self.checkpoint()[rid]["step"], "reconciling")
+        self.assertIs(r.session, session)  # the lease held: the session was kept, so no new session's recovery
+        self.settle(r, rounds=12)
+        self.assertEqual(self.board.requests[rid]["state"], "completed")
+        self.assertIs(r.session, session)
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(sent[0], sent[1])  # the same keys.reconcile: the board answers a repeat idempotently
+        self.assertEqual(self.checkpoint(), {})
+
     # 38 -----------------------------------------------------------------------------------------------------------
     def test_one_lost_answer_keeps_the_session_and_the_running_work(self):
         release = threading.Event()
