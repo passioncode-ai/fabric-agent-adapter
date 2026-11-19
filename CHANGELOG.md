@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.98.4 (2026-11-19)
+
+### Fixed
+
+- The kit's `LoopbackHTTPServer` (`fabric_descriptor.py`, re-exported by `fabric_service.py`) no longer sets
+  `SO_REUSEADDR` on Windows (FAA-362, Project Observatory's board request `fdb8b224`): it inherited
+  `allow_reuse_address = 1` from `http.server.HTTPServer`, and on Windows that option lets a bind succeed on a port
+  another live socket holds, so connections reach either listener (seen on the engine's Windows CI, its OBS-643). It
+  is now `os.name != "nt"`: Windows rebinds over TIME_WAIT without it, as asyncio does; elsewhere it stays on so a
+  restarted service takes its port back. The Node twin needs no change (libuv sets no `SO_REUSEADDR` on Windows).
+  Tests: `test_reuse_address_is_off_on_windows_only` and `test_a_second_server_cannot_bind_a_port_a_live_one_holds`
+  (the second fails on Windows with the old option).
+
 ## 0.98.3 (2026-11-19)
 
 ### Changed

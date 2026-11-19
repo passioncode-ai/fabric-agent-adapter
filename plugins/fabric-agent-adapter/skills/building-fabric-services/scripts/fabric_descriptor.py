@@ -165,9 +165,14 @@ class LoopbackHTTPServer(http.server.ThreadingHTTPServer):
     `self.server.peer_owner()`. A refusal writes one line to stderr with the owner's kind, uid and pid and nothing the
     peer sent (`peer_refused`), and counts in `peer_refusals`. The check applies to loopback peers only: a peer at
     another address (a service bound to 0.0.0.0) is no local account, so its table is not read and it is served under
-    `refuse` and `strict` alike, with `peer_owner()` None."""
+    `refuse` and `strict` alike, with `peer_owner()` None.
+
+    `allow_reuse_address` is off on Windows (FAA-362): there `SO_REUSEADDR` lets a bind succeed on a port another live
+    socket holds, and connections then reach either listener; Windows rebinds over TIME_WAIT without it, as asyncio
+    does. Elsewhere it stays on, so a restarted service takes its port back while the old one is in TIME_WAIT."""
 
     daemon_threads = True
+    allow_reuse_address = os.name != "nt"
     peer_check = "refuse"
     #: The reader of an accepted socket's peer; a test replaces it.
     peer_reader = staticmethod(lambda sock: fabric_peer_owner.peer(sock))
