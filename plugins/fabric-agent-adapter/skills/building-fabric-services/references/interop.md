@@ -484,7 +484,9 @@ your own record, keep it (OA-6).
 ## Two doors: search and execute
 
 The operator's rule of 2026-11-18 (agents database R33 O15, decision D-72): an MCP server lists two doors,
-`<domain>.search` and `<domain>.execute`, not one tool per capability. Opt in after the tools are added (FAA-356):
+`<domain>.search` and `<domain>.execute`, not one tool per capability. The rule itself, for every MCP server the estate
+builds or runs, is the canon in agent-stack, [`agent-interop/references/mcp-two-doors.md`](https://github.com/ssheleg/agent-stack/blob/98025b3/plugins/agent-stack/skills/agent-interop/references/mcp-two-doors.md)
+(agent-stack 0.33.0); this section is only how the kit serves it. Opt in after the tools are added (FAA-356):
 
 ```python
 server.serve_compact("example-agent")              # tools/list: example-agent.search, example-agent.execute

@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
-  version: "0.98.0"
+  version: "0.98.1"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "2bbfd7805b1f9c4eaf25f62394a11957f131a092"
@@ -85,20 +85,20 @@ each manifest capability is the tool of its name, long work is a job with a stab
 a question for a person is an elicitation, and every call carries one trace. A job a limit stops or pauses, and an
 effect nobody saw, have their own codes and a key per caller (DEC-0087); work held by the service's own limits is
 said on the job, pushed to the operator once per hold and lifted by their scoped answer (`scripts/fabric_holds.py`,
-FAA-298). Read
+FAA-298). **Two doors:** `serve_compact` lists only `search` and `execute` (FAA-356; [the rule](https://github.com/ssheleg/agent-stack/blob/98025b3/plugins/agent-stack/skills/agent-interop/references/mcp-two-doors.md)). Read
 [the interop reference](references/interop.md) before writing an MCP tool; the helpers
 are in [`scripts/fabric_interop.py`](scripts/fabric_interop.py) and
-[`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs). When the callers are agents of the estate, the
+[`scripts/fabric-interop.mjs`](scripts/fabric-interop.mjs). For estate callers the
 service checks each call's delegation token (DEC-0039; a partner's agent carries the partner innermost, DEC-0090):
 read [the delegation reference](references/delegation.md);
 the verifier is [`scripts/fabric_delegation.py`](scripts/fabric_delegation.py) /
 [`scripts/fabric-delegation.mjs`](scripts/fabric-delegation.mjs). A service on the operator's machines that
-applies the estate record (DEC-0055) verifies each revision first and trusts only the keys it certifies, and runs an
+applies the estate record (DEC-0055) verifies each revision first, trusts only keys it certifies, runs an
 agent once per context, the person's or an organization's (DEC-0082), and checks a share grant into an organization
 with [`scripts/fabric_share.py`](scripts/fabric_share.py) (DEC-0086); a revision's ceremonies and a headless
 machine's enroll token are in [`scripts/fabric_ceremonies.py`](scripts/fabric_ceremonies.py) (DEC-0084): read
 [the estate record reference](references/estate-record.md). When Fabric chooses the service's runner and models
-(DEC-0046), or a project routes its work through an ordered list of runners (DEC-0026: the doctor's closed probe
+(DEC-0046), or a project routes work through ordered runners (DEC-0026: the doctor's closed probe
 results, the route checks FAC-SEM-028…034), read [the profiles reference](references/profiles.md).
 
 When the service answers requests other Projects post to its Project on Fabric's project board
