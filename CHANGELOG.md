@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- working-with-fabric: a release of a product whose checks approve it (`"approval": "checks"`, the operator's
+  "Releases" rule, Fabric ADR-0145) is its version tag push, never a `fabric_effect_request` (FAA-363, board request
+  `e9562845` from the PassionCode PM agent): a run asked one for tag `v0.98.4` (`effect:205050`) and the operator got a
+  Telegram question he had no reason to answer. The skill's tool list (`SKILL.md`) and `references/on-demand-session.md`
+  step 4, which the dispatch exit contract names for details, say so; scenario eval `release-by-tag-push`; test
+  `test_a_checks_approved_release_is_a_tag_push`. The exit contract's own text is unchanged: it sits 6 characters under
+  Hermes' 4000-character cap.
+
 ## 0.98.4 (2026-11-19)
 
 ### Fixed

@@ -84,6 +84,9 @@ class WorkingWithFabricRelaysTheOperatorsWords(unittest.TestCase):
         self.assertNotIn("refused until a person agrees", self.body)
         self.assertIn("fabric_effect_request", self.body)
 
+    def test_a_checks_approved_release_is_a_tag_push(self):  # release-by-tag-push, FAA-363
+        self.assertIn("(a checks-approved release: its tag push, FAA-363)", self.body)
+
 
 class BuildingFabricServicesDeclaresActions(unittest.TestCase):
     """REQ-11: AP-1 parity, the gate, the hooks, D8, D9, D16."""

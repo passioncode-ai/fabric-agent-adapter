@@ -189,7 +189,9 @@ hook, or a Switchboard before 0.7.8 started the run, the launcher's appended exi
      close since `bcead0ef`), and no code uses `crash` yet. This run only leaves it open.
 
    A launcher that stops a run gives no time to answer:
-   Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`. A sign-in, a one-time code,
+   Switchboard sends SIGTERM and kills it about 5 s later on macOS and Linux, and at once on Windows (`taskkill`). Money, deletion and publication still go through `fabric_effect_request`, except a release of a product whose
+   checks approve it (`"approval": "checks"`): with its checks green the run pushes the version tag itself and asks no
+   effect (the operator's "Releases" rule, Fabric ADR-0145, FAA-363). A sign-in, a one-time code,
    a secret typed in or handed out (DEC-0147), or a payment is the person's: name it in the answer rather than wait. A production step is the
    operator's to approve, and named the same way until he does: no person is in this chat, the request alone never approves it, and
    his own words do when relayed verbatim, with their date and source, from one of his own projects (provenance
