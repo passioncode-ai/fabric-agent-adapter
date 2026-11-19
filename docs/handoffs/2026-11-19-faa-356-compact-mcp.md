@@ -7,7 +7,8 @@
 - **Done.** `McpToolServer.serve_compact(domain, direct=None, retired=None)`, `search` and `execute` in
   `plugins/fabric-agent-adapter/skills/building-fabric-services/scripts/fabric_interop.py`; the job tools take two of
   the three seats with no measurement on a server with a job store, and `retired` (YYYY-MM-DD) is what `search` answers
-  on each operation no longer listed (the base's settled points, thread message `6f0d1e79`); the probe's
+  on each operation no longer listed and what a call by its old name carries in `_meta` (`{since, replacedBy}`, as
+  the base's `patterns/compact-mcp` marks it; `_meta`, not `structuredContent`, so an `outputSchema` still holds) (the base's settled points, thread message `6f0d1e79`); the probe's
   `interop.compact-listing` and the capability checks read through `search` (`check_service.py`,
   `compact_listing_rule`); the reference section "Two doors: search and execute" in `references/interop.md`;
   `kit.json` history 0.98.0; CHANGELOG; backlog row FAA-356.

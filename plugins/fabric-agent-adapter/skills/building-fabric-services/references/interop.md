@@ -506,7 +506,9 @@ server.serve_compact("example-agent", direct={"notes.write": {"calls": 40, "tota
   `search` shows the measurement as `direct`).
 - Every tool still answers by its own name, so a client of the full listing keeps working (R28: an old name leaves
   `tools/list` at once and stays callable, with no sunset). `retired`, the day the full listing left `tools/list`
-  (YYYY-MM-DD), is what `search` answers as `retired` on each operation not listed itself; the manifest still declares
+  (YYYY-MM-DD), is what `search` answers as `retired` on each operation not listed itself, and a call by such a name
+  carries `_meta` `ai.passioncode.fabric/retired`: `{since, replacedBy: "<domain>.execute"}` (in `_meta`, so the tool's
+  `outputSchema` still holds; the base's `patterns/compact-mcp`); the manifest still declares
   and the probe still checks every capability one by one. A server whose full listing holds five tools or fewer lists
   it as it is.
 

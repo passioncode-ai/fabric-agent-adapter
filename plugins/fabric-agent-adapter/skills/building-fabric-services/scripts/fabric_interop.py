@@ -359,6 +359,7 @@ JOB_REQUEST_SCHEMA = {"type": "object", "required": ["id"], "additionalPropertie
 # listed beside them only on a measured case. Every capability stays served, declared and probed one by one.
 
 COMPACT_META = "ai.passioncode.fabric/compact"  # the door a compact tool is: "search" or "execute"
+COMPACT_RETIRED_META = "ai.passioncode.fabric/retired"  # on a call by a name off the listing: {since, replacedBy}
 COMPACT_LIMIT = 5  # a listing of at most this many tools is short enough as it is
 DIRECT_MAX = 3  # direct tools beside the two doors, each on a measured case
 DIRECT_MIN_CALLS, DIRECT_MIN_SHARE = 20, 0.3  # the measured case: >= 20 calls and >= 30 % of the service's calls
@@ -583,7 +584,7 @@ class McpToolServer:
             inner = {**inner, "idempotencyKey": key}
         message = {"jsonrpc": "2.0", "id": rid, "method": "tools/call",
                    "params": {"name": operation, "arguments": inner, "_meta": meta}}
-        return self.handle(message, None if headers is None else _NamedHeaders(headers, operation), tier=tier)
+        return self.handle(message, None if headers is None else _NamedHeaders(headers, operation), tier=tier, _route="execute")
 
     def well_known_protocols(self, protocols: Any = ()) -> List[str]:
         """The well-known `protocols` (DEC-0067) a service on this server lists: `protocols` and, when it reads `source`
@@ -803,7 +804,7 @@ class McpToolServer:
     def _error(rid: Any, code: int, message: str) -> Dict[str, Any]:
         return {"jsonrpc": "2.0", "id": rid, "error": {"code": code, "message": message}}
 
-    def handle(self, message: Any, headers: Any = None, tier: str = "T2") -> Optional[Dict[str, Any]]:
+    def handle(self, message: Any, headers: Any = None, tier: str = "T2", *, _route: str = "name") -> Optional[Dict[str, Any]]:
         """One JSON-RPC message. Pass the HTTP request headers so the 2026-07-28 standard headers
         are checked (`mcp_header_problem`); a mismatch answers HEADER_MISMATCH even for a
         notification, so the transport can return HTTP 400. `tier` is the caller's origin for the
@@ -847,6 +848,16 @@ class McpToolServer:
             return {"jsonrpc": "2.0", "id": rid, "result": self._search(arguments, span)}
         if self.compact is not None and name == self.compact["domain"] + ".execute":
             return self._execute(rid, arguments, headers, tier, meta, span)
+        if _route == "name" and self.compact is not None and self.compact.get("retired") and name in self.handlers \
+                and name not in self.compact["direct"] and len(self._full_listing()) > COMPACT_LIMIT:
+            # R28: a name off the listing keeps answering; its result says since when and what replaced it. In _meta,
+            # never structuredContent, so a tool's outputSchema still holds (FAA-356, the base's patterns/compact-mcp).
+            response = self.handle(message, headers, tier=tier, _route="retired")
+            result = (response or {}).get("result")
+            if isinstance(result, dict):
+                result["_meta"] = dict(result.get("_meta") or {}, **{COMPACT_RETIRED_META: {
+                    "since": self.compact["retired"], "replacedBy": self.compact["domain"] + ".execute"}})
+            return response
         if name in self.handlers or (self.jobs is not None and name in ("fabric.job.get", "fabric.job.cancel")):
             self.calls[name] = self.calls.get(name, 0) + 1
         if name in ("fabric.job.get", "fabric.job.cancel") and self.jobs is not None:

@@ -106,6 +106,17 @@ class CompactListingTests(unittest.TestCase):
         self.assertNotIn("retired", ops["fabric.job.get"])  # listed beside the doors
         unmarked = self.call(self.server(), "example-agent.search", {})["structuredContent"]
         self.assertNotIn("retired", unmarked["operations"][0])
+        mark = fi.COMPACT_RETIRED_META
+        server = self.server(direct={"notes.write": MEASURED}, retired="2026-11-19")
+        by_name = self.call(server, "example.op0", {})
+        self.assertFalse(by_name["isError"])
+        self.assertEqual(by_name["_meta"][mark], {"since": "2026-11-19", "replacedBy": "example-agent.execute"})
+        self.assertIn("traceparent", by_name["_meta"])
+        self.assertNotIn("retired", by_name.get("structuredContent") or {})  # the outputSchema still holds
+        for unmarked_call in (self.call(server, "notes.write", {"text": "a"}),  # listed directly
+                              self.call(server, "example-agent.execute", {"operation": "example.op0"}),
+                              self.call(self.server(), "example.op0", {})):  # no retired day given
+            self.assertNotIn(mark, unmarked_call.get("_meta") or {})
         for day in ("2026-13-01", "19.11.2026", 20261119):
             with self.subTest(day=day), self.assertRaises(fi.InteropError):
                 self.server(retired=day)
