@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.98.2"
+  version: "0.98.3"
   contract-version: "0.1.0"
   contract-commit: "2bbfd7805b1f9c4eaf25f62394a11957f131a092"
 ---
@@ -205,7 +205,10 @@ for a capability whose work may outlive one request, serve each capability as th
 operation of its name behind two doors, `search` and `execute` (the job tools and a measured direct tool beside
 them, three seats at most; [agent-stack's canon](https://github.com/ssheleg/agent-stack/blob/98025b3/plugins/agent-stack/skills/agent-interop/references/mcp-two-doors.md),
 `McpToolServer.serve_compact` in the kit), and carry the caller's trace (the `building-fabric-services` interop
-reference). An agent that is not a service is announced with a provider entry
+reference). When other agents will call, build on or read the new agent, plan its knowledge surface in the same
+version: `knowledge.search` with verified citations, a hybrid index rebuilt on each commit and checked before each
+push, and an evaluation set (the operator's rule of 2026-11-19, board request `52f7914b`; [agent
+knowledge](references/agent-knowledge.md); the template rule is the agents database's request `e968b42b`). An agent that is not a service is announced with a provider entry
 (`adapting-projects-to-fabric`, `scripts/fabric_provider.py`).
 
 ## Step 4: implement against the observables

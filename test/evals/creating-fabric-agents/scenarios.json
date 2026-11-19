@@ -383,6 +383,15 @@
         "names the seats beside the doors: the job tools when a capability is a job, a direct tool only after a measured case",
         "links the canon agent-stack agent-interop references/mcp-two-doors.md and the building-fabric-services interop reference instead of a second copy of the rule"
       ]
+    },
+    {
+      "id": "a-new-agent-others-build-on",
+      "request": "Design a new Fabric agent that other agents will query for product facts.",
+      "expected": [
+        "plans knowledge.search with verified citations in the first version",
+        "plans the index's rebuild on commit, a pre-push check and an evaluation set with recall at 3",
+        "lists search and execute as the MCP surface, knowledge.search an operation of search called through execute"
+      ]
     }
   ]
 }

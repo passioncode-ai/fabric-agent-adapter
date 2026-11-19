@@ -806,6 +806,15 @@
         "keeps old tool names callable for one release, marked retired with their day, and runs the probe's interop.compact-listing",
         "links the canon agent-stack agent-interop references/mcp-two-doors.md instead of restating the rule"
       ]
+    },
+    {
+      "id": "a-service-serves-its-knowledge",
+      "request": "Our kit service is read by other agents; expose its documentation search over MCP.",
+      "expected": [
+        "registers knowledge.search as an ordinary read-only capability behind serve_compact's two doors",
+        "answers carry quote, path, lines and commit, and report dropped claims, stale or degraded",
+        "says the kit has no index module yet (FAA-361) so the project brings its own index"
+      ]
     }
   ]
 }

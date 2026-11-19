@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.98.3 (2026-11-19)
+
+### Changed
+
+- The skills teach a project's knowledge surface, by default for every project other agents call, build on or read
+  (FAA-360, board request `52f7914b` relayed from another Project with the operator's words of 2026-11-19, provenance
+  `trusted`, scope: every Fabric project, always). One reference, `references/agent-knowledge.md`, the same file in
+  `adapting-projects-to-fabric`, `creating-fabric-agents`, `building-fabric-services` and `working-with-fabric`:
+  `knowledge.search` answers claims with a verbatim quote, path, lines, commit and date, and a verifier drops every
+  claim whose quote is not found at the cited lines; a hybrid index (BM25 with stemming, character trigrams, local
+  vectors, fused by RRF) rebuilt on each commit, checked before each push and measured on an evaluation set; both
+  behind the two MCP doors, `knowledge.search` an operation of `search` called through `execute`. Adapting and creating
+  decide and build it, building serves it, working-with-fabric asks another project through its doors or the board and
+  never reads its checkout, and `observing-products` gains the consumers' audit of a project others build on (pins,
+  calls and errors, retired names still called, questions that found nothing; every 30 minutes, linked to CO-598). The
+  template rule is the agents database's (its request `e968b42b`) and the doors are agent-stack's canon: linked, not
+  copied. Test `test/test_agent_knowledge_prose.py`; one scenario eval per skill. The kit has no index module yet:
+  FAA-361.
+
 ## 0.98.2 (2026-11-19)
 
 ### Fixed

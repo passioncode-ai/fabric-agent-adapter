@@ -304,6 +304,16 @@
         "points a server built on the kit at McpToolServer.serve_compact and the building-fabric-services interop reference, and one built otherwise at the canon agent-stack agent-interop references/mcp-two-doors.md",
         "keeps the old tool names callable for one release, marked retired, so no caller breaks"
       ]
+    },
+    {
+      "id": "a-project-other-agents-read",
+      "request": "Adapt this documentation-heavy engine to Fabric; three other projects build on it and their agents keep reading its repository.",
+      "expected": [
+        "decides the project needs a knowledge surface and records the decision with its reason",
+        "plans knowledge.search answering claims with a verbatim quote, path, lines and commit, and drops a claim whose quote is not found",
+        "plans a hybrid index (BM25 with stemming, trigrams, local vectors, RRF) rebuilt on each commit and checked before each push, with an evaluation set",
+        "serves it behind the two MCP doors, search and execute, and links the agents database's template rule (e968b42b) instead of copying it"
+      ]
     }
   ]
 }
