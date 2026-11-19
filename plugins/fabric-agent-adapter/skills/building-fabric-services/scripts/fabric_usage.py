@@ -464,7 +464,9 @@ def attribution_headers(setting: Any, request: Any) -> Dict[str, Any]:
 def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instance: str = "default",
                  now: Optional[_dt.datetime] = None,
                  budget: Optional[Dict[str, Any]] = None,
-                 budgets: Optional[Sequence[Dict[str, Any]]] = None) -> Dict[str, Any]:
+                 budgets: Optional[Sequence[Dict[str, Any]]] = None,
+                 limit_changes: Optional[Sequence[Dict[str, Any]]] = None,
+                 months: Optional[Sequence[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """The `service-usage.schema.json` answer: the last 31 UTC days, oldest first, per provider
     and model. Days without calls are omitted. A row whose calls are all unpriced has
     `costUsd: None`; totals are the sums of the model rows (FAC-SEM-025).
@@ -473,7 +475,12 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
     machine limit with a calendar ``period`` and no ``spentUsd`` is counted here from the receipts,
     the way ``budget`` is, so the two never disagree; a per-order limit (``per_job``, ``approval``)
     gets ``spentUsd: None``; every other limit states its own spend. A report whose limits break
-    FAC-SEM-031 is refused (``usage_limit_problems``)."""
+    FAC-SEM-031 is refused (``usage_limit_problems``). A limit may carry ``period: week`` (the ISO week from
+    Monday 00:00 UTC, kind ``weekly``) and ``editable`` with its bounds ``minUsd`` and ``maxUsd`` (DEC-0183 SL-1, SL-3).
+
+    ``limit_changes`` (DEC-0183 SL-4, at most 64, newest first) and ``months`` (SL-6, at most 12 UTC months of money,
+    oldest first, the current month last) are the service's own records, passed through as ``limitChanges`` and
+    ``months`` once they pass ``usage_history_problems``."""
     now = now or _dt.datetime.now(_dt.timezone.utc)
     receipts = list(receipts)
     first = (now - _dt.timedelta(days=USAGE_DAYS - 1)).strftime("%Y-%m-%d")
@@ -530,7 +537,7 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
             if "spentUsd" not in limit:
                 if limit.get("kind") in PER_ORDER_KINDS:
                     limit["spentUsd"] = None
-                elif limit.get("scope") == "machine" and limit.get("period") in ("day", "month"):
+                elif limit.get("scope") == "machine" and limit.get("period") in LIMIT_PERIODS:
                     limit["spentUsd"] = _spent_in(out_days, limit["period"], last)
                 elif limit.get("scope") == "machine" and _number(limit.get("windowSeconds")):
                     limit["spentUsd"] = _spent_since(receipts, now - _dt.timedelta(seconds=limit["windowSeconds"]), now)
@@ -541,6 +548,15 @@ def usage_report(receipts: Iterable[Dict[str, Any]], *, service_id: str, instanc
         problems = usage_limit_problems(report)
         if problems:
             raise ServiceError("the report's limits are not coherent: " + "; ".join(problems))
+    for name, given in (("limitChanges", limit_changes), ("months", months)):
+        if given is not None:
+            if not isinstance(given, (list, tuple)):
+                raise ServiceError("%s is a list" % name)
+            report[name] = [dict(row) if isinstance(row, dict) else row for row in given]
+    if limit_changes is not None or months is not None:
+        problems = usage_history_problems(report)
+        if problems:
+            raise ServiceError("the report's history is not coherent: " + "; ".join(problems))
     return report
 
 
@@ -629,13 +645,21 @@ def _spent_since(receipts: List[Dict[str, Any]], start: _dt.datetime, end: _dt.d
 
 
 def _spent_in(out_days: List[Dict[str, Any]], period: str, last: str) -> Optional[float]:
-    """Money spent in the current UTC day or month, over the window's model rows; None when no call off a subscription
-    in it is priced. A subscription's calls cost no money (DEC-0110, CT-115)."""
+    """Money spent in the current UTC day, ISO week (from Monday, DEC-0183 SL-1) or month, over the window's model
+    rows; None when no call off a subscription in it is priced. A subscription's calls cost no money (DEC-0110,
+    CT-115)."""
+    if period == "week":
+        today = _dt.date(int(last[:4]), int(last[5:7]), int(last[8:10]))
+        monday = (today - _dt.timedelta(days=today.weekday())).strftime("%Y-%m-%d")
+        return _money(usage_spend([m for d in out_days if monday <= d["date"] <= last for m in d["byModel"]]))
     prefix = last if period == "day" else last[:7]
     return _money(usage_spend([m for d in out_days if d["date"].startswith(prefix) for m in d["byModel"]]))
 
 
 LIMIT_SCOPES = ("machine", "project", "pool", "job")
+
+
+LIMIT_PERIODS = ("day", "week", "month")  # DEC-0183 SL-1: week is the ISO week from Monday 00:00 UTC
 
 
 PER_ORDER_KINDS = ("per_job", "approval")
@@ -647,7 +671,8 @@ _LIMIT_ID = re.compile(r"^[a-z0-9][a-z0-9._:-]{0,63}\Z")
 _LIMIT_KIND = re.compile(r"^[a-z][a-z0-9_]{0,31}\Z")
 
 
-_LIMIT_FIELDS = ("id", "scope", "subject", "kind", "period", "windowSeconds", "since", "limitUsd", "spentUsd", "enforced", "tripped")
+_LIMIT_FIELDS = ("id", "scope", "subject", "kind", "period", "windowSeconds", "since", "limitUsd", "spentUsd", "enforced", "tripped",
+                "editable", "minUsd", "maxUsd")
 
 
 _TIMESTAMP = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?([Zz]|[+-]([0-9]{2}):([0-9]{2}))")
@@ -699,8 +724,8 @@ def usage_limit_problems(report: Dict[str, Any]) -> List[str]:
             problems.append("%s/subject is 1 to 128 characters" % at)
         if "kind" in limit and not (isinstance(limit["kind"], str) and _LIMIT_KIND.fullmatch(limit["kind"])):
             problems.append("%s/kind must match %s" % (at, _LIMIT_KIND.pattern))
-        if "period" in limit and limit["period"] not in ("day", "month"):
-            problems.append("%s/period is day or month" % at)
+        if "period" in limit and limit["period"] not in LIMIT_PERIODS:
+            problems.append("%s/period is day, week or month" % at)
         if "windowSeconds" in limit and not (isinstance(limit["windowSeconds"], int) and not isinstance(limit["windowSeconds"], bool)
                                              and limit["windowSeconds"] >= 1):
             problems.append("%s/windowSeconds is a whole number of seconds, at least 1" % at)
@@ -710,7 +735,10 @@ def usage_limit_problems(report: Dict[str, Any]) -> List[str]:
             problems.append("%s/limitUsd is a dollar amount above zero, or null" % at)
         if "spentUsd" in limit and not (limit["spentUsd"] is None or (_number(limit["spentUsd"]) and limit["spentUsd"] >= 0)):
             problems.append("%s/spentUsd is a dollar amount, zero or more, or null" % at)
-        for key in ("enforced", "tripped"):
+        for key in ("minUsd", "maxUsd"):
+            if key in limit and not (_number(limit[key]) and limit[key] > 0):
+                problems.append("%s/%s is a dollar amount above zero" % (at, key))
+        for key in ("enforced", "tripped", "editable"):
             if key in limit and not isinstance(limit[key], bool):
                 problems.append("%s/%s is true or false" % (at, key))
 
@@ -738,6 +766,9 @@ def usage_limit_problems(report: Dict[str, Any]) -> List[str]:
         elif kind == "daily":
             if not (limit.get("period") == "day" or seconds == 86400):
                 problems.append("FAC-SEM-031 %s/period: a daily limit counts the UTC day (period day) or the last 24 hours (windowSeconds 86400)" % at)
+        elif kind == "weekly":
+            if not (limit.get("period") == "week" or seconds == 7 * 86400):
+                problems.append("FAC-SEM-031 %s/period: a weekly limit counts the ISO week from Monday 00:00 UTC (period week) or the last 7 days (windowSeconds 604800)" % at)
         elif kind == "monthly":
             if not (limit.get("period") == "month" or (seconds is not None and 28 * 86400 <= seconds <= 31 * 86400)):
                 problems.append("FAC-SEM-031 %s/period: a monthly limit counts the UTC month (period month) or a rolling 28–31 days (windowSeconds)" % at)
@@ -747,11 +778,17 @@ def usage_limit_problems(report: Dict[str, Any]) -> List[str]:
         elif kind in ("pool", "emergency"):
             if not windows:
                 problems.append("FAC-SEM-031 %s/period: a %s limit names the window it counts (period, windowSeconds or since)" % (at, kind))
-        known = kind in PER_ORDER_KINDS or kind in ("daily", "monthly", "pool", "emergency")
+        known = kind in PER_ORDER_KINDS or kind in ("daily", "weekly", "monthly", "pool", "emergency")
         if known and "limitUsd" in limit and limit["limitUsd"] is None:
             problems.append("FAC-SEM-031 %s/limitUsd: a %s limit is a dollar amount; only a relative limit (velocity) may leave it null" % (at, kind))
         if limit.get("tripped") is True and limit.get("enforced") is not True:
             problems.append("FAC-SEM-031 %s/tripped: a limit that is not enforced cannot have stopped work" % at)
+        # DEC-0183 SL-3: bounds belong to an editable limit, and the lower is not above the upper.
+        for bound in ("minUsd", "maxUsd"):
+            if bound in limit and limit.get("editable") is not True:
+                problems.append("FAC-SEM-031 %s/%s: %s bounds an edit, so it is only on a limit with editable: true" % (at, bound, bound))
+        if _number(limit.get("minUsd")) and _number(limit.get("maxUsd")) and limit["minUsd"] > limit["maxUsd"]:
+            problems.append("FAC-SEM-031 %s/minUsd: minUsd is not above maxUsd" % at)
 
     budget = report.get("budget")
     if isinstance(budget, dict) and limits:
@@ -768,6 +805,141 @@ def usage_limit_problems(report: Dict[str, Any]) -> List[str]:
         if not twin:
             problems.append("FAC-SEM-031 /budget: budget repeats one enforced machine %s limit with period %s in budgets[], so old "
                             "and new readers agree" % (kind, budget.get("period")))
+    return problems
+
+
+LIMIT_CHANGE_BY = ("operator", "agent", "service")
+
+
+LIMIT_CHANGE_VIA = ("dashboard", "agent", "config")
+
+
+_CHANGE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
+
+
+_CHANGE_FIELDS = ("id", "at", "by", "byRef", "via", "limitId", "before", "after", "reason")
+
+
+_MONTH = re.compile(r"^[0-9]{4}-(0[1-9]|1[0-2])\Z")
+
+
+def _limit_state_problems(state: Any, at: str) -> List[str]:
+    """`$defs/limitState`: {limitUsd: above zero or null, enforced: true or false}, nothing else."""
+    if not isinstance(state, dict):
+        return ["%s is {limitUsd, enforced}" % at]
+    problems = ["%s/%s is not a limit state field" % (at, k) for k in state if k not in ("limitUsd", "enforced")]
+    if "limitUsd" not in state or not (state["limitUsd"] is None or (_number(state["limitUsd"]) and state["limitUsd"] > 0)):
+        problems.append("%s/limitUsd is a dollar amount above zero, or null" % at)
+    if not isinstance(state.get("enforced"), bool):
+        problems.append("%s/enforced is true or false" % at)
+    return problems
+
+
+def _timestamp_seconds(value: str) -> float:
+    """An RFC 3339 timestamp `_is_timestamp` took, as seconds since the epoch (a leap second reads as :59)."""
+    m = _TIMESTAMP.fullmatch(value)
+    year, month, day, hour, minute, second = (int(m.group(i)) for i in range(1, 7))
+    when = _dt.datetime(year, month, day, hour, minute, min(second, 59), tzinfo=_dt.timezone.utc)
+    if m.group(9) is not None:
+        offset = _dt.timedelta(hours=int(m.group(9)), minutes=int(m.group(10)))
+        when -= offset if m.group(8)[0] == "+" else -offset
+    return when.timestamp() + (float(m.group(7)) if m.group(7) else 0.0)
+
+
+def usage_history_problems(report: Dict[str, Any]) -> List[str]:
+    """A usage report's `limitChanges` and `months` against `service-usage.schema.json` (`$defs/limitChange`,
+    `$defs/month`) and FAC-SEM-031 as DEC-0183 extends it: at most 64 changes with unique ids, newest first, none after
+    `generatedAt` (SL-4); at most 12 months, each once, oldest first, the report's UTC month or one of the 11 before
+    it (SL-6). A change names no person: `byRef` is an opaque reference (DL-22)."""
+    problems: List[str] = []
+    generated = report.get("generatedAt")
+    generated_at = _timestamp_seconds(generated) if _is_timestamp(generated) else None
+    changes = report.get("limitChanges")
+    if changes is not None:
+        if not isinstance(changes, list) or len(changes) > 64:
+            problems.append("limitChanges is a list of at most 64 changes")
+            changes = []
+        ids: set = set()
+        previous = math.inf
+        for i, change in enumerate(changes):
+            at = "/limitChanges/%d" % i
+            if not isinstance(change, dict):
+                problems.append("%s is not an object" % at)
+                continue
+            for key in change:
+                if key not in _CHANGE_FIELDS:
+                    problems.append("%s/%s is not a limit change field" % (at, key))
+            for key in ("id", "at", "by", "via", "limitId", "before", "after", "reason"):
+                if key not in change:
+                    problems.append("%s is missing %s" % (at, key))
+            if "id" in change and not (isinstance(change["id"], str) and _CHANGE_ID.fullmatch(change["id"])):
+                problems.append("%s/id must match %s" % (at, _CHANGE_ID.pattern))
+            if "at" in change and not _is_timestamp(change["at"]):
+                problems.append("%s/at is a UTC timestamp" % at)
+            if "by" in change and change["by"] not in LIMIT_CHANGE_BY:
+                problems.append("%s/by must be one of %s" % (at, ", ".join(LIMIT_CHANGE_BY)))
+            if "byRef" in change and not (isinstance(change["byRef"], str) and 1 <= len(change["byRef"]) <= 128):
+                problems.append("%s/byRef is 1 to 128 characters" % at)
+            if "via" in change and change["via"] not in LIMIT_CHANGE_VIA:
+                problems.append("%s/via must be one of %s" % (at, ", ".join(LIMIT_CHANGE_VIA)))
+            if "limitId" in change and not (isinstance(change["limitId"], str) and _LIMIT_ID.fullmatch(change["limitId"])):
+                problems.append("%s/limitId must match %s" % (at, _LIMIT_ID.pattern))
+            if "before" in change and change["before"] is not None:
+                problems.extend(_limit_state_problems(change["before"], at + "/before"))
+            if "after" in change:
+                problems.extend(_limit_state_problems(change["after"], at + "/after"))
+            if "reason" in change and not (isinstance(change["reason"], str) and 1 <= len(change["reason"]) <= 500):
+                problems.append("%s/reason is 1 to 500 characters" % at)
+            # FAC-SEM-031, DEC-0183 SL-4
+            ident = str(change.get("id", ""))
+            if ident in ids:
+                problems.append("FAC-SEM-031 %s/id: change id %s appears twice" % (at, ident))
+            ids.add(ident)
+            if _is_timestamp(change.get("at")):
+                when = _timestamp_seconds(change["at"])
+                if when > previous:
+                    problems.append("FAC-SEM-031 %s/at: limitChanges lists the newest change first" % at)
+                if generated_at is not None and when > generated_at:
+                    problems.append("FAC-SEM-031 %s/at: a change is not after the report's generatedAt" % at)
+                previous = when
+    months = report.get("months")
+    if months is not None:
+        if not isinstance(months, list) or len(months) > 12:
+            problems.append("months is a list of at most 12 months")
+            months = []
+        current = None
+        if generated_at is not None:
+            g = _dt.datetime.fromtimestamp(generated_at, _dt.timezone.utc)
+            current = g.year * 12 + g.month - 1
+        last = -math.inf
+        for i, row in enumerate(months):
+            at = "/months/%d" % i
+            if not isinstance(row, dict):
+                problems.append("%s is not an object" % at)
+                continue
+            for key in row:
+                if key not in ("month", "calls", "unpricedCalls", "costUsd"):
+                    problems.append("%s/%s is not a month field" % (at, key))
+            for key in ("month", "calls", "unpricedCalls", "costUsd"):
+                if key not in row:
+                    problems.append("%s is missing %s" % (at, key))
+            if "month" in row and not (isinstance(row["month"], str) and _MONTH.fullmatch(row["month"])):
+                problems.append("%s/month is YYYY-MM" % at)
+            for key in ("calls", "unpricedCalls"):
+                if key in row and not _whole(row[key]):
+                    problems.append("%s/%s is a whole number, zero or more" % (at, key))
+            if "costUsd" in row and not (row["costUsd"] is None or (_number(row["costUsd"]) and row["costUsd"] >= 0)):
+                problems.append("%s/costUsd is a dollar amount, zero or more, or null" % at)
+            # FAC-SEM-031, DEC-0183 SL-6 (the contract reads any YYYY-MM here, even a month the schema refuses)
+            month = row.get("month")
+            if not (isinstance(month, str) and re.fullmatch(r"[0-9]{4}-[0-9]{2}", month)):
+                continue
+            index = int(month[:4]) * 12 + int(month[5:7]) - 1
+            if index <= last:
+                problems.append("FAC-SEM-031 %s/month: months lists each month once, oldest first" % at)
+            if current is not None and (index > current or index < current - 11):
+                problems.append("FAC-SEM-031 %s/month: a month is the report's UTC month or one of the 11 before it" % at)
+            last = index
     return problems
 
 

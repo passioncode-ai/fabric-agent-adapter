@@ -5991,6 +5991,162 @@
           "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
         }
       }
+    },
+    {
+      "name": "comms-message-via-progress",
+      "schema": "comms-message.schema.json",
+      "valid": true,
+      "document": {
+        "id": "msg_R7t8Y9u0I1",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "reply",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Building the export; ready by 18:00 UTC."
+        },
+        "replyTo": "msg_Q2w3e4r5t6",
+        "via": "progress"
+      }
+    },
+    {
+      "name": "comms-message-via-reply",
+      "schema": "comms-message.schema.json",
+      "valid": true,
+      "document": {
+        "id": "msg_R7t8Y9u0I1",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "reply",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Done: the export is in the bucket."
+        },
+        "replyTo": "msg_Q2w3e4r5t6",
+        "via": "reply"
+      }
+    },
+    {
+      "name": "comms-message-via-on-message",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_R7t8Y9u0I1",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "message",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Building the export; ready by 18:00 UTC."
+        },
+        "replyTo": "msg_Q2w3e4r5t6",
+        "via": "progress"
+      }
+    },
+    {
+      "name": "comms-message-via-with-deliver",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_R7t8Y9u0I1",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "reply",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Building the export; ready by 18:00 UTC."
+        },
+        "replyTo": "msg_Q2w3e4r5t6",
+        "via": "progress",
+        "deliverTo": "thread"
+      }
+    },
+    {
+      "name": "comms-message-via-unknown",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_R7t8Y9u0I1",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "reply",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Building the export; ready by 18:00 UTC."
+        },
+        "replyTo": "msg_Q2w3e4r5t6",
+        "via": "note"
+      }
+    },
+    {
+      "name": "comms-message-via-without-reply-to",
+      "schema": "comms-message.schema.json",
+      "valid": false,
+      "document": {
+        "id": "msg_R7t8Y9u0I1",
+        "thread": "thr_8Hc2kQ9xA1",
+        "kind": "reply",
+        "sender": {
+          "project": "proj-analytics",
+          "principal": {
+            "kind": "agent",
+            "id": "enr_analytics_01",
+            "label": "Analytics agent",
+            "provenance": "trusted"
+          }
+        },
+        "at": "2026-10-26T15:00:00Z",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "body": {
+          "text": "Building the export; ready by 18:00 UTC."
+        },
+        "via": "progress"
+      }
     }
   ],
   "digests": [

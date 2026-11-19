@@ -277,9 +277,12 @@ export function attributionHeaders(setting, given) {
  * `budgets` (DEC-0027) lists every spending limit the service applies, enforced or not. A machine limit with a
  * calendar `period` and no `spentUsd` is counted here from the receipts, the way `budget` is, so the two never
  * disagree; a per-order limit (`per_job`, `approval`) gets `spentUsd: null`; every other limit states its own spend.
- * A report whose limits break FAC-SEM-031 is refused (`usageLimitProblems`).
+ * A report whose limits break FAC-SEM-031 is refused (`usageLimitProblems`). A limit may carry `period: 'week'` (the
+ * ISO week from Monday 00:00 UTC, kind `weekly`) and `editable` with its bounds `minUsd` and `maxUsd` (DEC-0183 SL-1,
+ * SL-3). `limitChanges` (SL-4, at most 64, newest first) and `months` (SL-6, at most 12 UTC months of money, oldest
+ * first, the current month last) are the service's own records, passed through once they pass `usageHistoryProblems`.
  */
-export function usageReport(receipts, { id, instance = 'default', now = Date.now(), budget, budgets } = {}) {
+export function usageReport(receipts, { id, instance = 'default', now = Date.now(), budget, budgets, limitChanges, months } = {}) {
   receipts = Array.from(receipts); // read twice: the days, then a rolling window
   const first = utcDate(now - (USAGE_DAYS - 1) * 86_400_000), last = utcDate(now);
   const days = new Map();
@@ -323,13 +326,22 @@ export function usageReport(receipts, { id, instance = 'default', now = Date.now
       const limit = { ...given };
       if (!('spentUsd' in limit)) {
         if (PER_ORDER_KINDS.includes(limit.kind)) limit.spentUsd = null;
-        else if (limit.scope === 'machine' && ['day', 'month'].includes(limit.period)) limit.spentUsd = spentIn(outDays, limit.period, last);
+        else if (limit.scope === 'machine' && LIMIT_PERIODS.includes(limit.period)) limit.spentUsd = spentIn(outDays, limit.period, last);
         else if (limit.scope === 'machine' && isNumber(limit.windowSeconds)) limit.spentUsd = spentSince(receipts, now - limit.windowSeconds * 1000, now);
       }
       return limit;
     });
     const problems = usageLimitProblems(report);
     if (problems.length) throw new ServiceError(`The report's limits are not coherent: ${problems.join('; ')}`);
+  }
+  for (const [name, given] of [['limitChanges', limitChanges], ['months', months]]) {
+    if (given === undefined) continue;
+    if (!Array.isArray(given)) throw new ServiceError(`${name} is a list.`);
+    report[name] = given.map((row) => (isPlainObject(row) ? { ...row } : row));
+  }
+  if (limitChanges !== undefined || months !== undefined) {
+    const problems = usageHistoryProblems(report);
+    if (problems.length) throw new ServiceError(`The report's history is not coherent: ${problems.join('; ')}`);
   }
   return report;
 }
@@ -389,8 +401,14 @@ function spentSince(receipts, start, end) {
   return money(usageSpend(inside.map((r) => ({ ...(r.route ? { route: r.route } : {}), calls: 1, unpricedCalls: priced(r) ? 0 : 1, costUsd: priced(r) ? r.costUsd : null }))));
 }
 
-/** Money spent in the current UTC day or month, over the window's model rows; null when no call off a subscription in it is priced. */
+/** Money spent in the current UTC day, ISO week (from Monday, DEC-0183 SL-1) or month, over the window's model rows;
+ *  null when no call off a subscription in it is priced. */
 function spentIn(outDays, period, last) {
+  if (period === 'week') {
+    const today = Date.UTC(Number(last.slice(0, 4)), Number(last.slice(5, 7)) - 1, Number(last.slice(8, 10)));
+    const monday = utcDate(today - ((new Date(today).getUTCDay() + 6) % 7) * 86_400_000);
+    return money(usageSpend(outDays.filter((d) => d.date >= monday && d.date <= last).flatMap((d) => d.byModel)));
+  }
   const prefix = period === 'day' ? last : last.slice(0, 7);
   return money(usageSpend(outDays.filter((d) => d.date.startsWith(prefix)).flatMap((d) => d.byModel)));
 }
@@ -399,11 +417,14 @@ export const LIMIT_SCOPES = Object.freeze(['machine', 'project', 'pool', 'job'])
 
 export const PER_ORDER_KINDS = Object.freeze(['per_job', 'approval']);
 
+/** DEC-0183 SL-1: week is the ISO week from Monday 00:00 UTC. */
+export const LIMIT_PERIODS = Object.freeze(['day', 'week', 'month']);
+
 const LIMIT_ID = /^[a-z0-9][a-z0-9._:-]{0,63}$/;
 
 const LIMIT_KIND = /^[a-z][a-z0-9_]{0,31}$/;
 
-const LIMIT_FIELDS = ['id', 'scope', 'subject', 'kind', 'period', 'windowSeconds', 'since', 'limitUsd', 'spentUsd', 'enforced', 'tripped'];
+const LIMIT_FIELDS = ['id', 'scope', 'subject', 'kind', 'period', 'windowSeconds', 'since', 'limitUsd', 'spentUsd', 'enforced', 'tripped', 'editable', 'minUsd', 'maxUsd'];
 
 const TIMESTAMP = /^([0-9]{4})-([0-9]{2})-([0-9]{2})[Tt]([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?([Zz]|[+-]([0-9]{2}):([0-9]{2}))$/;
 
@@ -441,12 +462,13 @@ export function usageLimitProblems(report) {
     if ('scope' in limit && !LIMIT_SCOPES.includes(limit.scope)) problems.push(`${at}/scope must be one of ${LIMIT_SCOPES.join(', ')}`);
     if ('subject' in limit && !(typeof limit.subject === 'string' && limit.subject.length >= 1 && limit.subject.length <= 128)) problems.push(`${at}/subject is 1 to 128 characters`);
     if ('kind' in limit && !(typeof limit.kind === 'string' && LIMIT_KIND.test(limit.kind))) problems.push(`${at}/kind must match ${LIMIT_KIND.source}`);
-    if ('period' in limit && !['day', 'month'].includes(limit.period)) problems.push(`${at}/period is day or month`);
+    if ('period' in limit && !LIMIT_PERIODS.includes(limit.period)) problems.push(`${at}/period is day, week or month`);
     if ('windowSeconds' in limit && !(Number.isInteger(limit.windowSeconds) && limit.windowSeconds >= 1)) problems.push(`${at}/windowSeconds is a whole number of seconds, at least 1`);
     if ('since' in limit && !isTimestamp(limit.since)) problems.push(`${at}/since is a UTC timestamp`);
     if ('limitUsd' in limit && !(limit.limitUsd === null || (isNumber(limit.limitUsd) && limit.limitUsd > 0))) problems.push(`${at}/limitUsd is a dollar amount above zero, or null`);
     if ('spentUsd' in limit && !(limit.spentUsd === null || (isNumber(limit.spentUsd) && limit.spentUsd >= 0))) problems.push(`${at}/spentUsd is a dollar amount, zero or more, or null`);
-    for (const key of ['enforced', 'tripped']) if (key in limit && typeof limit[key] !== 'boolean') problems.push(`${at}/${key} is true or false`);
+    for (const key of ['minUsd', 'maxUsd']) if (key in limit && !(isNumber(limit[key]) && limit[key] > 0)) problems.push(`${at}/${key} is a dollar amount above zero`);
+    for (const key of ['enforced', 'tripped', 'editable']) if (key in limit && typeof limit[key] !== 'boolean') problems.push(`${at}/${key} is true or false`);
 
     const flag = (where, message) => problems.push(`FAC-SEM-031 ${at}/${where}: ${message}`);
     const id = String(limit.id ?? '');
@@ -464,6 +486,8 @@ export function usageLimitProblems(report) {
       if (limit.spentUsd !== null) flag('spentUsd', `${kind} bounds one order, so nothing is spent against it (null)`);
     } else if (kind === 'daily') {
       if (!(limit.period === 'day' || seconds === 86400)) flag('period', 'a daily limit counts the UTC day (period day) or the last 24 hours (windowSeconds 86400)');
+    } else if (kind === 'weekly') {
+      if (!(limit.period === 'week' || seconds === 7 * 86400)) flag('period', 'a weekly limit counts the ISO week from Monday 00:00 UTC (period week) or the last 7 days (windowSeconds 604800)');
     } else if (kind === 'monthly') {
       if (!(limit.period === 'month' || (seconds !== null && seconds >= 28 * 86400 && seconds <= 31 * 86400))) flag('period', 'a monthly limit counts the UTC month (period month) or a rolling 28–31 days (windowSeconds)');
     } else if (kind === 'velocity') {
@@ -471,9 +495,12 @@ export function usageLimitProblems(report) {
     } else if (kind === 'pool' || kind === 'emergency') {
       if (!windows.length) flag('period', `a ${kind} limit names the window it counts (period, windowSeconds or since)`);
     }
-    const known = PER_ORDER_KINDS.includes(kind) || ['daily', 'monthly', 'pool', 'emergency'].includes(kind);
+    const known = PER_ORDER_KINDS.includes(kind) || ['daily', 'weekly', 'monthly', 'pool', 'emergency'].includes(kind);
     if (known && 'limitUsd' in limit && limit.limitUsd === null) flag('limitUsd', `a ${kind} limit is a dollar amount; only a relative limit (velocity) may leave it null`);
     if (limit.tripped === true && limit.enforced !== true) flag('tripped', 'a limit that is not enforced cannot have stopped work');
+    // DEC-0183 SL-3: bounds belong to an editable limit, and the lower is not above the upper.
+    for (const bound of ['minUsd', 'maxUsd']) if (bound in limit && limit.editable !== true) flag(bound, `${bound} bounds an edit, so it is only on a limit with editable: true`);
+    if (isNumber(limit.minUsd) && isNumber(limit.maxUsd) && limit.minUsd > limit.maxUsd) flag('minUsd', 'minUsd is not above maxUsd');
   });
   const budget = report.budget;
   if (isPlainObject(budget) && limits.length) {
@@ -481,6 +508,87 @@ export function usageLimitProblems(report) {
     const same = (x, y) => (x === null || y === null ? x === y : isNumber(x) && isNumber(y) && Math.abs(x - y) <= 0.000001);
     const twin = limits.some((l) => isPlainObject(l) && l.scope === 'machine' && l.enforced === true && l.kind === kind && l.period === budget.period && same(l.limitUsd, budget.limitUsd) && same(l.spentUsd, budget.spentUsd));
     if (!twin) problems.push(`FAC-SEM-031 /budget: budget repeats one enforced machine ${kind} limit with period ${budget.period} in budgets[], so old and new readers agree`);
+  }
+  return problems;
+}
+
+export const LIMIT_CHANGE_BY = Object.freeze(['operator', 'agent', 'service']);
+
+export const LIMIT_CHANGE_VIA = Object.freeze(['dashboard', 'agent', 'config']);
+
+const CHANGE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+
+const CHANGE_FIELDS = ['id', 'at', 'by', 'byRef', 'via', 'limitId', 'before', 'after', 'reason'];
+
+const MONTH_FIELDS = ['month', 'calls', 'unpricedCalls', 'costUsd'];
+
+/** `$defs/limitState`: {limitUsd: above zero or null, enforced: true or false}, nothing else. */
+function limitStateProblems(state, at) {
+  if (!isPlainObject(state)) return [`${at} is {limitUsd, enforced}`];
+  const problems = Object.keys(state).filter((k) => k !== 'limitUsd' && k !== 'enforced').map((k) => `${at}/${k} is not a limit state field`);
+  if (!('limitUsd' in state) || !(state.limitUsd === null || (isNumber(state.limitUsd) && state.limitUsd > 0))) problems.push(`${at}/limitUsd is a dollar amount above zero, or null`);
+  if (typeof state.enforced !== 'boolean') problems.push(`${at}/enforced is true or false`);
+  return problems;
+}
+
+/**
+ * A usage report's `limitChanges` and `months` against `service-usage.schema.json` and FAC-SEM-031 as DEC-0183
+ * extends it (SL-4, SL-6): the twin of fabric_usage.usage_history_problems. A change names no person (DL-22).
+ */
+export function usageHistoryProblems(report) {
+  const problems = [];
+  const whole = (v) => Number.isSafeInteger(v) && v >= 0;
+  const generated = isTimestamp(report?.generatedAt) ? Date.parse(report.generatedAt) : NaN;
+  let changes = report?.limitChanges;
+  if (changes !== undefined) {
+    if (!Array.isArray(changes) || changes.length > 64) { problems.push('limitChanges is a list of at most 64 changes'); changes = []; }
+    const ids = new Set();
+    let previous = Infinity;
+    changes.forEach((change, i) => {
+      const at = `/limitChanges/${i}`;
+      if (!isPlainObject(change)) { problems.push(`${at} is not an object`); return; }
+      for (const key of Object.keys(change)) if (!CHANGE_FIELDS.includes(key)) problems.push(`${at}/${key} is not a limit change field`);
+      for (const key of ['id', 'at', 'by', 'via', 'limitId', 'before', 'after', 'reason']) if (!(key in change)) problems.push(`${at} is missing ${key}`);
+      if ('id' in change && !(typeof change.id === 'string' && CHANGE_ID.test(change.id))) problems.push(`${at}/id must match ${CHANGE_ID.source}`);
+      if ('at' in change && !isTimestamp(change.at)) problems.push(`${at}/at is a UTC timestamp`);
+      if ('by' in change && !LIMIT_CHANGE_BY.includes(change.by)) problems.push(`${at}/by must be one of ${LIMIT_CHANGE_BY.join(', ')}`);
+      if ('byRef' in change && !(typeof change.byRef === 'string' && change.byRef.length >= 1 && change.byRef.length <= 128)) problems.push(`${at}/byRef is 1 to 128 characters`);
+      if ('via' in change && !LIMIT_CHANGE_VIA.includes(change.via)) problems.push(`${at}/via must be one of ${LIMIT_CHANGE_VIA.join(', ')}`);
+      if ('limitId' in change && !(typeof change.limitId === 'string' && LIMIT_ID.test(change.limitId))) problems.push(`${at}/limitId must match ${LIMIT_ID.source}`);
+      if ('before' in change && change.before !== null) problems.push(...limitStateProblems(change.before, `${at}/before`));
+      if ('after' in change) problems.push(...limitStateProblems(change.after, `${at}/after`));
+      if ('reason' in change && !(typeof change.reason === 'string' && change.reason.length >= 1 && change.reason.length <= 500)) problems.push(`${at}/reason is 1 to 500 characters`);
+      const id = String(change.id ?? '');
+      if (ids.has(id)) problems.push(`FAC-SEM-031 ${at}/id: change id ${id} appears twice`);
+      ids.add(id);
+      if (isTimestamp(change.at)) {
+        const when = Date.parse(change.at);
+        if (when > previous) problems.push(`FAC-SEM-031 ${at}/at: limitChanges lists the newest change first`);
+        if (!Number.isNaN(generated) && when > generated) problems.push(`FAC-SEM-031 ${at}/at: a change is not after the report's generatedAt`);
+        previous = when;
+      }
+    });
+  }
+  let months = report?.months;
+  if (months !== undefined) {
+    if (!Array.isArray(months) || months.length > 12) { problems.push('months is a list of at most 12 months'); months = []; }
+    const current = Number.isNaN(generated) ? NaN : new Date(generated).getUTCFullYear() * 12 + new Date(generated).getUTCMonth();
+    let last = -Infinity;
+    months.forEach((row, i) => {
+      const at = `/months/${i}`;
+      if (!isPlainObject(row)) { problems.push(`${at} is not an object`); return; }
+      for (const key of Object.keys(row)) if (!MONTH_FIELDS.includes(key)) problems.push(`${at}/${key} is not a month field`);
+      for (const key of MONTH_FIELDS) if (!(key in row)) problems.push(`${at} is missing ${key}`);
+      if ('month' in row && !(typeof row.month === 'string' && /^[0-9]{4}-(0[1-9]|1[0-2])$/.test(row.month))) problems.push(`${at}/month is YYYY-MM`);
+      for (const key of ['calls', 'unpricedCalls']) if (key in row && !whole(row[key])) problems.push(`${at}/${key} is a whole number, zero or more`);
+      if ('costUsd' in row && !(row.costUsd === null || (isNumber(row.costUsd) && row.costUsd >= 0))) problems.push(`${at}/costUsd is a dollar amount, zero or more, or null`);
+      // FAC-SEM-031, DEC-0183 SL-6 (the contract reads any YYYY-MM here, even a month the schema refuses)
+      if (!(typeof row.month === 'string' && /^[0-9]{4}-[0-9]{2}$/.test(row.month))) return;
+      const index = Number(row.month.slice(0, 4)) * 12 + Number(row.month.slice(5, 7)) - 1;
+      if (index <= last) problems.push(`FAC-SEM-031 ${at}/month: months lists each month once, oldest first`);
+      if (!Number.isNaN(current) && (index > current || index < current - 11)) problems.push(`FAC-SEM-031 ${at}/month: a month is the report's UTC month or one of the 11 before it`);
+      last = index;
+    });
   }
   return problems;
 }

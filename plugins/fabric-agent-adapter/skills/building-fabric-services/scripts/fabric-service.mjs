@@ -83,9 +83,13 @@ export {
   usageReport,
   usageSpend,
   LIMIT_SCOPES,
+  LIMIT_PERIODS,
+  LIMIT_CHANGE_BY,
+  LIMIT_CHANGE_VIA,
   PER_ORDER_KINDS,
   isTimestamp,
   usageLimitProblems,
+  usageHistoryProblems,
   JsonlUsageLedger,
 } from './fabric-usage.mjs';
 export {
