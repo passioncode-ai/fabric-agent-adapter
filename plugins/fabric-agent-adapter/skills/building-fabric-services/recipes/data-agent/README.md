@@ -52,7 +52,8 @@ other numbers says so in its description.
   a file, an argument or a log.
 - The fallback model is of another vendor; a config whose fallback shares the writer's vendor is refused at load.
 - `ceilingUsd` per `window` bounds the model spend before every attempt (fabric_openrouter); each call leaves its
-  receipt in `state/usage.jsonl`, which the service serves as its usage report.
+  receipt in `state/usage.jsonl`, which the service serves as its usage report; the example's 95 a `month` sits just under the
+  key's USD 100 monthly limit, and no default goes below 50 (the agents base's D-79, board request `12caaa48`).
 
 ## Install into a service
 

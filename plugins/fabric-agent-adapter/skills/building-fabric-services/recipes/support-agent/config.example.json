@@ -5,8 +5,8 @@
   "model": "deepseek/deepseek-v4.1-flash",
   "fallback": "qwen/qwen3.8-flash",
   "keyEnv": "OPENROUTER_API_KEY",
-  "ceilingUsd": 1.0,
-  "window": "day",
+  "ceilingUsd": 95,
+  "window": "month",
   "maxTokens": 600,
   "maxChars": 1200,
   "prices": {
