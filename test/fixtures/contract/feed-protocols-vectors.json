@@ -21,6 +21,9 @@
     "agent-directory": [
       "1"
     ],
+    "agent-health": [
+      "1"
+    ],
     "approval": [
       "1"
     ],
@@ -31,6 +34,9 @@
       "1"
     ],
     "coding-agents": [
+      "1"
+    ],
+    "compact-mcp-search": [
       "1"
     ],
     "credential-decision": [

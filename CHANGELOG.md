@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.99.0 (2026-11-19)
+
+### Changed
+
+- The repin to Fabric Agent Contract `v0.1.0+2026-11-19` (`aeecb12a`, FAA-363); `2bbfd780` (`v0.1.0+2026-11-16.6`)
+  stays supported for bundles issued under it. `agent-health/1` (DEC-0179) and `compact-mcp-search/1` (DEC-0180) are
+  known protocol revisions. Impact map: `docs/evidence/specs/2026-11-19-faa-363-repin-aeecb12a-impact-map.md`.
+
+### Added
+
+- The service kit's usage report takes the contract's DEC-0183 (FAA-363, board request `3bed4856` from
+  company-assessment-agent): a limit in `budgets[]` may carry `editable` with its bounds `minUsd` and `maxUsd` (SL-3;
+  a bound only on an editable limit, the lower not above the upper) and `period: week`, the ISO week from Monday
+  00:00 UTC, with the known kind `weekly` (SL-1); a machine weekly limit with no `spentUsd` is counted from the
+  receipts. `usage_report` / `usageReport` pass `limit_changes` / `limitChanges` (SL-4) and `months` (SL-6) through;
+  `usage_history_problems` / `usageHistoryProblems` check them as the schema and FAC-SEM-031 do (at most 64 changes
+  with unique ids, newest first, none after `generatedAt`; at most 12 months, oldest first, within the report's 12
+  months). Before this a report with any of them was refused. Tests: `Limits.test_dec_0183_*` and the two `DEC-0183:`
+  Node tests, over the contract's four fixtures.
+
 ## 0.98.4 (2026-11-19)
 
 ### Fixed

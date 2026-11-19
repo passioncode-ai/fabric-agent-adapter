@@ -1,6 +1,6 @@
 # Anonymous usage and error data (DEC-0157)
 
-The contract's [usage data page](https://github.com/passioncode-ai/fabric-agent-contract/blob/2bbfd7805b1f9c4eaf25f62394a11957f131a092/docs/specification/usage-data.md)
+The contract's [usage data page](https://github.com/passioncode-ai/fabric-agent-contract/blob/aeecb12a9aaa3792ab4dbd352698d80a0365b564/docs/specification/usage-data.md)
 (DEC-0157, rules UD-1 to UD-6) binds every product the estate ships to people that collects anonymous data about how it
 is used and about its errors: an app, an agent, a command line tool, a service installed on the person's machine or a
 component run on their own server. A product may collect none. A hosted service that installs nothing for the person is

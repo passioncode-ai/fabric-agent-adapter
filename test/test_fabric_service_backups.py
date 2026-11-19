@@ -372,6 +372,86 @@ class Limits(unittest.TestCase):
             {"id": "machine.24h", "scope": "machine", "kind": "emergency", "windowSeconds": 86400, "limitUsd": 50, "enforced": True}])
         self.assertEqual(rolling["budgets"][0]["spentUsd"], 0.25, "a rolling machine window is counted from the receipts")
 
+    def test_dec_0183_the_contract_fixtures(self):
+        edit = fixture("positive-service-usage-limits-edit")
+        self.assertEqual(fs.usage_limit_problems(edit), [])
+        self.assertEqual(fs.usage_history_problems(edit), [])
+        for name, needle in (("negative-service-usage-budgets-bad-period", "period is day, week or month"),
+                             ("negative-service-usage-limit-change-unknown-via", "via must be one of"),
+                             ("negative-service-usage-month-bad", "month is YYYY-MM")):
+            with self.subTest(name):
+                doc = fixture(name)
+                problems = fs.usage_limit_problems(doc) + fs.usage_history_problems(doc)
+                self.assertTrue(any(needle in p for p in problems), problems)
+
+    def test_dec_0183_sl_1_and_sl_3(self):
+        weekly = {"id": "machine.weekly", "scope": "machine", "kind": "weekly", "period": "week", "limitUsd": 80, "spentUsd": 1.0,
+                  "enforced": True, "editable": True, "minUsd": 1, "maxUsd": 200}
+        self.assertEqual(self.limits_problems(weekly), [])
+        rolling = {k: v for k, v in weekly.items() if k not in ("period", "minUsd", "maxUsd")}
+        self.assertEqual(self.limits_problems({**rolling, "windowSeconds": 604800}), [])
+        for limit, needle in (({**weekly, "period": "month"}, "a weekly limit"),
+                              ({**weekly, "editable": False}, "only on a limit with editable: true"),
+                              ({k: v for k, v in weekly.items() if k != "editable"}, "only on a limit with editable: true"),
+                              ({**weekly, "minUsd": 300}, "minUsd is not above maxUsd"),
+                              ({**weekly, "maxUsd": 0}, "maxUsd is a dollar amount above zero"),
+                              ({**weekly, "editable": "yes"}, "editable is true or false"),
+                              ({**weekly, "limitUsd": None}, "only a relative limit"),
+                              ({**weekly, "period": "year"}, "period is day, week or month")):
+            with self.subTest(needle):
+                self.assertTrue(any(needle in p for p in self.limits_problems(limit)), self.limits_problems(limit))
+
+    def test_dec_0183_sl_4_and_sl_6(self):
+        change = {"id": "chg-2", "at": "2026-10-04T09:00:00Z", "by": "operator", "byRef": "grant:7f3a", "via": "agent",
+                  "limitId": "machine.weekly", "before": {"limitUsd": 50, "enforced": True}, "after": {"limitUsd": 80, "enforced": True},
+                  "reason": "Raised for the launch week."}
+        older = {**change, "id": "chg-1", "at": "2026-10-01T09:00:00Z", "by": "service", "via": "config", "before": None}
+        month = {"month": "2026-10", "calls": 3, "unpricedCalls": 0, "costUsd": 1.5}
+        base = {"generatedAt": "2026-10-04T16:00:00Z"}
+        ok = {**base, "limitChanges": [change, older], "months": [{**month, "month": "2025-11"}, month]}
+        self.assertEqual(fs.usage_history_problems(ok), [])
+        cases = [
+            ({**base, "limitChanges": [older, change]}, "newest change first"),
+            ({**base, "limitChanges": [change, {**older, "id": "chg-2"}]}, "change id chg-2 appears twice"),
+            ({**base, "limitChanges": [{**change, "at": "2026-10-05T00:00:00Z"}]}, "not after the report's generatedAt"),
+            ({**base, "limitChanges": [{**change, "by": "person"}]}, "by must be one of"),
+            ({**base, "limitChanges": [{**change, "after": {"limitUsd": 0, "enforced": True}}]}, "after/limitUsd"),
+            ({**base, "limitChanges": [{**change, "who": "x"}]}, "who is not a limit change field"),
+            ({**base, "limitChanges": [{k: v for k, v in change.items() if k != "reason"}]}, "missing reason"),
+            ({**base, "limitChanges": [change] * 65}, "at most 64"),
+            ({**base, "months": [month, {**month, "month": "2026-09"}]}, "oldest first"),
+            ({**base, "months": [{**month, "month": "2026-11"}]}, "the report's UTC month or one of the 11 before it"),
+            ({**base, "months": [{**month, "month": "2025-10"}]}, "the report's UTC month or one of the 11 before it"),
+            ({**base, "months": [{**month, "calls": -1}]}, "calls is a whole number"),
+            ({**base, "months": [month] * 13}, "at most 12"),
+        ]
+        for report, needle in cases:
+            with self.subTest(needle):
+                problems = fs.usage_history_problems(report)
+                self.assertTrue(any(needle in p for p in problems), problems)
+
+    def test_dec_0183_the_report_counts_a_week_and_passes_the_history_through(self):
+        now = dt.datetime(2026, 10, 4, 16, 0, tzinfo=dt.timezone.utc)  # a Sunday: the ISO week began Monday 2026-09-28
+        receipts = [fs.make_usage_receipt("anthropic", "m", input_tokens=1, output_tokens=1, cost_usd=c, cost_basis="provider", at=at)
+                    for c, at in ((0.25, "2026-10-04T10:00:00Z"), (0.5, "2026-09-28T00:00:00Z"), (1.0, "2026-09-27T23:59:59Z"))]
+        change = {"id": "chg-1", "at": "2026-10-04T09:00:00Z", "by": "agent", "via": "agent", "limitId": "machine.weekly",
+                  "before": {"limitUsd": 100, "enforced": True}, "after": {"limitUsd": 80, "enforced": True}, "reason": "Tightened."}
+        months = [{"month": "2026-09", "calls": 1, "unpricedCalls": 0, "costUsd": 1.5}, {"month": "2026-10", "calls": 1, "unpricedCalls": 0, "costUsd": 0.25}]
+        report = fs.usage_report(receipts, service_id="example-agent", now=now, budgets=[
+            {"id": "machine.weekly", "scope": "machine", "kind": "weekly", "period": "week", "limitUsd": 80, "enforced": True,
+             "editable": True, "minUsd": 1, "maxUsd": 200}], limit_changes=[change], months=months)
+        self.assertEqual(report["budgets"][0]["spentUsd"], 0.75, "the week runs from Monday 00:00 UTC")
+        self.assertEqual(report["limitChanges"], [change])
+        self.assertEqual(report["months"], months)
+        plain = fs.usage_report(receipts, service_id="example-agent", now=now)
+        self.assertNotIn("limitChanges", plain)
+        self.assertNotIn("months", plain)
+        with self.assertRaises(fs.ServiceError) as caught:
+            fs.usage_report(receipts, service_id="example-agent", now=now, months=list(reversed(months)))
+        self.assertIn("oldest first", str(caught.exception))
+        with self.assertRaises(fs.ServiceError):
+            fs.usage_report(receipts, service_id="example-agent", now=now, limit_changes="chg-1")
+
     def test_the_descriptor_names_its_header_and_scheme_the_schema_way(self):
         base = {"protocol": fs.PROTOCOL, "id": "example-agent", "instance": "default", "name": "Example", "origin": "http://127.0.0.1:47195",
                 "auth": {"tokenFile": "~/t"}, "lifecycle": {"manager": "none"}, "paths": {"data": "~/d", "logs": []},
