@@ -241,7 +241,7 @@
    "imports": [
     "fabric_secrets"
    ],
-   "sha256": "c9c555bbefa0d1d43cf43d27d2b5c0cf37fd71e185593f646cb1d63a1d7bba80"
+   "sha256": "28022eb459724a1a681a533cab931fd697226d09f4ce06106dd59280db198b80"
   },
   {
    "module": "fabric_actions",
@@ -909,7 +909,7 @@
    "imports": [
     "fabric-secrets"
    ],
-   "sha256": "c5aa02c2f324a7e18a8036f0616aa2270af34288940acb82a8bd85cc9c841a92"
+   "sha256": "9dc71a24e0e3f4a9752a941cf262c2beca612e2511b7b1c7498c4511bb54f0d7"
   },
   {
    "module": "fabric-actions",
@@ -11529,7 +11529,7 @@
    "fabric_package_schema.py": "db5dbdda6dddcc97419e6751b79f77db48eb2a99c7e3f4df77581fcd9862824d",
    "fabric_package_rules.py": "2318a3efe1ac228e27cdf1dd80eda0bb1e3991963484a7f9a154b3274fa5408b",
    "fabric_package.py": "f141ae4c34376aaa540d2a03015d55f773e67441c9ad945667c7cf9a46466969",
-   "fabric_protocols.py": "c9c555bbefa0d1d43cf43d27d2b5c0cf37fd71e185593f646cb1d63a1d7bba80",
+   "fabric_protocols.py": "28022eb459724a1a681a533cab931fd697226d09f4ce06106dd59280db198b80",
    "fabric_actions.py": "6d483c879723da895b6e99b7e69c9869548ddd61fb717a9e6be291017769d95f",
    "fabric_connections.py": "35721ade284773a23ea5c8323577a8de80562c7f8508f48e8199bed1ae3af865",
    "fabric_instance_facts.py": "7bfeb2dcd97af5a6bfebb3855fd8069a15cc9fe12759189bb89f9bc91e349d84",
@@ -11587,7 +11587,7 @@
    "fabric-package-schema.mjs": "c13e3ea3e6cde71815111307251dec00023cd19dd5f9b2c033799a2eaf4df0e1",
    "fabric-package-rules.mjs": "b0a2dfc96a7429a68cf6b26f2822c3e620da03639d78e70e9a4370db596f89f5",
    "fabric-package.mjs": "feb7f97b155f6a99d0bc187b2f9d8832438eda3879fe4e25f649e684e6ae1d69",
-   "fabric-protocols.mjs": "c5aa02c2f324a7e18a8036f0616aa2270af34288940acb82a8bd85cc9c841a92",
+   "fabric-protocols.mjs": "9dc71a24e0e3f4a9752a941cf262c2beca612e2511b7b1c7498c4511bb54f0d7",
    "fabric-actions.mjs": "6435f458863a6cb7e3e1266de4aa1d9a68a5a5cfcd5aae1b934b9573b028b569",
    "fabric-connections.mjs": "9010a2493040eebd6d9777e497bdca32d0925a42c3cd3d44ced261b39ef68875",
    "fabric-instance-facts.mjs": "92382562424de25f1dc78bd03949ea1ddee2d0f22bf54b4b820ee1d2c87d477d",
