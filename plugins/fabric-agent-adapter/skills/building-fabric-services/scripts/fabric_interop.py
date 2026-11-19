@@ -18,6 +18,7 @@ Normative source: fabric-agent-contract docs/specification/interop.md (DEC-0016,
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import math
@@ -353,6 +354,58 @@ JOB_REQUEST_SCHEMA = {"type": "object", "required": ["id"], "additionalPropertie
     "inputResponses": {"type": "object"}}}
 
 
+# --- compact MCP: two doors, search and execute (FAA-356, agents database R33 O15, D-72) ----------------------------
+# The operator, 2026-11-18: an MCP server lists two doors, `<domain>.search` and `<domain>.execute`; a capability is
+# listed beside them only on a measured case. Every capability stays served, declared and probed one by one.
+
+COMPACT_META = "ai.passioncode.fabric/compact"  # the door a compact tool is: "search" or "execute"
+COMPACT_RETIRED_META = "ai.passioncode.fabric/retired"  # on a call by a name off the listing: {since, replacedBy}
+COMPACT_LIMIT = 5  # a listing of at most this many tools is short enough as it is
+DIRECT_MAX = 3  # direct tools beside the two doors, each on a measured case
+DIRECT_MIN_CALLS, DIRECT_MIN_SHARE = 20, 0.3  # the measured case: >= 20 calls and >= 30 % of the service's calls
+_COMPACT_DOMAIN = re.compile(r"^[a-z][a-z0-9_-]{0,62}(\.[a-z0-9_-]{1,63}){0,3}\Z")
+_RETIRED_DATE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\Z")
+JOB_TOOL_NAMES = ("fabric.job.get", "fabric.job.cancel")  # seats beside the doors with no measurement (D-72)
+
+
+def direct_problem(name: str, measured: Any) -> Optional[str]:
+    """Why `measured` ({calls, total, window}) is not a measured case for a direct tool, or None (D-72)."""
+    if not isinstance(measured, dict):
+        return "%s: a direct tool needs its measurement {calls, total, window}" % name
+    calls, total, window = measured.get("calls"), measured.get("total"), measured.get("window")
+    if not all(type(v) is int and v >= 0 for v in (calls, total)) or not (isinstance(window, str) and window.strip()):
+        return "%s: the measurement names calls and total as counts and its window" % name
+    if calls > total or calls < DIRECT_MIN_CALLS or total == 0 or calls / total < DIRECT_MIN_SHARE:
+        return "%s: %d of %d calls is not a measured case (at least %d calls and %d %% of the service's calls)" % (
+            name, calls, total, DIRECT_MIN_CALLS, int(DIRECT_MIN_SHARE * 100))
+    return None
+
+
+class _NamedHeaders:
+    """The request's headers with Mcp-Name naming the operation `execute` runs (case-insensitive, read only)."""
+
+    def __init__(self, headers: Any, name: str):
+        self._headers, self._name = headers, encode_header_value(name)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if str(key).lower() == "mcp-name":
+            return self._name
+        value = self._headers.get(key) if hasattr(self._headers, "get") else None
+        if value is None and isinstance(self._headers, dict):
+            value = next((v for k, v in self._headers.items() if str(k).lower() == str(key).lower()), None)
+        return default if value is None else value
+
+    def __getitem__(self, key: str) -> Any:
+        return self.get(key)
+
+    def __contains__(self, key: Any) -> bool:
+        return self.get(key) is not None
+
+    def items(self) -> List[Any]:
+        source = list(self._headers.items()) if hasattr(self._headers, "items") else []
+        return [(k, v) for k, v in source if str(k).lower() != "mcp-name"] + [("Mcp-Name", self._name)]
+
+
 _UNREADABLE = object()  # what a service's spend or project function answers when it raised
 _UNREADABLE_PROJECT = UNREADABLE_PROJECT  # never a member of a mandate's projects, so a scoped mandate refuses
 
@@ -414,6 +467,124 @@ class McpToolServer:
         # DEC-0126 OA-7: a server that reads `source` (a decision's on a relayed action, a mandate's with agent_id) lists
         # operator-source/1 in its well-known protocols; well_known_protocols() hands the list to build_well_known.
         self.reads_source = agent_id is not None
+        self.compact: Optional[Dict[str, Any]] = None  # FAA-356: serve_compact's {domain, direct}
+        self.calls: Dict[str, int] = {}  # calls answered per tool name since the start, for search's `calls`
+
+    def serve_compact(self, domain: str, direct: Any = None, retired: Optional[str] = None) -> None:
+        """List two doors, `<domain>.search` and `<domain>.execute`, instead of one tool per capability (FAA-356,
+        agents database R33 O15, decision D-72). Three seats beside the doors: the built-in job tools take theirs
+        with no measurement while the server has a job store (D-72, until the contract folds them into execute);
+        `direct` maps the rest, at most three in all, to their measured case {calls, total, window}: at least 20
+        calls and 30 % of the service's calls. Every tool stays callable by its own name, so a client of the full
+        listing keeps working; `retired` (YYYY-MM-DD), the day the full listing left tools/list, is what search
+        answers as each such name's `retired` (R28). A server whose full listing holds five tools or fewer lists it
+        as it is. Call it after the tools are added."""
+        if not isinstance(domain, str) or not _COMPACT_DOMAIN.match(domain):
+            raise InteropError("serve_compact: the domain is a lower-case name such as example-agent (FAA-356).")
+        doors = {domain + ".search", domain + ".execute"}
+        if doors & set(self.handlers) or doors & set(JOB_TOOL_NAMES):
+            raise InteropError("serve_compact: a served tool already has the name %s." % " or ".join(sorted(doors)))
+        if retired is not None and not (isinstance(retired, str) and _RETIRED_DATE.match(retired)):
+            raise InteropError("serve_compact: retired is the day the full listing left tools/list, YYYY-MM-DD (R28).")
+        direct = dict(direct or {})
+        seats = DIRECT_MAX - len(self._job_tools())
+        if len(direct) > seats:
+            raise InteropError("serve_compact: at most %d direct tools beside the two doors%s (D-72)." % (
+                seats, " and the two job tools" if self.jobs is not None else ""))
+        for name, measured in direct.items():
+            if name not in self.handlers or name in JOB_TOOL_NAMES:
+                raise InteropError("serve_compact: %s is not a tool this server serves." % name)
+            problem = direct_problem(name, measured)
+            if problem:
+                raise InteropError("serve_compact: " + problem + " (D-72).")
+        self.compact = {"domain": domain, "direct": {k: dict(v) for k, v in direct.items()}, "retired": retired}
+
+    def _full_listing(self) -> List[Dict[str, Any]]:
+        return self.tools + self._job_tools()
+
+    def listing(self) -> List[Dict[str, Any]]:
+        """What tools/list answers: the full listing, or the direct tools, the job tools and the two doors when
+        serve_compact was called and the full listing holds more than five tools."""
+        full = self._full_listing()
+        if self.compact is None or len(full) <= COMPACT_LIMIT:
+            return full
+        direct = [t for t in self.tools if t["name"] in self.compact["direct"]]
+        return direct + self._job_tools() + self._door_tools()
+
+    def _door_tools(self) -> List[Dict[str, Any]]:
+        domain = self.compact["domain"]
+        return [
+            {"name": domain + ".search",
+             "description": "Find what this agent can do: every operation with its purpose, input schema, gate (none, "
+                            "relayed, human) and an example; query filters by words. Run one with %s.execute." % domain,
+             "inputSchema": {"type": "object", "additionalProperties": False,
+                             "properties": {"query": {"type": "string", "maxLength": 200,
+                                                      "description": "Words every operation found must contain."}}},
+             "annotations": {"readOnlyHint": True, "idempotentHint": True}, "_meta": {COMPACT_META: "search"}},
+            {"name": domain + ".execute",
+             "description": "Run one operation %s.search names, with its arguments; the same checks, gate and audit as "
+                            "calling it by its own name." % domain,
+             "inputSchema": {"type": "object", "required": ["operation"], "additionalProperties": False,
+                             "properties": {"operation": {"type": "string", "minLength": 1, "maxLength": 128},
+                                            "arguments": {"type": "object"},
+                                            "idempotencyKey": {"type": "string", "minLength": 8, "maxLength": 128}}},
+             "_meta": {COMPACT_META: "execute"}},
+        ]
+
+    def _operation(self, tool: Dict[str, Any]) -> Dict[str, Any]:
+        """One operation as search answers it: the tool as the full listing serves it, its gate, an example and calls."""
+        name = tool["name"]
+        entry = self.actions.get(name)
+        examples = (tool.get("inputSchema") or {}).get("examples")
+        operation = dict(tool)
+        operation.update({"gate": entry["action"]["gate"] if entry else "none",
+                          "example": examples[0] if isinstance(examples, list) and examples else None,
+                          "calls": self.calls.get(name, 0)})
+        compact = self.compact or {}
+        if name in (compact.get("direct") or {}):
+            operation["direct"] = dict(compact["direct"][name])
+        elif compact.get("retired") and name not in JOB_TOOL_NAMES:
+            operation["retired"] = compact["retired"]  # its own name left tools/list that day and still answers (R28)
+        return operation
+
+    def _search(self, arguments: Dict[str, Any], span: str) -> Dict[str, Any]:
+        query = arguments.get("query", "")
+        if not isinstance(query, str) or len(query) > 200 or set(arguments) - {"query"}:
+            return tool_result({"error": {"code": "invalid-arguments", "message": "search takes {query?: string}."}},
+                               is_error=True, traceparent=span)
+        words = query.lower().split()
+        found = [self._operation(t) for t in self._full_listing()
+                 if all(w in " ".join(str(t.get(k, "")) for k in ("name", "title", "description")).lower() for w in words)]
+        return tool_result({"domain": self.compact["domain"], "operations": found, "total": len(self._full_listing())},
+                           traceparent=span)
+
+    def _execute(self, rid: Any, arguments: Dict[str, Any], headers: Any, tier: str,
+                 meta: Dict[str, Any], span: str) -> Dict[str, Any]:
+        """Re-enter tools/call with the operation's own name, so its authorize level, action gate, mandate and audit
+        run as they do for a call by that name, never wider (DEC-0121 parity, D-72)."""
+        def refuse(code: str, message: str, **extra: Any) -> Dict[str, Any]:
+            return {"jsonrpc": "2.0", "id": rid, "result": tool_result(
+                {"error": {"code": code, "message": message, **extra}}, is_error=True, traceparent=span)}
+        operation, inner = arguments.get("operation"), arguments.get("arguments", {})
+        key = arguments.get("idempotencyKey")
+        if set(arguments) - {"operation", "arguments", "idempotencyKey"} or not isinstance(operation, str) \
+                or not isinstance(inner, dict) or not (key is None or (isinstance(key, str) and 8 <= len(key) <= 128)):
+            return refuse("invalid-arguments", "execute takes {operation: string, arguments?: object, idempotencyKey?: string}.")
+        names = [t["name"] for t in self._full_listing()]
+        if operation not in names:
+            return refuse("unknown-operation", "%s is not an operation of this agent; %s.search lists them." % (
+                operation, self.compact["domain"]), near=difflib.get_close_matches(operation, names, n=3, cutoff=0.5))
+        if key is not None:
+            schema = next(t for t in self._full_listing() if t["name"] == operation).get("inputSchema") or {}
+            if "idempotencyKey" not in (schema.get("properties") or {}):
+                return refuse("invalid-arguments", "%s takes no idempotencyKey; leave it out or pass the key its "
+                                                   "arguments name." % operation)
+            if inner.get("idempotencyKey", key) != key:
+                return refuse("invalid-arguments", "idempotencyKey and arguments.idempotencyKey disagree.")
+            inner = {**inner, "idempotencyKey": key}
+        message = {"jsonrpc": "2.0", "id": rid, "method": "tools/call",
+                   "params": {"name": operation, "arguments": inner, "_meta": meta}}
+        return self.handle(message, None if headers is None else _NamedHeaders(headers, operation), tier=tier, _route="execute")
 
     def well_known_protocols(self, protocols: Any = ()) -> List[str]:
         """The well-known `protocols` (DEC-0067) a service on this server lists: `protocols` and, when it reads `source`
@@ -443,6 +614,8 @@ class McpToolServer:
         `personal` or `org:<orgId>` (a name, or a function of the arguments), and a relayed action names its effect."""
         if tool["name"] in self.handlers:
             raise InteropError("Tool %s is served twice." % tool["name"])
+        if self.compact is not None and tool["name"] in (self.compact["domain"] + ".search", self.compact["domain"] + ".execute"):
+            raise InteropError("Tool %s is a door of the compact listing (FAA-356)." % tool["name"])
         if "outputSchema" in tool:
             require_object_root(tool["name"], tool["outputSchema"])
         if action is not None:
@@ -631,7 +804,7 @@ class McpToolServer:
     def _error(rid: Any, code: int, message: str) -> Dict[str, Any]:
         return {"jsonrpc": "2.0", "id": rid, "error": {"code": code, "message": message}}
 
-    def handle(self, message: Any, headers: Any = None, tier: str = "T2") -> Optional[Dict[str, Any]]:
+    def handle(self, message: Any, headers: Any = None, tier: str = "T2", *, _route: str = "name") -> Optional[Dict[str, Any]]:
         """One JSON-RPC message. Pass the HTTP request headers so the 2026-07-28 standard headers
         are checked (`mcp_header_problem`); a mismatch answers HEADER_MISMATCH even for a
         notification, so the transport can return HTTP 400. `tier` is the caller's origin for the
@@ -663,7 +836,7 @@ class McpToolServer:
             return {"jsonrpc": "2.0", "id": rid, "result": {"resultType": "complete", "capabilities": {"tools": {}},
                                                              "serverInfo": self.info, "_meta": {"traceparent": span}}}
         if method == "tools/list":
-            return {"jsonrpc": "2.0", "id": rid, "result": {"resultType": "complete", "tools": self.tools + self._job_tools(),
+            return {"jsonrpc": "2.0", "id": rid, "result": {"resultType": "complete", "tools": self.listing(),
                                                              "_meta": {"traceparent": span}}}
         if method != "tools/call":
             return self._error(rid, -32601, "Method %s is not served here." % method)
@@ -671,6 +844,22 @@ class McpToolServer:
         arguments = {} if params.get("arguments") is None else params["arguments"]
         if not isinstance(name, str) or not isinstance(arguments, dict):
             return self._error(rid, -32602, "A tool call names its tool as a string and passes its arguments as a JSON object.")
+        if self.compact is not None and name == self.compact["domain"] + ".search":
+            return {"jsonrpc": "2.0", "id": rid, "result": self._search(arguments, span)}
+        if self.compact is not None and name == self.compact["domain"] + ".execute":
+            return self._execute(rid, arguments, headers, tier, meta, span)
+        if _route == "name" and self.compact is not None and self.compact.get("retired") and name in self.handlers \
+                and name not in self.compact["direct"] and len(self._full_listing()) > COMPACT_LIMIT:
+            # R28: a name off the listing keeps answering; its result says since when and what replaced it. In _meta,
+            # never structuredContent, so a tool's outputSchema still holds (FAA-356, the base's patterns/compact-mcp).
+            response = self.handle(message, headers, tier=tier, _route="retired")
+            result = (response or {}).get("result")
+            if isinstance(result, dict):
+                result["_meta"] = dict(result.get("_meta") or {}, **{COMPACT_RETIRED_META: {
+                    "since": self.compact["retired"], "replacedBy": self.compact["domain"] + ".execute"}})
+            return response
+        if name in self.handlers or (self.jobs is not None and name in ("fabric.job.get", "fabric.job.cancel")):
+            self.calls[name] = self.calls.get(name, 0) + 1
         if name in ("fabric.job.get", "fabric.job.cancel") and self.jobs is not None:
             verdict = None
             if self._authorize is not None:
