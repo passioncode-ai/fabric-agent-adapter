@@ -4,6 +4,12 @@
 
 ### Changed
 
+- building-fabric-services: no low default spend ceiling in what a builder copies (FAA-364, Fabric's board request
+  `12caaa48`, the operator's order of 2026-11-19, the agents base's D-79): the data-agent and support-agent example
+  configs hold `ceilingUsd` 95 a `month` (was 1 a `day`), just under the key's USD 100 a month, and
+  `references/connectors.md` shows the same with the rule (a lower ceiling only by a person or a proven pipeline);
+  `test/test_no_low_default_ceilings.py` fails an example under 50.
+
 - working-with-fabric: a release of a product whose checks approve it (`"approval": "checks"`, the operator's
   "Releases" rule, Fabric ADR-0145) is its version tag push, never a `fabric_effect_request` (FAA-363, board request
   `e9562845` from the PassionCode PM agent): a run asked one for tag `v0.98.4` (`effect:205050`) and the operator got a

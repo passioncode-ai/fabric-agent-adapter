@@ -61,7 +61,7 @@ ASCII digits, all as kind `refused` before sending; it checks a host's shape, no
 
 ```python
 import fabric_openrouter, fabric_usage
-client = fabric_openrouter.Client(ceiling_usd=2.0, window="day",
+client = fabric_openrouter.Client(ceiling_usd=95.0, window="month",
                                   ledger=fabric_usage.JsonlUsageLedger(state / "usage.jsonl"),
                                   prices=fabric_openrouter.prices_from_catalog(catalog))
 answer = client.chat(messages, model="deepseek/deepseek-v4.1-flash", fallback="qwen/qwen3.8-flash", max_tokens=800)
@@ -69,9 +69,14 @@ answer["content"], answer["receipt"]["costUsd"], answer["attempts"]
 ```
 
 ```js
-const client = new Client({ ceilingUsd: 2, ledger: new JsonlUsageLedger(file), prices: pricesFromCatalog(catalog) });
+const client = new Client({ ceilingUsd: 95, window: 'month', ledger: new JsonlUsageLedger(file), prices: pricesFromCatalog(catalog) });
 const answer = await client.chat(messages, { model, fallback, maxTokens: 800 });
 ```
+
+The ceiling is the agent's own stop just under its key's monthly limit (USD 100 a month by default, so 95 here). Never
+ship a low default such as 1, 5 or 10 USD a day: a default ceiling is large (50, 100, 1000), and a lower one is set only
+by a person or by a pipeline proven at twice its successful runs' price (the agents base's D-79 on R33 O16, the
+operator's order of 2026-11-19, board request `12caaa48`).
 
 | Rule | What happens |
 |---|---|
