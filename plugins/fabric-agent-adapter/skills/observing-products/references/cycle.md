@@ -17,7 +17,9 @@
 1. **Take the cycle's lock.** A cycle never starts over its own last run: when the previous cycle is still going (its
    lock is held, or its record for the window is not written), this one ends at once and says nothing. A lock older
    than three intervals is stale: record that the last cycle died, then take it.
-2. **Read the inventory** (`docs/observer/channels.md`) and its last cycle record. Windows missed while the machine
+2. **Read the state file first** (`docs/observer/state.json`, the channels reference): its cursors, open waits,
+   promises, checked heads and long sessions are where this cycle resumes, whether the last one ran in this session
+   or in one that died. Then **read the inventory** (`docs/observer/channels.md`) and its last cycle record. Windows missed while the machine
    slept run once, not once each: one cycle reads each channel from its saved cursor to now.
 3. **Read each `connected` channel** from its cursor, bounded by its row's page limit and deadline. In a cloud cycle
    read only `remote` rows and list the `local` ones as skipped.
@@ -27,9 +29,10 @@
 6. **Signals become findings.** Dedupe against the open findings (same channel, same cause): a repeat updates the
    open finding's count and last-seen time instead of opening a new one.
 7. **Triage and act** on each new or worsened finding (below).
-8. **Write one cycle record**, then advance the cursors of the channels read in full. Advance the cursors only after
-   the record is written: a cycle that dies before its record reads the same window again next time, and nothing is
-   lost.
+8. **Write one cycle record**, then advance the cursors of the channels read in full, in the state file with its
+   waits, promises and checked heads. Advance the cursors only after the record is written: a cycle that dies before
+   its record reads the same window again next time, and nothing is lost. A wait that cleared runs its `then` and is
+   closed with its evidence; a long session that went dark is restarted by the route its `sessions` entry names.
 9. **Release the lock.**
 
 ## The cycle record

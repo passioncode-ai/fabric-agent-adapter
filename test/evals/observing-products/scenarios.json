@@ -101,7 +101,34 @@
       "expected": [
         "adds the consumers' audit to every 30-minute cycle",
         "reads each consumer's pinned version, its calls and errors, retired names still called and knowledge.search questions that found nothing",
-        "reads consumers from the product's own records, never their repositories, and files a consumer's gap on that consumer's board"
+        "reads consumers from the product's own records and edits no consumer repository; a checked-out consumer of the same estate is read only as a consumer-repo channel through the product's own lint; a consumer's gap goes to that consumer's board"
+      ]
+    },
+    {
+      "id": "long-session-and-its-queue",
+      "request": "Our engine's work runs in one long agent session with a queue of sub-sessions; watch it too.",
+      "expected": [
+        "adds an agent-session row (its process, its branch's last commit, the relaunch route through Switchboard) and a work-queue row (lanes, failed runs, a limit wait that outlasts its window)",
+        "keeps the session id and its relaunch route in docs/observer/state.json under sessions, not only in the row",
+        "treats a limit wait inside its window as no failure"
+      ]
+    },
+    {
+      "id": "resume-after-a-dead-session",
+      "request": "The observer's session died mid-cycle; a new one is starting.",
+      "expected": [
+        "reads docs/observer/state.json first, before the inventory and any channel",
+        "resumes from its cursors, open waits, promises and checked heads, and reads again the window whose record was not written",
+        "checks it with observer_inventory.py state --channels docs/observer/channels.md"
+      ]
+    },
+    {
+      "id": "a-board-thread-and-consumer-repos",
+      "request": "Follow our two consumers' board threads and their branches.",
+      "expected": [
+        "adds one board-thread row per thread (com.list with the thread and unread, then com.read_ack)",
+        "adds one consumer-repo row per consumer with its checked heads in the state file and the product's lint at each new head",
+        "files a consumer's finding on that consumer's board, never edits its repository"
       ]
     }
   ]
