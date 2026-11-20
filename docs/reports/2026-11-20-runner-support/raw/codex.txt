@@ -1,0 +1,40 @@
+2026-11-20T20:43:38Z
+codex-cli 0.169.0
+$ codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox "<probe>"   (cwd: main checkout)
+Reading additional input from stdin...
+OpenAI Codex v0.169.0
+--------
+workdir: /Users/sshlg/DATA/fabric-agent-adapter
+model: gpt-6.1-sol
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 01a1fab3-58e5-7790-9aba-5612b0ac38f9
+--------
+user
+Call the MCP tool fabric_whoami exactly once (it may be named mcp__fabric__fabric_whoami or fabric_whoami or fabric__fabric_whoami). Then reply with exactly one line: "OK <project.name> <protocol.version>" from its answer, or "ERR <the error text>" if it failed or the tool is absent. Do nothing else.
+warning: Under-development features enabled: chronicle. Under-development features are incomplete and may behave unpredictably. To suppress this warning, set `suppress_unstable_features_warning = true` in /Users/sshlg/.codex/config.toml.
+warning: Combined user instructions use 71179 bytes, above the 65536-byte `project_doc_max_bytes` setting. The total includes global and thread instructions. The limit applies only to project files.
+hook: SessionStart
+hook: SessionStart
+hook: SessionStart
+hook: SessionStart Completed
+hook: SessionStart Completed
+hook: SessionStart Completed
+hook: UserPromptSubmit
+hook: UserPromptSubmit Completed
+codex
+ERR tool is absent
+hook: Stop
+hook: Stop Completed
+tokens used
+40.211
+ERR tool is absent
+exit 0
+
+# run 2, 2026-11-20T20:44:46Z: codex exec --json ... (same prompt); mcp_tool_call events and the answer, result text cut to 120 chars
+item.started fabric fabric_whoami in_progress 
+item.completed fabric fabric_whoami completed {   "session_id": "267d27e7-0254-48ca-ba07-5fec732084e2",   "waiting": {     "window_days": 7,     "board_requests": {  
+answer: OK fabric-agent-adapter 3

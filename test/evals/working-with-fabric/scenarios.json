@@ -840,6 +840,26 @@
         "pushes the tag, watches the release run to success and confirms the published package",
         "still asks fabric_effect_request for money, deletion and a publication that is not such a release"
       ]
+    },
+    {
+      "id": "deepseek-harness-host-hook",
+      "trap": "an agent copied Claude Code's hooks.json into DeepSeek Harness through dsh's own hooks bridge, which the published dsh refuses as incompatible, and the person's sessions started with no Fabric context",
+      "request": "I use DeepSeek Harness (dsh). How do I get the Fabric session-start context and the fabric tools there?",
+      "expected": [
+        "runs install-host-hooks --host deepseek-harness as a dry run, then --apply with the printed digest: a managed Cordis plugin loader and one managed block in $DSH_HOME/cordis.patch.yml",
+        "registers fabric-mcp itself with a @deepseek-ai/dsh-mcp-client row named fabric and --runner deepseek-harness in the same home layer, no secret in it",
+        "says a new session is needed, that Fabric 0.3.26 still looks for dsh-tui so fabric-mcp refuses until Fabric names dsh, and proves it with a fabric_whoami call reported with its actual answer"
+      ]
+    },
+    {
+      "id": "runner-support-from-the-matrix",
+      "trap": "an agent told the person every runner in Fabric's catalogue was supported because fabric-mcp accepted its --runner name, though OpenClaw cut fabric_whoami's answer and DeepSeek Harness was refused",
+      "request": "Which coding agents fully work with Fabric right now, and which are not checked?",
+      "expected": [
+        "answers from references/runner-support.json (runner-support/1), naming the date and versions it was measured on",
+        "separates fully supported, supported with a named gap, and not checked, and gives each gap's owner (Fabric, the contract or the adapter)",
+        "does not count a --runner name Fabric accepts, or a launch, as support without a real run"
+      ]
     }
   ]
 }

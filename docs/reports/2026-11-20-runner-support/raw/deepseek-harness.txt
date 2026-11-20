@@ -1,0 +1,47 @@
+2026-11-20T20:58:05Z
+dsh 0.2.2-rc.5
+$ DSH_HOME=<scratch>/dsh-run/home fabric_session.py install-host-hooks --host deepseek-harness --apply   (worktree build, FAA-370)
+host=deepseek-harness sha256=b006622c563e25e24ad97ee237ca04e6fc0819fbe6e30b0ee96d28c5e988e6f9 action=install
+would change <scratch>/dsh-run/home/plugins/fabric-agent-adapter.mjs
+would change <scratch>/dsh-run/home/cordis.patch.yml
+native loader files updated; existing sessions must reload to use them
+home layer (scratch paths shortened):
+- id: agent-default-model
+  config:
+    provider: openrouter
+    model: deepseek/deepseek-v4.1-flash
+- id: llm-pi-ai
+  config:
+    providers:
+      openrouter:
+        apiKeyEnv: OPENROUTER_API_KEY
+- insert:
+    - id: fabric-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: fabric
+        transport: stdio
+        command: /Applications/Fabric.app/Contents/Resources/bin/fabric-mcp
+        args: ['--runner', 'deepseek-harness']
+# >>> fabric-agent-adapter managed host hook v1 (install-host-hooks --host deepseek-harness --remove takes it out)
+- insert:
+    - id: fabric-agent-adapter
+      name: "<scratch>/dsh-run/home/plugins/fabric-agent-adapter.mjs"
+# <<< fabric-agent-adapter
+
+2026-11-20T20:58:31Z
+$ env -u FABRIC_LAUNCHED_SESSION DSH_HOME=<scratch>/dsh-run/home use_secret.py run --env local fabric-agent-adapter OPENROUTER_API_KEY -- dsh --profile headless --approval-policy never "<two-line probe: CONTEXT YES|NO, then fabric_whoami>"  (cwd: main checkout)
+result: CONTEXT NO ERR Fabric could not be reached: DeepSeek Harness is not installed on this computer as Fabric sees it (its program is not on Fabric's PATH). Nothing was shown to the operator. 
+stderr: fabric-mcp: failed — DeepSeek Harness is not installed on this computer as Fabric sees it (its program is not on Fabric's PATH). Nothing was shown to the operator.
+
+# the injection, read back from the session store (<scratch>/dsh-run/home/sessions/.../session.v4.jsonl.zstd, decompressed):
+"role":"user","content":[{"type":"text","text":"[fabric-agent-adapter] Fabric is running and this DeepSeek Harness has its MCP server `fabric` registered. Registration is not proof of connec
+"source":{"kind":"fabric-agent-adapter"}
+# the model's first words in a --json run with the task 'Reply with the single word: ready': 
+# fabric-mcp refused: Fabric 0.3.26's catalogue names program dsh-tui (consoleCatalog.ts), removed upstream in 10bb9cbf4a (2026-08-04)
+
+2026-11-20T21:00:36Z
+# interim: ln -s dsh /opt/homebrew/bin/dsh-tui (until Fabric names dsh); same run with the one-line probe
+OK fabric-agent-adapter 3
+fabric-mcp: connected
+exit 0

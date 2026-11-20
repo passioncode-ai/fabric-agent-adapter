@@ -1,0 +1,23 @@
+2026-11-20T20:46:49Z
+1.1.0
+$ pi mcp add fabric -- /Applications/Fabric.app/Contents/Resources/bin/fabric-mcp --runner pi
+Added global MCP server "fabric" in /Users/sshlg/.pi/agent/mcp.json.
+Check it with: pi mcp list
+$ pi mcp list
+fabric: connected, 51 tools (codemode, global)
+  /Applications/Fabric.app/Contents/Resources/bin/fabric-mcp --runner pi
+  tools: fabric_whoami, fabric_stage_report, fabric_agents_list, fabric_tasks_list, fabric_memory_search, fabric_transcripts_search, fabric_memory_remember, fabric_task_create, fabric_task_handoff, fabric_task_claim, fabric_task_release, fabric_task_move, fabric_task_close, fabric_task_note, fabric_task_link, fabric_task_brief, fabric_task_accept, fabric_access_list, fabric_access_decide, fabric_access_revoke, fabric_question_ask, fabric_question_check, fabric_project_profile, fabric_project_folder_attach, fabric_project_folder_detach, fabric_heartbeat, fabric_effect_report, fabric_effect_request, fabric_leases_list, fabric_work_list, fabric_board_search, fabric_work_claim, fabric_work_release, fabric_session_observe, com.submit, com.list, com.get, com.read_ack, com.reply, com.cancel, com.status, com.enroll, com.claim, com.renew, com.accept, com.progress, com.effect_begin, com.complete, com.reconcile, com.responder_replace, com.directory
+
+2026-11-20T20:46:59Z
+$ pi -p "<probe>"  (cwd: main checkout)
+No API key found for the selected model.
+
+Use /login to log into a provider via OAuth or API key. See:
+  /opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/docs/providers.md
+  /opt/homebrew/lib/node_modules/@earendil-works/pi-coding-agent/docs/models.md
+exit 1
+
+2026-11-20T20:47:14Z
+$ use_secret.py run --env local fabric-agent-adapter OPENROUTER_API_KEY -- pi --provider openrouter --model deepseek/deepseek-v4.1-flash -p "<probe>"  (cwd: main checkout; the key by name, never printed)
+OK fabric-agent-adapter 3
+exit 0

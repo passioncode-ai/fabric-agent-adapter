@@ -62,14 +62,14 @@ SESSION_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 LOOPBACK_ORIGIN = re.compile(r"http://127\.0\.0\.1:(\d{1,5})")
 
 
-VERSION = "0.100.1"
+VERSION = "0.101.0"
 
 
-HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code",
-         "hermes": "Hermes", "opencode": "OpenCode", "openclaw": "OpenClaw", "pi": "Pi"}
+HOSTS = {"claude": "Claude Code", "codex": "Codex", "kimi": "Kimi Code", "hermes": "Hermes", "opencode": "OpenCode",
+         "openclaw": "OpenClaw", "pi": "Pi", "deepseek-harness": "DeepSeek Harness"}  # FAA-370: dsh's Cordis plugin
 
 
-NATIVE_PLUGIN_HOSTS = frozenset(("hermes", "opencode", "openclaw", "pi"))
+NATIVE_PLUGIN_HOSTS = frozenset(("hermes", "opencode", "openclaw", "pi", "deepseek-harness"))
 
 
 # A session Fabric launched. FABRIC_LAUNCHED_SESSION=1 is the marker Fabric is asked to set (need D6); the others are

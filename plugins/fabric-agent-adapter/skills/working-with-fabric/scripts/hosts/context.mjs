@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const scriptPath = fileURLToPath(new URL('../fabric_session.py', import.meta.url));
-const hosts = new Set(['opencode', 'pi', 'openclaw']);
+const hosts = new Set(['opencode', 'pi', 'openclaw', 'deepseek-harness']);
 const cap = 64 * 1024;
 
 // Resolves the helper's context, '' when it answered none (or nothing usable), and null when the run failed: an error,

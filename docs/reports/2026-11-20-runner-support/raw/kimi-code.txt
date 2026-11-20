@@ -1,0 +1,13 @@
+2026-11-20T20:44:46Z
+2.5.3
+$ kimi --yolo -p "<probe>"  (cwd: main checkout)
+error: Cannot combine --prompt with --yolo.
+exit 1
+$ kimi -p "<probe>" --output-format text  (cwd: main checkout)
+kimi version 2.5.3
+• Call the tool.Reply exactly one line: "OK fabric-agent-adapter 3".
+
+• OK fabric-agent-adapter 3
+
+To resume this session: kimi -r session_7d333569-c7e3-4b63-b147-4f711939803c
+exit 0

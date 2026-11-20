@@ -1,0 +1,10 @@
+2026-11-20T20:42:31Z
+2.1.329 (Claude Code)
+$ claude -p --model haiku --allowedTools mcp__fabric__fabric_whoami -- "<probe>"
+OK ai-image-maker-app 3
+exit 0
+
+# from the main checkout ~/DATA/fabric-agent-adapter
+2026-11-20T20:43:09Z
+OK fabric-agent-adapter 3
+exit 0

@@ -1,0 +1,497 @@
+{
+  "schema": "runner-support/1",
+  "measuredAt": "2026-11-20",
+  "fabric": "0.3.26",
+  "adapter": "0.101.0",
+  "how": "Each verified check is a real run with a model on this date, from a checkout of a Fabric project, calling Fabric MCP tools (fabric_whoami, com.status, fabric_work_list) and reading the answer; raw output under docs/reports/2026-11-20-runner-support/raw/ in the adapter repository. documented: read from code or an earlier probe, not run today. none: the runner has no such channel. gap: a run showed it does not work, with the owner of the fix in gaps.",
+  "tiers": {
+    "full": {
+      "ru": "Полностью поддерживаются",
+      "en": "Fully supported"
+    },
+    "gap": {
+      "ru": "Поддерживаются с пробелом",
+      "en": "Supported with a gap"
+    },
+    "not-checked": {
+      "ru": "Не проверены",
+      "en": "Not checked"
+    }
+  },
+  "runners": [
+    {
+      "id": "claude-code",
+      "label": "Claude Code",
+      "versionChecked": "2.1.329",
+      "tier": "full",
+      "checks": {
+        "launchFromFabric": {
+          "state": "verified",
+          "how": "mcp-config-flag (--mcp-config, --strict-mcp-config); this run itself is a Fabric-launched Claude Code session"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "claude mcp add --scope user fabric -- <Fabric>/bin/fabric-mcp --runner claude-code"
+        },
+        "board": {
+          "state": "verified"
+        },
+        "startupContext": {
+          "state": "verified",
+          "how": "plugin hooks.json SessionStart"
+        },
+        "turnEvents": {
+          "state": "verified",
+          "how": "Stop, SessionEnd, UserPromptSubmit, PostToolUse hooks"
+        },
+        "questions": {
+          "state": "documented",
+          "how": "fabric_question_ask on the same surface; not called, it would ask the operator"
+        },
+        "limits": {
+          "state": "documented",
+          "how": "working-with-fabric: \"hit your limit, resets at\"; Switchboard usage"
+        },
+        "skills": {
+          "state": "verified",
+          "how": "the plugin"
+        }
+      },
+      "gaps": [],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/claude-code.txt",
+        "docs/reports/2026-11-20-runner-support/raw/round2-claude-code.txt"
+      ]
+    },
+    {
+      "id": "codex",
+      "label": "Codex",
+      "versionChecked": "0.169.0",
+      "tier": "full",
+      "checks": {
+        "launchFromFabric": {
+          "state": "documented",
+          "how": "codex-config-home (Fabric probe of 2026-10-11 on 0.162.1); Codex sessions hold enroll grants in 28 projects"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "codex mcp add fabric -- <Fabric>/bin/fabric-mcp --runner codex"
+        },
+        "board": {
+          "state": "verified"
+        },
+        "startupContext": {
+          "state": "verified",
+          "how": "hooks.json SessionStart (install-host-hooks --host codex)"
+        },
+        "turnEvents": {
+          "state": "none",
+          "how": "Codex sends no turn to Fabric"
+        },
+        "questions": {
+          "state": "documented",
+          "how": "same surface; not called"
+        },
+        "limits": {
+          "state": "documented",
+          "how": "Switchboard usage and codex route"
+        },
+        "skills": {
+          "state": "documented",
+          "how": "~/.codex/skills through the PassionCode launcher"
+        }
+      },
+      "gaps": [
+        "run 1 of 3: the model answered \"tool is absent\" without calling it; runs 2 and 3 called fabric_whoami"
+      ],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/codex.txt",
+        "docs/reports/2026-11-20-runner-support/raw/round2-codex.txt"
+      ]
+    },
+    {
+      "id": "hermes",
+      "label": "Hermes Agent",
+      "versionChecked": "0.22.2",
+      "tier": "full",
+      "checks": {
+        "launchFromFabric": {
+          "state": "documented",
+          "how": "acp-session over Fabric's stdio bridge (Fabric probe on 0.21.4); a CEO runner"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "mcp_servers.fabric in ~/.hermes/config.yaml"
+        },
+        "board": {
+          "state": "verified"
+        },
+        "startupContext": {
+          "state": "documented",
+          "how": "native plugin fabric.context, enabled on this machine; not read back from a prompt"
+        },
+        "turnEvents": {
+          "state": "none"
+        },
+        "questions": {
+          "state": "documented",
+          "how": "same surface; not called"
+        },
+        "limits": {
+          "state": "not-checked"
+        },
+        "skills": {
+          "state": "documented",
+          "how": "~/.hermes/skills through the launcher"
+        }
+      },
+      "gaps": [],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/hermes.txt",
+        "docs/reports/2026-11-20-runner-support/raw/round2-hermes.txt"
+      ]
+    },
+    {
+      "id": "pi",
+      "label": "Pi",
+      "versionChecked": "1.1.0",
+      "tier": "full",
+      "checks": {
+        "launchFromFabric": {
+          "state": "documented",
+          "how": "a console in Fabric (no surface handed over); the agent's own fabric-mcp from ~/.pi/agent/mcp.json (ADR-0134)"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "pi mcp add fabric -- <Fabric>/bin/fabric-mcp --runner pi (registered on this machine 2026-11-20)"
+        },
+        "board": {
+          "state": "verified"
+        },
+        "startupContext": {
+          "state": "documented",
+          "how": "extension before_agent_start (install-host-hooks --host pi), installed"
+        },
+        "turnEvents": {
+          "state": "none"
+        },
+        "questions": {
+          "state": "documented",
+          "how": "same surface; not called"
+        },
+        "limits": {
+          "state": "not-checked"
+        },
+        "skills": {
+          "state": "not-checked"
+        }
+      },
+      "gaps": [
+        "no model key of its own on this machine: the runs used an OpenRouter key by name (deepseek/deepseek-v4.1-flash)"
+      ],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/pi.txt",
+        "docs/reports/2026-11-20-runner-support/raw/round2-pi.txt"
+      ]
+    },
+    {
+      "id": "kimi-code",
+      "label": "Kimi Code",
+      "versionChecked": "2.5.3",
+      "tier": "gap",
+      "checks": {
+        "launchFromFabric": {
+          "state": "documented",
+          "how": "acp-session with HTTP MCP (Fabric probe on 2.1.1: tools/call verified with the session bearer)"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "~/.kimi-code/mcp.json mcpServers.fabric with --runner kimi-code"
+        },
+        "board": {
+          "state": "gap",
+          "how": "in its own terminal only fabric_whoami is listed: Kimi does not take Fabric's tools/list_changed after admission, so com.* and fabric_work_* are absent"
+        },
+        "startupContext": {
+          "state": "documented",
+          "how": "config.toml [[hooks]] SessionStart (install-host-hooks --host kimi)"
+        },
+        "turnEvents": {
+          "state": "none"
+        },
+        "questions": {
+          "state": "gap",
+          "how": "unreachable in its own terminal, as the board"
+        },
+        "limits": {
+          "state": "not-checked"
+        },
+        "skills": {
+          "state": "not-checked",
+          "how": "Fabric knows no skills folder of Kimi Code"
+        }
+      },
+      "gaps": [
+        "own-terminal session sees one tool: Fabric to keep the tool list stable from the first tools/list"
+      ],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/kimi-code.txt",
+        "docs/reports/2026-11-20-runner-support/raw/round2-kimi-code.txt"
+      ]
+    },
+    {
+      "id": "openclaw",
+      "label": "OpenClaw",
+      "versionChecked": "2026.10.4",
+      "tier": "gap",
+      "checks": {
+        "launchFromFabric": {
+          "state": "documented",
+          "how": "a console in Fabric; the agent's own fabric-mcp from openclaw.json mcp.servers (ADR-0134)"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "openclaw mcp set fabric {command, args: [--runner, openclaw]} (registered on this machine 2026-11-20); com.* tools are renamed fabric__com-*"
+        },
+        "board": {
+          "state": "verified"
+        },
+        "startupContext": {
+          "state": "documented",
+          "how": "plugin before_prompt_build, loaded (a provenance warning only)"
+        },
+        "turnEvents": {
+          "state": "none"
+        },
+        "questions": {
+          "state": "documented",
+          "how": "same surface; not called"
+        },
+        "limits": {
+          "state": "not-checked"
+        },
+        "skills": {
+          "state": "gap",
+          "how": "skill discovery stops at 300 of 509 entries in ~/.agents/skills"
+        }
+      },
+      "gaps": [
+        "fabric_whoami's answer (about 28 KB) is cut at 16,000 characters, so project and rules are lost: Fabric to put project first and shorten the answer",
+        "its default model (openai) has no sign-in on this machine: the runs used an OpenRouter key by name"
+      ],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/openclaw.txt",
+        "docs/reports/2026-11-20-runner-support/raw/round2-openclaw.txt"
+      ]
+    },
+    {
+      "id": "deepseek-harness",
+      "label": "DeepSeek Harness",
+      "versionChecked": "0.2.2-rc.5",
+      "tier": "gap",
+      "checks": {
+        "launchFromFabric": {
+          "state": "gap",
+          "how": "Fabric 0.3.26 starts program dsh-tui, removed upstream on 2026-08-04 (10bb9cbf4a); fabric-mcp refuses the runner until Fabric names dsh. Interim: a dsh-tui -> dsh link"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "a @deepseek-ai/dsh-mcp-client row (serverName fabric, --runner deepseek-harness) in ~/.dsh/cordis.patch.yml"
+        },
+        "board": {
+          "state": "verified"
+        },
+        "startupContext": {
+          "state": "verified",
+          "how": "install-host-hooks --host deepseek-harness (FAA-370): the injected message read back from the session store"
+        },
+        "turnEvents": {
+          "state": "none"
+        },
+        "questions": {
+          "state": "documented",
+          "how": "same surface; not called"
+        },
+        "limits": {
+          "state": "documented",
+          "how": "dsh prints RATE_LIMIT, QUOTA, ACCOUNT_QUOTA codes"
+        },
+        "skills": {
+          "state": "documented",
+          "how": "reads ~/.agents/skills"
+        }
+      },
+      "gaps": [
+        "Fabric catalogue names dsh-tui",
+        "fabric_whoami read as unknown tool in 2 of 3 runs while Fabric changes the tool list after admission",
+        "no DeepSeek key in the vault: the runs used an OpenRouter key by name"
+      ],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/deepseek-harness.txt",
+        "docs/reports/2026-11-20-runner-support/raw/round2-deepseek-harness.txt"
+      ]
+    },
+    {
+      "id": "kilo",
+      "label": "Kilo Code",
+      "versionChecked": "7.4.17",
+      "tier": "gap",
+      "checks": {
+        "launchFromFabric": {
+          "state": "documented",
+          "how": "config-content-env (KILO_CONFIG_CONTENT), Fabric probe on 7.4.17"
+        },
+        "mcp": {
+          "state": "verified",
+          "how": "the session config Fabric gives it, run by hand"
+        },
+        "board": {
+          "state": "not-checked"
+        },
+        "startupContext": {
+          "state": "none",
+          "how": "no adapter context hook"
+        },
+        "turnEvents": {
+          "state": "none"
+        },
+        "questions": {
+          "state": "not-checked"
+        },
+        "limits": {
+          "state": "not-checked"
+        },
+        "skills": {
+          "state": "documented",
+          "how": "~/.kilocode/skills through the launcher"
+        }
+      },
+      "gaps": [
+        "board not run; no startup context hook"
+      ],
+      "evidence": [
+        "docs/reports/2026-11-20-runner-support/raw/kilo.txt"
+      ]
+    },
+    {
+      "id": "opencode",
+      "label": "OpenCode",
+      "tier": "not-checked",
+      "note": "a startup context hook exists (install-host-hooks --host opencode); fabric-mcp not registered here, no run"
+    },
+    {
+      "id": "cline",
+      "label": "Cline",
+      "tier": "not-checked",
+      "note": "Fabric: not connected, its ACP session asks for sign-in"
+    },
+    {
+      "id": "gemini-cli",
+      "label": "Gemini CLI",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "goose",
+      "label": "Goose",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "cursor-cli",
+      "label": "Cursor CLI",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "aider",
+      "label": "Aider",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "amp",
+      "label": "Amp",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "crush",
+      "label": "Crush",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "qwen-code",
+      "label": "Qwen Code",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "copilot-cli",
+      "label": "GitHub Copilot CLI",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "factory-droid",
+      "label": "Factory Droid",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "kiro-cli",
+      "label": "Kiro CLI",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "devin",
+      "label": "Devin CLI",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "continue",
+      "label": "Continue (cn)",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "command-code",
+      "label": "Command Code",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "auggie",
+      "label": "Auggie CLI",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "freebuff",
+      "label": "Freebuff",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "omp",
+      "label": "omp (oh-my-pi)",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "zcode",
+      "label": "ZCode",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    },
+    {
+      "id": "openhands",
+      "label": "OpenHands CLI",
+      "tier": "not-checked",
+      "note": "a console in Fabric; no run"
+    }
+  ]
+}
