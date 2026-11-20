@@ -314,6 +314,15 @@
         "plans a hybrid index (BM25 with stemming, trigrams, local vectors, RRF) rebuilt on each commit and checked before each push, with an evaluation set",
         "serves it behind the two MCP doors, search and execute, and links the agents database's template rule (e968b42b) instead of copying it"
       ]
+    },
+    {
+      "id": "an-existing-agent-with-memory",
+      "request": "Adapt our existing support agent to Fabric; it answers from a folder of documents and its own memory.",
+      "expected": [
+        "the audit asks for the knowledge layer (D-84) and records each of the eight parts with its state and reason",
+        "starts from hybrid search and a local reranker before the graph, and gates changes on a gold set per language (recall@5, MRR@10)",
+        "names the knowledge map panel for the dashboard without vendoring a CDN script"
+      ]
     }
   ]
 }

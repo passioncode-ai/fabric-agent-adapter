@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode.
 metadata:
   author: PassionCode.ai
-  version: "0.99.0"
+  version: "0.99.1"
   contract-version: "0.1.0"
   contract-commit: "aeecb12a9aaa3792ab4dbd352698d80a0365b564"
 ---
@@ -138,6 +138,12 @@ path, lines, commit and date; a claim whose quote is not found is dropped), a hy
 trigrams, local vectors, fused by RRF; rebuilt on each commit, checked before each push, measured on an evaluation
 set) and the two doors above. Decide it in the audit and record the answer with its reason; how: [agent
 knowledge](references/agent-knowledge.md). The rule for templates is the agents database's (its request `e968b42b`).
+
+When the project's agent answers from a knowledge base of its own (documents, records, conversations, memory), the
+audit also asks for its knowledge layer, the agents database's D-84 (board request `599b59d6`): the eight parts in
+order of value, each recorded in the bundle's `knowledge` section as `built`, `planned` or `not needed` with its
+reason, embeddings local and cached by the sha256 of their text ([agent knowledge](references/agent-knowledge.md),
+Part 4). A project with no knowledge base records that answer instead.
 
 `--effect` is required and never defaulted: the capability's class (`none`, `draft`, `publish`, `send`, `reply`,
 `charge`, `delete`, `merge`, `deploy`, `change-policy`), read from what the code does or asked of the author. Choose

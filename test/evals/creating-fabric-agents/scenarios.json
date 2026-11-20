@@ -392,6 +392,15 @@
         "plans the index's rebuild on commit, a pre-push check and an evaluation set with recall at 3",
         "lists search and execute as the MCP surface, knowledge.search an operation of search called through execute"
       ]
+    },
+    {
+      "id": "a-new-agent-with-a-knowledge-base",
+      "request": "Design a new agent that answers our team's questions from its notes and past conversations, in Russian and English.",
+      "expected": [
+        "asks the grill row 'Does it keep a knowledge base?' and records the languages",
+        "lists the eight D-84 parts in order of value, each built, planned or not needed with a reason, in the bundle's knowledge section",
+        "keeps embeddings local and cached by the sha256 of their text, and refuses empty texts before embedding"
+      ]
     }
   ]
 }

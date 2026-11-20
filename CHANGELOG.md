@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.99.1 (2026-11-20)
+
+### Added
+
+- The knowledge layer of the agents database's D-84 where the adapter teaches how an agent is built (FAA-366, board
+  request `599b59d6`, the operator's words of 2026-11-19 relayed with provenance `trusted`): `references/agent-knowledge.md`
+  (one text in four skills) gains Part 4, the eight parts in order of value (hybrid search, a local reranker over the top
+  30 to 50, a gold set per language as a gate with recall@5 and MRR@10 and no LLM judge, context headers, a link graph
+  with semantic links and PageRank only for multi-hop questions, bi-temporal facts, a compiled wiki, a `knowledge-map/1`
+  map), local embeddings cached by the sha256 of their text, and the empty-text trap. `creating-fabric-agents` asks it
+  in the grill (row "Does it keep a knowledge base?"), `adapting-projects-to-fabric` in the audit; each part goes into the
+  bundle's `knowledge` section as `built`, `planned` or `not needed` with its reason.
+- building-fabric-services: `references/knowledge-map-panel.md`, the knowledge map panel's recipe: the map's fields, the
+  base's five baked renderers (Circulation, Living organism, Atlas, Galaxy, Semantic map; d3, force-graph, sigma with
+  graphology, cosmos.gl; MIT or ISC), Semantic map first under the kit's strict CSP, and the traps found
+  (`Sigma.DEFAULT_STYLES`, cosmos.gl `fitView`, injected styles, empty texts). The renderers as a dashboard-kit component
+  are FAA-367. `test/test_knowledge_layer_prose.py`; three scenario evals.
+
 ## 0.99.0 (2026-11-19)
 
 ### Changed
