@@ -141,6 +141,103 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.run_cli("template", "--project", "a b|c").returncode, 2)
 
 
+class StateFile(unittest.TestCase):
+    """docs/observer/state.json: what a session started in place of a dead one reads first (board request da5a75a2)."""
+
+    NOW = datetime.datetime(2026, 11, 20, 7, 0, tzinfo=datetime.timezone.utc)
+
+    def good(self):
+        return {
+            "schema": "observer-state/1", "project": "example-app", "updated": "2026-11-20T06:00:00Z",
+            "cursors": {"ci": "run 812", "consumer-example": "a1b2c3d"},
+            "heads": {"example-consumer": {"main": "a1b2c3d", "release/2": "e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3"}},
+            "sessions": {"architect": {"session": "s-1", "relaunch": "switchboard_session_continue with this id"}},
+            "waits": [{"id": "W-01", "what": "release 2", "watch": "consumer-example", "then": "lint", "source": "t1"},
+                      {"id": "W-02", "what": "x", "watcher": "board", "next": "y", "owner": "z", "status": "done",
+                       "done": "2026-11-19 commit abc1234"}],
+            "promises": [{"id": "P-01", "to": "example-consumer", "what": "a fix", "source": "t1", "by": "2026-11-21"}],
+            "example_own_field": {"kept": True},
+        }
+
+    def check(self, data, channels=None):
+        return inventory.check_state(json.dumps(data), channels, self.NOW)
+
+    def test_a_full_state_is_valid_and_counted(self):
+        report = self.check(self.good(), ["ci", "consumer-example", "board"])
+        self.assertEqual(report["problems"], [])
+        self.assertEqual((report["cursors"], report["heads"], report["openWaits"], report["openPromises"]), (2, 2, 1, 1))
+
+    def test_the_four_new_kinds_are_known(self):
+        for kind in ("agent-session", "work-queue", "consumer-repo", "board-thread"):
+            self.assertIn(kind, inventory.KINDS)
+        row = ("| s | agent-session | local | `pgrep -f x` | none | last commit | 45m | no process | program "
+               "| connected 2026-11-19 |")
+        text = inventory.TEMPLATE.format(project="example-app") + row + "\n"
+        self.assertTrue(inventory.check(text, datetime.date(2026, 11, 20))["valid"])
+
+    def test_schema_time_and_shapes_are_refused(self):
+        data = self.good()
+        data["schema"] = "observer-state/2"
+        data["updated"] = "2026-11-21T06:00:00Z"
+        data["heads"]["example-consumer"]["main"] = "HEAD"
+        data["sessions"]["architect"] = {"session": "s-1"}
+        data["waits"][0].pop("then")
+        data["waits"][1].pop("done")
+        data["promises"].append(dict(data["promises"][0]))
+        problems = " | ".join(self.check(data)["problems"])
+        for part in ("schema must be", "in the future", "not a commit id", "relaunch", "then or next is missing",
+                     "needs a 'done' field", "used twice"):
+            self.assertIn(part, problems)
+
+    def test_a_prefixed_schema_and_a_null_time_are_accepted(self):
+        data = self.good()
+        data["schema"] = "example-app.observer-state/1"
+        data["updated"] = None
+        self.assertTrue(self.check(data)["valid"])
+
+    def test_a_cursor_must_name_a_channel_of_the_inventory(self):
+        problems = self.check(self.good(), ["ci"])["problems"]
+        self.assertEqual(problems, ["cursors.consumer-example: no channel of that name in the inventory"])
+
+    def test_a_secret_written_in_the_state_is_refused(self):
+        data = self.good()
+        data["sessions"]["architect"]["token"] = "plain-value"
+        data["waits"][0]["what"] = "use sk-" + "a" * 24
+        data["promises"][0]["source"] = "<https>://u:pw@h".replace("<https>", "https")
+        data["example_own_field"]["api_key"] = "example-app/prod/EXAMPLE_KEY"
+        problems = self.check(data)["problems"]
+        self.assertEqual(len(problems), 3, problems)
+
+    def test_not_json_or_not_an_object(self):
+        self.assertFalse(inventory.check_state("{", None, self.NOW)["valid"])
+        self.assertFalse(inventory.check_state("[]", None, self.NOW)["valid"])
+
+    def test_cli_state_and_state_template(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "state.json"
+            channels = Path(tmp) / "channels.md"
+            channels.write_text(inventory.TEMPLATE.format(project="example-app"), encoding="utf-8")
+            template = subprocess.run([sys.executable, str(SCRIPT), "state-template", "--project", "example-app"],
+                                      capture_output=True, text=True)
+            self.assertEqual(template.returncode, 0)
+            state.write_text(template.stdout, encoding="utf-8")
+            done = subprocess.run([sys.executable, str(SCRIPT), "state", str(state), "--channels", str(channels),
+                                   "--json"], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stdout)
+            self.assertTrue(json.loads(done.stdout)["valid"])
+            state.write_text(json.dumps(self.good()), encoding="utf-8")
+            bad = subprocess.run([sys.executable, str(SCRIPT), "state", str(state), "--channels", str(channels),
+                                  "--now", "2026-11-20T07:00:00Z"], capture_output=True, text=True)
+            self.assertEqual(bad.returncode, 1)
+            self.assertIn("problem: cursors.consumer-example", bad.stdout)
+            missing = subprocess.run([sys.executable, str(SCRIPT), "state", str(Path(tmp) / "none.json")],
+                                     capture_output=True, text=True)
+            self.assertEqual(missing.returncode, 2)
+            odd = subprocess.run([sys.executable, str(SCRIPT), "state", str(state), "--now", "today"],
+                                 capture_output=True, text=True)
+            self.assertEqual(odd.returncode, 2)
+
+
 class SkillProse(unittest.TestCase):
     """The rules the skill states, so a later edit cannot drop one silently."""
 
@@ -158,7 +255,9 @@ class SkillProse(unittest.TestCase):
                      "two failed attempts",
                      "USD 100 a month",
                      "Only the person sets `ship`",
-                     "names the local channels it skipped"):
+                     "names the local channels it skipped",
+                     "reads it **first**",
+                     "the fourteen kinds"):
             self.assertIn(rule.lower(), text.lower())
 
     def test_the_skill_names_neutral_examples_only_and_no_em_dash(self):

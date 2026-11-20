@@ -2,14 +2,15 @@
 
 ## Contents
 
-- [The ten kinds](#the-ten-kinds)
+- [The fourteen kinds](#the-fourteen-kinds)
 - [Reading a channel bounded](#reading-a-channel-bounded)
 - [Discovering the channels](#discovering-the-channels)
 - [Credentials and human gates](#credentials-and-human-gates)
 - [The inventory file](#the-inventory-file)
 - [A worked inventory](#a-worked-inventory)
+- [The state file](#the-state-file)
 
-## The ten kinds
+## The fourteen kinds
 
 Every product reports through a different set of channels. The kind decides what the observer reads and what it
 compares with. `other` is allowed for a channel none of these fits; give it a baseline like its nearest kind.
@@ -26,6 +27,17 @@ compares with. `other` is allowed for a channel none of these fits; give it a ba
 | `ci` | the repository's checks and nightly runs | `gh run list --branch <default> --limit 20 --json conclusion,databaseId,createdAt` | red runs on the default branch | none: any red run is a finding |
 | `board` | the project's Fabric board and backlog | `com.status`, `com.list` with `unread: true` (working-with-fabric) | requests addressed to the project, findings other agents filed | none |
 | `support` | a support inbox, review replies | the inbox's or the store tooling's read tool | unanswered questions, repeated complaints | open count over 7 days |
+| `agent-session` | a long-running agent session the product's work depends on (an architect, a program runner) | its process (`pgrep -f` with the session id from the state file) and `git log -1` of the branch it commits to; restarted by the same session through Switchboard (`switchboard_session_continue` with that id) | alive or not, the time of its last commit | a commit at least every N minutes while its queue is not empty |
+| `work-queue` | the queue of sub-sessions or jobs a long session drives | the queue's own status command (lanes, the last log line, a limit wait) | lanes running, failed runs, how long a limit wait has lasted | at most the lanes the queue allows; a limit wait is not a failure until it outlasts its window |
+| `consumer-repo` | a repository that builds on the product (an app on an engine, an agent on a kit) | `git -C <checkout> fetch` and the heads of the branches named in the state file, then the product's own usage lint at each new head | new branch heads, new lint findings against the current release, the version each pins | the last checked head of each branch, its findings count |
+| `board-thread` | one Fabric board thread the product carries a conversation in (a consumer's, a contract's) | `com.list` with `thread: <id>` and `unread: true`, then `com.read_ack` for what was handled (working-with-fabric) | unread messages, answers to the product's own requests | none: any unread message in the thread is a finding |
+
+`board` reads the project's whole board (requests addressed to it); `board-thread` reads one thread the product
+follows, so a conversation with a consumer has its own cursor and owner. `consumer-repo` reads the consumer's
+repository from a local checkout and only through the product's own lint; it never edits that repository, and a
+finding goes to the consumer's Project on the board. The kinds `agent-session`, `work-queue` and `consumer-repo`
+take their ids (the session, the queue command, the checkout and the branches) from the state file below, never
+from the row alone, so a restarted observer knows them.
 
 A **placement** goes with each row: `local` when the read needs this machine (a local file, a loopback service, a
 local CLI session), `remote` when it works from anywhere with a read-only credential. A cloud cycle reads only
@@ -100,7 +112,7 @@ for it again.
 | Column | Holds |
 |---|---|
 | Channel | a short unique name |
-| Kind | one of the ten kinds, or `other` |
+| Kind | one of the fourteen kinds, or `other` |
 | Placement | `local` or `remote` |
 | Read | the exact route: an MCP tool and its arguments, a CLI command, or an HTTP endpoint, with its page limit and deadline |
 | Credential | a vault slot name or `none`, never a value |
@@ -127,3 +139,43 @@ A pipe inside a cell is written inside backticks or escaped as `\|`.
 ```
 
 `observer_inventory.py check` on this file reports 3 of 5 named channels connected (local 1, remote 2).
+
+## The state file
+
+`docs/observer/state.json` in the product's own repository holds what the observer must not lose when its session
+dies. A session started in place of a dead one (a restart, a resume, a cloud cycle) reads it **first**, before the
+inventory and before any channel, and resumes from it; nothing in it is kept only in a session's memory.
+
+```json
+{
+  "schema": "observer-state/1",
+  "project": "example-app",
+  "updated": "2026-11-20T06:00:00Z",
+  "cursors": {"ci": "run 812", "consumer-example": "a1b2c3d"},
+  "heads": {"example-consumer": {"main": "a1b2c3d", "release/2": "e4f5a6b"}},
+  "sessions": {"architect": {"session": "<session id>", "relaunch": "switchboard_session_continue with this id"}},
+  "waits": [{"id": "W-01", "what": "the consumer moves to release 2", "watch": "consumer-example",
+             "then": "run the usage lint on its new head", "source": "board thread 1a2b3c4d"}],
+  "promises": [{"id": "P-01", "to": "example-consumer", "what": "a fixed release by Friday",
+                "by": "2026-11-21", "source": "board thread 1a2b3c4d"}]
+}
+```
+
+| Field | Holds |
+|---|---|
+| `schema` | `observer-state/1`, or `<name>.observer-state/1` when the project extends it |
+| `updated` | when the observer last wrote it (date-time with its zone) |
+| `cursors` | channel name to cursor, moved only after the cycle record is written; each names a channel of the inventory |
+| `heads` | repository to `{branch: checked commit}`: the heads a `consumer-repo` read already checked |
+| `sessions` | the long sessions an `agent-session` row watches: their id and the exact route that restarts them |
+| `waits` | what the observer waits on: `id`, `what`, `watch` (the channel or read that shows it clear), `then` (the next action when it clears), `source` (or `owner`); `status` open, paused, done or dropped, and a closed one carries a `done` or `dropped` field with its date and evidence |
+| `promises` | what the observer promised someone: `id`, `to`, `what`, `source`, optional `by`; `status` open, kept, broken or dropped, a closed one with its evidence |
+
+Other top-level fields are the project's own and are kept. A credential is named by its vault slot; the check refuses
+a token, a key, a private key or a URL with a password in any field. Check it with the inventory:
+
+```bash
+python3 <skill-dir>/scripts/observer_inventory.py state docs/observer/state.json --channels docs/observer/channels.md
+```
+
+Exit 0 valid, 1 problems listed, 2 a file cannot be read. `state-template --project <name>` prints an empty one.

@@ -12,7 +12,7 @@ compatibility: >-
   from Project Observatory's vault by slot name when it is installed.
 metadata:
   author: PassionCode.ai
-  version: "0.99.1"
+  version: "0.100.0"
 ---
 
 # Observing products
@@ -74,7 +74,9 @@ The first run is setup, and every run is a setup run until the inventory exists.
    analytics event catalogue, the store listing files), Project Observatory's record of the project's resources when
    it is installed (`observatory_project`, `observatory_credentials` names keys and never returns a value), the Fabric
    services on the machine, and the project's Fabric board. The [channels reference](references/channels.md) lists
-   the ten kinds and where each is usually found.
+   the fourteen kinds and where each is usually found: the product's own reports (`ops-log`, `errors`, `analytics`,
+   `funnel`, `revenue`, `store`, `uptime`, `ci`, `support`), the board (`board`, one thread as `board-thread`), and the
+   work that keeps it moving (`agent-session`, `work-queue`, `consumer-repo`).
 2. **Write the inventory** in the product's own repository: `docs/observer/channels.md`, one row per channel. Start
    from `python3 <skill-dir>/scripts/observer_inventory.py template --project <name>`. Each row records the kind, the
    placement (`local` or `remote`), the read route (an MCP tool, an exact CLI command, or an HTTP endpoint), the
@@ -89,12 +91,16 @@ The first run is setup, and every run is a setup run until the inventory exists.
    `missing: <the step that connects it>` or, when a human gate holds it (a sign-in, a consent, a payment, a key only
    its account holder can issue), `blocked: <the gate and its direct link>`. Name each gate once and continue with the
    other channels.
-5. **Record the baseline** from history where the source keeps it (the windows in the channels reference), so the
+5. **Write the state file**, `docs/observer/state.json` (start from `observer_inventory.py state-template`): the
+   cursors, waits, promises, checked branch heads and long sessions. A session started in place of a dead one reads it
+   first and resumes from it; nothing the watch needs lives only in a session's memory.
+6. **Record the baseline** from history where the source keeps it (the windows in the channels reference), so the
    first cycle has something to compare with.
-6. **Check the inventory and commit it** through the project's delivery route:
+7. **Check the inventory and the state file and commit them** through the project's delivery route:
 
    ```bash
    python3 <skill-dir>/scripts/observer_inventory.py check docs/observer/channels.md
+   python3 <skill-dir>/scripts/observer_inventory.py state docs/observer/state.json --channels docs/observer/channels.md
    ```
 
    It refuses a credential written as a value, `connected` without a date, an unknown kind, state or placement, a
@@ -108,13 +114,14 @@ The [cycle reference](references/cycle.md) holds the full procedure, the cycle r
 In short:
 
 ```
+read docs/observer/state.json first: cursors, waits, promises, checked heads, long sessions
 for each connected channel (only remote ones in a cloud cycle):
     read from its cursor, bounded: a page limit and a deadline
     compare with the baseline -> signals
     a read that fails is itself a signal: the channel went dark
 signals -> findings: dedupe against open findings, attach evidence (the read, the numbers, the baseline)
 findings -> triage -> act
-write one cycle record; advance the cursors only after the record is written
+write one cycle record; then advance the cursors and update the state file
 ```
 
 - A failed read is a finding, never a silent skip, and its channel's cursor stays where it was.
@@ -137,8 +144,10 @@ linked to CO-598):
 - which questions to the product's `knowledge.search` found nothing or had every claim dropped: each is a missing
   or wrong document.
 
-Consumers are read from the product's own records (its board threads, its keys' callers, its logs), never from their
-repositories. A consumer's gap goes to that consumer's Project on the board; the product's own gap is fixed like any
+Consumers are read from the product's own records (its board threads, its keys' callers, its logs). Their
+repositories are never edited; a consumer of the same estate that is checked out on the machine may be read
+read-only as a `consumer-repo` channel (its branch heads from the state file, the product's own usage lint at each
+new head), and nothing else of it is read. A consumer's gap goes to that consumer's Project on the board; the product's own gap is fixed like any
 finding. The product's search side: `working-with-fabric`, `references/agent-knowledge.md`.
 
 ## Phase 3: triage and act
@@ -190,7 +199,7 @@ The scheduling recipes, including how to keep a cycle from overlapping its last 
 
 ## Finish line of each phase
 
-- Setup: the inventory is committed, `observer_inventory.py check` exits 0, and the report states connected out of
+- Setup: the inventory and the state file are committed, `observer_inventory.py check` and `state` exit 0, and the report states connected out of
   named with every `missing` or `blocked` channel and its step.
 - A cycle: its record is written and the cursors advanced; every new finding is fixed and read back, filed, or noted.
 - The watch itself has no finish line: it runs until the person turns it off.

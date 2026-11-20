@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.100.0 (2026-11-20)
+
+### Added
+
+- observing-products: four channel kinds for the work that keeps a product moving and the watch's state in the
+  product's repository (FAA-368, Fabric's board request `da5a75a2`, parts 1 and 2 of Fabric CO-598 from sound-engine,
+  the operator's words of 2026-11-19 relayed with provenance `trusted`). `agent-session` (a long session alive or not,
+  its last commit, restarted by the same session through Switchboard), `work-queue` (lanes of sub-sessions, a limit
+  wait), `consumer-repo` (consumers' branch heads read only through the product's own lint) and `board-thread` (unread
+  messages in one board thread) join the ten; `observer_inventory.py check` accepts them. `docs/observer/state.json`
+  (`observer-state/1`: cursors, checked heads, long sessions with their relaunch route, waits, promises) is what a
+  session started in place of a dead one reads first; `observer_inventory.py state [--channels]` checks its shape,
+  that each cursor names a channel, that a closed wait or promise carries its evidence, and refuses a secret written
+  in it; `state-template` prints an empty one. `references/channels.md`, `references/cycle.md` and `SKILL.md` say
+  where it is read and written; a consumer's repository is never edited. `test/test_observer_inventory.py`
+  (`StateFile`), three scenario evals.
+
 ## 0.99.1 (2026-11-20)
 
 ### Added
