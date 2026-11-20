@@ -304,6 +304,30 @@ class ProbeActionsRuleTests(unittest.TestCase):
         verdict, evidence = self.rules.action_tools_verdict(ok, None, "no readable token")
         self.assertEqual((verdict, evidence), ("NOT_RUN", "no readable token"))
 
+    def test_action_tools_on_a_compact_surface_passes_only_an_operation_search_answered(self):
+        # DEC-0184 AO-2: the execute door being in tools/list is not a twin; the tool must be one of search's operations.
+        compact = {"doors": {"hub.search", "hub.execute"}, "operations": {"hub.pipeline_audit", "hub.status"}}
+        listed = {"hub.search": {}, "hub.execute": {}, "hub.pipeline_audit": {}, "hub.status": {}}
+        act = lambda tool: with_actions([{"id": "audit", "title": "Audit", "tool": tool, "gate": "none"}],
+                                        capabilities=["hub.pipeline_audit", "hub.status"])
+        verdict, evidence = self.rules.action_tools_verdict(act("hub.pipeline_audit"), listed, compact=compact)
+        self.assertEqual(verdict, "PASS", evidence)
+        self.assertIn("AO-2", evidence)
+        for door in ("hub.execute", "hub.search"):
+            verdict, evidence = self.rules.action_tools_verdict(act(door), listed, compact=compact)
+            self.assertEqual(verdict, "FAIL", evidence)
+            self.assertIn("name the operation it runs in tool", evidence)
+            self.assertIn("audit", evidence)
+        verdict, evidence = self.rules.action_tools_verdict(act("hub.rebuild"), listed, compact=compact)
+        self.assertEqual(verdict, "FAIL")
+        self.assertIn("search answers no operation hub.rebuild", evidence)
+        # search unread: a door still fails, an operation name is not judged.
+        unread = {"doors": {"hub.search", "hub.execute"}, "operations": None}
+        self.assertEqual(self.rules.action_tools_verdict(act("hub.execute"), listed, compact=unread)[0], "FAIL")
+        verdict, evidence = self.rules.action_tools_verdict(act("hub.pipeline_audit"), listed, compact=unread)
+        self.assertEqual(verdict, "NOT_RUN")
+        self.assertIn("compact-listing", evidence)
+
     def test_declared_actions_with_no_mcp_surface_fail(self):
         # Seam reading of 0.50.0: AP-1, every action has a tool on the MCP surface; a declaration with none is a page-only button.
         ok = with_actions([{"id": "echo", "title": "Echo", "tool": "sample.echo", "gate": "none"}])

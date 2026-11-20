@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.100.1 (2026-11-20)
+
+### Changed
+
+- Contract DEC-0184 (a button behind execute names its operation in `tool`, contract `47df6447`) in the kit and the
+  probe (FAA-369, board request `23c37a58` from fabric-agent-contract, raised by the sound-engine Hub's `e13bb350`).
+  AO-1: `FAC-SEM-142` in `actions_extension_rules` / `actionsExtensionRules` finds an action whose `tool` equals a
+  declared `surfaces.mcp.compact.search` or `.execute`, with the contract's text from `src/actions.ts`; before, such a
+  tool read only as not served (AP-1). AO-2: the probe's `interop.action-tools` on a compact (two-door) surface passes an
+  action only when its `tool` is an operation search answered; `tool: "execute"` no longer passes because the door is in
+  `tools/list`. `building-fabric-services` (`references/interop.md`, Actions and the probe's table, which SKILL.md points to)
+  says that on a compact surface `tool` names the operation (`hub.pipeline_audit`). No schema change and no repin: the
+  contract records that such a declaration already failed `FAC-SEM-142` at the pin (`aeecb12a`); only the finding's
+  cause is new. Tests: `test_fabric_actions.CompactDoor`, `fabric-actions.test.mjs` (the compact door case),
+  `test_probe_interop` (`test_action_tools_on_a_compact_surface_passes_only_an_operation_search_answered`).
+
 ## 0.100.0 (2026-11-20)
 
 ### Added

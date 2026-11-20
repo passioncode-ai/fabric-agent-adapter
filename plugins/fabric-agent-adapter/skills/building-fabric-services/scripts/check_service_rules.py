@@ -529,12 +529,15 @@ def well_known_actions_verdict(wk: Any) -> Tuple[str, str]:
 
 
 def action_tools_verdict(wk: Any, tools: Optional[Dict[str, Any]], why_not: str = "tools/list was not read",
-                         no_surface: bool = False, remote: bool = False) -> Tuple[str, str]:
+                         no_surface: bool = False, remote: bool = False,
+                         compact: Optional[Dict[str, Any]] = None) -> Tuple[str, str]:
     """`interop.action-tools`: every declared action's tool is served by tools/list, the live surface (FAC-SEM-142
     checks only the list the document names). `tools` None means no listing was read; `why_not` says why. A local
     service that declares actions and has no MCP surface fails: every action has a tool on its agent surface
     (DEC-0121 AP-1), and a local service's is MCP. A remote agent's surface may be A2A or MCP behind a gateway (the
-    contract's surfaces table), so there it is NOT_RUN. This goes beyond FAC-SEM-142, which reads only a present list."""
+    contract's surfaces table), so there it is NOT_RUN. This goes beyond FAC-SEM-142, which reads only a present list.
+    `compact` ({doors, operations: search's names, None unread}): on a two-door surface a tool must be an operation
+    search answered; one naming a door is a button without a twin (DEC-0184 AO-2, DEC-0180 CM-6, DEC-0182 TD-5)."""
     view = fa.actions_view(wk)
     if not view["declared"]:
         return "NOT_RUN", "no extensions/actions/0.1 declaration"
@@ -548,6 +551,18 @@ def action_tools_verdict(wk: Any, tools: Optional[Dict[str, Any]], why_not: str 
                         "(DEC-0121 AP-1)" % len(view["actions"]))
     if tools is None:
         return "NOT_RUN", why_not
+    if compact is not None:
+        doors, operations = set(compact.get("doors") or ()), compact.get("operations")
+        at_door = ["%s (%s)" % (a["tool"], a["id"]) for a in view["actions"] if a["tool"] in doors]
+        if operations is None and not at_door:
+            return "NOT_RUN", "a compact surface whose search answered no operations (interop.compact-listing says why)"
+        unknown = ["%s (%s)" % (a["tool"], a["id"]) for a in view["actions"] if a["tool"] not in doors | set(operations or ())]
+        problems = (["%s names the compact surface's search or execute door, not an operation: a button without an agent "
+                     "twin, name the operation it runs in tool (DEC-0184 AO-1, AO-2)" % ", ".join(at_door)] if at_door else []) + \
+                   (["search answers no operation %s: a button without an agent twin (DEC-0121 AP-1, DEC-0184 AO-2)"
+                     % ", ".join(unknown)] if unknown and operations is not None else [])
+        return ("FAIL", "; ".join(problems)) if problems else \
+            ("PASS", "%d declared action(s), every tool an operation search answers (DEC-0184 AO-2)" % len(view["actions"]))
     missing = ["%s (%s)" % (a["tool"], a["id"]) for a in view["actions"] if a["tool"] not in tools]
     if missing:
         return "FAIL", ("tools/list does not serve %s: a button without an agent twin (DEC-0121 AP-1)" % ", ".join(missing))

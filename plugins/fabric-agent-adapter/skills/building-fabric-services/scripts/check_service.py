@@ -43,7 +43,8 @@ is NOT_RUN, never FAIL, for a dashboard that declares none (a read-only dashboar
 interop.compact-listing (FAA-356, agents database R33 O15, D-72): a tools/list that names a search door
 (`_meta` ai.passioncode.fabric/compact) lists at most five tools: the two doors and up to three seats, the job tools
 with no measurement and direct tools each with its measured case in search's answer. The capabilities are then read through search, so interop.tools-match and
-interop.action-tools still check every one. A full listing of more than five tools is NOT_RUN while the mode is opt-in.
+interop.action-tools still check every one; there an action's tool must be an operation search answered, never a door
+(DEC-0184 AO-2). A full listing of more than five tools is NOT_RUN while the mode is opt-in.
 
 channel-agent.declaration (DEC-0150, FAC-SEM-162 to 165): extensions/channel-agent/0.1 under provider.extensions of the
 manifest the descriptor names, or, with no manifest, under extensions of the well-known answer (CA-1). FAC-SEM-164's
@@ -662,7 +663,7 @@ class Probe(LifecycleRules):
                 self.object_root_rule(tools)
                 self.tools_match_rule(capabilities, manifest_path, tools)
                 self.job_tools_rule(capabilities, tools)
-                self.add("interop.action-tools", *action_tools_verdict(self.wk, tools))  # DEC-0121 AP-1: the live twin
+                self.add("interop.action-tools", *action_tools_verdict(self.wk, tools, compact=self.compact_surface))  # DEC-0121 AP-1, DEC-0184 AO-2
                 listed_tools = tools
                 self.unknown_job_rule(list(tools))
                 self.trace_rule(listing, sent)
@@ -712,6 +713,7 @@ class Probe(LifecycleRules):
         compact service's operations are read through search, so the rules after this one see every tool one by one.
         A full listing of more than five tools is NOT_RUN while the mode is opt-in."""
         doors = {}
+        self.compact_surface = None  # set below for a two-door listing: its doors and the operations search answered
         for name, tool in listed.items():
             door = (tool.get("_meta") or {}).get(fi.COMPACT_META) if isinstance(tool.get("_meta"), dict) else None
             if door in ("search", "execute"):
@@ -726,6 +728,7 @@ class Probe(LifecycleRules):
         if len(listed) > fi.COMPACT_LIMIT:
             problems.append("%d tools listed beside the doors, at most %d in all" % (len(listed), fi.COMPACT_LIMIT))
         operations: List[Any] = []
+        searched = False
         if "search" in doors:
             try:
                 answer = self.mcp_call("tools/call", {"name": doors["search"], "arguments": {}})
@@ -733,9 +736,11 @@ class Probe(LifecycleRules):
                 if not isinstance(found, list):
                     raise ValueError("it answered no operations")
                 operations = [op for op in found if isinstance(op, dict) and isinstance(op.get("name"), str)]
+                searched = True
             except (OSError, ValueError) as exc:
                 problems.append("%s failed: %s" % (doors["search"], exc))
         by_name = {op["name"]: op for op in operations}
+        self.compact_surface = {"doors": set(doors.values()), "operations": set(by_name) if searched else None}  # DEC-0184 AO-2
         for name in sorted(set(listed) - set(doors.values()) - set(fi.JOB_TOOL_NAMES)):
             problem = fi.direct_problem(name, (by_name.get(name) or {}).get("direct"))
             if problem:

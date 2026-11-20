@@ -514,7 +514,8 @@ def _finding(instance_path: str, message: str) -> Dict[str, str]:
 def actions_extension_rules(well_known: Any) -> List[Dict[str, str]]:
     """FAC-SEM-142 on a well-known document that carries the actions key: a value that is not its schema's (one
     finding at the key); an id named twice; a `humanStep` present without `gate: human` or absent with it; a `tool`
-    that a present `surfaces.mcp.capabilities` does not list (a button without an agent twin, AP-1)."""
+    that a present `surfaces.mcp.capabilities` does not list (a button without an agent twin, AP-1); a `tool` that names a
+    declared compact surface's search or execute tool rather than the operation behind it (DEC-0184 AO-1)."""
     view = actions_view(well_known)
     if not view["declared"]:
         return []
@@ -525,6 +526,9 @@ def actions_extension_rules(well_known: Any) -> List[Dict[str, str]]:
     mcp = get(surfaces, "mcp") if isinstance(surfaces, dict) else MISSING
     capabilities = get(mcp, "capabilities") if isinstance(mcp, dict) else MISSING
     capabilities = capabilities if isinstance(capabilities, list) else None
+    compact = get(mcp, "compact") if isinstance(mcp, dict) else MISSING
+    compact = compact if isinstance(compact, dict) else {}
+    doors = {compact.get(door) for door in ("search", "execute") if isinstance(compact.get(door), str)}
     findings: List[Dict[str, str]] = []
     seen = set()
     for index, action in enumerate(view["actions"]):
@@ -534,7 +538,11 @@ def actions_extension_rules(well_known: Any) -> List[Dict[str, str]]:
         seen.add(action["id"])
         if (action["gate"] == "human") != ("humanStep" in action):
             findings.append(_finding(at + "/humanStep", "humanStep is present exactly when gate is human (DEC-0121 AP-4)"))
-        if capabilities is not None and not contains(capabilities, action["tool"]):
+        if action["tool"] in doors:
+            findings.append(_finding(at + "/tool", "%s is the compact surface's search or execute tool, not a capability: "
+                                                   "tool names the operation the button runs, one of capabilities "
+                                                   "(DEC-0184 AO-1, DEC-0180 CM-6)" % action["tool"]))
+        elif capabilities is not None and not contains(capabilities, action["tool"]):
             findings.append(_finding(at + "/tool", "the MCP surface does not serve %s: a button without an agent twin "
                                                    "(DEC-0121 AP-1)" % action["tool"]))
     return findings
