@@ -825,6 +825,15 @@
         "vendors the library by version with its licence, no CDN, light and dark, reduced motion honoured",
         "names the traps: Sigma.DEFAULT_STYLES with custom styles, cosmos.gl fitView after the first frame, empty texts linking at 1.0"
       ]
+    },
+    {
+      "id": "a-button-behind-two-doors",
+      "request": "Our service lists only search and execute now. Its dashboard has an Audit button; what goes in the action's tool?",
+      "expected": [
+        "names the operation the button runs (for example hub.pipeline_audit), one of surfaces.mcp.capabilities and of what search answers",
+        "never execute or search: every button shares that door, so the declaration would not say what the button does (contract DEC-0184 AO-1)",
+        "says FAC-SEM-142 and the probe's interop.action-tools fail a tool that names a door, and that no operation member exists"
+      ]
     }
   ]
 }

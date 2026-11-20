@@ -345,3 +345,21 @@ test('the reserved capability project.work is never declared (FAA-244, DEC-0140 
   }
   wellKnown({ surfaces: { events, mcp: { ...mcp, capabilities: [...CAPABILITIES, 'project.workspace'] } } });
 });
+
+// DEC-0184 AO-1 (contract 47df6447, src/actions.ts actionsKeyFindings): a compact surface's button names the operation.
+test('a compact surface button that names the search or execute door is a finding naming the cause', () => {
+  const capabilities = ['records.list', 'records.get', 'records.update', 'records.delete', 'records.export', 'records.import', 'records.search_text'];
+  const doc = (tool, compact = true) => ({
+    surfaces: { mcp: { path: '/mcp', capabilities, ...(compact ? { compact: { search: 'records.search', execute: 'records.execute', direct: ['records.list'] } } : {}) } },
+    extensions: { [KEY]: { actions: [{ id: 'export-records', title: 'Export the records', tool, gate: 'none' }] } },
+  });
+  assert.deepEqual(actionsExtensionRules(doc('records.export')), []);
+  for (const door of ['records.execute', 'records.search']) {
+    const findings = actionsExtensionRules(doc(door));
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].code, 'FAC-SEM-142');
+    assert.equal(findings[0].instancePath, `/extensions/${KEY.replace(/\//g, '~1')}/actions/0/tool`);
+    assert.equal(findings[0].message, `${door} is the compact surface's search or execute tool, not a capability: tool names the operation the button runs, one of capabilities (DEC-0184 AO-1, DEC-0180 CM-6)`);
+  }
+  assert.match(actionsExtensionRules(doc('records.execute', false))[0].message, /DEC-0121 AP-1/);
+});

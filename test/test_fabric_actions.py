@@ -393,3 +393,41 @@ class CallerSide(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CompactDoor(unittest.TestCase):
+    """DEC-0184 AO-1 (contract 47df6447, src/actions.ts actionsKeyFindings): on a compact surface a button's tool names
+    the operation, never the declared search or execute door; the contract's two fixtures of that commit, inline."""
+
+    CAPS = ["records.list", "records.get", "records.update", "records.delete", "records.export", "records.import",
+            "records.search_text"]
+
+    def document(self, tool):
+        return {"surfaces": {"mcp": {"path": "/mcp", "capabilities": list(self.CAPS),
+                                     "compact": {"search": "records.search", "execute": "records.execute",
+                                                 "direct": ["records.list", "records.get", "records.update"]}}},
+                "extensions": {KEY: {"actions": [{"id": "export-records", "title": "Export the records", "tool": tool,
+                                                  "gate": "none"}]}}}
+
+    def test_the_operation_passes(self):
+        self.assertEqual(fa.actions_extension_rules(self.document("records.export")), [])
+
+    def test_the_execute_or_search_door_is_a_finding_that_names_the_cause(self):
+        for door in ("records.execute", "records.search"):
+            with self.subTest(door=door):
+                findings = fa.actions_extension_rules(self.document(door))
+                self.assertEqual([f["instancePath"] for f in findings], ["/extensions/%s/actions/0/tool" % KEY.replace("/", "~1")])
+                self.assertEqual(findings[0]["code"], "FAC-SEM-142")
+                self.assertEqual(findings[0]["message"], "%s is the compact surface's search or execute tool, not a capability: "
+                                 "tool names the operation the button runs, one of capabilities (DEC-0184 AO-1, DEC-0180 CM-6)" % door)
+
+    def test_no_compact_member_keeps_the_ap1_finding(self):
+        document = self.document("records.execute")
+        del document["surfaces"]["mcp"]["compact"]
+        findings = fa.actions_extension_rules(document)
+        self.assertIn("DEC-0121 AP-1", findings[0]["message"])
+
+    def test_actions_extension_refuses_nothing_new_without_the_surface(self):
+        # actions_extension builds its document from capabilities alone: it never sees compact, as before.
+        fa.actions_extension([{"id": "x", "title": "X", "tool": "records.export", "gate": "none"}], capabilities=self.CAPS)
+
