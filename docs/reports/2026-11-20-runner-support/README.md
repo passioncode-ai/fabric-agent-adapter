@@ -53,18 +53,21 @@ gone upstream; tool-list race), Kilo 7.4.17 (board not run). Not checked: OpenCo
    and a live feed. Owners: the contract (a `work-milestone/1` decision), Fabric (sort modes, live feed, cadences),
    the adapter (FAA-371).
 
-## What this release changed in the adapter
+## What the branch carries (not released)
 
 `install-host-hooks --host deepseek-harness` (a Cordis plugin on `agent/created`, injected as the session's first
 user message; one managed block in `$DSH_HOME/cordis.patch.yml`), the matrix data and page, the full runner list
-`fabric-mcp` takes in Fabric 0.3.26 and each host's registration line in the skill's Step 2.
+`fabric-mcp` takes in Fabric 0.3.26 and each host's registration line in the skill's Step 2. Held unmerged on branch
+`agent/runner-support-matrix` (PR #357, draft) by the owner's pause of 2026-11-21 00:30: every session waits for the
+strategic plan (fabric-workspace session 2d03ce15); no release and no change of behaviour until it lands.
 
 ## On this machine, 2026-11-20
 
 `fabric-mcp` registered for Pi (`~/.pi/agent/mcp.json`) and OpenClaw (`~/.openclaw/openclaw.json`); DeepSeek Harness
 installed (`npm install -g @deepseek-ai/dsh@0.2.2-rc.5`) with the link `dsh-tui -> dsh`. The DeepSeek Harness runs used
-an isolated home in the session's scratch folder; the person's own `~/.dsh` gets the hook from the installed skill
-after the release.
+an isolated home in the session's scratch folder; the person's own `~/.dsh` has no hook yet. The adapter's skills on
+this machine come from the PassionCode launcher (`~/.passioncode/current`, 0.2.80, adapter 0.96.0), so a new adapter
+version reaches them through the launcher's pin, not a second install channel.
 
 ## Not done here, and why
 
