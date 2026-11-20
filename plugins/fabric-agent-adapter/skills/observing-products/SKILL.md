@@ -144,10 +144,10 @@ linked to CO-598):
 - which questions to the product's `knowledge.search` found nothing or had every claim dropped: each is a missing
   or wrong document.
 
-Consumers are read from the product's own records (its board threads, its keys' callers, its logs). Their
-repositories are never edited; a consumer of the same estate that is checked out on the machine may be read
-read-only as a `consumer-repo` channel (its branch heads from the state file, the product's own usage lint at each
-new head), and nothing else of it is read. A consumer's gap goes to that consumer's Project on the board; the product's own gap is fixed like any
+Consumers are read from the product's own records (its board threads, its keys' callers, its logs), never from their
+repositories. The one exception is a `consumer-repo` channel: a consumer of the same estate checked out on the
+machine, read only for its branch heads (kept in the state file) and through the product's own usage lint at each
+new head. A consumer's repository is never edited. A consumer's gap goes to that consumer's Project on the board; the product's own gap is fixed like any
 finding. The product's search side: `working-with-fabric`, `references/agent-knowledge.md`.
 
 ## Phase 3: triage and act
