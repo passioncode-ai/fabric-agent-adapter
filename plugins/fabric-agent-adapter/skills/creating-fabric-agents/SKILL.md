@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Requires filesystem access and Python 3.9+. Exact schema checks additionally need git, Node.js, pnpm, and the pinned fabric-agent-contract checkout (a public repository). Works without those tools in an explicitly degraded structural-check mode. Ships in one plugin with adapting-projects-to-fabric, whose scripts it reuses.
 metadata:
   author: PassionCode.ai
-  version: "0.99.0"
+  version: "0.99.1"
   contract-version: "0.1.0"
   contract-commit: "aeecb12a9aaa3792ab4dbd352698d80a0365b564"
 ---
@@ -80,6 +80,7 @@ board (or, with a grant, its scan tool over the source projects), and build from
 | **Text for people?** | if it writes anything a person reads (a reply, a message, a post, a report, a UI string), its prompt forbids the em dash (U+2014) and any substitute for it, and a test fails on U+2014 in new output, from the first commit (the resilience reference, *Text for people*) |
 | **Does it send usage data?** | if it sends anonymous usage or error data to its owner (DEC-0157): nothing before its notice was shown where the person reads it (for an agent, its first answer in the person's chat), a notice and never a question; its own switch read before the first send, an earlier decline kept off; a random UUID installation id only, no person, path, credential or content; the switch's agent tool a `change-policy` effect with `gate: relayed`, back on only on the operator's own word naming it ([the usage data reference](references/usage-data.md), UD-1 to UD-6) |
 | **Does it answer people?** | if it answers people in a chat, by mail, in store reviews or in a group, it starts from the agents database's template when one is named, read beside references/communication-agent-template.md, else from that template prompt, and either way carries from its first release the turn record and the daily `support.quality_daily` report, the lane table with vendor exclusion and fallback recoveries counted, a writer change only after an offline replay, false-state gates and a checker that sees the material first, numbers and account state from tools, the live tail re-read before sending, repair then research then a hold that comes back, hand-offs by cause and never counted or judged as answers, a commitments ledger, a knowledge client that reads the service's `answer` flag, a gap queue and a feed re-read on a new event kind (references/agents-that-answer-people.md) |
+| **Does it keep a knowledge base?** | if it answers from documents, records, conversations or memory of its own: in which languages, and the knowledge layer's eight parts (the agents database's D-84: hybrid search, a local reranker, a gold set per language as a gate, context headers, a link graph, bi-temporal facts, a compiled wiki, a knowledge map), each `built`, `planned` or `not needed` with its reason, in the bundle's `knowledge` section; embeddings local and cached by the sha256 of their text ([agent knowledge](references/agent-knowledge.md), Part 4). When it keeps none, that answer and its reason are recorded |
 
 ## Step 1: the knowledge intake
 

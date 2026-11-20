@@ -17,6 +17,7 @@ This page is the same file in `adapting-projects-to-fabric`, `creating-fabric-ag
 - [Part 2: the hybrid index](#part-2-the-hybrid-index)
 - [Part 3: an MCP server with two doors](#part-3-an-mcp-server-with-two-doors)
 - [Asking another project (the caller's side)](#asking-another-project-the-callers-side)
+- [Part 4: the knowledge layer of an agent that keeps a knowledge base](#part-4-the-knowledge-layer-of-an-agent-that-keeps-a-knowledge-base)
 - [A project others build on: the consumers' audit](#a-project-others-build-on-the-consumers-audit)
 - [Where this stands in the adapter](#where-this-stands-in-the-adapter)
 
@@ -86,6 +87,53 @@ its index and the kit serves it.
 What a person runs as a command (rebuild the index, run the evaluation) is an operation too, so an agent reaches every
 part through the same two doors.
 
+## Part 4: the knowledge layer of an agent that keeps a knowledge base
+
+The agents database's decision D-84 (2026-11-19, board request `599b59d6`, relayed with the operator's words of
+2026-11-19 and provenance `trusted`, scope: the knowledge layer and its graphs wherever the adapter teaches how an agent
+is built) extends Parts 1 and 2 for an agent that keeps a knowledge base of its own: documents, records, conversations
+or memory it answers from. The base's research and its measurements are its report on memory graphs (2026-11-19); this
+section is what the adapter asks of the agent, not a copy of that decision. Where they differ, the base wins.
+
+**The intake asks it.** The grill (`creating-fabric-agents`) or the adaptation's audit (`adapting-projects-to-fabric`)
+asks: does the agent keep a knowledge base it answers from, and in which languages? When it does, the bundle's
+`knowledge` section lists the eight parts below, each with its state (`built`, `planned` with a reason, or `not needed`
+with a reason). When it does not, the answer and its reason are written down and the section is left out.
+
+The eight parts, in the order of quality gained per unit of complexity (build them in this order):
+
+1. **Hybrid search**: BM25 with stemming, character trigrams and local vectors, fused by RRF (Part 2).
+2. **A local reranker over the top 30 to 50** fused hits; never over the whole index.
+3. **A gold set per language as a gate on every change**: held-out questions with the path and lines that answer them;
+   the run reports recall@5 and MRR@10 and checks quotes verbatim in code, with no LLM judge. A drop below the line
+   recorded beside the set fails the change.
+4. **A context header on every chunk** (the document's title, its path and its section, prepended before embedding and
+   before BM25) and questions handled across languages (a local translation of the query, or an embedder measured on
+   the gold set in both languages).
+5. **A link graph beside the index**: the explicit links the files state; **semantic links**, the nearest neighbours
+   that no file names (the links keyword search misses); entity and co-occurrence links, all built without LLM calls.
+   Personalized PageRank over the graph, seeded from the fused hits, runs only for a question classified multi-hop or
+   global, never for every query.
+6. **Bi-temporal facts**: every fact carries the time it was true and the time it was recorded; a changed fact
+   supersedes the old one, which is never deleted, and a question can ask what was true at a point in time.
+7. **A compiled wiki for hot topics** with a generative lint: contradictions, superseded claims, orphans and proposed
+   links, each a finding a person or the agent settles.
+8. **A knowledge map** (`knowledge-map/1`): the same graph with 2D coordinates and clusters, served to the dashboard's
+   panel (`building-fabric-services`, `references/knowledge-map-panel.md`).
+
+**Embeddings are local and cached.** The embedding model runs on the machine and no text leaves it; each vector is
+cached under the model, its dimension and the sha256 of the text it embeds, so a rebuild embeds only what changed.
+The model and its version are named in the index's manifest (Part 2).
+
+**A trap the base hit:** records whose text lives in a field the embedder does not read (`body`, `symptom`, `fix`)
+embed as empty strings, and every such pair links at similarity 1.0, which also collapses clustering on the duplicates.
+Embed the field that holds the text, refuse an empty or whitespace-only text before it reaches the model, and count
+pairs at similarity 1.0 as a finding, not a link.
+
+The operations that serve the layer (`kb.*`) and the `knowledge-map/1` schema are the agent contract's to define (the
+base sent the contract's project a parallel request); until a pinned contract names them, a service serves the layer through
+`knowledge.search` and its own operations behind the two doors (Part 3), and names the map's schema as the base does.
+
 ## Asking another project (the caller's side)
 
 An agent that needs a fact about another project, or wants it to do something, asks that project and never reads its
@@ -114,3 +162,7 @@ on: the consumers' audit".
   consumers (FAA-360, 0.98.3).
 - The kit has the two doors (FAA-356, 0.98.0) and no index or verifier module; a standard-library index module (BM25,
   trigrams, RRF and the verifier, vectors through a local model the project names) is the backlog row FAA-361.
+- The knowledge layer of Part 4 (D-84, FAA-366, 0.99.1): the intake asks it in `creating-fabric-agents` and
+  `adapting-projects-to-fabric`; `building-fabric-services` carries the knowledge map panel's recipe
+  (`references/knowledge-map-panel.md`). The panel as a dashboard-kit component with a variant switch is the backlog
+  row FAA-367; the reranker, the gold-set runner and the graph in the kit's own index module extend FAA-361.

@@ -9,7 +9,7 @@ license: AGPL-3.0-only OR LicenseRef-PassionCode-Commercial
 compatibility: Python 3.9+ or Node.js 20+ for the kits (Node.js 22+ for a Linux service's instance lock); the probe needs Python 3.9+. launchd steps are macOS-only; Linux services install a systemd user unit and Windows ones a per-user Scheduled Task with the kits' writers. Dashboard handoff optionally uses Fabric Dashboards MCP link/host_status/open; without it, report unresolved host capability. The contract checkout is optional. On macOS 27.2 run kit services and the probe on Apple's /usr/bin/python3.
 metadata:
   author: PassionCode.ai
-  version: "0.99.0"
+  version: "0.99.1"
   contract-version: "0.1.0"
   extension: "fabric-service/0.1"
   extension-commit: "aeecb12a9aaa3792ab4dbd352698d80a0365b564"
@@ -256,8 +256,8 @@ The host shows the page in a pane the operator can drag wide, so it holds from *
 host's colour scheme and theme (`fabric-dashboard/0.1`, contract DEC-0036). **Build it from the dashboard kit**
 (`assets/dashboard-kit/`: `dashboard_kit.py install <static dir>`, seven AA themes, light and dark) and declare it with
 `extensions=fs.dashboard_extension()`. [The dashboard kit reference](references/dashboard-kit.md) has the layout rules,
-the markup, the themes, the declaration and how to upgrade a dashboard built before the kit, which the plugin's
-session-start notice offers in a repository that owns the service.
+the markup, the themes, the declaration and how to upgrade an older dashboard (the session-start notice offers it
+where the repository owns the service); a knowledge map: [its panel](references/knowledge-map-panel.md).
 
 **Every button has a tool** (`fabric-actions/0.1`, contract DEC-0121 AP-1): each action the page offers is an MCP tool
 with the same effect, checks, audit record and idempotency key, registered with

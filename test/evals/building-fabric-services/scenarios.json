@@ -815,6 +815,16 @@
         "answers carry quote, path, lines and commit, and report dropped claims, stale or degraded",
         "says the kit has no index module yet (FAA-361) so the project brings its own index"
       ]
+    },
+    {
+      "id": "a-knowledge-map-on-the-dashboard",
+      "request": "Show our agent's knowledge as a graph on its dashboard.",
+      "expected": [
+        "serves knowledge-map/1 from the service's API and shows degraded or stale maps as such",
+        "starts from the Semantic map variant under the kit's strict CSP, and widens style-src only for sigma or force-graph pages",
+        "vendors the library by version with its licence, no CDN, light and dark, reduced motion honoured",
+        "names the traps: Sigma.DEFAULT_STYLES with custom styles, cosmos.gl fitView after the first frame, empty texts linking at 1.0"
+      ]
     }
   ]
 }
