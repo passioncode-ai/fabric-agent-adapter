@@ -51,12 +51,27 @@ removed `dsh-tui`; tool-list race), Kilo (board not run); 20 not checked.
 
 Fabric writes the version number into thread `efff223b` when items 1 to 3 ship.
 
-## Next
+## Released, 2026-11-21 (third run), and paused again
 
-1. After PR #357 merges: push the annotated tag `v0.101.0` on the merge commit (a checks-approved release is its tag
-   push, FAA-363), watch `release.yml`, read `npm view @passioncode-ai/fabric-agent-adapter version` back as 0.101.0 and
-   check `runner-support.json` in the tarball (FAA-370's acceptance; the release also publishes 0.100.0 and 0.100.1).
-   Then ask the launcher (passioncode) to pin it so local installs update, and close FAA-370.
-2. When Fabric names its release in thread `efff223b`: run the matrix again (`runner-support.md`, "Run it again"),
-   update `runner-support.json`, and do FAA-378.
-3. FAA-377 (milestones) and FAA-379 (logging) once the contract's decisions land (thread `c8f5e7eb`).
+- `v0.101.0` is tagged on `d7a4339e` (the operator's «давай вперёд» in the adapter session `6a78ed83`); `release.yml`
+  run 44852845209 succeeded; npm `latest` reads 0.101.0; the published tarball carries `runner-support.json`
+  (`runner-support/1`, 28 runners, byte for byte `main`), `runner-support.md` and `hosts/deepseek-harness/fabric.mjs`.
+  FAA-370's acceptance holds.
+- Board: Fabric told in thread `efff223b` (`cbd19155`); the publication question `effect:219658` (request `d3169811`)
+  marked as no longer needed in thread `4eabd112` (`241da7af`); launcher pin requested from passioncode, request
+  `4644bcde` (thread `121cf170`, no responder online, deadline 2026-11-28). The operator was told through the
+  communicator (eventId `faa-0.101.0-released-2026-11-21`).
+- **Paused by the owner, 2026-11-21 ~03:30** (CEO window: every session stands while the reconciler on Fable 5.2,
+  fabric-workspace `25879d0f`, orders the owner's instructions of the last hours). Nothing is open on this work.
+
+## Next, after the CEO's signal
+
+1. Close the FAA-370 row in `docs/backlog.md` (under an agent-sync lease; another session held it at 02:09 UTC):
+   done 2026-11-21, `v0.101.0`, run 44852845209, npm 0.101.0 with the matrix in the tarball. Move Fabric task
+   `3118313c` to review.
+2. When passioncode answers `4644bcde` with a launcher release that pins `v0.101.0`: update the local install
+   through the launcher and read `claude plugin list` back as 0.101.0.
+3. When Fabric names its release in thread `efff223b` (`dsh` in its catalogue, due 2026-11-23): run the matrix again
+   (`runner-support.md`, "Run it again"), update `runner-support.json`, and do FAA-378.
+4. FAA-377 (milestones) and FAA-379 (logging) once the contract's DECs land (CT-364 by 2026-12-10, CT-365 by
+   2026-12-12, thread `c8f5e7eb`); the contract allows starting from `protocol-revision.md` before them.
