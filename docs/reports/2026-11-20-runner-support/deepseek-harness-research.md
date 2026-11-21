@@ -41,7 +41,7 @@ LLM failure codes (`packages/llm/llm/src/error.ts`): `RATE_LIMIT` (retryable), `
 
 ## Probe (keyless, isolated DSH_HOME)
 
-Command: `DSH_HOME=<scratch>/home python3 -I acp_client.py <scratch> <scratch>/node_modules/.bin/dsh --profile acp` with `<scratch>/home/cordis.patch.yml` = `- insert: [ {id: fabric-agent-adapter, name: '<scratch>/fabric-native.mjs'} ]`, `session/new {cwd, mcpServers:[stdio probe, absolute python3]}`.
+Command: `DSH_HOME=<scratch>/dsh-home python3 -I acp_client.py <scratch> <scratch>/node_modules/.bin/dsh --profile acp` with `<scratch>/dsh-home/cordis.patch.yml` = `- insert: [ {id: fabric-agent-adapter, name: '<scratch>/fabric-native.mjs'} ]`, `session/new {cwd, mcpServers:[stdio probe, absolute python3]}`.
 Result: `initialize` ok (`agentInfo deepseek-harness-acp 0.0.1`, `mcpCapabilities.http: true`), `session/new` ok with the stdio MCP server connected, `session/close` ok; the native plugin's marker: `{"event":"agent/created","source":"startup","injected":"yes","sessionCwd":"<scratch>/dsh/work"}` (session cwd via `inject = ['workingDirectory']`, `ctx.workingDirectory.ensure(agent, signal)`). No model call, no spend. Not proven: that the model sees the injected text (needs a credential).
 
 ## Integration spec: `install-host-hooks --host deepseek-harness`

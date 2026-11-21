@@ -1,7 +1,7 @@
 2026-11-20T20:47:40Z
 OpenClaw 2026.10.4 (383c124)
 $ openclaw mcp set fabric {"command":"/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp","args":["--runner","openclaw"]}
-Saved MCP server "fabric" to /Users/sshlg/.openclaw/openclaw.json.
+Saved MCP server "fabric" to ~/.openclaw/openclaw.json.
 $ openclaw mcp probe
 [34m[bundle-mcp][39m [33mtool "com.accept" from server "fabric" registered as "fabric__com-accept" to keep the tool name provider-safe.[39m
 [34m[bundle-mcp][39m [33mtool "com.cancel" from server "fabric" registered as "fabric__com-cancel" to keep the tool name provider-safe.[39m
@@ -14,8 +14,8 @@ $ openclaw mcp probe
 
 2026-11-20T20:48:04Z
 $ openclaw agent --local --agent main -m "<probe>"  (cwd: main checkout)
-[skills] root has many entries, truncating discovery. dir=/Users/sshlg/.agents/skills baseDir=/Users/sshlg/.agents/skills childDirCount=509 maxCandidatesPerRoot=300 maxSkillsLoadedPerSource=200
-[skills] root hit recursive discovery budget, truncating discovery. dir=/Users/sshlg/.agents/skills baseDir=/Users/sshlg/.agents/skills maxCandidatesPerRoot=300 maxSkillsLoadedPerSource=200 maxGroupedSkillScanDepth=6
+[skills] root has many entries, truncating discovery. dir=~/.agents/skills baseDir=~/.agents/skills childDirCount=509 maxCandidatesPerRoot=300 maxSkillsLoadedPerSource=200
+[skills] root hit recursive discovery budget, truncating discovery. dir=~/.agents/skills baseDir=~/.agents/skills maxCandidatesPerRoot=300 maxSkillsLoadedPerSource=200 maxGroupedSkillScanDepth=6
 [skills] ~/.openclaw/skills shadows 1 skills from /opt/homebrew/lib/node_modules/openclaw/skills (skill-creator)
 [diagnostic] lane task error: lane=main durationMs=428 error="No route-compatible authentication source is configured for openai." errorName=Error taskKind=turn sessionKey=agent:main:main runId=832508c6-46ba-4b9e-aa3d-8d65b67aaf5e
 [diagnostic] lane task error: lane=session:agent:main:main durationMs=438 error="No route-compatible authentication source is configured for openai." errorName=Error taskKind=turn sessionKey=agent:main:main runId=832508c6-46ba-4b9e-aa3d-8d65b67aaf5e

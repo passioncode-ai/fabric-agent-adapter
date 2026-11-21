@@ -1,7 +1,7 @@
 2026-11-20T20:46:49Z
 1.1.0
 $ pi mcp add fabric -- /Applications/Fabric.app/Contents/Resources/bin/fabric-mcp --runner pi
-Added global MCP server "fabric" in /Users/sshlg/.pi/agent/mcp.json.
+Added global MCP server "fabric" in ~/.pi/agent/mcp.json.
 Check it with: pi mcp list
 $ pi mcp list
 fabric: connected, 51 tools (codemode, global)
