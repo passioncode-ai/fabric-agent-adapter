@@ -64,14 +64,26 @@ Fabric writes the version number into thread `efff223b` when items 1 to 3 ship.
 - **Paused by the owner, 2026-11-21 ~03:30** (CEO window: every session stands while the reconciler on Fable 5.2,
   fabric-workspace `25879d0f`, orders the owner's instructions of the last hours). Nothing is open on this work.
 
-## Next, after the CEO's signal
+## Closed, 2026-11-21 (fourth run, no person in it)
 
-1. Close the FAA-370 row in `docs/backlog.md` (under an agent-sync lease; another session held it at 02:09 UTC):
-   done 2026-11-21, `v0.101.0`, run 44852845209, npm 0.101.0 with the matrix in the tarball. Move Fabric task
-   `3118313c` to review.
-2. When passioncode answers `4644bcde` with a launcher release that pins `v0.101.0`: update the local install
-   through the launcher and read `claude plugin list` back as 0.101.0.
-3. When Fabric names its release in thread `efff223b` (`dsh` in its catalogue, due 2026-11-23): run the matrix again
-   (`runner-support.md`, "Run it again"), update `runner-support.json`, and do FAA-378.
-4. FAA-377 (milestones) and FAA-379 (logging) once the contract's DECs land (CT-364 by 2026-12-10, CT-365 by
+- The FAA-370 row in `docs/backlog.md` is closed with its receipt (tag, release run, npm 0.101.0, the matrix file's
+  path in the tarball, read back with `npm pack` in this run).
+- passioncode answered `4644bcde` (reply `7a13a480`, thread `121cf170`): launcher 0.2.82 pins `v0.101.0`, target
+  2026-11-28 (its PC-237); 0.2.81 goes out first with `v0.99.0`. The local install reads 0.96.0 until then.
+- The pause: this run did the record only (the row, this file, the state in the pulse thread `6255f2d5`) and started
+  no feature work. SD-ADP-01 is named in the system design as work that runs during the pause, and closing its row
+  is its last step.
+- Fabric has not named its release in thread `efff223b` yet. The Fabric task `3118313c` stays open on a time wait
+  until 2026-11-24 08:00 UTC, the morning after Fabric's date for `dsh` in its catalogue.
+
+## Next
+
+1. From 2026-11-24: read thread `efff223b`. When Fabric names the release with `dsh` in its catalogue (promised by
+   2026-11-23; the tool list and `fabric_whoami` items by 2026-11-25): run the matrix again (`runner-support.md`,
+   "Run it again"), update `runner-support.json`, and do FAA-378 (remove the interim `dsh-tui -> dsh` link and its
+   note). If it has not shipped, ask for the new date in that thread and move the wait to it.
+2. When the launcher's 0.2.82 is out (target 2026-11-28): update the local install through the launcher and read
+   `claude plugin list` back as 0.101.0.
+3. FAA-377 (milestones) and FAA-379 (logging) once the contract's DECs land (CT-364 by 2026-12-10, CT-365 by
    2026-12-12, thread `c8f5e7eb`); the contract allows starting from `protocol-revision.md` before them.
+4. FAA-375 (the matrix generated from conformance runs) follows FAA-373.
