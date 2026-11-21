@@ -1,0 +1,8 @@
+2026-11-20T21:05:09Z
+$ <scratch>/k.sh openclaw agent --local --agent main --model openrouter/deepseek/deepseek-v4.1-flash -m <round-2 probe>
+[agent/embedded] tool-search: cataloged 110 tools behind compact prompt surface
+OK whoami=ERR (project.name absent) board=ready work=1
+[agents/agent-command] [agent] run 5c3770a1-0361-47a4-b651-e58df898be0f ended with stopReason=stop
+[stant-db] agent database clean-close receipt: active-leases
+te/agent-db] agent database clean-close receipt: written
+exit 0

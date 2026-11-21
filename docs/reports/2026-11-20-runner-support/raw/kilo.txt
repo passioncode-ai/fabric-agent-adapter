@@ -1,0 +1,9 @@
+2026-11-20T20:49:56Z
+7.4.17
+$ KILO_CONFIG_CONTENT='{"mcp":{"fabric":{"type":"local","command":["/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp","--runner","kilo"]}},"permission":{"*":"allow"}}' use_secret.py run ... OPENROUTER_API_KEY -- kilo run -m openrouter/deepseek/deepseek-v4.1-flash "<probe>"
+
+> code · deepseek/deepseek-v4.1-flash
+
+⚙ fabric_fabric_whoami Unknown
+OK fabric-agent-adapter 3
+exit 0

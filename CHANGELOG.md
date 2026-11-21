@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.101.0 (2026-11-20)
+
+### Added
+
+- working-with-fabric: DeepSeek Harness as a native host (FAA-370, the owner's brief of 2026-11-20, package 2).
+  `install-host-hooks --host deepseek-harness` writes a managed Cordis plugin loader to
+  `$DSH_HOME/plugins/fabric-agent-adapter.mjs` (default `~/.dsh`) and one managed block in `$DSH_HOME/cordis.patch.yml`,
+  the home layer every dsh profile reads; any other byte of that layer is kept, and a mapping, a flow list with items or
+  a half-open block is refused unchanged. The plugin (`hosts/deepseek-harness/fabric.mjs`) listens to `agent/created`
+  for a started root agent, asks the shared helper for the session-start context and injects it as one user message
+  (`source.kind: fabric-agent-adapter`); a resumed agent is told nothing, and nothing escapes the listener. Fabric's
+  registration is read from the same layer (a `@deepseek-ai/dsh-mcp-client` row named `fabric`). Run for real on
+  dsh 0.2.2-rc.5: the session store holds the injected message and the model acted on it. Tests:
+  `test/test_dsh_host.py`, `test/host-hooks-deepseek-harness.test.mjs`.
+- working-with-fabric: the runner support matrix, `references/runner-support.json` (`runner-support/1`, the data for
+  Fabric's «Полностью поддерживаются / Не проверены» section) and `references/runner-support.md`, from real runs on
+  2026-11-20 against Fabric 0.3.26: fully supported Claude Code, Codex, Hermes, Pi; with a named gap Kimi Code,
+  OpenClaw, DeepSeek Harness, Kilo; 20 runners not checked. Report and raw runs:
+  `docs/reports/2026-11-20-runner-support/`, with the protocol revision, its milestone-only proposal and the logging inventory
+  at every level (§d, the owner's addendum; the adapter's half is FAA-379).
+
+### Changed
+
+- working-with-fabric Step 2: the runner names `fabric-mcp --runner` takes in Fabric 0.3.26 (all 28 of its catalogue,
+  not the six of 0.3.5) and the registration line for Pi, OpenClaw, Hermes and DeepSeek Harness;
+  `references/native-host-hooks.md` documents the DeepSeek Harness host, its layer rules and Fabric's `dsh-tui` gap.
+
 ## 0.100.1 (2026-11-20)
 
 ### Changed

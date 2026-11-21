@@ -1,0 +1,8 @@
+2026-11-20T21:02:11Z
+$ codex exec --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox <round-2 probe>
+codex
+OK whoami=fabric-agent-adapter board=ready work=1
+tokens used
+51.720
+OK whoami=fabric-agent-adapter board=ready work=1
+exit 0

@@ -13,8 +13,9 @@ Use this when installing, upgrading or diagnosing startup context outside Claude
 | OpenCode | Native `experimental.chat.system.transform` | Appends one unique system string | Install `.js` loader; start a new instance |
 | OpenClaw | Plugin `before_prompt_build` | `{prependContext}` | Install native plugin path/config; host runtime must be installed; reload through its owner |
 | Pi | Extension `before_agent_start` | Structured section, or preserved forced/legacy system prompt | Install `.js` loader; use the host's extension reload or a new instance |
+| DeepSeek Harness | Cordis plugin on `agent/created` (`source: startup`) | One injected user message, `source.kind: fabric-agent-adapter` | Install the `.mjs` loader and one managed block in `$DSH_HOME/cordis.patch.yml`; start a new session (every profile: web, headless, acp) |
 
-These adapters were checked against Codex 0.162.1, Hermes 0.21.4 (2026.9.21), OpenCode 1.19.0, OpenClaw 2026.10.4 and Pi 1.1.0. Claude Code 2.1.299 also executed SessionStart through an isolated SDK initialization, without a user turn. A parser/loader fixture does not establish a model run or live Fabric connection.
+These adapters were checked against Codex 0.162.1, Hermes 0.21.4 (2026.9.21), OpenCode 1.19.0, OpenClaw 2026.10.4 and Pi 1.1.0. DeepSeek Harness 0.2.2-rc.5 was added on 2026-11-20 (FAA-370) and run for real: the session store holds the injected message and the model acted on it; the other hosts were run again with a model the same day ([runner support](runner-support.md)). Claude Code 2.1.299 also executed SessionStart through an isolated SDK initialization, without a user turn. A parser/loader fixture does not establish a model run or live Fabric connection.
 
 Codex accepts plain text only when it does not look like JSON. The old `[fabric-agent-adapter]` prefix begins with `[`, so Codex tries JSON parsing and reports `hook returned invalid session start JSON output`. Structured JSON removes that ambiguity.
 
@@ -26,7 +27,7 @@ python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host opencode
 python3 <skill-dir>/scripts/fabric_session.py install-host-hooks --host opencode --remove
 ```
 
-Use `codex`, `kimi`, `hermes`, `opencode`, `openclaw` or `pi`. Default is a dry run. `--config` overrides the native destination, `--script` selects an absolute `fabric_session.py` in a **complete installed skill**. Keep that path stable; a versioned plugin cache disappears on updates. Reapply after moving the skill: an install refuses a `--script` that is not an existing file, and Codex and Kimi Code rewrite their own hook in place to the new path (`updated`), finding a Kimi `[[hooks]]` table by the command it runs, not by its exact text. The native installer checks the helper and every required host module before writing a loader. Removal needs neither: it reads nothing from the skill it was installed from, so it works after that skill moved or lost its `hosts/` folder.
+Use `codex`, `kimi`, `hermes`, `opencode`, `openclaw`, `pi` or `deepseek-harness`. Default is a dry run. `--config` overrides the native destination, `--script` selects an absolute `fabric_session.py` in a **complete installed skill**. Keep that path stable; a versioned plugin cache disappears on updates. Reapply after moving the skill: an install refuses a `--script` that is not an existing file, and Codex and Kimi Code rewrite their own hook in place to the new path (`updated`), finding a Kimi `[[hooks]]` table by the command it runs, not by its exact text. The native installer checks the helper and every required host module before writing a loader. Removal needs neither: it reads nothing from the skill it was installed from, so it works after that skill moved or lost its `hosts/` folder.
 
 | Host | Default destination |
 |---|---|
@@ -34,12 +35,35 @@ Use `codex`, `kimi`, `hermes`, `opencode`, `openclaw` or `pi`. Default is a dry 
 | OpenCode | `$XDG_CONFIG_HOME/opencode/plugins/fabric-agent-adapter.js`, default `~/.config/` |
 | OpenClaw | `$OPENCLAW_CONFIG_PATH`, otherwise `$OPENCLAW_STATE_DIR/openclaw.json`, default `~/.openclaw/` |
 | Pi | `$PI_CODING_AGENT_DIR/extensions/fabric-agent-adapter.js`, default `~/.pi/agent/` |
+| DeepSeek Harness | `$DSH_HOME/plugins/fabric-agent-adapter.mjs` and a managed block in `$DSH_HOME/cordis.patch.yml`, default `~/.dsh/`; `--config` names the home |
 
 Hermes activation remains its own explicit CLI step. Remove its activation with `hermes plugins disable fabric-agent-adapter`, then remove the loader. The installer does not parse or rewrite arbitrary Hermes YAML.
 
 OpenClaw uses strict JSON. For a JSON5 configuration, use OpenClaw's own config commands; this installer refuses it without guessing. An existing master/entry disable, deny list or denied hook permission is preserved and reported. This adapter needs both `allowConversationAccess` and `allowPromptInjection`; it does not read messages. Removing it drops its recognized load path and owned entry; customized entries are disabled. An existing allow-list entry is retained to avoid changing broader discovery policy. Removal is ownership-limited, not an exact rollback of the whole config.
 
 Codex's `hooks.json` and Kimi Code's `config.toml` are refused, nothing changed, when they have another shape than the one the installer writes into.
+
+DeepSeek Harness reads its home patch layer, `cordis.patch.yml`, a top-level YAML sequence. The installer edits only an
+absent or empty file, `[]` or a block sequence, adds one block between two managed comment lines (`# >>> fabric-agent-adapter
+managed host hook v1 …` and `# <<< fabric-agent-adapter`) and keeps every other byte; a mapping, a flow list with items
+or a block left open is refused, nothing changed. Removal takes the block out (an emptied file becomes `[]`) and deletes
+the loader. dsh reads no project-level MCP file, so a person's own session registers Fabric in the same layer, by hand:
+
+```yaml
+- insert:
+    - id: fabric-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: fabric
+        transport: stdio
+        command: <Fabric>/bin/fabric-mcp
+        args: ['--runner', 'deepseek-harness']
+```
+
+The loader sees that row (a `dsh-mcp-client` row with `serverName: fabric`) and tells the helper Fabric is registered.
+Fabric 0.3.26's catalogue still names `dsh-tui`, a program DeepSeek Harness removed on 2026-08-04 (`10bb9cbf4a`), so
+`fabric-mcp --runner deepseek-harness` refuses ("not installed on this computer as Fabric sees it") until Fabric names
+`dsh`; on 2026-11-20 a link `dsh-tui -> dsh` beside `dsh` made the run pass, an interim step until then.
 
 OpenCode and Pi loader files carry a managed marker. A foreign file at the same destination is refused, not overwritten. Existing unrelated extensions/settings remain. Config replacement uses a backup and a stale-plan hash check; Hermes's multi-file loader is preflighted before writes, but the operation is not a filesystem-wide transaction.
 
@@ -54,7 +78,7 @@ OpenCode and Pi loader files carry a managed marker. A foreign file at the same 
   and the hooks keep no record there. A native bridge gives the hook no session id either and is always told the
   conditional contract
   ([on-demand session](on-demand-session.md)).
-- Other native events are not advertised: turn observations, unread counts and rejoin-only release remain Claude-specific and feature-gated.
+- Other native events are not advertised: turn observations, unread counts and rejoin-only release remain Claude-specific and feature-gated. DeepSeek Harness raises `agent/created` only for root agents: a subagent is told nothing.
 - A host in Switchboard's catalog may support MCP, proxy or launch while exposing no startup context hook. Never copy this configuration to another host solely because it can launch an agent.
 
 ## Verification

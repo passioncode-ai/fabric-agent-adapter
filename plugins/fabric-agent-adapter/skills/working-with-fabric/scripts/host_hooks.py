@@ -7,6 +7,8 @@ its native `hermes plugins enable fabric-agent-adapter` opt-in separately.
 OpenClaw loads the bundled plugin through its native configuration. Removal
 keeps unrelated settings and disables only this entry; existing allow/deny policy
 is never loosened. JSON5 configuration is refused, not rewritten as guessed JSON.
+DeepSeek Harness loads a managed Cordis plugin shim through one managed block in
+its home patch layer; any other layer shape is refused, never rewritten (FAA-370).
 """
 import argparse
 import hashlib
@@ -31,6 +33,8 @@ def destination(host, env):
         return Path(env.get('PI_CODING_AGENT_DIR') or home / '.pi/agent') / 'extensions/fabric-agent-adapter.js'
     if host == 'hermes':
         return Path(env.get('HERMES_HOME') or home / '.hermes') / 'plugins/fabric-agent-adapter'
+    if host == 'deepseek-harness':
+        return Path(env.get('DSH_HOME') or home / '.dsh')  # the home: its plugins/ folder and its cordis.patch.yml
     return Path(env.get('OPENCLAW_CONFIG_PATH') or Path(env.get('OPENCLAW_STATE_DIR') or home / '.openclaw') / 'openclaw.json')
 
 
@@ -99,8 +103,53 @@ def openclaw_edit(data, script, remove):
     return (json.dumps(doc, indent=2) + '\n').encode()
 
 
+DSH_BEGIN = '# >>> ' + MARKER + ' (install-host-hooks --host deepseek-harness --remove takes it out)'
+DSH_END = '# <<< ' + IDENTITY
+
+
+def dsh_layer_edit(data, loader, remove):
+    """dsh's home layer `cordis.patch.yml` is a top-level YAML sequence of patch rows. Ours is one managed block,
+    found by its two comment lines and replaced whole; the rest is kept byte for byte. Only an absent or empty file,
+    `[]`, or a block sequence (every top-level line a `-` item) is edited; a mapping, a flow list with items or a
+    block left half open is refused, never guessed (FAA-370)."""
+    try:
+        text = data.decode('utf-8') if data else ''
+    except UnicodeError:
+        raise fs.Refused('DeepSeek Harness layer is not UTF-8; nothing was changed')
+    lines, kept, inside = text.splitlines(True), [], False
+    for line in lines:
+        bare = line.rstrip('\r\n')
+        if bare.startswith('# >>> ' + MARKER):
+            if inside: raise fs.Refused('DeepSeek Harness layer has a managed block left open; nothing was changed')
+            inside = True
+        elif bare == DSH_END and inside: inside = False
+        elif not inside: kept.append(line)
+    if inside: raise fs.Refused('DeepSeek Harness layer has a managed block left open; nothing was changed')
+    if remove and len(kept) == len(lines): return data
+    items = [l for l in kept if l.strip() and not l.lstrip().startswith('#')]
+    empty_list = [l for l in items if l.strip() == '[]']
+    if empty_list and len(items) > 1 or any(not (l.startswith('-') or l[0] in ' \t') for l in items if l.strip() != '[]'):
+        raise fs.Refused('DeepSeek Harness layer is not a block sequence; edit it with dsh itself, nothing was changed')
+    if empty_list: kept = [l for l in kept if l.strip() != '[]']
+    if kept and not kept[-1].endswith('\n'): kept[-1] += '\n'
+    body = ''.join(kept)
+    if remove:
+        return (body if [l for l in kept if l.strip() and not l.lstrip().startswith('#')] else body + '[]\n').encode()
+    block = (DSH_BEGIN + '\n- insert:\n    - id: ' + IDENTITY + '\n      name: ' + json.dumps(str(loader)) + '\n' + DSH_END + '\n')
+    return (body + block).encode()
+
+
 def plan(host, path, script, remove):
     """Return [(path, expected bytes, desired bytes|None)] before any mutation."""
+    if host == 'deepseek-harness':
+        if path.is_symlink(): raise fs.Refused('DeepSeek Harness home is a symlink; nothing was changed')
+        loader, layer = path / 'plugins/fabric-agent-adapter.mjs', path / 'cordis.patch.yml'
+        changes = _changes({loader: '// ' + MARKER + '\nexport * from '
+                            + json.dumps((script.parent / 'hosts/deepseek-harness/fabric.mjs').as_uri()) + ';\n'}, remove)
+        old = fs._read_bytes(layer)
+        if not (remove and old is None):
+            changes.append((layer, old, dsh_layer_edit(old, loader, remove)))
+        return changes
     if host == 'openclaw':
         old = fs._read_bytes(path)
         if remove and old is None: return []
@@ -140,7 +189,7 @@ def plan_digest(changes):
 def main(argv=None, env=None, out=print, err=print):
     env = os.environ if env is None else env
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--host', choices=['hermes','opencode','openclaw','pi'], required=True)
+    parser.add_argument('--host', choices=['hermes','opencode','openclaw','pi','deepseek-harness'], required=True)
     mode=parser.add_mutually_exclusive_group()
     mode.add_argument('--apply',action='store_true');mode.add_argument('--remove',action='store_true');mode.add_argument('--dry-run',action='store_true')
     parser.add_argument('--config');parser.add_argument('--script');parser.add_argument('--expect-sha256')
@@ -153,6 +202,7 @@ def main(argv=None, env=None, out=print, err=print):
             required = {'hermes':['hosts/hermes/__init__.py','hosts/hermes/plugin.yaml'],
                         'opencode':['hosts/context.mjs','hosts/opencode/fabric.mjs'],
                         'pi':['hosts/context.mjs','hosts/pi/fabric.mjs'],
+                        'deepseek-harness':['hosts/context.mjs','hosts/deepseek-harness/fabric.mjs'],
                         'openclaw':['hosts/context.mjs','hosts/openclaw/index.mjs','hosts/openclaw/package.json','hosts/openclaw/openclaw.plugin.json']}[args.host]
             required += ['fabric_session_env.py','fabric_session_mcp.py','fabric_session_paths.py','fabric_session_mail.py','fabric_session_hosts.py','fabric_session_cli.py','fabric_git.py']  # the helper's own modules (FAA-65; fabric_git, FAA-190)
             if any(not (script.parent/p).is_file() for p in required):

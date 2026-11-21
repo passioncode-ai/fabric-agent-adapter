@@ -1,0 +1,45 @@
+2026-11-20T20:46:04Z
+Hermes Agent v0.22.2 (2026.9.24) · stable · local d923a5eb487a
+$ hermes chat -q "<probe>" --oneshot --yolo  (cwd: main checkout)
+  Command helper: applied 3 secrets
+Query: Call the MCP tool fabric_whoami exactly once (it may be named 
+mcp__fabric__fabric_whoami or fabric_whoami or fabric__fabric_whoami). Then 
+reply with exactly one line: "OK <project.name> <protocol.version>" from its 
+answer, or "ERR <the error text>" if it failed or the tool is absent. Do nothing
+else.
+Initializing agent...
+────────────────────────────────────────
+
+
+┌─ Reasoning ──────────────────────────────────────────────────────────────────┐
+I need to call the fabric_whoami tool exactly once, using the MCP name mcp__fabric__
+fabric_whoami through tool_call. Its schema is unknown, so I'm weighing whether to
+ load it with tool_describe first, and since that only loads the schema without calling the tool, it
+ fits the instruction to do nothing else.
+
+I'm weighing whether tool_describe should come first, since the parameters are unknown and
+ the tool says to describe before calling. Loading the schema doesn't invoke fabric_
+whoami, so it wouldn't break the call-once limit, but the instruction to do nothing else
+ makes me hesitate.
+
+I'm going to call fabric_whoami directly with empty arguments, since whoami tools us
+ually take none. If the runtime insists on a schema first, a describe-then-call would still inv
+oke the tool only once, so I'll go with the direct call.
+
+└──────────────────────────────────────────────────────────────────────────────┘
+  ┊ ⚡ preparing a tool call…
+  ┊ 🔌 Fabric · fabric whoami  0.2s
+
+╭─ ☤ Hermes ───────────────────────────────────────────────────────────────────╮
+OK fabric-agent-adapter 3
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+Resume this session with:
+  hermes --resume 20261120_214610_4f828b
+  hermes -c "Call fabric_whoami MCP tool"
+
+Session:        20261120_214610_4f828b
+Title:          Call fabric_whoami MCP tool
+Duration:       21s
+Messages:       4 (1 user, 2 tool calls)
+exit 0

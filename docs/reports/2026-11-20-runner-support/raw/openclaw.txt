@@ -1,0 +1,35 @@
+2026-11-20T20:47:40Z
+OpenClaw 2026.10.4 (383c124)
+$ openclaw mcp set fabric {"command":"/Applications/Fabric.app/Contents/Resources/bin/fabric-mcp","args":["--runner","openclaw"]}
+Saved MCP server "fabric" to ~/.openclaw/openclaw.json.
+$ openclaw mcp probe
+[34m[bundle-mcp][39m [33mtool "com.accept" from server "fabric" registered as "fabric__com-accept" to keep the tool name provider-safe.[39m
+[34m[bundle-mcp][39m [33mtool "com.cancel" from server "fabric" registered as "fabric__com-cancel" to keep the tool name provider-safe.[39m
+[34m[bundle-mcp][39m [33mtool "com.claim" from server "fabric" registered as "fabric__com-claim" to keep the tool name provider-safe.[39m
+[34m[bundle-mcp][39m [33mtool "com.complete" from server "fabric" registered as "fabric__com-complete" to keep the tool name provider-safe.[39m
+[34m[bundle-mcp][39m [33mtool "com.directory" from server "fabric" registered as "fabric__com-directory" to keep the tool name provider-safe.[39m
+[34m[bundle-mcp][39m [33mtool "com.effect_begin" from server "fabric" registered as "fabric__com-effect_begin" to keep the tool name provider-safe.[39m
+[34m[bundle-mcp][39m [33mtool "com.enroll" from server "fabric" registered as "fabric__com-enroll" to keep the tool name provider-safe.[39m
+[34m[bundle-mcp][39m [33mtool "com.get" from server "fabric" registered as "fabric__com-get" to keep the tool name provider-safe.[39m
+
+2026-11-20T20:48:04Z
+$ openclaw agent --local --agent main -m "<probe>"  (cwd: main checkout)
+[skills] root has many entries, truncating discovery. dir=~/.agents/skills baseDir=~/.agents/skills childDirCount=509 maxCandidatesPerRoot=300 maxSkillsLoadedPerSource=200
+[skills] root hit recursive discovery budget, truncating discovery. dir=~/.agents/skills baseDir=~/.agents/skills maxCandidatesPerRoot=300 maxSkillsLoadedPerSource=200 maxGroupedSkillScanDepth=6
+[skills] ~/.openclaw/skills shadows 1 skills from /opt/homebrew/lib/node_modules/openclaw/skills (skill-creator)
+[diagnostic] lane task error: lane=main durationMs=428 error="No route-compatible authentication source is configured for openai." errorName=Error taskKind=turn sessionKey=agent:main:main runId=832508c6-46ba-4b9e-aa3d-8d65b67aaf5e
+[diagnostic] lane task error: lane=session:agent:main:main durationMs=438 error="No route-compatible authentication source is configured for openai." errorName=Error taskKind=turn sessionKey=agent:main:main runId=832508c6-46ba-4b9e-aa3d-8d65b67aaf5e
+[model-fallback/decision] model fallback decision: decision=candidate_failed requested=openai/gpt-6-astra candidate=openai/gpt-6-astra reason=auth next=none detail=No route-compatible authentication source is configured for openai.
+No route-compatible authentication source is configured for openai.
+[state/agent-db] agent database clean-close receipt: active-leases
+exit 1
+
+2026-11-20T20:48:36Z
+$ use_secret.py run --env local fabric-agent-adapter OPENROUTER_API_KEY -- openclaw agent --local --agent main --model openrouter/deepseek/deepseek-v4.1-flash -m "<probe>"
+[agent/embedded] tool-search: cataloged 110 tools behind compact prompt surface
+ERR tool result truncated; project.name and protocol.version not present in returned answer
+[agents/agent-command] [agent] run 9853ea3d-9240-4831-99cb-1259cbb1aac8 ended with stopReason=stop
+[state/agent-db] agent database clean-close receipt: written
+nt-db] agent database clean-close receipt: active-leases
+exit 0
+note: OpenClaw 2026.10.4 dist: DEFAULT_MAX_LIVE_TOOL_RESULT_CHARS = 16e3 (LARGE 32e3, XL 64e3); the plugin warning above is printed only for a plugin with status "loaded" (dist/loader-runtime-load-BrZtlYge.mjs, warnAboutUntrackedLoadedPlugins): the startup-context plugin loaded; it asks for provenance, it does not refuse

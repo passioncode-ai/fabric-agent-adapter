@@ -1,0 +1,8 @@
+2026-11-20T21:04:04Z
+$ ~/.local/bin/hermes chat -q <round-2 probe> --oneshot --yolo
+
+Session:        20261120_220415_347cd9
+Title:          Fabric MCP whoami, board status, work list check
+Duration:       35s
+Messages:       10 (1 user, 8 tool calls)
+exit 0

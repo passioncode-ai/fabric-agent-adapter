@@ -203,7 +203,7 @@ def install_host_hooks_cli(argv: Sequence[str], env: Optional[Dict[str, str]] = 
         spec.loader.exec_module(installer)
         return installer.main(list(argv), env=env, out=out, err=err)
     if args.host not in ("codex", "kimi"):
-        err("install-host-hooks: --host must be codex, kimi, hermes, opencode, openclaw or pi (Claude uses its plugin)")
+        err("install-host-hooks: --host must be codex, kimi, hermes, opencode, openclaw, pi or deepseek-harness (Claude uses its plugin)")
         return 2
     if args.config:
         path = Path(args.config).expanduser()

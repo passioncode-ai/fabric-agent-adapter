@@ -10,10 +10,10 @@ compatibility: >-
   Needs the Fabric desktop app (v0.3.5 or later for fabric-mcp and the fabric_work tools) and an MCP client.
   The hooks and status script need python3 3.9+ (3.11+ to edit Kimi Code's config.toml). Starting Fabric needs the
   local-lifecycle MCP server; else the person opens Fabric. The full session hooks run in Claude Code from
-  this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi use native context plugins after opt-in.
+  this plugin; Codex/Kimi use command hooks; Hermes/OpenCode/OpenClaw/Pi/DeepSeek Harness use native plugins.
 metadata:
   author: PassionCode.ai
-  version: "0.100.1"
+  version: "0.101.0"
 ---
 
 # Working with Fabric
@@ -92,12 +92,10 @@ On a Mac, a registration naming another user's copy (outside your home, not your
 own (or root's) copy: `claude mcp remove` then `add` with the same scope; a project's `.mcp.json` entry is overridden with
 `--scope local`, never edited (`status` checks Claude Code's, Codex's and Kimi Code's).
 
-Kimi Code, pending Fabric's documented probe: in `~/.kimi-code/mcp.json`, `mcpServers.fabric` is
-`{"command": "<Fabric>/bin/fabric-mcp", "args": ["--runner", "kimi-code"]}`.
+Other runners, and which work today: [runner support](references/runner-support.md).
 
-`--runner` names the agent as Fabric's runner catalogue does (`claude-code`, `codex`, `kilo`, `hermes`, `cline`,
-`kimi-code`); a runner the catalogue does not know, or one not found on this computer, is refused before any
-prompt. Never put a token, header or environment secret into the entry. The agent picks the server up at its next
+`--runner` names the agent as Fabric's runner catalogue does (28 names in Fabric 0.3.26); a runner it does not know,
+or whose program it does not find here, is refused before any prompt. Never put a token, header or environment secret into the entry. The agent picks the server up at its next
 start. The proof is a `fabric_whoami` call from it (Step 3), reported with its actual answer.
 
 ## Step 3: `fabric_whoami` first, always
