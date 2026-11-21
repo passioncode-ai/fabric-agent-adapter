@@ -197,7 +197,7 @@ no secrets, provided for in every supported agent. Read at the same commits as a
 - **Fabric:** apply the trace retention to the journal (milestones kept); enforce the board's secret rule with the
   same redactor as transcripts (refuse or redact a secret-shaped body before it is stored, counted); a "Логи" view
   per request that joins `fabric-mcp`, board and service lines by `requestId`.
-- **Adapter (FAA-373):** every host's session start writes one `hooks.log` line, `event=session-start host=<host>
+- **Adapter (FAA-379):** every host's session start writes one `hooks.log` line, `event=session-start host=<host>
   outcome=context|pointer|down|silent|failed`, through the shared helper, so the native bridges leave a trace; the
   bridges themselves write nothing (they run inside the host); `fabric_session.py logs` prints the last lines and the
   retention; the kit's `RotatingLog` gains the `protocol-log/1` fields; the retention table above goes into the skill.

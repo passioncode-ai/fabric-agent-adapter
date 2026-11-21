@@ -42,7 +42,7 @@ gone upstream; tool-list race), Kilo 7.4.17 (board not run). Not checked: OpenCo
 3. **Fabric's catalogue names `dsh-tui`**, removed by DeepSeek Harness in `10bb9cbf4a` (2026-08-04); `fabric-mcp
    --runner deepseek-harness` refuses ("not installed on this computer as Fabric sees it"). Owner: Fabric (`dsh`, or a
    core `acp-session` row `dsh --profile acp` with HTTP MCP like Kimi Code). Interim here: a `dsh-tui -> dsh` link
-   (FAA-372 takes it out).
+   (FAA-378 takes it out).
 4. **A worktree under `~/DATA/_worktrees/` enrolled into another project.** Claude Code run from
    `~/DATA/_worktrees/faa-runner-support` (a worktree of this repository) answered project `ai-image-maker-app`; the
    same run from the main checkout answered `fabric-agent-adapter` (`raw/claude-code.txt`). Owner: Fabric.
@@ -51,7 +51,7 @@ gone upstream; tool-list race), Kilo 7.4.17 (board not run). Not checked: OpenCo
    The proposal: six milestones (`task.started`, `step.finished`, `waiting.started`, `waiting.cleared`,
    `task.finished`, `task.released`) derived by Fabric from calls agents already make; everything else to the journal
    and a live feed. Owners: the contract (a `work-milestone/1` decision), Fabric (sort modes, live feed, cadences),
-   the adapter (FAA-371).
+   the adapter (FAA-377).
 
 ## What the branch carries (not released)
 

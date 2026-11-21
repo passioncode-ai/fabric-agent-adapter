@@ -19,7 +19,7 @@
   2026-11-20 against Fabric 0.3.26: fully supported Claude Code, Codex, Hermes, Pi; with a named gap Kimi Code,
   OpenClaw, DeepSeek Harness, Kilo; 20 runners not checked. Report and raw runs:
   `docs/reports/2026-11-20-runner-support/`, with the protocol revision, its milestone-only proposal and the logging inventory
-  at every level (§d, the owner's addendum; the adapter's half is FAA-373).
+  at every level (§d, the owner's addendum; the adapter's half is FAA-379).
 
 ### Changed
 
